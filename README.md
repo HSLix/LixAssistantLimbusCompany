@@ -15,10 +15,15 @@
 ## 简介
 
 <center>LALC是LixAssistantLimbusCompany各取大写字母的缩写</center>
+
 <center>这是一款思想源于MAA的边狱巴士游戏小助手</center>
+
 <center>但制作动机是作者因在潜水过久</center>
+
 <center>被边狱巴士自动脚本测试群踢出来后进群失败</center>
+
 <center>基于图像识别，通过鼠标操作</center>
+
 <center>~~看项目星星数与本人心情~~飞速更新中</center>
 
 
