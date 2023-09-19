@@ -11,7 +11,7 @@ from nb_log import get_logger
 
 '''记录debug及以上级别日志'''
 debugLogger =  get_logger("debugLogger", 
-                          log_path = "D:\Code\LimbusCompanyAssistant\log",
+                          log_path = ".\\log",
                           log_level_int = 10, 
                           is_add_stream_handler=False, 
                           log_filename = "debugLog.log", 
@@ -21,7 +21,7 @@ debugLogger =  get_logger("debugLogger",
 
 '''记录warning及以上级别日志'''
 warningLogger =  get_logger("warningLogger", 
-                          log_path = "D:\Code\LimbusCompanyAssistant\log",
+                          log_path = ".\\log",
                           log_level_int = 30, 
                           is_add_stream_handler=False, 
                           log_filename = "warningLog.log", 
