@@ -11,28 +11,36 @@
   - [待办开发](#待办开发)
   - [最后](#最后)
 
-
+---
 ## 简介
 
-<center>LALC是LixAssistantLimbusCompany各取大写字母的缩写</center>
-<center>这是一款思想源于MAA的边狱巴士游戏小助手</center>
-<center>但制作动机是作者因在潜水过久</center>
-<center>被边狱巴士自动脚本测试群踢出来后进群失败</center>
-<center>基于图像识别，通过鼠标操作</center>
-<center>~~看项目星星数与本人心情~~飞速更新中</center>
+#### <center>LALC是LixAssistantLimbusCompany各取大写字母的缩写</center>
+
+#### <center>这是一款思想源于MAA的边狱巴士游戏小助手</center>
+
+#### <center>但制作动机是作者因在潜水过久</center>
+
+#### <center>被边狱巴士自动脚本测试群踢出来后进群失败</center>
+
+#### <center>基于图像识别，通过鼠标操作</center>
+
+#### <center>~~看项目星星数与本人心情~~飞速更新中</center>
 
 
+---
 ## 实用功能
 
 - 自动刷取经验本EXP，纽本Thread和镜牢Mirror
 - 自动转换体力，和购买26狂气的体力
 - ~~确实没啥功能~~
 
+
+---
 ## 下载方式
 
 点击右边的realease即可下载最新版
 
-
+---
 ## 使用说明
 
 点击下方"Start"按钮即可启动软件
@@ -74,7 +82,7 @@ Keep The Screen Clear
 
 Had Better not use Mouse
 
-
+---
 ## 问题处理
 
 如遇到软件运行异常
@@ -98,14 +106,14 @@ Save the logs
 
 Please send the Problem to the Issue in GitHub
 
-
+---
 ## 致谢
 
 直接或间接参与到本软件开发的所有人员
 
 包括在网络上分享各种教程的大佬们
 
-
+---
 ## 声明
 
 本软件开源、免费，仅供学习交流使用。
@@ -118,7 +126,7 @@ Please send the Problem to the Issue in GitHub
 
 软件图标素材来源网图，不属于GPL协议开源的内容，如有侵权，请及时联系作者删除
 
-
+---
 ## 待办开发
 
 - [ ] 英语之外的游戏语言支持
@@ -126,7 +134,7 @@ Please send the Problem to the Issue in GitHub
 - [ ] 联网自动更新
 - [ ] ……
 
-
+---
 ## 最后
 
 如果你觉得该软件对你有帮助，请帮忙点个Star吧，这个网页右上角小星星对我们是最好的支持！
