@@ -1,6 +1,11 @@
 system window11 64位
 python 3.9
 
+
+# 就是pywin32，opencv-python，pyinstaller，numpy，nb_log
+
+
+
 Package                   Version
 ------------------------- ------------
 altgraph                  0.17.3
