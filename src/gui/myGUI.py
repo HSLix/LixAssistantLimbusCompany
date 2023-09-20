@@ -36,7 +36,7 @@ class myGUI:
 
         self.root = tk.Tk()
 
-        titleName = "LLCA_LimbusCompanyAssistant_" + version
+        titleName = "LALC_LixAssistantLimbusCompany_" + version
         self.root.title(titleName)
         self.root.iconbitmap('./pic/GUITitlePic.ico')
 
