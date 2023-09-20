@@ -17,7 +17,7 @@ from time import sleep
 
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
-version = "V2.1.2_Realease"
+version = "V2.1.3_Realease"
 
 
 
@@ -85,7 +85,8 @@ class myGUI:
         self.aboutText.insert("end", "* 关于本软件\n\n")
         self.aboutText.insert("end", "* 软件图标素材来源网图，不属于GPL协议开源的内容，如有侵权，请及时联系作者删除\n")
         self.aboutText.insert("end", "* GitHub地址\n")
-        self.aboutText.insert("end", "* https://github.com/HSLix/LixAssistantLimbusCompany.git\n\n")
+        self.aboutText.insert("end", "* https://github.com/HSLix/LixAssistantLimbusCompany.git\n")
+        self.aboutText.insert("end", "* 你知道吗？你的一个星星能让作者开心一整天，然后拼命更新本软件\n\n")
         self.aboutText.insert("end", "* 致谢\n")
         self.aboutText.insert("end", "* 直接或间接参与到本软件开发的所有人员\n")
         self.aboutText.insert("end", "* 包括在网络上分享各种教程的大佬们\n\n")
@@ -381,6 +382,8 @@ class myGUI:
             msg = "请自己选好人后再启动程序，往后会自动选上一次的队伍"
         elif(ExitCode == 11):
             msg = "请自行结束其它镜牢再启动程序，本程序不能自作主张"
+        elif(ExitCode == 12):
+            msg = "请自行决定是否领取上周的奖励，本程序不能自作主张"
         else:
             msg = "未知情况错误，请另存日志文件并提交Issue"
 

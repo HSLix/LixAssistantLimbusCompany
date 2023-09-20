@@ -14,7 +14,7 @@ from src.script.event import eventPart
 from src.script.classScript import _mainScript,checkAndExit
 from src.log.nbLog import myLog, beginAndFinishLog
 from src.common.myTime import myTimeSleep
-from src.error.myError import unexpectNumError,noSavedPresetsError, mirrorInProgressError 
+from src.error.myError import unexpectNumError,noSavedPresetsError, mirrorInProgressError, previousClaimRewardError
 
 notFullFlag = 0
 
@@ -178,6 +178,8 @@ class _MirrorOfMirrors():
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror2/MirrorDungeons.png", "MirrorDungeons", 0, 0, 1, 1, 0.9)
         getPic.winCap()
+        if(afc.autoFind("./pic/mirror/previousClaimReward.png", "previousClaimReward")):
+            raise previousClaimRewardError("有上周的镜牢奖励未领取")
         afc.autoSinClick("./pic/mirror/mirror2/Mirror2Normal.png", "Mirror2Normal")
         getPic.winCap()
         if(afc.autoFind("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):
@@ -734,6 +736,8 @@ class _MirrorOfTheBeginning():
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror1/MirrorDungeons.png", "MirrorDungeons", 0, 0, 1, 1, 0.9)
         getPic.winCap()
+        if(afc.autoFind("./pic/mirror/previousClaimReward.png", "previousClaimReward")):
+            raise previousClaimRewardError("有上周的镜牢奖励未领取")
         afc.autoSinClick("./pic/mirror/mirror1/Mirror1Normal.png", "Mirror1Normal")
         getPic.winCap()
         if(afc.autoFind("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):

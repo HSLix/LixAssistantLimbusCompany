@@ -76,6 +76,10 @@ class _mainScript(Thread):
         myLog("debug", "ExitCode：" + str(exitCode))
         try:
             self._run()
+        except previousClaimRewardError as e:
+            with lock:
+                exitCode = 12
+            self.exception = e
         except userStopError as e:
             with lock:
                 exitCode = -1
