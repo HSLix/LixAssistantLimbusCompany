@@ -3,6 +3,7 @@
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [简介](#简介)
   - [实用功能](#实用功能)
+  - [图示样例](#图示样例)
   - [下载方式](#下载方式)
   - [使用说明](#使用说明)
   - [问题处理](#问题处理)
@@ -13,24 +14,33 @@
 
 ---
 ## 简介
+- LALC是LixAssistantLimbusCompany各取大写字母的缩写
+- 这是一款思想源于MAA的边狱巴士游戏小助手
+- ~~但真实制作动机是作者因潜水过久~~
+- ~~被全自动镜本脚本测试群踢出来后进群失败~~
+- 本软件在**PC端Window11/10 64位**下即可运行
+- 无需下载其它软件，**解压即撸**
+- 基于图像识别，通过鼠标操作
+- 主打**全自动**，点击一次，一直刷关
+- ~~看项目星星数与本人心情~~飞速更新中
 
-#### <center>LALC是LixAssistantLimbusCompany各取大写字母的缩写</center>
 
-#### <center>这是一款思想源于MAA的边狱巴士游戏小助手</center>
 
-#### <center>但制作动机是作者因在潜水过久</center>
+---
+## 图示样例
+#### 开始界面
+![image](/pic/example/mainPage.png)
+#### 关于界面
+![image](/pic/example/aboutPage.png)
 
-#### <center>被边狱巴士自动脚本测试群踢出来后进群失败</center>
-
-#### <center>基于图像识别，通过鼠标操作</center>
-
-#### <center>~~看项目星星数与本人心情~~飞速更新中</center>
 
 
 ---
 ## 实用功能
 
-- 自动刷取经验本EXP，纽本Thread和镜牢Mirror
+- 自动刷取**经验本**EXP
+- 自动刷取**纽本**Thread
+- 自动刷取**镜牢**Mirror，可选镜牢1或镜牢2
 - 自动转换体力，和购买26狂气的体力
 - ~~确实没啥功能~~
 
@@ -38,7 +48,7 @@
 ---
 ## 下载方式
 
-点击右边的realease即可下载最新版
+点击右方的realease即可下载最新版
 
 ---
 ## 使用说明
