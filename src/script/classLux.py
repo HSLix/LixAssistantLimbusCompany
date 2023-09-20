@@ -25,6 +25,7 @@ class _Luxcavation(_mainScript):
         self.ThreadFinishCount = 0
 
 
+
     def getEXPFinishCount(self):
         '''返回经验本完成次数'''
         return self.EXPFinishCount
@@ -42,7 +43,6 @@ class _Luxcavation(_mainScript):
     @beginAndFinishLog
     def ScriptTaskEXP(self):
         '''打完一次经验本的流程'''
-        self.EXPFinishCount = 0
         loopCount = 0
         while(self.EXPFinishCount < self.EXPCount):
             self.errorRetry()
@@ -68,7 +68,6 @@ class _Luxcavation(_mainScript):
     @beginAndFinishLog
     def ScriptTaskThread(self):
         '''打完一次纽本的流程'''
-        self.ThreadFinishCount = 0
         loopCount = 0
         while(self.ThreadFinishCount < self.ThreadCount):
             

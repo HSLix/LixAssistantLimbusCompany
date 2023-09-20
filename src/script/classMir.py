@@ -29,7 +29,6 @@ class _Mirror(_mainScript):
         self.mirrorFinishCount = 0
 
 
-
     def start(self):
         '''根据选择变量，选择具体镜牢执行任务'''
         if(self.mirrorSwitch == 1):
@@ -50,7 +49,6 @@ class _Mirror(_mainScript):
     def ScriptTaskMirror2Normal(self):
         '''镜牢2一次流程'''
         mir = _MirrorOfMirrors()
-        self.mirrorFinishCount = 0
         loopCount = 0
         while(self.mirrorFinishCount < self.mirrorCount):
             

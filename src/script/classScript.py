@@ -183,14 +183,18 @@ class _mainScript(Thread):
         self.buyFirstPai()
         self.convertPai()
         lux.ScriptTaskEXP()
+        # 每完成一次任务，获取完成次数
+        self.EXPFinishCount = lux.getEXPFinishCount()
         lux.ScriptTaskThread()
+        self.ThreadFinishCount = lux.getThreadFinishCount()
         mir.start()
+        self.MirrorFinishCount = mir.getMirrorFinishCount()
         prize.getPrize()
 
-        # 获取完成次数
-        self.EXPFinishCount = lux.getEXPFinishCount()
-        self.ThreadFinishCount = lux.getThreadFinishCount()
-        self.MirrorFinishCount = mir.getMirrorFinishCount()
+        
+        
+        
+        
    
 
 
