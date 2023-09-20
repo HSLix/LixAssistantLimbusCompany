@@ -2,7 +2,7 @@
 
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [简介](#简介)
-  - [实用功能](#实用功能)
+  - [实用功能/亮点](#实用功能/亮点)
   - [图示样例](#图示样例)
   - [下载方式](#下载方式)
   - [使用说明](#使用说明)
@@ -125,6 +125,8 @@ Please send the Problem to the Issue in GitHub
 直接或间接参与到本软件开发的所有人员
 
 包括在网络上分享各种教程的大佬们
+
+还有开源自己代码的巨佬们！
 
 ---
 ## 声明
