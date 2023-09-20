@@ -3,6 +3,7 @@
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [简介](#简介)
   - [实用功能](#实用功能)
+  - [图示样例](#图示样例)
   - [下载方式](#下载方式)
   - [使用说明](#使用说明)
   - [问题处理](#问题处理)
