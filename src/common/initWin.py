@@ -35,7 +35,6 @@ def initWin(switch = 0):
     else:
         myLog("error","Can't Find The Game Window")
         raise withOutGameWinError("没有找到游戏窗口")
-        return result
     
     # 若最小化，则将其显示
     if win32gui.IsIconic(hWnd):

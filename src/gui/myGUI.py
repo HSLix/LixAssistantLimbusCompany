@@ -166,6 +166,7 @@ class myGUI:
         self.descriptionText.insert("end", "* 但可按ESC键立即停止\nPress ESC can interrupt the program immediately\n\n")
         self.descriptionText.insert("end", "* 为了确保软件运行顺利\n")
         self.descriptionText.insert("end", "* 请在64位Windows系统下运行本软件\n")
+        self.descriptionText.insert("end", "* 请把屏幕的缩放调整为\"150%\"\n")
         self.descriptionText.insert("end", "* 不要关闭此窗口\nDon't turn this window off\n")
         self.descriptionText.insert("end", "* 将游戏语言设置为英语\nSet Game Language English\n")
         self.descriptionText.insert("end", "* 请勿遮挡游戏画面\nKeep The Screen Clear\n")

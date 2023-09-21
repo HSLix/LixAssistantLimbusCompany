@@ -20,6 +20,8 @@ def move_window(handle: HWND, x: int, y: int):
         x (int): 横坐标
         y (int): 纵坐标
     """
+    # 排除缩放干扰
+    windll.user32.SetProcessDPIAware()
     windll.user32.SetWindowPos(handle, 0, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER)
 
 def resize_window(handle: HWND, width: int, height: int):
@@ -30,4 +32,6 @@ def resize_window(handle: HWND, width: int, height: int):
         width (int): 宽
         height (int): 高
     """
+    # 排除缩放干扰
+    windll.user32.SetProcessDPIAware()
     windll.user32.SetWindowPos(handle, 0, 0, 0, width, height, SWP_NOMOVE | SWP_NOZORDER)

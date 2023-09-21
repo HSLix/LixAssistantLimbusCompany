@@ -56,7 +56,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror2():
                 loopCount += 1
-                if loopCount > 1:
+                if loopCount > 2:
                     mir.mirror2Leave()
                     self.ScriptBackToInitMenu()
                     self.convertPai()
@@ -70,7 +70,7 @@ class _Mirror(_mainScript):
                 myLog("info", msg)
                 continue
 
-            if loopCount > 2:
+            if loopCount > 3:
                 myLog("warning","死循环！下一个任务")
                 #离开进入函数
                 self.mirrorCount = 0
@@ -91,7 +91,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror1():
                 loopCount += 1
-                if loopCount > 1:
+                if loopCount > 2:
                     mir.mirror1Leave()
                     self.ScriptBackToInitMenu()
                     self.convertPai()
@@ -105,7 +105,7 @@ class _Mirror(_mainScript):
                 myLog("info", msg)
                 continue
 
-            if loopCount > 2:
+            if loopCount > 3:
                 myLog("warning","死循环！下一个任务")
                 #离开进入函数
                 self.mirrorCount = 0
