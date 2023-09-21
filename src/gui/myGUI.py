@@ -17,7 +17,7 @@ from time import sleep
 
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
-version = "V2.1.3_Realease"
+version = "V2.1.4_Realease"
 
 
 
