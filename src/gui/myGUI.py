@@ -95,6 +95,10 @@ class myGUI:
         self.aboutText.insert("end", "* 若您遇到商家使用本软件进行代练并收费，可能是设备与时间等费用，产生的问题及后果与本软件无关。\n")
         self.aboutText.insert("end", "* 获取管理员权限是为了确保运行顺利\n")
         self.aboutText.insert("end", "* 该版本离线，只能到github自助更新\n\n")
+        self.aboutText.insert("end", "* 提交Issue反馈问题参考格式\n")
+        self.aboutText.insert("end", "* 时间 + 自己的配置，如电脑系统，屏幕缩放率等\n")
+        self.aboutText.insert("end", "* 出错时屏幕状况图片(要有程序和游戏界面)\n")
+        self.aboutText.insert("end", "* 程序正在处理的任务 + 日志文件\n\n")
 
         
 
@@ -172,7 +176,8 @@ class myGUI:
         self.descriptionText.insert("end", "* 如遇到软件运行异常\nWhen error occur\n")
         self.descriptionText.insert("end", "* 请点击\"Stop\"按钮获取软件运行情况\nClick the Stop Button\n")
         self.descriptionText.insert("end", "* 保存好文件夹log内的日志文件\nSave the logs\n")
-        self.descriptionText.insert("end", "* 自行查看常见Q&A，如仍没能解决\nCheck Q&A\n")
+        self.descriptionText.insert("end", "* 自行查看Q&A，如仍没能解决\nCheck Q&A\n")
+        self.descriptionText.insert("end", "* 可以参考\"关于\"界面的Issue参考格式\nYou can refer to the Issue reference format\nof the \"关于\" page.\n")
         self.descriptionText.insert("end", "* 请在GitHub的Issue里提交问题\nPlease send the Problem to the Issue in GitHub\n\n")
         self.descriptionText.insert("end", "* 希望能减少游戏中有时间压力的部分\nHope you can have fun\n")
         self.descriptionText.insert("end", "* 祝使用愉快 (-▽-)\nGood Luck~\n")

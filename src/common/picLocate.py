@@ -58,13 +58,8 @@ def getSinCenXY(img_model_path, correctNum = 0.8):
     for p in zip(*locations[::-1]):
         x1, y1 = p[0], p[1]
         center = (x1 + w/2,y1 + h/2)
-
         existFlag = True
-        #print(f"左上坐标{x1}:{y1}，右下坐标{x2}:{y2}, 中心坐标{center[0]}:{center[1]}")
-        #cv2.rectangle(img, (x1, y1), (x2, y2), (0,255,0), 2)
         break
-    #cv2.imshow("image", img)
-    #cv2.waitKey()
 
     # 内存释放
     del img,template,match,locations
@@ -124,14 +119,9 @@ def getMulCenXY(img_model_path, correctNum = 0.8):
 
         positionList.append(cx)
         positionList.append(cy)
-
         firstFlag = 0
         existFlag = True
-        #print(f"左上坐标{x1}:{y1}，右下坐标{x2}:{y2}, 中心坐标{center[0]}:{center[1]}")
-        #cv2.rectangle(img, (x1, y1), (x2, y2), (0,255,0), 2)
 
-    #cv2.imshow("image", img)
-    #cv2.waitKey()
     # 内存释放
     del img,template,match,locations
     collect()

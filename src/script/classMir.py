@@ -788,7 +788,7 @@ class _MirrorOfTheBeginning():
 
 
     def mirror1Cope(self): 
-        '''处理镜牢2交互的各种情况'''
+        '''处理镜牢1交互的各种情况'''
         result = False
         getPic.winCap()
         if(afc.autoFind("./pic/team/Announcer.png", "Announcer")):
@@ -864,6 +864,7 @@ class _MirrorOfTheBeginning():
     @checkAndExit
     @beginAndFinishLog
     def mirror1PrepareBattle(self):
+        '''镜牢1在战斗前的组队操作'''
         i = 1
         global notFullFlag 
         countFlag = 0
@@ -961,7 +962,7 @@ class _MirrorOfTheBeginning():
     @checkAndExit
     @beginAndFinishLog
     def mirror1SinCoreFindWay(self):
-        
+        '''镜牢1单进程寻路'''
         
         result = False
 

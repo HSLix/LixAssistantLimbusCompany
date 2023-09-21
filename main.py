@@ -17,7 +17,7 @@ from sys import exit
 
 if __name__ == '__main__':
     # 测试识图
-    # tryClick("./pic/mirror/previousClaimReward.png", "1", 0 , 0, 1, 1, 0.99)
+    # tryClick("./pic/mirror/mirror2/Mirror2Normal.png", "Mirror2Normal", 0, 0, 1, 1, 0.8)
     
     # 互斥锁
     mutex = CreateMutex(None, False, 'LALC.Running')
