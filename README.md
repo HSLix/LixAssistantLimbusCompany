@@ -57,6 +57,7 @@
 ## 下载方式
 
 点击右方的realease即可下载最新版
+![image](/pic/example/githubDownloadExample.gif)
 
 ---
 ## 使用说明
