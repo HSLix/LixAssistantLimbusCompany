@@ -11,6 +11,7 @@
   - [致谢](#致谢)
   - [声明](#声明)
   - [待办开发](#待办开发)
+  - [友链](#友链)
   - [最后](#最后)
 
 ---
@@ -154,6 +155,17 @@ Please send the Problem to the Issue in GitHub
 - [ ] 更快识图，多进程之类
 - [ ] 联网自动更新
 - [ ] ……
+
+---
+##友链
+
+除我以外，还有其它开发者也致力于limbus脚本的开发，可以的话，也希望大家多多支持！！
+
+https://github.com/Xie-Tiao/Limbus-Scripts
+
+https://github.com/Janrilw/limbus-company-auto
+
+https://github.com/hxdnshx/MAALimbusCompany
 
 ---
 ## 最后
