@@ -716,9 +716,9 @@ class _MirrorOfTheBeginning():
         self.mirror1Entry()
         #有地图标识才寻路，否则仅作事件处理
         getPic.winCap()
-        if(afc.autoFind("./pic/mirror/mirror2/way/mirror2MapSign.png", "mirror2MapSign") and\
-            (afc.autoFind("./pic/mirror/mirror2/way/BigSelf.png", "BigSelf", 0.8) or\
-            afc.autoFind("./pic/mirror/mirror2/way/Self.png", "Self", 0.8))):
+        if(afc.autoFind("./pic/mirror/mirror1/way/mirror1MapSign.png", "mirror1MapSign") and\
+            (afc.autoFind("./pic/mirror/mirror1/way/BigSelf.png", "BigSelf", 0.8) or\
+            afc.autoFind("./pic/mirror/mirror1/way/Self.png", "Self", 0.8))):
             self.mirror1SinCoreFindWay()
 
         result = self.mirror1Cope()
@@ -823,15 +823,15 @@ class _MirrorOfTheBeginning():
     def mirror1JudTeamCondition(self):
         resultCondition = -1
         if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.95) or\
-            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.95)):
+            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.98) or\
+            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.993)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.95)):
+        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.98)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.95) or\
-        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.95)):
+        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.98) or\
+        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.98)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.95) or\
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.98) or\
         afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.99)):
             resultCondition = 3
         return resultCondition
@@ -843,18 +843,18 @@ class _MirrorOfTheBeginning():
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.95)):
+            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.95)):
+            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.96)):
                 result = True
         elif(condition == 3):
             if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99)):
                 result = True
         else:
             if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.95) or\
-                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.95)):
+                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.96) or\
+                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
                 result = True
         return result
 
@@ -976,7 +976,7 @@ class _MirrorOfTheBeginning():
             result = True
             return result
         self.mirror1SinCoreChair()
-        if(afc.autoSinClick("./pic/mirror/mirror2/way/Enter.png", "Enter", 0, 0, 2)):
+        if(afc.autoSinClick("./pic/mirror/mirror1/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
             return result
         self.mirror1SinCoreBus()
