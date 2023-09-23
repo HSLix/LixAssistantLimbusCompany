@@ -157,7 +157,7 @@ Please send the Problem to the Issue in GitHub
 - [ ] ……
 
 ---
-##友链
+## 友链
 
 除我以外，还有其它开发者也致力于limbus脚本的开发，可以的话，也希望大家多多支持！！
 
