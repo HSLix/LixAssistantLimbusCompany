@@ -73,9 +73,15 @@ class _mainScript(Thread):
         lock = Lock()
         global exitCode
         exitCode = 0
-        myLog("debug", "ExitCode：" + str(exitCode))
+
+        # myLog("debug", "ExitCode：" + str(exitCode))
+
         try:
             self._run()
+        except screenScaleError as e:
+            with lock:
+                exitCode = 13
+            self.exception = e
         except previousClaimRewardError as e:
             with lock:
                 exitCode = 12
@@ -168,10 +174,12 @@ class _mainScript(Thread):
         from src.script.classLux import _Luxcavation
         from src.script.classMir import _Mirror
         from src.script.classPrize import _getPrize
+        from src.common.classWin import _win
 
         lux = _Luxcavation(self.EXPCount, self.ThreadCount)
         mir = _Mirror(self.MirrorSwitch, self.MirrorCount)
         prize = _getPrize(self.PrizeSwitch)
+        win = _win(self.InitSwitch)
 
         # 重置完成次数
         self.EXPFinishCount = 0
@@ -181,7 +189,7 @@ class _mainScript(Thread):
 
         # 全流程
         getAdmin()
-        initWin(self.InitSwitch)
+        win.winTask()
         self.ScriptGameStart()
         self.ScriptBackToInitMenu()
         self.buyFirstPai()

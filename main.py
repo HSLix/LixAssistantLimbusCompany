@@ -15,10 +15,11 @@ from sys import exit
 
 
 
+
 if __name__ == '__main__':
     # 测试识图
     # tryClick("./pic/team/FullTeam44.png", "1", 0, 0, 1, 1, 0.98)
-    
+
     # 互斥锁
     mutex = CreateMutex(None, False, 'LALC.Running')
     if GetLastError() > 0:

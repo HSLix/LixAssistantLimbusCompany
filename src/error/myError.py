@@ -138,3 +138,19 @@ class previousClaimRewardError(Exception):
     
     def __str__(self):
         return self.errorInfo
+    
+
+class screenScaleError(Exception):
+    '''屏幕缩放不是150%'''
+    __slots__ = ()
+    def __init__(self, ErrorInfo):
+        # 初始化父类
+        super().__init__(self)
+        self.errorInfo = ErrorInfo
+    
+    def __str__(self):
+        return self.errorInfo
+
+
+
+

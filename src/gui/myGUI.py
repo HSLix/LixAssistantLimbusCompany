@@ -15,6 +15,7 @@ from ctypes import windll
 from src.script.classScript import _mainScript
 from time import sleep
 
+
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
 version = "V2.1.6_Realease"
@@ -31,25 +32,40 @@ class myGUI:
 
     # 构造函数
     def __init__(self):
+        # 检查缩放率
+        self.checkScreenScale()
+
         # 排除缩放干扰
         windll.user32.SetProcessDPIAware()
 
         self.root = tk.Tk()
 
-        titleName = "LALC_LixAssistantLimbusCompany_" + version
-        self.root.title(titleName)
-        self.root.iconbitmap('./pic/GUITitlePic.ico')
+        # 设置窗口大小的位置
+        self.setWholeWinSizeAndPlace()
 
-        #设置主题
+        # 设置主题
         self.root.tk.call("source", "./azure.tcl")
         self.root.tk.call("set_theme", "dark")
 
-        #禁止窗口拉伸
+        # 禁止窗口拉伸
         self.root.resizable(0,0)
 
-        #窗口置顶
+        # 窗口置顶
         self.root.attributes('-alpha', 1)
 
+        
+
+        #关闭设置
+        self.root.protocol('WM_DELETE_WINDOW', self.offCommand)
+
+        #多线程监听键盘ESC
+        listenAndExit()
+
+
+    def setWholeWinSizeAndPlace(self):
+        titleName = "LALC_LixAssistantLimbusCompany_" + version
+        self.root.title(titleName)
+        self.root.iconbitmap('./pic/GUITitlePic.ico')
         #设置窗口在屏幕中心出现
         screenWidth = self.root.winfo_screenwidth()
         screenHeight = self.root.winfo_screenheight()
@@ -60,11 +76,24 @@ class myGUI:
         #设置窗口大小和位置
         self.root.geometry("%dx%d+%d+%d" % (width, height, left, top))
 
-        #关闭设置
-        self.root.protocol('WM_DELETE_WINDOW', self.offCommand)
 
-        #多线程监听键盘ESC
-        listenAndExit()
+    def checkScreenScale(self):
+        '''在屏蔽缩放前，检查缩放率'''
+        from src.log.nbLog import myLog
+        user32 = windll.user32
+        gdi32 = windll.gdi32
+        dc = user32.GetDC(None)
+        widthScale = gdi32.GetDeviceCaps(dc, 8)  # 分辨率缩放后的宽度
+        heightScale = gdi32.GetDeviceCaps(dc, 10)  # 分辨率缩放后的高度
+        width = gdi32.GetDeviceCaps(dc, 118)  # 原始分辨率的宽度
+        height = gdi32.GetDeviceCaps(dc, 117)  # 原始分辨率的高度
+        scale = width / widthScale
+        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale * 100)) + "%\n请设置屏幕的缩放为150%后再启动程序"
+        myLog("debug", msg)
+        if(not(scale > 1.49 and scale < 1.51)):
+            msgbox.showinfo("异常报告", msg)
+            _exit(1)
+
 
 
             
@@ -390,6 +419,8 @@ class myGUI:
             msg = "请自行结束其它镜牢再启动程序，本程序不能自作主张"
         elif(ExitCode == 12):
             msg = "请自行决定是否领取上周的奖励，本程序不能自作主张"
+        elif(ExitCode == 13):
+            msg = "请设置屏幕的缩放为150%后再启动程序"
         else:
             msg = "未知情况错误，请另存日志文件并提交Issue"
 
