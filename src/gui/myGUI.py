@@ -17,7 +17,7 @@ from time import sleep
 
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
-version = "V2.1.5_Realease"
+version = "V2.1.6_Realease"
 
 
 
@@ -433,6 +433,8 @@ class myGUI:
         strSetPrize = self.SetPrize.get()
         strSetMirror = self.SetMirror.get()
 
+        # print(strSetWin + " " + strSetPrize + " " + strSetMirror)
+
         if(strSetWin == "位置+大小"):
             exeCount["setWinSwitch"] = 0
         elif(strSetWin == "大小"):
@@ -443,13 +445,13 @@ class myGUI:
             exeCount["setWinSwitch"] = 3
 
         if(strSetPrize == "邮件+日/周常"):
-            exeCount["setWinSwitch"] = 0
+            exeCount["setPrizeSwitch"] = 0
         elif(strSetPrize == "日/周常"):
-            exeCount["setWinSwitch"] = 1
+            exeCount["setPrizeSwitch"] = 1
         elif(strSetPrize == "邮件"):
-            exeCount["setWinSwitch"] = 2
+            exeCount["setPrizeSwitch"] = 2
         elif(strSetPrize == "无"):
-            exeCount["setWinSwitch"] = 3
+            exeCount["setPrizeSwitch"] = 3
 
         if(strSetMirror == "镜牢1"):
             exeCount["MirrorSwitch"] = 1
@@ -457,7 +459,7 @@ class myGUI:
             exeCount["MirrorSwitch"] = 2
         
 
-        #print(exeCount["setWinSwitch"] + exeCount["setWinSwitch"])
+        # print(str(exeCount["setWinSwitch"]) + " " + str(exeCount["setPrizeSwitch"]))
         
 
     def showWin(self):

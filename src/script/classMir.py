@@ -195,9 +195,9 @@ class _MirrorOfMirrors():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 3)
+            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5)
             getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 5)
+            afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
             myWait()
 
@@ -220,13 +220,9 @@ class _MirrorOfMirrors():
         elif(afc.autoFind("./pic/mirror/mirror2/way/Confirm.png", "EGOGift")):
             afc.autoSinClick("./pic/mirror/mirror2/way/Confirm.png", "EGOGift", 0, 0, 1, 2)
             result = True
-        elif(afc.autoFind("./pic/mirror/mirror2/ego/egoGift.png", "chooseEgoGift")):
-            getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror2/ego/egoGift.png", "egoGift")
+        elif(afc.autoSinClick("./pic/mirror/mirror2/ego/egoGift.png", "ChooseEgoGift")):
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 6)
-            getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror2/way/Confirm.png", "Confirm")
             result = True
         elif(afc.autoSinClick("./pic/mirror/mirror2/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
@@ -753,9 +749,9 @@ class _MirrorOfTheBeginning():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror1/Confirm.png", "Confirm", 0, 0, 3)
+            afc.autoSinClick("./pic/mirror/mirror1/Confirm.png", "Confirm", 0, 0, 5)
             getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 5)
+            afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
             myWait()
 
@@ -804,13 +800,9 @@ class _MirrorOfTheBeginning():
         elif(afc.autoFind("./pic/mirror/mirror1/way/Confirm.png", "EGOGift")):
             afc.autoSinClick("./pic/mirror/mirror1/way/Confirm.png", "EGOGift", 0, 0, 1, 2)
             result = True
-        elif(afc.autoFind("./pic/mirror/mirror1/ego/egoGift.png", "chooseEgoGift")):
-            getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror1/ego/egoGift.png", "egoGift")
+        elif(afc.autoSinClick("./pic/mirror/mirror1/ego/egoGift.png", "ChooseEgoGift")):
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 6)
-            getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror1/way/Confirm.png", "Confirm")
             result = True
         elif(afc.autoSinClick("./pic/mirror/mirror1/way/Enter.png", "Enter", 0, 0, 2)):
             result = True

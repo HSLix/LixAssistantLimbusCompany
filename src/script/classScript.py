@@ -181,7 +181,7 @@ class _mainScript(Thread):
 
         # 全流程
         getAdmin()
-        initWin()
+        initWin(self.InitSwitch)
         self.ScriptGameStart()
         self.ScriptBackToInitMenu()
         self.buyFirstPai()
@@ -256,20 +256,29 @@ class _mainScript(Thread):
                 dailyBattlePart()
                 loopCount = 0
             elif(afc.autoFind("./pic/event/Skip.png", "Skip")):
+                # 事件过程
                 eventPart()
                 loopCount = 0
             elif afc.autoSinClick("./pic/battle/confirm.png", "Confirm"):
+                # 战斗结算
                 loopCount = 0   
             elif afc.autoSinClick("./pic/battle/Confirm.png", "LevelUpConfirm"):
+                # 升级结算
                 loopCount = 0
             elif afc.autoSinClick("./pic/scene/QuitScene.png", "QuitScene"):
+                # 剧情退出
                 getPic.winCap()
                 afc.autoSinClick("./pic/scene/SkipScene.png", "SkipScene")
                 getPic.winCap()
                 afc.autoSinClick("./pic/scene/SkipConfirm.png", "SkipConfirm")
                 loopCount = 0
             elif(afc.autoSinClick("./pic/team/LeftArrow.png", "ExitPrepareTeam")):
-                #组队过程中
+                # 组队过程中
+                loopCount = 0
+            elif(afc.autoSinClick("./pic/mirror/mirror2/ego/egoGift.png", "ChooseEgoGift")):
+                # 选择ego
+                getPic.winCap()
+                afc.autoSinClick("./pic/mirror/mirror2/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 6)
                 loopCount = 0
 
             #等待加载情况
@@ -280,6 +289,7 @@ class _mainScript(Thread):
             #经验本或者纽本的情况
             if(afc.autoFind("./pic/luxcavation/ThreadEntrance.png", "ThreadEntrance")):
                 afc.autoSinClick("./pic/goBack/leftArrow.png", "leftArrow")
+                loopCount = 0
             #镜牢的情况
             elif(afc.autoFind("./pic/mirror/mirror2/way/mirror2MapSign.png", "mirror2MapSign")\
                 or afc.autoFind("./pic/mirror/mirror2/EGOGiftOwned.png", "EGOGiftOwned")):
@@ -288,7 +298,7 @@ class _mainScript(Thread):
                 afc.autoSinClick("./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
                 getPic.winCap()
                 afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5)
-            
+                loopCount = 0
             #在循环里必须有应对错误的情况
             self.errorRetry()
             getPic.winCap()

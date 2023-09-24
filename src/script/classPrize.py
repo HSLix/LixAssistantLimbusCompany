@@ -14,9 +14,9 @@ class _getPrize(_mainScript):
 
     def getPrize(self):
         '''根据奖励选择来执行奖励获取'''
-        if(self.prizeSwitch == 0 or self.prizeSwitch == 2):
-            self.getDayWeekPrize()
         if(self.prizeSwitch == 0 or self.prizeSwitch == 1):
+            self.getDayWeekPrize()
+        if(self.prizeSwitch == 0 or self.prizeSwitch == 2):
             self.receiveMail()
 
 
