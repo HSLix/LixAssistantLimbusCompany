@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/18 14:34
@@ -15,7 +16,7 @@ debugLogger =  get_logger("debugLogger",
                           log_level_int = 10, 
                           is_add_stream_handler=False, 
                           log_filename = "debugLog.log", 
-                          formatter_template = 2,
+                          formatter_template = 7,
                           log_file_handler_type = 1)
 
 

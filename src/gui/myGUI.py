@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/16 9:25
@@ -18,7 +19,7 @@ from time import sleep
 
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
-version = "V2.1.6_Realease"
+version = "V2.1.7_Realease"
 
 
 
@@ -32,6 +33,7 @@ class myGUI:
 
     # 构造函数
     def __init__(self):
+        from src.log.nbLog import myLog
         # 检查缩放率
         self.checkScreenScale()
 
@@ -39,6 +41,13 @@ class myGUI:
         windll.user32.SetProcessDPIAware()
 
         self.root = tk.Tk()
+
+
+        # 设置标题和图标
+        titleName = "LALC_LixAssistantLimbusCompany_" + version
+        self.root.title(titleName)
+        myLog("info", titleName + " 启动！")
+        self.root.iconbitmap('./pic/GUITitlePic.ico')
 
         # 设置窗口大小的位置
         self.setWholeWinSizeAndPlace()
@@ -63,9 +72,8 @@ class myGUI:
 
 
     def setWholeWinSizeAndPlace(self):
-        titleName = "LALC_LixAssistantLimbusCompany_" + version
-        self.root.title(titleName)
-        self.root.iconbitmap('./pic/GUITitlePic.ico')
+        '''设置窗口的大小和位置'''
+        
         #设置窗口在屏幕中心出现
         screenWidth = self.root.winfo_screenwidth()
         screenHeight = self.root.winfo_screenheight()
@@ -88,9 +96,10 @@ class myGUI:
         width = gdi32.GetDeviceCaps(dc, 118)  # 原始分辨率的宽度
         height = gdi32.GetDeviceCaps(dc, 117)  # 原始分辨率的高度
         scale = width / widthScale
-        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale * 100)) + "%\n请设置屏幕的缩放为150%后再启动程序"
+        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale * 100)) + "%"
         myLog("debug", msg)
         if(not(scale > 1.49 and scale < 1.51)):
+            msg += "\n请设置屏幕的缩放为150%后再启动程序"
             msgbox.showinfo("异常报告", msg)
             _exit(1)
 
@@ -125,9 +134,9 @@ class myGUI:
         self.aboutText.insert("end", "* 获取管理员权限是为了确保运行顺利\n")
         self.aboutText.insert("end", "* 该版本离线，只能到github自助更新\n\n")
         self.aboutText.insert("end", "* 提交Issue反馈问题参考格式\n")
-        self.aboutText.insert("end", "* 时间 + 自己的配置，如电脑系统，屏幕缩放率等\n")
+        self.aboutText.insert("end", "* 错误发生时间 + 自己的配置，如电脑系统，屏幕缩放率等\n")
         self.aboutText.insert("end", "* 出错时屏幕状况图片(要有程序和游戏界面)\n")
-        self.aboutText.insert("end", "* 程序正在处理的任务 + 日志文件\n\n")
+        self.aboutText.insert("end", "* 程序正在处理的任务 + 日志文件（包括debugLog和warningLog）\n\n")
 
         
 
@@ -189,28 +198,44 @@ class myGUI:
         self.descriptionText.place(width = 493, height = 415,x = 0, y = 0)
         
         
-        self.descriptionText.insert("end", "* 点击下方\"Start\"按钮即可启动软件\nClick the Start Button\n")
+        self.descriptionText.insert("end", "* 点击下方\"Start\"按钮即可启动软件\n")
         self.descriptionText.insert("end", "* 点击下方\"Stop\"按钮即可停止软件\n并获取软件运行情况\n")
         self.descriptionText.insert("end", "* 为确保稳定性，该停止按钮不会立即生效\n")
-        self.descriptionText.insert("end", "* 但可按ESC键立即停止\nPress ESC can interrupt the program immediately\n\n")
+        self.descriptionText.insert("end", "* 但可按ESC键立即停止\n\n")
         self.descriptionText.insert("end", "* 为了确保软件运行顺利\n")
         self.descriptionText.insert("end", "* 请在64位Windows系统下运行本软件\n")
         self.descriptionText.insert("end", "* 请把屏幕的缩放调整为\"150%\"\n")
-        self.descriptionText.insert("end", "* 不要关闭此窗口\nDon't turn this window off\n")
-        self.descriptionText.insert("end", "* 将游戏语言设置为英语\nSet Game Language English\n")
-        self.descriptionText.insert("end", "* 请勿遮挡游戏画面\nKeep The Screen Clear\n")
-        self.descriptionText.insert("end", "* 尽量不要在运行过程中使用鼠标\nHad Better not use Mouse\n")
+        self.descriptionText.insert("end", "* 不要关闭此窗口\n")
+        self.descriptionText.insert("end", "* 将游戏语言设置为英语\n")
+        self.descriptionText.insert("end", "* 请勿遮挡游戏画面\n")
+        self.descriptionText.insert("end", "* 尽量不要在运行过程中使用鼠标\n")
         self.descriptionText.insert("end", "* 游戏窗口大小设置为 1280*720\n\n")
         self.descriptionText.insert("end", "* 游戏窗口位置默认设置为 左上角(0,0)\n")
         self.descriptionText.insert("end", "* 默认将脑啡肽转成绿饼和购买第一次体力\n\n")
-        self.descriptionText.insert("end", "* 如遇到软件运行异常\nWhen error occur\n")
-        self.descriptionText.insert("end", "* 请点击\"Stop\"按钮获取软件运行情况\nClick the Stop Button\n")
-        self.descriptionText.insert("end", "* 保存好文件夹log内的日志文件\nSave the logs\n")
-        self.descriptionText.insert("end", "* 自行查看Q&A，如仍没能解决\nCheck Q&A\n")
-        self.descriptionText.insert("end", "* 可以参考\"关于\"界面的Issue参考格式\nYou can refer to the Issue reference format\nof the \"关于\" page.\n")
-        self.descriptionText.insert("end", "* 请在GitHub的Issue里提交问题\nPlease send the Problem to the Issue in GitHub\n\n")
-        self.descriptionText.insert("end", "* 希望能减少游戏中有时间压力的部分\nHope you can have fun\n")
-        self.descriptionText.insert("end", "* 祝使用愉快 (-▽-)\nGood Luck~\n")
+        self.descriptionText.insert("end", "* 如遇到软件运行异常\n")
+        self.descriptionText.insert("end", "* 请点击\"Stop\"按钮获取软件运行情况\n")
+        self.descriptionText.insert("end", "* 保存好文件夹log内的日志文件\n")
+        self.descriptionText.insert("end", "* 自行查看Issue，如仍没能解决\n")
+        self.descriptionText.insert("end", "* 可以参考\"关于\"界面的Issue参考格式\n")
+        self.descriptionText.insert("end", "* 请在GitHub的Issue里提交问题\n\n")
+        self.descriptionText.insert("end", "* 希望能减少游戏中有时间压力的部分\n")
+        self.descriptionText.insert("end", "* 祝使用愉快 (-▽-)\n\n")
+
+        self.descriptionText.insert("end", "* Click the Start Button\n")
+        self.descriptionText.insert("end", "* Press ESC can interrupt the program immediately\n\n")
+        self.descriptionText.insert("end", "* Don't turn this window off\n")
+        self.descriptionText.insert("end", "* Set Game Language English\n")
+        self.descriptionText.insert("end", "* eep The Screen Clear\n")
+        self.descriptionText.insert("end", "* Had Better not use Mouse\n\n")
+        self.descriptionText.insert("end", "* When error occur\n")
+        self.descriptionText.insert("end", "* Click the Stop Button\n")
+        self.descriptionText.insert("end", "* Save the logs\n")
+        self.descriptionText.insert("end", "* Check Issue\n")
+        self.descriptionText.insert("end", "* You can refer to the Issue reference format\nof the \"关于\" page.\n")
+        self.descriptionText.insert("end", "* Please send the Problem to the Issue in GitHub\n\n")
+        self.descriptionText.insert("end", "* Hope you can have fun\n")
+        self.descriptionText.insert("end", "* Good Luck~\n\n")
+
         
         self.descriptionText.configure(state="disabled", font=("微软雅黑", 10))
 

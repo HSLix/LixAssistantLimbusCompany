@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/18 17:48
@@ -56,7 +57,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror2():
                 loopCount += 1
-                if loopCount > 2:
+                if loopCount == 3:
                     mir.mirror2Leave()
                     self.ScriptBackToInitMenu()
                     self.convertPai()
@@ -66,12 +67,12 @@ class _Mirror(_mainScript):
             if(mir.mirror2Prize()):
                 loopCount = 0
                 self.mirrorFinishCount += 1
-                msg = "已完成 " + str(self.mirrorFinishCount) + " 次镜牢2Normal任务"
+                msg = "Mirror2 Success "  + str(self.mirrorFinishCount) + " Times!"
                 myLog("info", msg)
                 continue
 
-            if loopCount > 3:
-                myLog("warning","死循环！下一个任务")
+            if loopCount > 4:
+                myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
             
@@ -83,7 +84,6 @@ class _Mirror(_mainScript):
     def ScriptTaskMirror1(self):
         '''镜牢1一次流程'''
         mir = _MirrorOfTheBeginning()
-        self.mirrorFinishCount = 0
         loopCount = 0
         while(self.mirrorFinishCount < self.mirrorCount):
             
@@ -91,7 +91,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror1():
                 loopCount += 1
-                if loopCount > 2:
+                if loopCount == 3:
                     mir.mirror1Leave()
                     self.ScriptBackToInitMenu()
                     self.convertPai()
@@ -101,12 +101,12 @@ class _Mirror(_mainScript):
             if(mir.mirror1Prize()):
                 loopCount = 0
                 self.mirrorFinishCount += 1
-                msg = "已完成 " + str(self.mirrorFinishCount) + " 次镜牢1任务"
+                msg = "Mirror1 Success "  + str(self.mirrorFinishCount) + " Times!"
                 myLog("info", msg)
                 continue
 
-            if loopCount > 3:
-                myLog("warning","死循环！下一个任务")
+            if loopCount > 4:
+                myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
             
@@ -195,7 +195,7 @@ class _MirrorOfMirrors():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5)
+            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 6)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
@@ -749,7 +749,7 @@ class _MirrorOfTheBeginning():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror1/Confirm.png", "Confirm", 0, 0, 5)
+            afc.autoSinClick("./pic/mirror/mirror1/Confirm.png", "Confirm", 0, 0, 6)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):

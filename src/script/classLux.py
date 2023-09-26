@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/18 17:06
@@ -50,7 +51,7 @@ class _Luxcavation(_mainScript):
                 loopCount += 1
                 if loopCount > 0:
                     if loopCount > 3:
-                        myLog("warning","死循环！下一个任务")
+                        myLog("warning","Hard to continue! Next Mission!")
                         #离开进入函数
                         self.EXPCount = 0
             else:
@@ -58,7 +59,7 @@ class _Luxcavation(_mainScript):
 
             if(self.EXPPrize()):
                 self.EXPFinishCount += 1
-                msg = "已完成 " + str(self.EXPFinishCount) + " 次经验本EXP任务"
+                msg = "EXP Success " + str(self.EXPFinishCount) + " Times!"
                 myLog("info", msg)
                 
             myTimeSleep(1)
@@ -76,7 +77,7 @@ class _Luxcavation(_mainScript):
                 loopCount += 1
                 if loopCount > 0:
                     if loopCount > 3:
-                        myLog("warning","死循环！下一个任务")
+                        myLog("warning","Hard to continue! Next Mission!")
                         #离开进入函数
                         self.ThreadCount = 0
             else:
@@ -84,7 +85,7 @@ class _Luxcavation(_mainScript):
 
             if(self.ThreadPrize()):
                 self.ThreadFinishCount += 1
-                msg = "已完成 " + str(self.ThreadFinishCount) + " 次纽本Thread任务"
+                msg = "Thread Success "  + str(self.ThreadFinishCount) + " Times!"
                 myLog("info", msg)
 
             myTimeSleep(1)
