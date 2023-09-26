@@ -815,15 +815,15 @@ class _MirrorOfTheBeginning():
     def mirror1JudTeamCondition(self):
         resultCondition = -1
         if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.98) or\
+            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99) or\
             afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.993)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.98)):
+        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.99)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.98) or\
-        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.98)):
+        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.99) or\
+        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.99)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.98) or\
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.99) or\
         afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.99)):
             resultCondition = 3
         return resultCondition
@@ -838,14 +838,14 @@ class _MirrorOfTheBeginning():
             if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.96)):
+            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99)):
                 result = True
         elif(condition == 3):
             if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99)):
                 result = True
         else:
             if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.96) or\
+                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99) or\
                 afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
                 result = True
         return result
