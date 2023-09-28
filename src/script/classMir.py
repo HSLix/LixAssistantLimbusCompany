@@ -60,7 +60,6 @@ class _Mirror(_mainScript):
                 if loopCount == 3:
                     mir.mirror2Leave()
                     self.ScriptBackToInitMenu()
-                    self.convertPai()
             else:
                 loopCount = 0
 
@@ -69,6 +68,8 @@ class _Mirror(_mainScript):
                 self.mirrorFinishCount += 1
                 msg = "Mirror2 Success "  + str(self.mirrorFinishCount) + " Times!"
                 myLog("info", msg)
+                self.ScriptBackToInitMenu()
+                self.convertPai()
                 continue
 
             if loopCount > 4:
@@ -94,7 +95,6 @@ class _Mirror(_mainScript):
                 if loopCount == 3:
                     mir.mirror1Leave()
                     self.ScriptBackToInitMenu()
-                    self.convertPai()
             else:
                 loopCount = 0
 
@@ -103,6 +103,8 @@ class _Mirror(_mainScript):
                 self.mirrorFinishCount += 1
                 msg = "Mirror1 Success "  + str(self.mirrorFinishCount) + " Times!"
                 myLog("info", msg)
+                self.ScriptBackToInitMenu()
+                self.convertPai()
                 continue
 
             if loopCount > 4:
