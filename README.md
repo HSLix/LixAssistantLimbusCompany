@@ -2,6 +2,7 @@
 
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [简介](#简介)
+  - [视频教程](#视频教程)
   - [图示样例](#图示样例)
   - [实用功能和亮点](#实用功能和亮点)
   - [注意](#注意)
@@ -25,6 +26,11 @@
 - 基于图像识别，通过鼠标操作
 - 主打**全自动**，点击一次，一直刷关
 - ~~看项目星星数与本人心情~~飞速更新中
+
+
+---
+## 视频教程
+[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://www.bilibili.com/video/BV1iw41117My/?spm_id_from=333.881.dynamic.content.click&vd_source=0e55873fcd6a0d01839a7f7f37c36254)
 
 ---
 ## 图示样例
