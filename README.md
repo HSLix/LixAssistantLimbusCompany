@@ -30,7 +30,7 @@
 
 ---
 ## 视频教程
-[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://www.bilibili.com/video/BV1iw41117My/?spm_id_from=333.881.dynamic.content.click&vd_source=0e55873fcd6a0d01839a7f7f37c36254)
+[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://www.bilibili.com/video/BV12w41117so/?spm_id_from=333.999.list.card_archive.click&vd_source=0e55873fcd6a0d01839a7f7f37c36254)
 
 ---
 ## 图示样例
@@ -58,6 +58,7 @@
 
 - 屏幕缩放须定为150%
 - 游戏内更改语言设置后，须重启游戏才能使设置生效
+- 如有点击异常现象，请尝试自行“用管理员模式运行”尝试修复
 - 根据反馈，零协的汉化很可能需要彻底卸载并重启游戏，才能免除其影响
 
 
