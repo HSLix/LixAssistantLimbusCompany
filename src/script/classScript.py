@@ -176,9 +176,8 @@ class _mainScript(Thread):
         win.winTask()
         self.ScriptGameStart()
         self.ScriptBackToInitMenu()
-        # 狂气换脑啡肽
-        if self.LunacyToEnkephalin == 1:
-            self.buyFirstPai()
+        # 狂气购买脑啡肽
+        self.buyEnkephalin()
         # 脑啡肽换饼
         self.convertPai()
         lux.ScriptTaskEXP()
@@ -335,6 +334,14 @@ class _mainScript(Thread):
         if(afc.autoFind("./pic/initMenu/FirstBuy.png", "FirstBuy", 0.95)):
             afc.autoSinClick("./pic/initMenu/confirm.png", "confirm")
         afc.autoSinClick("./pic/initMenu/cancel.png", "cancel")
+        
+    @checkAndExit
+    @beginAndFinishLog
+    def buyEnkephalin(self):
+        '''购买脑啡肽'''
+        if self.LunacyToEnkephalin == 1:
+            self.buyFirstPai()
+        # 后续可以加入购买多次脑啡肽的功能
 
     @checkAndExit
     @beginAndFinishLog
