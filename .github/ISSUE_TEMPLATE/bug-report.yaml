@@ -1,0 +1,59 @@
+name: 问题反馈
+description: 程序出现问题
+labels: ['bug']
+body:
+  - type: checkboxes
+    id: shallcheck
+    attributes:
+      label: 应该确定的
+      options:
+      - label: 已尝试使用搜索引擎，且不能解决我的问题
+        required: true
+      - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等
+        required: true
+      - label: 我使用的程序版本已为最新版
+        required: true
+  - type: textarea
+    id: describe
+    attributes:
+      label: 问题描述
+      description: 尽可能详细描述你的问题
+    validations:
+      required: true
+  - type: textarea
+    id: rebug
+    attributes:
+      label: 重现问题
+      description: 描述一个可重复的步骤，复现你的问题
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: 日志文件
+      description: 上传debugLog.log与warningLog.log
+    validations:
+      required: true
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图
+      description: 上传你发生此问题时的截图
+    validations:
+      required: false
+  - type: textarea
+    id: shouldbe
+    attributes:
+      label: 应该是？
+      description: 描述你认为应为的实际效果
+    validations:
+      required: false
+  - type: textarea
+    id: others
+    attributes:
+      label: 其他信息
+      description: |
+        你最好提供以下内容：
+        操作系统、语言及版本号；屏幕分辨率；软件版本号等。
+    validations:
+      required: false
