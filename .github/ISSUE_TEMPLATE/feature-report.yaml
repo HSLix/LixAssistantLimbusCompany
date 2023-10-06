@@ -1,0 +1,19 @@
+name: 需求建议
+description: 提出你需要的新功能
+labels: ['enhancement']
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 应该被确定的
+      options:
+      - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等
+        required: true
+      - label: 我确定这是一个建议，而不是遇到了问题。
+        required: true
+  - type: textarea
+    id: feature
+    attributes:
+      label: 建议
+    validations:
+      required: false
