@@ -19,7 +19,7 @@ from time import sleep
 
 exeCount = {"EXPCount" : 0, "ThreadCount" : 0, "MirrorCount":0, "setWinSwitch":0, "setPrizeSwitch":0, "MirrorSwitch":0, "ActivityCount":0}
 
-version = "V2.1.7_Realease"
+version = "V2.1.8_Realease"
 
 
 
@@ -34,8 +34,10 @@ class myGUI:
     # 构造函数
     def __init__(self):
         from src.log.nbLog import myLog
-        # 检查缩放率
-        self.checkScreenScale()
+        
+
+        # 检查是否管理员模式运行
+        self.checkAdmin()
 
         # 排除缩放干扰
         windll.user32.SetProcessDPIAware()
@@ -85,25 +87,17 @@ class myGUI:
         self.root.geometry("%dx%d+%d+%d" % (width, height, left, top))
 
 
-    def checkScreenScale(self):
-        '''在屏蔽缩放前，检查缩放率'''
+    
+
+
+    def checkAdmin(self):
+        '''在程序启动前，检查是否以管理员模式启动'''
         from src.log.nbLog import myLog
-        user32 = windll.user32
-        gdi32 = windll.gdi32
-        dc = user32.GetDC(None)
-        widthScale = gdi32.GetDeviceCaps(dc, 8)  # 分辨率缩放后的宽度
-        heightScale = gdi32.GetDeviceCaps(dc, 10)  # 分辨率缩放后的高度
-        width = gdi32.GetDeviceCaps(dc, 118)  # 原始分辨率的宽度
-        height = gdi32.GetDeviceCaps(dc, 117)  # 原始分辨率的高度
-        scale = width / widthScale
-        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale * 100)) + "%"
-        myLog("debug", msg)
-        if(not(scale > 1.49 and scale < 1.51)):
-            msg += "\n请设置屏幕的缩放为150%后再启动程序"
+        if not windll.shell32.IsUserAnAdmin():
+            msg = "当前程序未以\"管理员模式\"运行\n为确保运行顺利\n请自行以\"管理员模式\"重新启动程序"
+            myLog("warning", msg)
             msgbox.showinfo("异常报告", msg)
             _exit(1)
-
-
 
             
     def offCommand(self):

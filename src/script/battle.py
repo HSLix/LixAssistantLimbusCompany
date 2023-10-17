@@ -23,7 +23,7 @@ def dailyBattlePart():
         if (afc.autoSinClick("./pic/battle/WinRate.png", "WinRate")):
             getPic.winCap()
             condition = True
-        if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
+        if (afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7)):
             condition = True
         elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
             myTimeSleep(3)

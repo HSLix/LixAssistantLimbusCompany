@@ -12,6 +12,7 @@ from numpy import where
 from gc import collect
 from src.log.nbLog import myLog
 from src.error.myError import withOutPicError
+from src.common.histogramNormalization import getGreyNormalizedPic
 
 
 
@@ -36,17 +37,19 @@ def getSinCenXY(img_model_path, correctNum = 0.8):
     
     #初始化匹配模板图片
     try:
-        template = imread(img_model_path, IMREAD_GRAYSCALE)
+        # template = imread(img_model_path, IMREAD_GRAYSCALE)
+        template = getGreyNormalizedPic(img_model_path)
     except:
         myLog("error","file could not be read, check with os.path.exists()") 
-        raise withOutPicError("无法读取图片文件，图片文件很可能被删除，或主程序被移动")
+        raise withOutPicError("无法读取图片文件\"" + img_model_path + "\"图片文件很可能被删除，或主程序被移动")
     
     #初始化目标截图
     try:
-        img = imread('./pic/screenshot.png',  IMREAD_GRAYSCALE)
+        # img = imread('./pic/screenshot.png',  IMREAD_GRAYSCALE)
+        img = getGreyNormalizedPic('./pic/screenshot.png')
     except:
         myLog("error","file could not be read, check with os.path.exists()") 
-        raise withOutPicError("无法读取图片文件，图片文件很可能被删除，或主程序被移动")
+        raise withOutPicError("无法读取图片文件\"" + './pic/screenshot.png' + "\"图片文件很可能被删除，或主程序被移动")
     
     #匹配并得到坐标
     match = matchTemplate(img, template, TM_CCOEFF_NORMED)
@@ -85,14 +88,16 @@ def getMulCenXY(img_model_path, correctNum = 0.8):
     
     #初始化匹配模板图片
     try:
-        template = imread(img_model_path, IMREAD_GRAYSCALE)
+        # template = imread(img_model_path, IMREAD_GRAYSCALE)
+        template = getGreyNormalizedPic(img_model_path)
     except:
         myLog("error","file could not be read, check with os.path.exists()") 
         raise withOutPicError("无法读取图片文件，图片文件很可能被删除，或主程序被移动")
     
     #初始化目标截图
     try:
-        img = imread('./pic/screenshot.png',  IMREAD_GRAYSCALE)
+        # img = imread('./pic/screenshot.png',  IMREAD_GRAYSCALE)
+        img = getGreyNormalizedPic('./pic/screenshot.png')
     except:
         myLog("error","file could not be read, check with os.path.exists()") 
         raise withOutPicError("无法读取图片文件，图片文件很可能被删除，或主程序被移动")

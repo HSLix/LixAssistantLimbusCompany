@@ -16,6 +16,7 @@ from src.script.classScript import _mainScript,checkAndExit
 from src.log.nbLog import myLog, beginAndFinishLog
 from src.common.myTime import myTimeSleep
 from src.error.myError import unexpectNumError,noSavedPresetsError, mirrorInProgressError, previousClaimRewardError
+from src.common.mouseScroll import littleUpScroll
 
 notFullFlag = 0
 
@@ -57,7 +58,8 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror2():
                 loopCount += 1
-                if loopCount == 3:
+                if loopCount == 1 and not mir.noWayFlag:
+                    mir.noWayFlag = False
                     mir.mirror2Leave()
                     self.ScriptBackToInitMenu()
             else:
@@ -72,12 +74,14 @@ class _Mirror(_mainScript):
                 self.convertPai()
                 continue
 
-            if loopCount > 4:
+            if loopCount > 3:
                 myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
-            
-            myTimeSleep(1)
+
+            msg = "Mirror2 Loop " + str(loopCount) + " Times!"
+            myLog("info", msg) 
+            # myTimeSleep(1)
     
 
     @checkAndExit
@@ -92,7 +96,8 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror1():
                 loopCount += 1
-                if loopCount == 3:
+                if loopCount > 2 and not mir.noWayFlag:
+                    mir.noWayFlag = False
                     mir.mirror1Leave()
                     self.ScriptBackToInitMenu()
             else:
@@ -107,12 +112,14 @@ class _Mirror(_mainScript):
                 self.convertPai()
                 continue
 
-            if loopCount > 4:
+            if loopCount > 3:
                 myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
             
-            myTimeSleep(1)
+            msg = "Mirror1 Loop " + str(loopCount) + " Times!"
+            myLog("info", msg) 
+            myTimeSleep(5)
 
 
 
@@ -120,22 +127,24 @@ class _Mirror(_mainScript):
 
 class _MirrorOfMirrors():
     '''镜牢2相关函数集合类'''
-    __slots__ = ()
+    __slots__ = ("noWayFlag")
 
     def __init__(self):
+        noWayFlag = False
         pass
 
     
     def Mirror2(self):
         '''镜牢2进入、寻路、处理交互的集合'''
         result = False
+        self.noWayFlag = False
         self.mirror2Entry()
         #有地图标识才寻路，否则仅作事件处理
         getPic.winCap()
         if(afc.autoFind("./pic/mirror/mirror2/way/mirror2MapSign.png", "mirror2MapSign") and\
             (afc.autoFind("./pic/mirror/mirror2/way/BigSelf.png", "BigSelf", 0.8) or\
             afc.autoFind("./pic/mirror/mirror2/way/Self.png", "Self", 0.8))):
-            self.mirror2SinCoreFindWay()
+            self.noWayFlag = self.mirror2SinCoreFindWay()
 
         result = self.mirror2Cope()
         
@@ -149,7 +158,7 @@ class _MirrorOfMirrors():
         getPic.winCap()
         afc.autoSinClick("./pic/battle/confirm.png", "Final_Victory")
         getPic.winCap()
-        afc.autoSinClick("./pic/mirror/mirror2/ClaimRewards.png","ClaimRewards")
+        afc.autoSinClick("./pic/mirror/mirror2/ClaimRewards.png","ClaimRewards", 0, 0, 0.7, 1, 0.7)
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror2/Receive.png","Receive")
         getPic.winCap()
@@ -228,6 +237,9 @@ class _MirrorOfMirrors():
             result = True
         elif(afc.autoSinClick("./pic/mirror/mirror2/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
+        elif(afc.autoFind("./pic/Wait.png", "Wait Sign")):
+            myWait()
+            result = True
             
         return result
             
@@ -237,17 +249,17 @@ class _MirrorOfMirrors():
     def mirror2JudTeamCondition(self):
         '''判断当前队伍状况'''
         resultCondition = -1
-        if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.992)):
+        if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965) or\
+            afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97) or\
+            afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.992)):
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.99) or\
-        afc.autoFind("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.99)):
+        elif(afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.965) or\
+        afc.autoFind("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.965)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.99) or\
-        afc.autoFind("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.99)):
+        elif(afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.965) or\
+        afc.autoFind("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.965)):
             resultCondition = 3
         return resultCondition
 
@@ -259,18 +271,18 @@ class _MirrorOfMirrors():
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.992)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.99)):
+            if(afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97)):
                 result = True
         elif(condition == 3):
-            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.99)):
+            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965)):
                 result = True
         else:
-            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.992)):
+            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965) or\
+                afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97) or\
+                afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
                 result = True
         return result
 
@@ -307,12 +319,12 @@ class _MirrorOfMirrors():
 
         #即使选不到满人，也要尽可能多选人
         if(notFullFlag == 1 and\
-        (afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.992)or\
-            afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.99)or\
-            afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam16.png", "NotFullTeam1/6", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam17.png", "NotFullTeam1/7", 0.99))
+        (afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)or\
+            afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.965)or\
+            afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.965)or\
+            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.965)or\
+            afc.autoFind("./pic/team/NotFullTeam16.png", "NotFullTeam1/6", 0.965)or\
+            afc.autoFind("./pic/team/NotFullTeam17.png", "NotFullTeam1/7", 0.965))
             ):
             for i in range(1,13):
                 getPic.winCap()
@@ -345,7 +357,7 @@ class _MirrorOfMirrors():
             if (afc.autoSinClick("./pic/battle/WinRate.png", "WinRate")):
                 getPic.winCap()
                 condition = True
-            if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
+            if (afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7)):
                 condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
                 myTimeSleep(3)
@@ -376,6 +388,9 @@ class _MirrorOfMirrors():
     def mirror2SinCoreFindWay(self):
         '''镜牢2单进程寻路流程'''
         result = False
+
+        # 滚动滑轮以保持视图大小不变
+        littleUpScroll()
 
         afc.autoSinClick("./pic/mirror/mirror2/way/Self.png", "Self")
         getPic.winCap()
@@ -410,6 +425,7 @@ class _MirrorOfMirrors():
         if(afc.autoSinClick("./pic/mirror/mirror2/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
             return result
+        
         
         return result
 
@@ -703,21 +719,23 @@ class _MirrorOfMirrors():
 
 class _MirrorOfTheBeginning():
     '''镜牢1相关函数集合类'''
-    __slots__ = ()
+    __slots__ = ("noWayFlag")
 
     def __init__(self):
+        noWayFlag = False
         pass
 
     def Mirror1(self):
         '''镜牢1进入、寻路、处理交互的集合'''
         result = False
+        self.noWayFlag = False
         self.mirror1Entry()
         #有地图标识才寻路，否则仅作事件处理
         getPic.winCap()
         if(afc.autoFind("./pic/mirror/mirror1/way/mirror1MapSign.png", "mirror1MapSign") and\
             (afc.autoFind("./pic/mirror/mirror1/way/BigSelf.png", "BigSelf", 0.8) or\
             afc.autoFind("./pic/mirror/mirror1/way/Self.png", "Self", 0.8))):
-            self.mirror1SinCoreFindWay()
+            self.noWayFlag = self.mirror1SinCoreFindWay()
 
         result = self.mirror1Cope()
         
@@ -772,7 +790,7 @@ class _MirrorOfTheBeginning():
         getPic.winCap()
         afc.autoSinClick("./pic/battle/confirm.png", "Final_Victory")
         getPic.winCap()
-        afc.autoSinClick("./pic/mirror/mirror1/ClaimRewards.png","ClaimRewards")
+        afc.autoSinClick("./pic/mirror/mirror1/ClaimRewards.png","ClaimRewards", 0, 0, 0.7, 1, 0.7)
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror1/Receive.png","Receive")
         getPic.winCap()
@@ -808,6 +826,10 @@ class _MirrorOfTheBeginning():
             result = True
         elif(afc.autoSinClick("./pic/mirror/mirror1/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
+        elif(afc.autoFind("./pic/Wait.png", "Wait Sign")):
+            myWait()
+            result = True
+        
             
         return result
 
@@ -816,17 +838,17 @@ class _MirrorOfTheBeginning():
     #检测3/3；4/4；5/5最好就一个标准，能省不少时间
     def mirror1JudTeamCondition(self):
         resultCondition = -1
-        if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99) or\
-            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.993)):
+        if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965) or\
+            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965) or\
+            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.99)):
+        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.97)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.99) or\
-        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.99)):
+        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.965) or\
+        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.965)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.99) or\
-        afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.99)):
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965) or\
+        afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.965)):
             resultCondition = 3
         return resultCondition
 
@@ -837,18 +859,18 @@ class _MirrorOfTheBeginning():
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
+            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99)):
+            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965)):
                 result = True
         elif(condition == 3):
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
                 result = True
         else:
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.99) or\
-                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.992)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965) or\
+                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965) or\
+                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
                 result = True
         return result
 
@@ -887,12 +909,10 @@ class _MirrorOfTheBeginning():
 
         #即使选不到满人，也要尽可能多选人
         if(notFullFlag == 1 and\
-        (afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.992)or\
-            afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.99)or\
-            afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam16.png", "NotFullTeam1/6", 0.99)or\
-            afc.autoFind("./pic/team/NotFullTeam17.png", "NotFullTeam1/7", 0.99))
+        (afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.97)or\
+            afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.965)or\
+            afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)or\
+            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.965))
             ):
             for i in range(1,13):
                 getPic.winCap()
@@ -925,7 +945,7 @@ class _MirrorOfTheBeginning():
             if (afc.autoSinClick("./pic/battle/WinRate.png", "WinRate")):
                 getPic.winCap()
                 condition = True
-            if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
+            if (afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7)):
                 condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
                 myTimeSleep(3)
@@ -960,6 +980,9 @@ class _MirrorOfTheBeginning():
         
         result = False
 
+        # 滚动滑轮以保持视图大小不变
+        littleUpScroll()
+
         afc.autoSinClick("./pic/mirror/mirror1/way/Self.png", "Self")
         getPic.winCap()
         if(afc.autoSinClick("./pic/mirror/mirror1/way/Enter.png", "Enter", 0, 0, 2)):
@@ -993,6 +1016,7 @@ class _MirrorOfTheBeginning():
         if(afc.autoSinClick("./pic/mirror/mirror1/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
             return result
+        
         
         return result
 

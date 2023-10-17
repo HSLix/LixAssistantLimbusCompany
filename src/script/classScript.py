@@ -9,7 +9,6 @@
 import sys
 import traceback
 from threading import Thread, Lock
-from src.common.getAdmin import getAdmin
 from src.common.initWin import initWin
 from src.log.nbLog import myLog, beginAndFinishLog
 from src.error.myError import *
@@ -189,7 +188,6 @@ class _mainScript(Thread):
         self.ActivityFinishCount = -1
 
         # 全流程
-        getAdmin()
         win.winTask()
         self.ScriptGameStart()
         self.ScriptBackToInitMenu()
@@ -221,7 +219,7 @@ class _mainScript(Thread):
         while(not afc.autoFind("./pic/initMenu/Window.png", "MainMenuSign", 0.8)):
             
             getPic.winCap()
-            if( afc.autoSinClick("./pic/initMenu/FaceTheSinSaveTheEGO.png", "84启动!", 0, 0, 10, 1, 0.998)):
+            if( afc.autoSinClick("./pic/initMenu/FaceTheSinSaveTheEGO.png", "84启动!", 0, 0, 10, 1, 0.95)):
                 loopCount = 0
                 continue
             elif(afc.autoSinClick("./pic/initMenu/downloadConfirm.png", "downloadConfirm", 0, 0, 1, 1, 0.9)):
@@ -289,6 +287,15 @@ class _mainScript(Thread):
                 getPic.winCap()
                 afc.autoSinClick("./pic/mirror/mirror2/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 6)
                 loopCount = 0
+            elif  afc.autoSinClick("./pic/mirror/mirror1/ClaimRewards.png","ClaimRewards", 0, 0, 0.7, 1, 0.7):
+                '''镜牢12获取奖励的流程'''
+                getPic.winCap()
+                afc.autoSinClick("./pic/mirror/mirror1/Receive.png","Receive")
+                getPic.winCap()
+                if afc.autoSinClick("./pic/mirror/mirror1/Confirm.png","FirstConfirm"):
+                    getPic.winCap()
+                    if afc.autoSinClick("./pic/mirror/mirror1/way/Confirm.png","SecondConfirm"):
+                        loopCount = 0
 
             #等待加载情况
             if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
@@ -306,8 +313,8 @@ class _mainScript(Thread):
                 getPic.winCap()
                 afc.autoSinClick("./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
                 getPic.winCap()
-                afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5)
-                loopCount = 0
+                if afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5):
+                    loopCount = 0
             #在循环里必须有应对错误的情况
             self.errorRetry()
             getPic.winCap()
@@ -317,7 +324,7 @@ class _mainScript(Thread):
                 myLog("warning","Can't Find The Way MainMenu. Must be Unknown Situation. Please Restart the Game and the Script")
                 raise backMainWinError("无法返回主界面，不能进行下一步")
 
-
+            myTimeSleep(3)
             loopCount += 1
 
 

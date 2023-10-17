@@ -101,8 +101,8 @@ class _Luxcavation(_mainScript):
         i = 1
         myTimeSleep(2)
         getPic.winCap()
-        while(not afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.992) and\
-            afc.autoSinClick("./pic/team/Announcer.png", "prepareBattle")):
+        while(not afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.95) and\
+            afc.autoFind("./pic/team/Announcer.png", "prepareBattle")):
             if(i > 12):
                 i = 1
             if(i < 7):
@@ -124,7 +124,7 @@ class _Luxcavation(_mainScript):
                 myWait()
 
         getPic.winCap()
-        if(afc.autoSinClick("./pic/battle/Start.png", "Start") or\
+        if(afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7) or\
         afc.autoSinClick("./pic/battle/WinRate.png", "WinRate") or\
         afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
             result = True

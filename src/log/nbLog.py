@@ -8,6 +8,7 @@
 '''
 
 from nb_log import get_logger
+from src.error.myError import logTypeError
 
 
 '''记录debug及以上级别日志'''
@@ -17,6 +18,16 @@ debugLogger =  get_logger("debugLogger",
                           is_add_stream_handler=False, 
                           log_filename = "debugLog.log", 
                           formatter_template = 7,
+                          log_file_handler_type = 1)
+
+
+'''记录info及以上级别日志'''
+infoLogger =  get_logger("infoLogger", 
+                          log_path = ".\\log",
+                          log_level_int = 20, 
+                          is_add_stream_handler=False, 
+                          log_filename = "infoLog.log", 
+                          formatter_template = 2,
                           log_file_handler_type = 1)
 
 
@@ -53,19 +64,26 @@ def myLog(type, msg):
     '''
     if(type == "debug"):
         debugLogger.debug(msg)
+        infoLogger.debug(msg)
         warningLogger.debug(msg)
     elif(type == "info"):
         debugLogger.info(msg)
+        infoLogger.info(msg)
         warningLogger.info(msg)
     elif(type == "warning"):
         debugLogger.warning(msg)
+        infoLogger.warning(msg)
         warningLogger.warning(msg)
     elif(type == "error"):
         debugLogger.error(msg)
+        infoLogger.error(msg)
         warningLogger.error(msg)
     elif(type == "critical"):
         debugLogger.critical(msg)
+        infoLogger.critical(msg)
         warningLogger.critical(msg)
+    else:
+        raise logTypeError("出现未知类型日志，请及时检查代码")
 
 
 

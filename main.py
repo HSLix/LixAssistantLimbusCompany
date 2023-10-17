@@ -13,6 +13,8 @@ from win32event import CreateMutex
 from win32api import GetLastError
 from sys import exit
 
+import win32api,win32con
+
 
 
 
@@ -23,6 +25,8 @@ if __name__ == '__main__':
     mutex = CreateMutex(None, False, 'LALC.Running')
     if GetLastError() > 0:
         exit(0)
+
+   
     
     #图形化操作界面
     scriptGUI()
