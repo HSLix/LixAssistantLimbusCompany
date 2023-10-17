@@ -34,8 +34,8 @@ def winCap():
         myLog("debug","Get Pic")
         hdesktop = GetDesktopWindow()
 
-        width = GetWindowRect(hdesktop)[2]
-        height = GetWindowRect(hdesktop)[3]
+        width = 1280
+        height = 720
         # 获取窗口的设备上下文DC(Device Context)
         desktop_dc = GetWindowDC(hdesktop)
         # 根据窗口的DC创建一个内存中的DC
