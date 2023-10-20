@@ -11,13 +11,14 @@ from ctypes import windll
 import win32api, win32con
 from src.common.picLocate import *
 from src.common.myTime import myTimeSleep
+from src.common.classWin import _win
 from src.log.nbLog import myLog
 
 
 
 
 
-def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.7, clickCount = 1, correctRate = 0.8):
+def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount = 1, correctRate = 0.8):
     """
     输入一个图片模板，自动点击截图中一个
     :param img_model_path: 图片模板相对坐标
@@ -43,8 +44,8 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.7, clickCount
     
     msg = "Auto Clicking " + name
     myLog("debug",msg)
-    cx = int(center[0] + addX)
-    cy = int(center[1] + addY)
+    cx = int(center[0] + addX) + _win.winLeft
+    cy = int(center[1] + addY) + _win.winTop
 
     
     
@@ -62,6 +63,7 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.7, clickCount
     #归零避免妨碍识图
     try:
         windll.user32.SetCursorPos(1,1)
+        myTimeSleep(0.1)
     except:
         myLog("error","The Mouse is used by other man.")
     #win32api.SetCursorPos((1,1))
@@ -99,8 +101,8 @@ def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCoun
                 addX += uniform(-10, 10)
                 addY += uniform(-10, 10)
 
-                cx = int(center[i + 0] + addX)
-                cy = int(center[i + 1] + addY)
+                cx = int(center[i + 0] + addX) + _win.winLeft
+                cy = int(center[i + 1] + addY) + _win.winTop
 
                 #具体点击实现
                 try:

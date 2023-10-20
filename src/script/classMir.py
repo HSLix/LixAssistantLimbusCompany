@@ -249,17 +249,17 @@ class _MirrorOfMirrors():
     def mirror2JudTeamCondition(self):
         '''判断当前队伍状况'''
         resultCondition = -1
-        if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965) or\
-            afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97) or\
-            afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
+        if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+            afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+            afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)):
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.965) or\
-        afc.autoFind("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.965)):
+        elif(afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.94) or\
+        afc.autoFind("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.94)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.965) or\
-        afc.autoFind("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.965)):
+        elif(afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.94) or\
+        afc.autoFind("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.94)):
             resultCondition = 3
         return resultCondition
 
@@ -271,18 +271,18 @@ class _MirrorOfMirrors():
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97)):
+            if(afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94)):
                 result = True
         elif(condition == 3):
-            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94)):
                 result = True
         else:
-            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.965) or\
-                afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.97) or\
-                afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+                afc.autoFind("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+                afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
                 result = True
         return result
 
@@ -319,12 +319,12 @@ class _MirrorOfMirrors():
 
         #即使选不到满人，也要尽可能多选人
         if(notFullFlag == 1 and\
-        (afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)or\
-            afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.965)or\
-            afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.965)or\
-            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.965)or\
-            afc.autoFind("./pic/team/NotFullTeam16.png", "NotFullTeam1/6", 0.965)or\
-            afc.autoFind("./pic/team/NotFullTeam17.png", "NotFullTeam1/7", 0.965))
+        (afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94)or\
+            afc.autoFind("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.94)or\
+            afc.autoFind("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.94)or\
+            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.94)or\
+            afc.autoFind("./pic/team/NotFullTeam16.png", "NotFullTeam1/6", 0.94)or\
+            afc.autoFind("./pic/team/NotFullTeam17.png", "NotFullTeam1/7", 0.94))
             ):
             for i in range(1,13):
                 getPic.winCap()
@@ -356,9 +356,8 @@ class _MirrorOfMirrors():
             condition = False
             if (afc.autoSinClick("./pic/battle/WinRate.png", "WinRate")):
                 getPic.winCap()
-                condition = True
-            if (afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7)):
-                condition = True
+                if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
+                    condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
                 myTimeSleep(3)
                 condition = True
@@ -838,17 +837,17 @@ class _MirrorOfTheBeginning():
     #检测3/3；4/4；5/5最好就一个标准，能省不少时间
     def mirror1JudTeamCondition(self):
         resultCondition = -1
-        if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965) or\
-            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965) or\
-            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
+        if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+            afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+            afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
             resultCondition = 0
-        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.97)):
+        elif(afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.94)):
             resultCondition = 1
-        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.965) or\
-        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.965)):
+        elif(afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.94) or\
+        afc.autoFind("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.94)):
             resultCondition = 2
-        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965) or\
-        afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.965)):
+        elif(afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94) or\
+        afc.autoFind("./pic/team/NotFullTeam45.png", "NotFullTeam4/5", 0.94)):
             resultCondition = 3
         return resultCondition
 
@@ -859,18 +858,18 @@ class _MirrorOfTheBeginning():
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
                 result = True
         elif(condition == 2):
-            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94)):
                 result = True
         elif(condition == 3):
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
                 result = True
         else:
-            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.965) or\
-                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.965) or\
-                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.965)):
+            if(afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+                afc.autoFind("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+                afc.autoFind("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
                 result = True
         return result
 
@@ -909,10 +908,10 @@ class _MirrorOfTheBeginning():
 
         #即使选不到满人，也要尽可能多选人
         if(notFullFlag == 1 and\
-        (afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.97)or\
-            afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.965)or\
-            afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.965)or\
-            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.965))
+        (afc.autoFind("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.94)or\
+            afc.autoFind("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.94)or\
+            afc.autoFind("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94)or\
+            afc.autoFind("./pic/team/NotFullTeam15.png", "NotFullTeam1/5", 0.94))
             ):
             for i in range(1,13):
                 getPic.winCap()
@@ -944,9 +943,8 @@ class _MirrorOfTheBeginning():
             condition = False
             if (afc.autoSinClick("./pic/battle/WinRate.png", "WinRate")):
                 getPic.winCap()
-                condition = True
-            if (afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7)):
-                condition = True
+                if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
+                    condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
                 myTimeSleep(3)
                 condition = True

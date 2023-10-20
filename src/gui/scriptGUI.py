@@ -24,8 +24,7 @@ def scriptGUI():
     checkScreenScale()
 
     # 测试识图
-    tryClick("./pic/team/EmptyTeam05.png", "1", 0, 0, 1, 1, 0.93)
-    
+    # tryClick("./pic/battle/Start.png", "Start")
     checkAdmin()
     gui = myGUI()
     gui.showWin()

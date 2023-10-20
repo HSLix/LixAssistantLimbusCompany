@@ -9,7 +9,6 @@
 import sys
 import traceback
 from threading import Thread, Lock
-from src.common.initWin import initWin
 from src.log.nbLog import myLog, beginAndFinishLog
 from src.error.myError import *
 
@@ -197,7 +196,7 @@ class _mainScript(Thread):
         while(not afc.autoFind("./pic/initMenu/Window.png", "MainMenuSign", 0.8)):
 
             getPic.winCap()
-            if( afc.autoSinClick("./pic/initMenu/FaceTheSinSaveTheEGO.png", "84启动!", 0, 0, 10, 1, 0.998)):
+            if( afc.autoSinClick("./pic/initMenu/FaceTheSinSaveTheEGO.png", "84启动!", 0, 0, 10, 1, 0.9)):
                 loopCount = 0
                 continue
             elif(afc.autoSinClick("./pic/initMenu/downloadConfirm.png", "downloadConfirm", 0, 0, 1, 1, 0.9)):

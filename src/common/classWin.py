@@ -13,8 +13,17 @@ from ctypes import windll
 from src.log.nbLog import myLog
 from src.error.myError import withOutGameWinError,screenScaleError
 
+
+
+
 class _win():
     __slots__=("initSwitch")
+
+    winLeft = -1
+    winTop = -1
+    winRight = -1
+    winBotton = -1
+    hWnd = ""
 
     def __init__(self, initSwitch = 0):
         self.initSwitch = initSwitch
@@ -29,6 +38,11 @@ class _win():
 
         # 初始化窗口的位置的大小
         self.initWin()
+
+        # 获取窗口左上角坐标和右下角坐标
+        # 排除缩放干扰
+        windll.user32.SetProcessDPIAware()
+        _win.winLeft, _win.winTop, _win.winRight, _win.winBottom = win32gui.GetWindowRect(_win.hWnd)
 
 
 
@@ -51,8 +65,8 @@ class _win():
         myLog("debug", msg)
         if(not(scale > 1.49 and scale < 1.51)):
             raise screenScaleError("屏幕缩放不是150%")
-
-
+        
+        
 
 
 
@@ -73,29 +87,33 @@ class _win():
 
 
         # 获取窗口的信息
-        hWnd = win32gui.FindWindow("UnityWndClass","LimbusCompany")
-        if(hWnd != 0):
+        _win.hWnd = win32gui.FindWindow("UnityWndClass","LimbusCompany")
+        if(_win.hWnd != 0):
             result = True
         else:
             myLog("error","Can't Find The Game Window")
             raise withOutGameWinError("没有找到游戏窗口")
         
         # 若最小化，则将其显示
-        if win32gui.IsIconic(hWnd):
-            win32gui.ShowWindow(hWnd, win32con.SW_SHOWMAXIMIZED)
+        if win32gui.IsIconic(_win.hWnd):
+            win32gui.ShowWindow(_win.hWnd, win32con.SW_SHOWMAXIMIZED)
 
         # 置顶窗口
-        win32gui.SetForegroundWindow(hWnd)
+        win32gui.SetForegroundWindow(_win.hWnd)
 
         #大小为1280，720
         if(self.initSwitch == 0 or self.initSwitch == 1):
-            resize_window(hWnd, 1280, 720)
+            resize_window(_win.hWnd, 1280, 720)
 
         #窗口默认至左上角（0，0）
         if(self.initSwitch == 0 or self.initSwitch == 2):
-            move_window(hWnd, 0, 0)
+            move_window(_win.hWnd, 0, 0)
+
+        
         
         #回收句柄
-        windll.user32.ReleaseDC(hWnd)
+        windll.user32.ReleaseDC(_win.hWnd)
 
         return result
+    
+

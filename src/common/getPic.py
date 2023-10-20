@@ -15,6 +15,7 @@ from numpy import fromstring
 from cv2 import cvtColor, COLOR_BGRA2BGR, imwrite
 from threading import Lock
 from src.log.nbLog import myLog
+from src.common.classWin import _win
 
 
 lock = Lock()
@@ -38,6 +39,7 @@ def winCap():
         height = 720
         # 获取窗口的设备上下文DC(Device Context)
         desktop_dc = GetWindowDC(hdesktop)
+        
         # 根据窗口的DC创建一个内存中的DC
         img_dc = CreateDCFromHandle(desktop_dc)
 
@@ -49,7 +51,7 @@ def winCap():
         screenshot.CreateCompatibleBitmap(img_dc, width, height)
         mem_dc.SelectObject(screenshot)
 
-        mem_dc.BitBlt((0, 0), (width, height), img_dc, (0, 0), SRCCOPY)
+        mem_dc.BitBlt((0,0), (width, height), img_dc, (_win.winLeft, _win.winTop), SRCCOPY)
 
         bmpinfo = screenshot.GetInfo()
         bmpstr = screenshot.GetBitmapBits(True)
@@ -70,7 +72,4 @@ def winCap():
 
         #简单压缩
         #simpleCompress()
-
-
-
-
+        

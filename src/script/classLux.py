@@ -99,9 +99,8 @@ class _Luxcavation(_mainScript):
         '''
         result = False
         i = 1
-        myTimeSleep(2)
         getPic.winCap()
-        while(not afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.95) and\
+        while(not afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) and\
             afc.autoFind("./pic/team/Announcer.png", "prepareBattle")):
             if(i > 12):
                 i = 1

@@ -12,6 +12,9 @@ from src.gui.scriptGUI import scriptGUI
 from win32event import CreateMutex
 from win32api import GetLastError
 from sys import exit
+from src.common.classWin import _win
+from src.common.getPic import winCap
+from src.script.classMir import _Mirror
 
 import win32api,win32con
 
@@ -19,14 +22,13 @@ import win32api,win32con
 
 
 if __name__ == '__main__':
-    
 
     # 互斥锁
     mutex = CreateMutex(None, False, 'LALC.Running')
     if GetLastError() > 0:
         exit(0)
 
-   
+    
     
     #图形化操作界面
     scriptGUI()
