@@ -32,7 +32,7 @@
 
 ---
 ## 视频教程
-[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://www.bilibili.com/video/BV12w41117so/?spm_id_from=333.999.list.card_archive.click&vd_source=0e55873fcd6a0d01839a7f7f37c36254)
+[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://youtu.be/ZKsNTLM-IT4)
 
 ---
 ## 图示样例
