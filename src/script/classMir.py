@@ -58,7 +58,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror2():
                 loopCount += 1
-                if loopCount == 1 and not mir.noWayFlag:
+                if loopCount == 2 and not mir.noWayFlag:
                     mir.noWayFlag = False
                     mir.mirror2Leave()
                     self.ScriptBackToInitMenu()
@@ -74,7 +74,7 @@ class _Mirror(_mainScript):
                 self.convertPai()
                 continue
 
-            if loopCount > 3:
+            if loopCount > 4:
                 myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
@@ -96,7 +96,7 @@ class _Mirror(_mainScript):
             # print("mirror LoopCount :" + str(loopCount))
             if not mir.Mirror1():
                 loopCount += 1
-                if loopCount > 2 and not mir.noWayFlag:
+                if loopCount == 2 and not mir.noWayFlag:
                     mir.noWayFlag = False
                     mir.mirror1Leave()
                     self.ScriptBackToInitMenu()
@@ -112,7 +112,7 @@ class _Mirror(_mainScript):
                 self.convertPai()
                 continue
 
-            if loopCount > 3:
+            if loopCount > 4:
                 myLog("warning","Hard to continue! Next Mission!")
                 #离开进入函数
                 self.mirrorCount = 0
