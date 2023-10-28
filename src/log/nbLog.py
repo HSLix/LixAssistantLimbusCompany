@@ -15,7 +15,7 @@ from src.error.myError import logTypeError
 debugLogger =  get_logger("debugLogger", 
                           log_path = ".\\log",
                           log_level_int = 10, 
-                          is_add_stream_handler=False, 
+                          is_add_stream_handler=True, 
                           log_filename = "debugLog.log", 
                           formatter_template = 7,
                           log_file_handler_type = 1)

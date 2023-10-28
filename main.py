@@ -12,11 +12,7 @@ from src.gui.scriptGUI import scriptGUI
 from win32event import CreateMutex
 from win32api import GetLastError
 from sys import exit
-from src.common.classWin import _win
-from src.common.getPic import winCap
-from src.script.classMir import _Mirror
 
-import win32api,win32con
 
 
 

@@ -162,7 +162,7 @@ class _MirrorOfMirrors():
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror2/Receive.png","Receive")
         getPic.winCap()
-        if afc.autoSinClick("./pic/mirror/mirror2/Confirm.png","FirstConfirm"):
+        if afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png","FirstConfirm"):
             getPic.winCap()
             if afc.autoSinClick("./pic/mirror/mirror2/way/Confirm.png","SecondConfirm"):
                 result = True
@@ -206,7 +206,8 @@ class _MirrorOfMirrors():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 6)
+            
+            afc.autoSinClick("./pic/mirror/mirror2/blackConfirm.png", "Confirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
@@ -313,7 +314,7 @@ class _MirrorOfMirrors():
                 addX = (i - 6) * 140
                 addY = 200
 
-            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY, 0.2)
+            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
             getPic.winCap()
             i += 1
 
@@ -335,7 +336,7 @@ class _MirrorOfMirrors():
                     addX = (i - 6) * 140
                     addY = 200
 
-                afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY, 0.2)
+                afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
 
 
 
@@ -768,7 +769,7 @@ class _MirrorOfTheBeginning():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            afc.autoSinClick("./pic/mirror/mirror1/Confirm.png", "Confirm", 0, 0, 6)
+            afc.autoSinClick("./pic/mirror/mirror1/blackConfirm.png", "blackConfirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
@@ -793,7 +794,7 @@ class _MirrorOfTheBeginning():
         getPic.winCap()
         afc.autoSinClick("./pic/mirror/mirror1/Receive.png","Receive")
         getPic.winCap()
-        if afc.autoSinClick("./pic/mirror/mirror1/Confirm.png","FirstConfirm"):
+        if afc.autoSinClick("./pic/mirror/mirror1/whiteConfirm.png","FirstConfirm"):
             getPic.winCap()
             if afc.autoSinClick("./pic/mirror/mirror1/way/Confirm.png","SecondConfirm"):
                 result = True
@@ -902,7 +903,7 @@ class _MirrorOfTheBeginning():
                 addX = (i - 6) * 140
                 addY = 200
 
-            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY, 0.2)
+            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
             getPic.winCap()
             i += 1
 

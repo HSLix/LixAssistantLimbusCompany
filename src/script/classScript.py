@@ -6,8 +6,8 @@
 * Project   :LixAssistantLimbusCompany
 * Function  :脚本流程归类化
 '''
-import sys
-import traceback
+from sys import exc_info
+from traceback import format_exception
 from threading import Thread, Lock
 from src.log.nbLog import myLog, beginAndFinishLog
 from src.error.myError import *
@@ -130,7 +130,7 @@ class _mainScript(Thread):
             self.exception = e
         finally:
             self.exc_traceback = ''.join(
-                traceback.format_exception(*sys.exc_info()))
+                format_exception(*exc_info()))
 
     def kill(self):
         '''终止函数'''
@@ -281,7 +281,7 @@ class _mainScript(Thread):
                 afc.autoSinClick(
                     "./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
                 getPic.winCap()
-                afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm", 0, 0, 5)
+                afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png", "Confirm", 0, 0, 5)
                 loopCount = 0
             #在循环里必须有应对错误的情况
             self.errorRetry()
@@ -340,7 +340,6 @@ class _mainScript(Thread):
         # 后续可以加入购买多次脑啡肽的功能
 
     @checkAndExit
-    @beginAndFinishLog
     def errorRetry(self):
         '''
         点击重试按钮，同时监测重试失败并返回错误

@@ -46,7 +46,7 @@ def eventPart():
 
         if(afc.autoSinClick("./pic/event/Leave.png", "Leave")):
             getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror2/Confirm.png", "Confirm")
+            afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
         myTimeSleep(1)
 
         if(not afc.autoFind("./pic/event/Skip.png", "Skip")):

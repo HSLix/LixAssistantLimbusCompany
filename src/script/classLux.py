@@ -112,7 +112,7 @@ class _Luxcavation(_mainScript):
                 addY = 200
 
             getPic.winCap()
-            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY, 0.2)
+            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
             getPic.winCap()
             i += 1
             
