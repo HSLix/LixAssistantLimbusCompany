@@ -10,7 +10,7 @@
 from cv2 import imread, IMREAD_GRAYSCALE, matchTemplate, TM_CCOEFF_NORMED
 from numpy import where
 from gc import collect
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from src.error.myError import withOutPicError
 from src.common.histogramNormalization import getGreyNormalizedPic
 

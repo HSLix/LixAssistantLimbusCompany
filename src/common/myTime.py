@@ -7,7 +7,7 @@
 * Function  :包装等待函数，便于日志记录      
 '''
 from time import sleep
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 
 
 

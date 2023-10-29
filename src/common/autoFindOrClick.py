@@ -12,7 +12,7 @@ import win32api, win32con
 from src.common.picLocate import *
 from src.common.myTime import myTimeSleep
 from src.common.classWin import _win
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 
 
 

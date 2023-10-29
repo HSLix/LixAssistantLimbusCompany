@@ -12,7 +12,7 @@ from src.script.battle import dailyBattlePart
 from src.common.myTime import myTimeSleep
 from src.script.myWait import myWait
 from src.script.classScript import checkAndExit
-from src.log.nbLog import myLog, beginAndFinishLog
+from src.log.myLog import myLog, beginAndFinishLog
 
 
 class _Luxcavation(_mainScript):

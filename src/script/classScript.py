@@ -9,7 +9,7 @@
 from sys import exc_info
 from traceback import format_exception
 from threading import Thread, Lock
-from src.log.nbLog import myLog, beginAndFinishLog
+from src.log.myLog import myLog, beginAndFinishLog
 from src.error.myError import *
 
 from src.common import getPic, autoFindOrClick as afc

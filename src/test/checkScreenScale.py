@@ -8,7 +8,7 @@
 '''
 
 from ctypes import windll
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from tkinter.messagebox import showinfo
 from os import _exit
 

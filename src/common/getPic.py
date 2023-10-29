@@ -14,7 +14,7 @@ from win32con import SRCCOPY
 from numpy import fromstring
 from cv2 import cvtColor, COLOR_BGRA2BGR, imwrite
 from threading import Lock
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from src.common.classWin import _win
 
 

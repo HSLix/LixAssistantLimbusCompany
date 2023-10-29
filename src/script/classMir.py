@@ -13,7 +13,7 @@ from src.common import getPic, autoFindOrClick as afc
 from src.script.myWait import myWait
 from src.script.event import eventPart
 from src.script.classScript import _mainScript,checkAndExit
-from src.log.nbLog import myLog, beginAndFinishLog
+from src.log.myLog import myLog, beginAndFinishLog
 from src.common.myTime import myTimeSleep
 from src.error.myError import unexpectNumError,noSavedPresetsError, mirrorInProgressError, previousClaimRewardError
 from src.common.mouseScroll import littleUpScroll
@@ -206,7 +206,7 @@ class _MirrorOfMirrors():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
-            
+            self.mirror2PrepareBattle() 
             afc.autoSinClick("./pic/mirror/mirror2/blackConfirm.png", "Confirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 8)
@@ -302,7 +302,7 @@ class _MirrorOfMirrors():
                 i = 1
                 countFlag += 1
                 if(countFlag > 1):
-                    from src.log.nbLog import beginAndFinishLog, myLog
+                    from src.log.myLog import beginAndFinishLog, myLog
                     myLog("warning","Can't make team full")
                     notFullFlag = 1
                     break
@@ -769,6 +769,7 @@ class _MirrorOfTheBeginning():
             getPic.winCap()
             if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
                 raise noSavedPresetsError("没有预选队伍")
+            self.mirror1PrepareBattle() 
             afc.autoSinClick("./pic/mirror/mirror1/blackConfirm.png", "blackConfirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 8)
@@ -891,7 +892,7 @@ class _MirrorOfTheBeginning():
                 i = 1
                 countFlag += 1
                 if(countFlag > 1):
-                    from src.log.nbLog import beginAndFinishLog, myLog
+                    from src.log.myLog import beginAndFinishLog, myLog
                     myLog("warning","Can't make team full")
                     notFullFlag = 1
                     break

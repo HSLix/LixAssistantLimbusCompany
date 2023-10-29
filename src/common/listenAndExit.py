@@ -9,7 +9,7 @@
 from pynput import keyboard
 from os import _exit
 from threading import Thread
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from src.common.myTime import myTimeSleep
 
 

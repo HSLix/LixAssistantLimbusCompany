@@ -7,11 +7,11 @@
 * Function  :调用图形化交互            
 '''
 from src.gui.myGUI import myGUI
-from src.log.nbLog import beginAndFinishLog
+from src.log.myLog import beginAndFinishLog
 from src.test.tryClick import tryClick
 from ctypes import windll
 from src.error.myError import withOutAdminError
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from src.test.checkScreenScale import checkScreenScale
 from src.test.checkAdmin import checkAdmin
 

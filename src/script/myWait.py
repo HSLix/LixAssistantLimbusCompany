@@ -8,7 +8,7 @@
 '''
 from src.common import getPic, autoFindOrClick as afc
 from src.common.myTime import myTimeSleep
-from src.log.nbLog import beginAndFinishLog
+from src.log.myLog import beginAndFinishLog
 
 
 @beginAndFinishLog

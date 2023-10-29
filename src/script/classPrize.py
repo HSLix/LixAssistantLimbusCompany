@@ -3,7 +3,7 @@
 
 from src.script.classScript import _mainScript,checkAndExit
 from src.common import getPic, autoFindOrClick as afc
-from src.log.nbLog import myLog, beginAndFinishLog
+from src.log.myLog import myLog, beginAndFinishLog
 
 class _getPrize(_mainScript):
     __slots__ = ("prizeSwitch")

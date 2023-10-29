@@ -2,43 +2,41 @@
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/18 14:34
-* File  : nbLog.py
+* File  : myLog.py
 * Project   :LixAssistantLimbusCompany
 * Function  :日志记录
 '''
 
-from nb_log import get_logger
+from logging import DEBUG, INFO, WARNING
+from kuai_log import get_logger 
 from src.error.myError import logTypeError
 
 
 '''记录debug及以上级别日志'''
-debugLogger =  get_logger("debugLogger", 
+debugLogger =  get_logger(name="debugLogger", 
                           log_path = ".\\log",
-                          log_level_int = 10, 
+                          level=DEBUG,
                           is_add_stream_handler=True, 
                           log_filename = "debugLog.log", 
-                          formatter_template = 7,
-                          log_file_handler_type = 1)
+                          is_add_file_handler=True)
 
 
 '''记录info及以上级别日志'''
-infoLogger =  get_logger("infoLogger", 
+infoLogger =  get_logger(name="infoLogger", 
                           log_path = ".\\log",
-                          log_level_int = 20, 
+                          level=INFO,
                           is_add_stream_handler=False, 
                           log_filename = "infoLog.log", 
-                          formatter_template = 2,
-                          log_file_handler_type = 1)
+                          is_add_file_handler=True)
 
 
 '''记录warning及以上级别日志'''
-warningLogger =  get_logger("warningLogger", 
+warningLogger =  get_logger(name="warningLogger", 
                           log_path = ".\\log",
-                          log_level_int = 30, 
+                          level=WARNING,
                           is_add_stream_handler=False, 
                           log_filename = "warningLog.log", 
-                          formatter_template = 2,
-                          log_file_handler_type = 1)
+                          is_add_file_handler=True)
 
 
 

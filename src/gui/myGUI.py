@@ -33,10 +33,10 @@ class myGUI:
 
 
     def __init__(self):
-        from src.log.nbLog import myLog
+        from src.log.myLog import myLog
         
         # 检查是否管理员模式运行
-        self.checkAdmin()
+        # self.checkAdmin()
 
         # 排除缩放干扰
         windll.user32.SetProcessDPIAware()
@@ -86,7 +86,7 @@ class myGUI:
 
     def checkAdmin(self):
         '''在程序启动前，检查是否以管理员模式启动'''
-        from src.log.nbLog import myLog
+        from src.log.myLog import myLog
         if windll.shell32.IsUserAnAdmin():
             #图形操作窗口
             myLog("info","Already got Admin")

@@ -10,7 +10,7 @@
 from src.common.winSet import *
 import win32gui, win32con
 from ctypes import windll
-from src.log.nbLog import myLog
+from src.log.myLog import myLog
 from src.error.myError import withOutGameWinError,screenScaleError
 
 
