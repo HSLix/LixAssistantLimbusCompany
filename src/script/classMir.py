@@ -119,7 +119,7 @@ class _Mirror(_mainScript):
             
             msg = "Mirror1 Loop " + str(loopCount) + " Times!"
             myLog("info", msg) 
-            myTimeSleep(5)
+            # myTimeSleep(2)
 
 
 
@@ -130,7 +130,7 @@ class _MirrorOfMirrors():
     __slots__ = ("noWayFlag")
 
     def __init__(self):
-        noWayFlag = False
+        self.noWayFlag = False
         pass
 
     
@@ -202,16 +202,45 @@ class _MirrorOfMirrors():
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/ego/SelectEGOGift.png", "SelectEGOGift")
             getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror2/Preset.png", "Preset")
-            getPic.winCap()
-            if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
-                raise noSavedPresetsError("没有预选队伍")
-            self.mirror2PrepareBattle() 
+            if afc.autoSinClick("./pic/mirror/mirror2/Preset.png", "Preset"):
+                getPic.winCap()
+                if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
+                    raise noSavedPresetsError("没有预选队伍")
+                self.mirror2ChoosePreset()
             afc.autoSinClick("./pic/mirror/mirror2/blackConfirm.png", "Confirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror2/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
             myWait()
+
+
+    def mirror2ChoosePreset(self):
+        '''镜牢2预选人的流程'''
+        i = 1
+        countFlag = 0
+        while(not afc.autoFind("./pic/team/FullTeam77.png", "7/7PresetFullSign")):
+            #i的归零
+            if(i > 12):
+                i = 1
+                countFlag += 1
+                if(countFlag > 1):
+                    from src.log.myLog import myLog
+                    myLog("warning","Preset Fail")
+                    break
+            getPic.winCap()
+            if(i < 7):
+                addX = i * 140
+                addY = 0
+            else:
+                addX = (i - 6) * 140
+                addY = 200
+
+            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
+            getPic.winCap()
+            i += 1
+
+        afc.autoSinClick("./pic/team/Announcer.png", "Confirm", 1000, 400, 3)
+        
 
 
 
@@ -360,7 +389,7 @@ class _MirrorOfMirrors():
                 if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
                     condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
-                myTimeSleep(3)
+                myTimeSleep(2)
                 condition = True
             elif(afc.autoSinClick("./pic/battle/trianglePause.png", "Continue Fight!")):
                 condition = True    
@@ -370,7 +399,6 @@ class _MirrorOfMirrors():
             elif(afc.autoFind("./pic/Wait.png", "Wait Sign")):
                 myWait()
                 condition = True
-            myTimeSleep(1)
             if(not condition):
                 loopCount += 1
                 if(loopCount > 2):
@@ -381,6 +409,7 @@ class _MirrorOfMirrors():
                         loopCount = 0
             else:
                 loopCount = 0
+            myTimeSleep(0.9)
 
 
     @checkAndExit
@@ -716,13 +745,12 @@ class _MirrorOfMirrors():
 
 
 
-
 class _MirrorOfTheBeginning():
     '''镜牢1相关函数集合类'''
     __slots__ = ("noWayFlag")
 
     def __init__(self):
-        noWayFlag = False
+        self.noWayFlag = False
         pass
 
     def Mirror1(self):
@@ -740,6 +768,8 @@ class _MirrorOfTheBeginning():
         result = self.mirror1Cope()
         
         return result
+    
+
     
     @checkAndExit
     @beginAndFinishLog
@@ -765,22 +795,50 @@ class _MirrorOfTheBeginning():
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/ego/SelectEGOGift.png", "SelectEGOGift")
             getPic.winCap()
-            afc.autoSinClick("./pic/mirror/mirror1/Preset.png", "Preset")
-            getPic.winCap()
-            if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
-                raise noSavedPresetsError("没有预选队伍")
-            self.mirror1PrepareBattle() 
+            if afc.autoSinClick("./pic/mirror/mirror1/Preset.png", "Preset"):
+                getPic.winCap()
+                if(afc.autoFind("./pic/error/noSavedPreset.png", "noPreset")):
+                    raise noSavedPresetsError("没有预选队伍")
+                self.mirror1ChoosePreset()
             afc.autoSinClick("./pic/mirror/mirror1/blackConfirm.png", "blackConfirm", 0, 0, 3)
             getPic.winCap()
             afc.autoSinClick("./pic/mirror/mirror1/BuyCoin.png", "BuyCoin", 0, 0, 8)
         if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
             myWait()
 
+    
+    def mirror1ChoosePreset(self):
+        '''镜牢1预选人的流程'''
+        i = 1
+        countFlag = 0
+        while(not afc.autoFind("./pic/team/FullTeam55.png", "5/5PresetFullSign")):
+            #i的归零
+            if(i > 12):
+                i = 1
+                countFlag += 1
+                if(countFlag > 1):
+                    from src.log.myLog import myLog
+                    myLog("warning","Preset Fail")
+                    break
+            getPic.winCap()
+            if(i < 7):
+                addX = i * 140
+                addY = 0
+            else:
+                addX = (i - 6) * 140
+                addY = 200
+
+            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
+            getPic.winCap()
+            i += 1
+
+        afc.autoSinClick("./pic/team/Announcer.png", "Confirm", 1000, 400, 3)
+
 
     @checkAndExit
     @beginAndFinishLog
     def mirror1Leave(self):
-        '''镜牢2离开时处理notFullFlag'''
+        '''镜牢1离开时处理notFullFlag'''
         global notFullFlag 
         notFullFlag = 0
 
@@ -948,7 +1006,7 @@ class _MirrorOfTheBeginning():
                 if (afc.autoSinClick("./pic/battle/Start.png", "Start")):
                     condition = True
             elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
-                myTimeSleep(3)
+                myTimeSleep(2)
                 condition = True
             elif(afc.autoSinClick("./pic/battle/trianglePause.png", "Continue Fight!")):
                 condition = True    
@@ -958,7 +1016,6 @@ class _MirrorOfTheBeginning():
             elif(afc.autoFind("./pic/Wait.png", "Wait Sign")):
                 myWait()
                 condition = True
-            myTimeSleep(1)
             if(not condition):
                 loopCount += 1
                 if(loopCount > 2):
@@ -969,6 +1026,7 @@ class _MirrorOfTheBeginning():
                         loopCount = 0
             else:
                 loopCount = 0
+            myTimeSleep(0.9)
 
 
 

@@ -20,7 +20,7 @@ from time import sleep
 exeCfg = {"EXPCount": 0, "ThreadCount": 0, "MirrorCount": 0,
             "setWinSwitch": 0, "setPrizeSwitch": 0, "MirrorSwitch": 0, "ActivityCount": 0}
 
-version = "V2.1.8_Realease"
+version = "V2.1.9_Realease"
 
 
 
@@ -260,7 +260,7 @@ class myGUI:
         self.LunacyToEnkephalinSet.place(width=180, height=40, x=0, y=45)
 
 
-        tk.Label(settingFrame, text="更多设置，等我用qt重构图形化界面再加\n承蒙各位厚爱！\n现在准备要加的设置有：\n1、镜牢第三层提前退出；\n2、镜牢可选择是否使用加成；\n3、会保留上次使用的设置；\n4、还有什么可以github提issue\n但记得看看有无重复\n\n！！为了奖励最大化\n尽量用完每周加成再使用本程序！！\nPS:月计11月将大改UI\n到时请自行到github更新2.1.9\n",
+        tk.Label(settingFrame, text="更多设置，等我用qt重构图形化界面再加\n承蒙各位厚爱！\n现在准备要加的设置有：\n1、镜牢第三层提前退出；\n2、镜牢可选择是否使用加成；\n3、会保留上次使用的设置；\n4、还有什么可以github提issue\n但记得看看有无重复\n\n！！为了奖励最大化\n尽量用完每周加成再使用本程序！！\nPS:近期时间安排紧张\n一段时间内只能不定期维护LALC现有功能\n",
                  font=("微软雅黑", 10),
                  justify="left",
                  anchor="w").place(width=400, height=390, x=0, y=100)

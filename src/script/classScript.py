@@ -245,7 +245,7 @@ class _mainScript(Thread):
             elif afc.autoSinClick("./pic/battle/confirm.png", "Confirm"):
                 # 战斗结算
                 loopCount = 0
-            elif afc.autoSinClick("./pic/battle/Confirm.png", "LevelUpConfirm"):
+            elif afc.autoSinClick("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
                 # 升级结算
                 loopCount = 0
             elif afc.autoSinClick("./pic/scene/QuitScene.png", "QuitScene"):
@@ -276,13 +276,22 @@ class _mainScript(Thread):
             # 镜牢的情况
             elif(afc.autoFind("./pic/mirror/mirror2/way/mirror2MapSign.png", "mirror2MapSign")
                  or afc.autoFind("./pic/mirror/mirror2/EGOGiftOwned.png", "EGOGiftOwned")):
-                afc.autoSinClick("./pic/mirror/mirror2/Gear.png", "ExitGear")
-                getPic.winCap()
-                afc.autoSinClick(
-                    "./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
-                getPic.winCap()
-                afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png", "Confirm", 0, 0, 5)
-                loopCount = 0
+                if afc.autoSinClick("./pic/mirror/mirror2/Gear.png", "ExitGear"):
+                    getPic.winCap()
+                    afc.autoSinClick(
+                        "./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
+                    getPic.winCap()
+                    afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png", "Confirm", 0, 0, 5)
+                    loopCount = 0
+                elif afc.autoSinClick("./pic/mirror/mirror2/ClaimRewards.png","ClaimRewards", 0, 0, 0.7, 1, 0.7):
+                    getPic.winCap()
+                    afc.autoSinClick("./pic/mirror/mirror2/Receive.png","Receive")
+                    getPic.winCap()
+                    if afc.autoSinClick("./pic/mirror/mirror2/whiteConfirm.png","FirstConfirm"):
+                        getPic.winCap()
+                        if afc.autoSinClick("./pic/mirror/mirror2/way/Confirm.png","SecondConfirm"):
+                            loopCount = 0
+                            
             #在循环里必须有应对错误的情况
             self.errorRetry()
             getPic.winCap()
