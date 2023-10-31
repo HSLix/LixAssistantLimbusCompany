@@ -172,11 +172,17 @@ Please send the Problem to the Issue in GitHub
 
 除我以外，还有其它开发者也致力于limbus脚本的开发，可以的话，也希望大家多多支持！！
 
+### MAALimbus
+正统MAA传承，经典配方，满足安卓模拟器上一键长草的梦想
+https://github.com/hxdnshx/MAALimbusCompany
+
+### Limbus-Script
 https://github.com/Xie-Tiao/Limbus-Scripts
 
+### limbus-company-auto
 https://github.com/Janrilw/limbus-company-auto
 
-https://github.com/hxdnshx/MAALimbusCompany
+
 
 ---
 ## 最后
