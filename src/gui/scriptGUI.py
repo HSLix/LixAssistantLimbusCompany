@@ -16,10 +16,10 @@ from src.test.checkAdmin import checkAdmin
 def scriptGUI():
     '''申请管理员权限并，调用图形化函数'''
     checkAdmin()
-    # checkScreenScale()
+    checkScreenScale()
 
     # 测试识图
-    # tryClick("./pic/battle/Start.png", "Start")
+    # tryClick("./pic/initMenu/FirstBuy.png", "26Lunary", 0, 0, 0.7, 1, 0.825)
     
     gui = myGUI()
     gui.showWin()

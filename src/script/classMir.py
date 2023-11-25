@@ -403,10 +403,6 @@ class _MirrorOfMirrors():
                 loopCount += 1
                 if(loopCount > 2):
                     break
-                elif(loopCount > 0):
-                    if (afc.autoFind("./pic/battle/Gear.png", "FinishingBattle")):
-                        condition = True
-                        loopCount = 0
             else:
                 loopCount = 0
             myTimeSleep(0.9)

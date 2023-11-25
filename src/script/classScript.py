@@ -334,7 +334,7 @@ class _mainScript(Thread):
         getPic.winCap()
         afc.autoSinClick("./pic/initMenu/UseLunary.png", "UseLunary")
         getPic.winCap()
-        if(afc.autoFind("./pic/initMenu/FirstBuy.png", "26Lunary", 0.95)):
+        if(afc.autoFind("./pic/initMenu/FirstBuy.png", "26Lunary", 0.85)):
             afc.autoSinClick("./pic/initMenu/confirm.png", "confirm")
         afc.autoSinClick("./pic/initMenu/cancel.png", "cancel")
         

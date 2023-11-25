@@ -18,7 +18,7 @@ from src.log.myLog import myLog
 
 
 
-def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount = 1, correctRate = 0.8):
+def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount = 1, correctRate = 0.7):
     """
     输入一个图片模板，自动点击截图中一个
     :param img_model_path: 图片模板相对坐标
@@ -27,7 +27,7 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount
     :param addY:y坐标偏移，默认为0
     :param waitTime:点击一次后的等待时间
     :param clickCount:点击次数，默认为1
-    :param correctRate:准确率，0.8起步会比较准确
+    :param correctRate:准确率，0.7起步会比较准确
     :return: 是否完成点击
     """
 
@@ -78,7 +78,7 @@ def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCoun
     :param addY:y坐标偏移，默认为0
     :param waitTime:点击一次后的等待时间
     :param clickCount:点击次数，默认为1
-    :param correctRate:准确率，0.8起步会比较准确
+    :param correctRate:准确率，0.7起步会比较准确
     :return: 是否完成点击
     """
     
@@ -124,12 +124,12 @@ def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCoun
     return True
 
 
-def autoFind(img_model_path, name, correctRate = 0.9):
+def autoFind(img_model_path, name, correctRate = 0.7):
     """
     输入一个图片模板，自动点击
     :param img_model_path: 图片模板相对坐标
     :param name:当前进程名字/代号
-    :param resetSwitch:设置为1时，找到目标后，鼠标移至目标中心
+    :param correctRate:准确率，0.7起步会比较准确
     :param return: 是否在截屏中找到目标模板
     """
 

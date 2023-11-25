@@ -10,6 +10,7 @@
 from ctypes import windll
 from src.log.myLog import myLog
 from tkinter.messagebox import showinfo
+import tkinter as tk
 from os import _exit
 
 
@@ -24,14 +25,16 @@ def checkScreenScale():
         heightScale = gdi32.GetDeviceCaps(dc, 10)  # 分辨率缩放后的高度
         width = gdi32.GetDeviceCaps(dc, 118)  # 原始分辨率的宽度
         height = gdi32.GetDeviceCaps(dc, 117)  # 原始分辨率的高度
-        scale = width / widthScale
-        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale * 100)) + "%"
+        scale = width / widthScale * 100
+        msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale)) + "%"
         myLog("debug", msg)
-        if(not(scale > 1.49 and scale < 1.51)):
-            msg += "\n请设置屏幕的缩放为150%后再启动程序"
+        if(not(scale > 99 and scale < 151)):
+            msg += "\n最好将缩放调整至100%-150%，最好是150%"
             myLog("warning", msg)
-            showinfo("异常报告", msg)
-            _exit(0)
+            top = tk.Tk()
+            top.geometry('0x0+999999+0')
+            showinfo("缩放警告", msg)
+            top.destroy()
 
 
 
