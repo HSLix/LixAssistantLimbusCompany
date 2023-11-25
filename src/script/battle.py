@@ -27,8 +27,6 @@ def dailyBattlePart():
         elif(afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
             myTimeSleep(3)
             condition = True
-        elif(afc.autoSinClick("./pic/battle/trianglePause.png", "Continue Fight!")):
-            condition = True    
         elif(afc.autoFind("./pic/event/Skip.png", "Skip")):
             eventPart()
             condition = True
@@ -40,10 +38,10 @@ def dailyBattlePart():
             loopCount += 1
             if(loopCount > 2):
                 break
-            elif(loopCount > 0):
-                if (afc.autoFind("./pic/battle/Gear.png", "FinishingBattle")):
-                    condition = True
-                    loopCount = 0
+            elif(afc.autoSinClick("./pic/battle/blackWordConfirm.png", "Level Increased!")):
+                loopCount = 0
+            elif(afc.autoSinClick("./pic/battle/trianglePause.png", "Continue Fight!")):
+                loopCount = 0
         else:
             loopCount = 0
 

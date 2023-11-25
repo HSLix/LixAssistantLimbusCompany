@@ -7,25 +7,20 @@
 * Function  :调用图形化交互            
 '''
 from src.gui.myGUI import myGUI
-from src.log.myLog import beginAndFinishLog
 from src.test.tryClick import tryClick
-from ctypes import windll
-from src.error.myError import withOutAdminError
-from src.log.myLog import myLog
 from src.test.checkScreenScale import checkScreenScale
 from src.test.checkAdmin import checkAdmin
 
 
 
-@beginAndFinishLog
 def scriptGUI():
     '''申请管理员权限并，调用图形化函数'''
-    
-    checkScreenScale()
+    checkAdmin()
+    # checkScreenScale()
 
     # 测试识图
     # tryClick("./pic/battle/Start.png", "Start")
-    checkAdmin()
+    
     gui = myGUI()
     gui.showWin()
             

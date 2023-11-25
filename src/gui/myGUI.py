@@ -466,7 +466,7 @@ class myGUI:
         elif(ExitCode == 13):
             msg = "请设置屏幕的缩放为150%后再启动程序"
         else:
-            msg = "未知情况错误，请另存日志文件并提交Issue"
+            msg = "未知情况错误，请另存日志文件并提交Issue\nexitCode:" + str(ExitCode)
 
         msg += "\nEXP:{} Thread:{} Mirror:{} Activity:{}".format(
             self.script.EXPFinishCount, self.script.ThreadFinishCount, self.script.MirrorFinishCount, self.script.ActivityFinishCount)

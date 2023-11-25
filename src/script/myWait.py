@@ -11,7 +11,6 @@ from src.common.myTime import myTimeSleep
 from src.log.myLog import beginAndFinishLog
 
 
-@beginAndFinishLog
 def myWait():
     #发现等待中的标志后调用函数
     myTimeSleep(3)

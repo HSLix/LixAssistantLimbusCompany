@@ -326,9 +326,7 @@ class _mainScript(Thread):
         afc.autoSinClick("./pic/initMenu/confirm.png", "confirm")
         afc.autoSinClick("./pic/initMenu/cancel.png", "cancel")
 
-    @checkAndExit
-    @beginAndFinishLog
-    def buyFirstPai(self):
+    def buyPaiOnce(self):
         '''每天第一次购买体力'''
         self.ScriptBackToInitMenu()
         getPic.winCap()
@@ -336,7 +334,7 @@ class _mainScript(Thread):
         getPic.winCap()
         afc.autoSinClick("./pic/initMenu/UseLunary.png", "UseLunary")
         getPic.winCap()
-        if(afc.autoFind("./pic/initMenu/FirstBuy.png", "FirstBuy", 0.95)):
+        if(afc.autoFind("./pic/initMenu/FirstBuy.png", "26Lunary", 0.95)):
             afc.autoSinClick("./pic/initMenu/confirm.png", "confirm")
         afc.autoSinClick("./pic/initMenu/cancel.png", "cancel")
         
@@ -345,7 +343,7 @@ class _mainScript(Thread):
     def buyEnkephalin(self):
         '''购买脑啡肽'''
         if self.LunacyToEnkephalin == 1:
-            self.buyFirstPai()
+            self.buyPaiOnce()
         # 后续可以加入购买多次脑啡肽的功能
 
     @checkAndExit
