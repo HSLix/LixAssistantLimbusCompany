@@ -10,7 +10,7 @@ from random import uniform
 from ctypes import windll
 import win32api, win32con
 from src.common.picLocate import *
-from src.common.myTime import myTimeSleep
+from src.common.myTime import mySleep
 from src.common.classWin import _win
 from src.log.myLog import myLog
 
@@ -58,12 +58,12 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,cx,cy,0,0)
         win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,cx,cy,0,0)
         clickCount -= 1
-        myTimeSleep(waitTime)
+        mySleep(waitTime)
 
     #归零避免妨碍识图
     try:
         windll.user32.SetCursorPos(1,1)
-        myTimeSleep(0.1)
+        mySleep(0.1)
     except:
         myLog("error","The Mouse is used by other man.")
     #win32api.SetCursorPos((1,1))
@@ -111,7 +111,7 @@ def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCoun
                     myLog("error","The Mouse is used by other man.")
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,cx,cy,0,0)
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,cx,cy,0,0)
-                myTimeSleep(waitTime)
+                mySleep(waitTime)
                 i += 2
             clickCount -= 1
 

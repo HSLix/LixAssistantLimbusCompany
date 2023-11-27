@@ -13,14 +13,13 @@ from threading import Thread, Lock
 from src.common.listenAndExit import listenAndExit
 from os import _exit
 from ctypes import windll
-from src.script.classScript import _mainScript
+from src.script.classBridge import _bridgeGuiAndScript
 from time import sleep
+from src.log.myLog import myLog
+import globalVar
 
 
-exeCfg = {"EXPCount": 0, "ThreadCount": 0, "MirrorCount": 0,
-            "setWinSwitch": 0, "setPrizeSwitch": 0, "MirrorSwitch": 0, "ActivityCount": 0}
 
-version = "V2.1.9_Realease"
 
 
 
@@ -29,11 +28,11 @@ class myGUI:
     __slots__ = ("root", "aboutPageFrame", "aboutText", "leftMainPageFrame", "rightMainPageFrame","instructionPageFrame",
                  "buttonFrame", "SetWin", "SetPrize", "descriptionText", "startButton",
                  "taskFrame", "EXPCount", "ThreadCount", "MirrorCount", "script", "buttonThread",
-                 "EXPSpin", "ThreadSpin", "MirrorSpin", "ActivitySpin", "SetMirror", "LunacyToEnkephalinSet", "ActivityCount")
+                 "EXPSpin", "ThreadSpin", "MirrorSpin", "ActivitySpin", "SetMirror", "LunacyToEnkephalinSwitch", "ActivityCount")
 
 
     def __init__(self):
-        from src.log.myLog import myLog
+        
         
         # 检查是否管理员模式运行
         # self.checkAdmin()
@@ -44,7 +43,8 @@ class myGUI:
         self.root = tk.Tk()
 
         # 设置标题和图标
-        titleName = "LALC_LixAssistantLimbusCompany_" + version
+        globalVar.init()
+        titleName = "LALC_LixAssistantLimbusCompany_" + globalVar.version
         self.root.title(titleName)
         myLog("info", titleName + " 启动！")
         self.root.iconbitmap('./pic/GUITitlePic.ico')
@@ -86,7 +86,7 @@ class myGUI:
 
     def checkAdmin(self):
         '''在程序启动前，检查是否以管理员模式启动'''
-        from src.log.myLog import myLog
+        
         if windll.shell32.IsUserAnAdmin():
             #图形操作窗口
             myLog("info","Already got Admin")
@@ -253,11 +253,11 @@ class myGUI:
                  font=("微软雅黑", 10),
                  justify="left",
                  anchor="w").place(width=180, height=20, x=0, y=10)
-        self.LunacyToEnkephalinSet = ttk.Combobox(settingFrame)
-        self.LunacyToEnkephalinSet['values'] = ["不换", "换第一次"]
-        self.LunacyToEnkephalinSet.configure(state="readonly")
-        self.LunacyToEnkephalinSet.current(0)
-        self.LunacyToEnkephalinSet.place(width=180, height=40, x=0, y=45)
+        self.LunacyToEnkephalinSwitch = ttk.Combobox(settingFrame)
+        self.LunacyToEnkephalinSwitch['values'] = ["不换", "换第一次"]
+        self.LunacyToEnkephalinSwitch.configure(state="readonly")
+        self.LunacyToEnkephalinSwitch.current(0)
+        self.LunacyToEnkephalinSwitch.place(width=180, height=40, x=0, y=45)
 
 
         tk.Label(settingFrame, text="更多设置，等我用qt重构图形化界面再加\n承蒙各位厚爱！\n现在准备要加的设置有：\n1、镜牢第三层提前退出；\n2、镜牢可选择是否使用加成；\n3、会保留上次使用的设置；\n4、还有什么可以github提issue\n但记得看看有无重复\n\n！！为了奖励最大化\n尽量用完每周加成再使用本程序！！\nPS:近期时间安排紧张\n一段时间内只能不定期维护LALC现有功能\n",
@@ -420,8 +420,7 @@ class myGUI:
 
     def createAndStartScript(self):
         '''启动脚本线程'''
-        self.script = _mainScript(exeCfg["LunacyToEnkephalin"], exeCfg["EXPCount"], exeCfg["ThreadCount"], exeCfg["MirrorCount"],
-                                  exeCfg["setWinSwitch"], exeCfg["setPrizeSwitch"], exeCfg["MirrorSwitch"], exeCfg["ActivityCount"])
+        self.script = _bridgeGuiAndScript()
         self.script.setDaemon(True)
         self.script.start()
 
@@ -435,12 +434,13 @@ class myGUI:
 
     def checkScriptExitCode(self, ExitCode):
         '''根据ExitCode给出窗口提示程序运行情况和任务完成情况'''
+
         if(ExitCode == -1):
             msg = "程序被手动终止"
         elif(ExitCode == 0):
-            msg = "程序正常结束"
+            msg = "程序无显式报错结束"
         elif(ExitCode == 1):
-            msg = "程序出现未知错误"
+            msg = "未知情况错误，请另存日志文件并提交Issue\nexitCode:" + str(ExitCode)
         elif(ExitCode == 2):
             msg = "没有管理员权限，程序不能稳定运行"
         elif(ExitCode == 3):
@@ -465,51 +465,49 @@ class myGUI:
             msg = "请自行决定是否领取上周的奖励，本程序不能自作主张"
         elif(ExitCode == 13):
             msg = "请设置屏幕的缩放为150%后再启动程序"
-        else:
-            msg = "未知情况错误，请另存日志文件并提交Issue\nexitCode:" + str(ExitCode)
+
 
         msg += "\nEXP:{} Thread:{} Mirror:{} Activity:{}".format(
-            self.script.EXPFinishCount, self.script.ThreadFinishCount, self.script.MirrorFinishCount, self.script.ActivityFinishCount)
+            globalVar.exeResult["EXPFinishCount"], globalVar.exeResult["EXPFinishCount"], globalVar.exeResult["ThreadFinishCount"], globalVar.exeResult["MirrorFinishCount"], globalVar.exeResult["ActivityFinishCount"])
 
         msgbox.showinfo("本次程序运行情况", msg)
 
 
     def outputList(self):
-        '''将GUI接受的变量传到exeCfg的字典里给脚本类调用'''
+        '''将GUI接受的变量传到globalVar.exeCfg的字典里给脚本类调用'''
+        globalVar.exeCfg["EXPCount"] = self.EXPCount.get()
+        globalVar.exeCfg["ThreadCount"] = self.ThreadCount.get()
+        globalVar.exeCfg["MirrorCount"] = self.MirrorCount.get()
+        globalVar.exeCfg["ActivityCount"] = self.ActivityCount.get()
         
-        exeCfg["EXPCount"] = self.EXPCount.get()
-        exeCfg["ThreadCount"] = self.ThreadCount.get()
-        exeCfg["MirrorCount"] = self.MirrorCount.get()
-        exeCfg["ActivityCount"] = self.ActivityCount.get()
-        
-        strLunacyToEnkephalin = self.LunacyToEnkephalinSet.get()
+        strLunacyToEnkephalin = self.LunacyToEnkephalinSwitch.get()
         if strLunacyToEnkephalin == "换第一次":
-            exeCfg["LunacyToEnkephalin"] = 1
+            globalVar.exeCfg["LunacyToEnkephalinSwitch"] = 1
         elif strLunacyToEnkephalin == "不换":
-            exeCfg["LunacyToEnkephalin"] = 0
+            globalVar.exeCfg["LunacyToEnkephalinSwitch"] = 0
         else:
-            exeCfg["LunacyToEnkephalin"] = 0
+            globalVar.exeCfg["LunacyToEnkephalinSwitch"] = 0
             
         # 防止传空值 
-        if exeCfg["EXPCount"] == "":
-            exeCfg["EXPCount"] = 0
+        if globalVar.exeCfg["EXPCount"] == "":
+            globalVar.exeCfg["EXPCount"] = 0
         else:
-            exeCfg["EXPCount"] = int(exeCfg["EXPCount"])
+            globalVar.exeCfg["EXPCount"] = int(globalVar.exeCfg["EXPCount"])
 
-        if exeCfg["ThreadCount"] == "":
-            exeCfg["ThreadCount"] = 0
+        if globalVar.exeCfg["ThreadCount"] == "":
+            globalVar.exeCfg["ThreadCount"] = 0
         else:
-            exeCfg["ThreadCount"] = int(exeCfg["ThreadCount"])
+            globalVar.exeCfg["ThreadCount"] = int(globalVar.exeCfg["ThreadCount"])
 
-        if exeCfg["MirrorCount"] == "":
-            exeCfg["MirrorCount"] = 0
+        if globalVar.exeCfg["MirrorCount"] == "":
+            globalVar.exeCfg["MirrorCount"] = 0
         else:
-            exeCfg["MirrorCount"] = int(exeCfg["MirrorCount"])
+            globalVar.exeCfg["MirrorCount"] = int(globalVar.exeCfg["MirrorCount"])
 
-        if exeCfg["ActivityCount"] == "":
-            exeCfg["ActivityCount"] = 0
+        if globalVar.exeCfg["ActivityCount"] == "":
+            globalVar.exeCfg["ActivityCount"] = 0
         else:
-            exeCfg["ActivityCount"] = int(exeCfg["ActivityCount"])
+            globalVar.exeCfg["ActivityCount"] = int(globalVar.exeCfg["ActivityCount"])
 
         # 根据窗口和奖励选择传值
         strSetWin = self.SetWin.get()
@@ -519,29 +517,29 @@ class myGUI:
         # print(strSetWin + " " + strSetPrize + " " + strSetMirror)
 
         if(strSetWin == "位置+大小"):
-            exeCfg["setWinSwitch"] = 0
+            globalVar.exeCfg["WinSwitch"] = 0
         elif(strSetWin == "大小"):
-            exeCfg["setWinSwitch"] = 1
+            globalVar.exeCfg["WinSwitch"] = 1
         elif(strSetWin == "位置"):
-            exeCfg["setWinSwitch"] = 2
+            globalVar.exeCfg["WinSwitch"] = 2
         elif(strSetWin == "无"):
-            exeCfg["setWinSwitch"] = 3
+            globalVar.exeCfg["WinSwitch"] = 3
 
         if(strSetPrize == "邮件+日/周常"):
-            exeCfg["setPrizeSwitch"] = 0
+            globalVar.exeCfg["PrizeSwitch"] = 0
         elif(strSetPrize == "日/周常"):
-            exeCfg["setPrizeSwitch"] = 1
+            globalVar.exeCfg["PrizeSwitch"] = 1
         elif(strSetPrize == "邮件"):
-            exeCfg["setPrizeSwitch"] = 2
+            globalVar.exeCfg["PrizeSwitch"] = 2
         elif(strSetPrize == "无"):
-            exeCfg["setPrizeSwitch"] = 3
+            globalVar.exeCfg["PrizeSwitch"] = 3
 
         if(strSetMirror == "镜牢1"):
-            exeCfg["MirrorSwitch"] = 1
+            globalVar.exeCfg["MirrorSwitch"] = 1
         elif(strSetMirror == "镜牢2Normal"):
-            exeCfg["MirrorSwitch"] = 2
+            globalVar.exeCfg["MirrorSwitch"] = 2
 
-        # print(str(exeCfg["setWinSwitch"]) + " " + str(exeCfg["setPrizeSwitch"]))
+        # print(str(globalVar.exeCfg["WinSwitch"]) + " " + str(globalVar.exeCfg["PrizeSwitch"]))
 
 
     def showWin(self):

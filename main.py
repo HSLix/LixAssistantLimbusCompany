@@ -8,7 +8,6 @@
 '''
 
 from src.gui.scriptGUI import scriptGUI
-#from src.common import getPic, autoFindOrClick as afc
 from win32event import CreateMutex
 from win32api import GetLastError
 from sys import exit

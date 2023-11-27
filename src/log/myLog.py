@@ -40,18 +40,7 @@ warningLogger =  get_logger(name="warningLogger",
 
 
 
-def beginAndFinishLog(func):
-    '''一个任务开始与结束的日志'''
-    def wrapper(*args, **kw):
-        msg = "Begin " + func.__name__
-        myLog("info", msg)
 
-        #真正函数
-        func(*args, **kw)
-
-        msg = "Finish " + func.__name__
-        myLog("info", msg)
-    return wrapper
 
 
 

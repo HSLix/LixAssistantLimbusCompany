@@ -6,16 +6,15 @@
 * Project   :LixAssistantLimbusCompany
 * Function  :经验本与纽本交互的类
 '''
-from src.script.classScript import _mainScript
-from src.common import getPic, autoFindOrClick as afc
-from src.script.battle import dailyBattlePart
-from src.common.myTime import myTimeSleep
-from src.script.myWait import myWait
-from src.script.classScript import checkAndExit
-from src.log.myLog import myLog, beginAndFinishLog
+
+from src.script.classTask import _task, checkAndExit, beginAndFinishLog
+from src.common.myTime import mySleep
+from src.log.myLog import myLog
+
+from src.script.classScript import _script
 
 
-class _Luxcavation(_mainScript):
+class _Luxcavation(_script):
     '''经验本纽本的类'''
     __slots__ = ("EXPCount", "ThreadCount", "EXPFinishCount", "ThreadFinishCount")
 
@@ -62,7 +61,7 @@ class _Luxcavation(_mainScript):
                 msg = "EXP Success " + str(self.EXPFinishCount) + " Times!"
                 myLog("info", msg)
                 
-            myTimeSleep(1)
+            mySleep(1)
 
 
     @checkAndExit
@@ -88,7 +87,7 @@ class _Luxcavation(_mainScript):
                 msg = "Thread Success "  + str(self.ThreadFinishCount) + " Times!"
                 myLog("info", msg)
 
-            myTimeSleep(1)
+            mySleep(1)
 
 
     @checkAndExit
@@ -99,9 +98,9 @@ class _Luxcavation(_mainScript):
         '''
         result = False
         i = 1
-        getPic.winCap()
-        while(not afc.autoFind("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) and\
-            afc.autoFind("./pic/team/Announcer.png", "prepareBattle")):
+        self.cap_win()
+        while(not self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) and\
+            self.is_find("./pic/team/Announcer.png", "prepareBattle")):
             if(i > 12):
                 i = 1
             if(i < 7):
@@ -111,21 +110,21 @@ class _Luxcavation(_mainScript):
                 addX = (i - 6) * 140
                 addY = 200
 
-            getPic.winCap()
-            afc.autoSinClick("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
-            getPic.winCap()
+            self.cap_win()
+            self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
+            self.cap_win()
             i += 1
             
-        getPic.winCap()
-        afc.autoSinClick("./pic/team/Announcer.png", "ToBattle", 1000, 400, 5)
-        getPic.winCap()
-        if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
-                myWait()
+        self.cap_win()
+        self.single_target_click("./pic/team/Announcer.png", "ToBattle", 1000, 400, 5)
+        self.cap_win()
+        if(self.is_find("./pic/Wait.png", "Wait Sign")):
+                self.myWait()
 
-        getPic.winCap()
-        if(afc.autoSinClick("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7) or\
-        afc.autoSinClick("./pic/battle/WinRate.png", "WinRate") or\
-        afc.autoFind("./pic/battle/battlePause.png", "Fighting Sign")):
+        self.cap_win()
+        if(self.single_target_click("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7) or\
+        self.single_target_click("./pic/battle/WinRate.png", "WinRate") or\
+        self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
             result = True
         return result
         
@@ -135,13 +134,13 @@ class _Luxcavation(_mainScript):
         '''统筹了完成一次经验本所有流程
         :param result:是否成功进入战斗部分并完成一次循环
         '''
-        getPic.winCap()
+        self.cap_win()
         result = False
         result = self.EXPEnter()
-        getPic.winCap()
-        if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
-            myWait()
-        dailyBattlePart()
+        self.cap_win()
+        if(self.is_find("./pic/Wait.png", "Wait Sign")):
+            self.myWait()
+        self.allWinRateBattle()
         return result
 
 
@@ -153,14 +152,14 @@ class _Luxcavation(_mainScript):
 
         #是否进入到战斗（核心步骤）中
         result = False
-        getPic.winCap()
-        switch = afc.autoFind("./pic/team/Announcer.png", "prepareBattle")
+        self.cap_win()
+        switch = self.is_find("./pic/team/Announcer.png", "prepareBattle")
         if not switch:
-            afc.autoSinClick("./pic/initMenu/drive.png", "Drive")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/EXPHard.png", "EXPHard", 0, 0, 3)
+            self.single_target_click("./pic/initMenu/drive.png", "Drive")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/EXPHard.png", "EXPHard", 0, 0, 3)
         result = self.EXPOrThreadPrepareBattle()
         return result
 
@@ -173,12 +172,12 @@ class _Luxcavation(_mainScript):
         '''
         result = False
         
-        if afc.autoFind("./pic/Wait.png", "WaitSign"):
-            myWait()
-        elif afc.autoSinClick("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
+        if self.is_find("./pic/Wait.png", "WaitSign"):
+            self.myWait()
+        elif self.single_target_click("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
             result =True
             self.ScriptBackToInitMenu()
-        elif afc.autoSinClick("./pic/battle/confirm.png", "Confirm"):
+        elif self.single_target_click("./pic/battle/confirm.png", "Confirm"):
             result = True
             self.ScriptBackToInitMenu()
         return result
@@ -191,14 +190,14 @@ class _Luxcavation(_mainScript):
         :param result:是否成功进入战斗部分并完成一次循环
         '''
 
-        getPic.winCap()
+        self.cap_win()
         result = False
         result = self.ThreadEnter()
         if(result):
-            getPic.winCap()
-            if(afc.autoFind("./pic/Wait.png", "Wait Sign")):
-                myWait()
-        dailyBattlePart()
+            self.cap_win()
+            if(self.is_find("./pic/Wait.png", "Wait Sign")):
+                self.myWait()
+        self.allWinRateBattle()
         return result
 
 
@@ -209,18 +208,18 @@ class _Luxcavation(_mainScript):
         '''
         
         result = False
-        getPic.winCap()
-        switch = afc.autoFind("./pic/team/Announcer.png", "prepareBattle")
+        self.cap_win()
+        switch = self.is_find("./pic/team/Announcer.png", "prepareBattle")
         if not switch:
-            afc.autoSinClick("./pic/initMenu/drive.png", "Drive")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/ThreadEntrance.png", "ThreadEntrance")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/Enter.png", "Enter")
-            getPic.winCap()
-            afc.autoSinClick("./pic/luxcavation/ThreadHard.png", "ThreadHard", 0, 0, 3)
+            self.single_target_click("./pic/initMenu/drive.png", "Drive")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/ThreadEntrance.png", "ThreadEntrance")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/Enter.png", "Enter")
+            self.cap_win()
+            self.single_target_click("./pic/luxcavation/ThreadHard.png", "ThreadHard", 0, 0, 3)
         result = self.EXPOrThreadPrepareBattle()
         return result
 
@@ -231,12 +230,12 @@ class _Luxcavation(_mainScript):
         :param result:是否成功结算
         '''
         result = False
-        if afc.autoFind("./pic/Wait.png", "WaitSign"):
-            myWait()
-        elif afc.autoSinClick("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
+        if self.is_find("./pic/Wait.png", "WaitSign"):
+            self.myWait()
+        elif self.single_target_click("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
             result =True
             self.ScriptBackToInitMenu()
-        elif afc.autoSinClick("./pic/battle/confirm.png", "Confirm"):
+        elif self.single_target_click("./pic/battle/confirm.png", "Confirm"):
             result = True
             self.ScriptBackToInitMenu()
         return result

@@ -12,7 +12,7 @@ from src.log.myLog import myLog
 from tkinter.messagebox import showinfo
 from sys import executable, version_info
 from os import _exit
-from src.common.myTime import myTimeSleep
+from src.common.myTime import mySleep
 
 
 
@@ -30,7 +30,7 @@ def checkAdmin():
                     showinfo("异常报告", "无管理员权限，软件很可能不能正常运作")
                 else:
                     myLog("info","Agree to get Admin, Restart!")
-                    # myTimeSleep(0.9)
+                    # mySleep(0.9)
             _exit(0)
 
 

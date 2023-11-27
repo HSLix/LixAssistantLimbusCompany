@@ -12,7 +12,7 @@ from src.log.myLog import myLog
 
 
 
-def myTimeSleep(t):
+def mySleep(t):
     '''
     包装了timesleep，方便记录日志  
     '''

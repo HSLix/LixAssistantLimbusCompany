@@ -10,7 +10,7 @@ from pynput import keyboard
 from os import _exit
 from threading import Thread
 from src.log.myLog import myLog
-from src.common.myTime import myTimeSleep
+from src.common.myTime import mySleep
 
 
 def listenAndExit():
@@ -25,7 +25,7 @@ def listenAndExit():
 # 执行需要在按下ESC键后运行的代码
 def exit_program():
     myLog("info", "ESC Quit!")
-    myTimeSleep(0.2)    
+    mySleep(0.2)    
     _exit(0)
 
 def on_press(key):
