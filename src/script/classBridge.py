@@ -10,7 +10,7 @@ from sys import exc_info
 from traceback import format_exception
 from threading import Thread, Lock
 from src.error.myError import *
-
+from src.log.myLog import myLog
 from src.script.scheme import scriptTasks
 
 
@@ -107,6 +107,7 @@ class _bridgeGuiAndScript(Thread):
         finally:
             self.exc_traceback = ''.join(
                 format_exception(*exc_info()))
+            myLog('error', self.exc_traceback)
 
     def kill(self):
         '''终止函数'''

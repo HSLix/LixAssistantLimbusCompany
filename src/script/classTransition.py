@@ -27,7 +27,7 @@ class _transition(_script):
         while(not self.is_find("./pic/initMenu/Window.png", "MainMenuSign", 0.8)):
 
             self.cap_win()
-            if( self.single_target_click("./pic/initMenu/FaceTheSinSaveTheEGO.png", "84启动!", 0, 0, 10, 1, 0.9)):
+            if( self.single_target_click("./pic/login/Clear all caches.png", "Clear all caches", 300, -300, 10, 1)):
                 loopCount = 0
                 continue
             elif(self.single_target_click("./pic/initMenu/downloadConfirm.png", "downloadConfirm", 0, 0, 1, 1, 0.9)):

@@ -44,8 +44,8 @@ class _script(_task):
         while(not self.single_target_click("./pic/initMenu/Window.png", "mainMenuSign")):
 
             # 战斗或事件中
-            if(self.single_target_click("./pic/battle/WinRate.png", "battleSign1") or
-               self.single_target_click("./pic/battle/Start.png", "battleSign2")):
+            if(self.is_find("./pic/battle/WinRate.png", "battleSign1") or
+               self.is_find("./pic/battle/Start.png", "battleSign2")):
                 self.allWinRateBattle()
                 loopCount = 0
             elif(self.is_find("./pic/event/Skip.png", "Skip")):
@@ -122,10 +122,13 @@ class _script(_task):
         while(True):
             self.cap_win()
             condition = False
-            if (self.single_target_click("./pic/battle/WinRate.png", "WinRate")):
-                self.cap_win()
-                if (self.single_target_click("./pic/battle/Start.png", "Start")):
-                    condition = True
+            if (self.is_find("./pic/battle/WinRate.png", "WinRate") or 
+                self.is_find("./pic/battle/Start.png", "StartBattle")):
+
+                self.press_key("p")
+                #self.single_target_click("./pic/battle/WinRate.png", "WinRate")
+                self.press_key("enter")
+                condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
                 mySleep(3)
                 condition = True
