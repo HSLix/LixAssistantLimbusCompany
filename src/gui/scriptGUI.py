@@ -8,6 +8,7 @@
 '''
 from src.gui.myGUI import myGUI
 from src.test.tryClick import tryClick
+from src.test.tryFind import tryFind
 from src.test.checkScreenScale import checkScreenScale
 from src.test.checkAdmin import checkAdmin
 
@@ -19,7 +20,9 @@ def scriptGUI():
     checkScreenScale()
 
     # 测试识图
-    # tryClick("./pic/initMenu/FirstBuy.png", "26Lunary", 0, 0, 0.7, 1, 0.825)
+    # tryFind("./pic/event/ToBattle.png", "ToBattle!", 0.80)
+    # tryClick("./pic/event/ToBattle.png", "ToBattle!", 0, 0, 0.7, 1, 0.80)
+    
     
     gui = myGUI()
     gui.showWin()

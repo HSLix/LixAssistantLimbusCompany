@@ -71,7 +71,7 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount
 
 def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCount = 1, correctRate = 0.9):
     """
-    输入一个图片模板，自动点击截图中一个
+    输入一个图片模板，自动点击截图中多个
     :param img_model_path: 图片模板相对坐标
     :param name:当前进程名字/代号
     :param addX:x坐标偏移，默认为0

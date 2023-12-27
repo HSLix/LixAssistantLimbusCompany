@@ -31,6 +31,6 @@ def pressKey(key):
     keybd_event(asciiIndex,scanIndex,0,0) 
     mySleep(0.2) 
     keybd_event(asciiIndex,scanIndex,KEYEVENTF_KEYUP,0)  
-    
+    mySleep(0.2) 
     
 

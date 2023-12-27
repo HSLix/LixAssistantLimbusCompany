@@ -12,6 +12,7 @@ from threading import Thread, Lock
 from src.error.myError import *
 from src.log.myLog import myLog
 from src.script.scheme import scriptTasks
+import globalVar
 
 
 
@@ -30,8 +31,7 @@ class _bridgeGuiAndScript(Thread):
     def __init__(self):
         '''构造函数'''
         super(_bridgeGuiAndScript, self).__init__()
-        global exitCode
-        exitCode = 0
+        globalVar.exitCode = 0
         self.exception = None
         self.exc_traceback = ''
         
@@ -39,70 +39,69 @@ class _bridgeGuiAndScript(Thread):
         
 
     def run(self):
-        '''捕捉错误并更改exitCode'''
+        '''捕捉错误并更改globalVar.exitCode'''
         lock = Lock()
-        global exitCode
-        exitCode = 0
+        globalVar.exitCode = 0
 
-        # myLog("debug", "ExitCode：" + str(exitCode))
+        # myLog("debug", "globalVar.exitCode：" + str(globalVar.exitCode))
 
         try:
             self._run()
         except screenScaleError as e:
             with lock:
-                exitCode = 13
+                globalVar.exitCode = 13
             self.exception = e
         except previousClaimRewardError as e:
             with lock:
-                exitCode = 12
+                globalVar.exitCode = 12
             self.exception = e
         except userStopError as e:
             with lock:
-                exitCode = -1
+                globalVar.exitCode = -1
             self.exception = e
         except mirrorInProgressError as e:
             with lock:
-                exitCode = 11
+                globalVar.exitCode = 11
             self.exception = e
         except noSavedPresetsError as e:
             with lock:
-                exitCode = 10
+                globalVar.exitCode = 10
             self.exception = e
         except unexpectNumError as e:
             with lock:
-                exitCode = 9
+                globalVar.exitCode = 9
             self.exception = e
         except cannotOperateGameError as e:
             with lock:
-                exitCode = 8
+                globalVar.exitCode = 8
             self.exception = e
         except netWorkUnstableError as e:
             with lock:
-                exitCode = 7
+                globalVar.exitCode = 7
             self.exception = e
         except backMainWinError as e:
             with lock:
-                exitCode = 6
+                globalVar.exitCode = 6
             self.exception = e
         except withOutGameWinError as e:
             with lock:
-                exitCode = 5
+                globalVar.exitCode = 5
             self.exception = e
         except notWaitError as e:
             with lock:
-                exitCode = 4
+                globalVar.exitCode = 4
             self.exception = e
         except withOutPicError as e:
             with lock:
-                exitCode = 3
+                globalVar.exitCode = 3
             self.exception = e
         except withOutAdminError as e:
             with lock:
-                exitCode = 2
+                globalVar.exitCode = 2
             self.exception = e
         except Exception as e:
             with lock:
-                exitCode = 1
+                globalVar.exitCode = 1
             self.exception = e
         finally:
             self.exc_traceback = ''.join(
@@ -111,14 +110,13 @@ class _bridgeGuiAndScript(Thread):
 
     def kill(self):
         '''终止函数'''
-        '''判定为正常终止'''
-        global exitCode
-        exitCode = -1
+        '''判定为用户手动终止'''
+        globalVar.exitCode = -1
 
     @staticmethod
     def getExitCode():
-        '''exitCode向外传值接口'''
-        global exitCode
+        '''globalVar.exitCode向外传值接口'''
+        exitCode = globalVar.exitCode
         return exitCode
 
     def _run(self):

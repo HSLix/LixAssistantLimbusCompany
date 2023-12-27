@@ -260,10 +260,6 @@ class myGUI:
         self.LunacyToEnkephalinSwitch.place(width=180, height=40, x=0, y=45)
 
 
-        tk.Label(settingFrame, text="更多设置，等我用qt重构图形化界面再加\n承蒙各位厚爱！\n现在准备要加的设置有：\n1、镜牢第三层提前退出；\n2、镜牢可选择是否使用加成；\n3、会保留上次使用的设置；\n4、还有什么可以github提issue\n但记得看看有无重复\n\n！！为了奖励最大化\n尽量用完每周加成再使用本程序！！\nPS:近期时间安排紧张\n一段时间内只能不定期维护LALC现有功能\n",
-                 font=("微软雅黑", 10),
-                 justify="left",
-                 anchor="w").place(width=400, height=390, x=0, y=100)
 
         """右边布局 按钮交互"""
         self.buttonFrame = tk.Frame(self.rightMainPageFrame, padx=5, pady=5)
@@ -320,9 +316,9 @@ class myGUI:
                  anchor="w").place(width=180, height=20, x=0, y=320)
 
         self.SetMirror = ttk.Combobox(self.taskFrame)
-        self.SetMirror['values'] = ["镜牢1", "镜牢2Normal"]
+        self.SetMirror['values'] = ["镜牢1", "镜牢2Normal", "镜牢3Normal"]
         self.SetMirror.configure(state="readonly")
-        self.SetMirror.current(1)
+        self.SetMirror.current(2)
         self.SetMirror.place(width=180, height=40, x=0, y=345)
 
         self.MirrorSpin = tk.Spinbox(self.taskFrame, from_=0, to=maxCount, width=10, textvariable=self.MirrorCount,
@@ -468,7 +464,7 @@ class myGUI:
 
 
         msg += "\nEXP:{} Thread:{} Mirror:{} Activity:{}".format(
-            globalVar.exeResult["EXPFinishCount"], globalVar.exeResult["EXPFinishCount"], globalVar.exeResult["ThreadFinishCount"], globalVar.exeResult["MirrorFinishCount"], globalVar.exeResult["ActivityFinishCount"])
+            globalVar.exeResult["EXPFinishCount"], globalVar.exeResult["ThreadFinishCount"], globalVar.exeResult["MirrorFinishCount"], globalVar.exeResult["ActivityFinishCount"])
 
         msgbox.showinfo("本次程序运行情况", msg)
 
@@ -538,6 +534,8 @@ class myGUI:
             globalVar.exeCfg["MirrorSwitch"] = 1
         elif(strSetMirror == "镜牢2Normal"):
             globalVar.exeCfg["MirrorSwitch"] = 2
+        elif(strSetMirror == "镜牢3Normal"):
+            globalVar.exeCfg["MirrorSwitch"] = 3
 
         # print(str(globalVar.exeCfg["WinSwitch"]) + " " + str(globalVar.exeCfg["PrizeSwitch"]))
 

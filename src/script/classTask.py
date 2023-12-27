@@ -21,19 +21,51 @@ class _task():
     '''在这里做前后台的切换'''
     __slots__ = ()
     
-    def single_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount = 1, correctRate = 0.7):
+    def single_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.8, clickCount = 1, correctRate = 0.75):
+        """
+        输入一个图片模板，自动点击截图中一个
+        :param img_model_path: 图片模板相对坐标
+        :param name:当前进程名字/代号
+        :param addX:x坐标偏移，默认为0
+        :param addY:y坐标偏移，默认为0
+        :param waitTime:点击一次后的等待时间
+        :param clickCount:点击次数，默认为1
+        :param correctRate:准确率，0.7起步会比较准确
+        :return: 是否完成点击
+        """
         return autoSinClick(img_model_path, name, addX, addY,waitTime, clickCount, correctRate)
 
     def press_key(self,key):
         pressKey(key)
 
-    def multiple_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.5, clickCount = 1, correctRate = 0.7):
+    def multiple_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.5, clickCount = 1, correctRate = 0.75):
+        """
+        输入一个图片模板，自动点击截图中多个
+        :param img_model_path: 图片模板相对坐标
+        :param name:当前进程名字/代号
+        :param addX:x坐标偏移，默认为0
+        :param addY:y坐标偏移，默认为0
+        :param waitTime:点击一次后的等待时间
+        :param clickCount:点击次数，默认为1
+        :param correctRate:准确率，0.7起步会比较准确
+        :return: 是否完成点击
+        """
         return autoMulClick(img_model_path, name, addX, addY,waitTime, clickCount, correctRate)
 
     def cap_win(self):
+        '''
+        截屏函数，并将图片保存为screenshot.png
+        '''
         winCap()
 
     def is_find(self,img_model_path, name, correctRate = 0.7):
+        """
+        输入一个图片模板，自动点击
+        :param img_model_path: 图片模板相对坐标
+        :param name:当前进程名字/代号
+        :param correctRate:准确率，0.7起步会比较准确
+        :param return: 是否在截屏中找到目标模板
+        """
         return autoFind(img_model_path, name, correctRate)
 
 def beginAndFinishLog(func):
@@ -53,13 +85,13 @@ def checkAndExit(func):
     '''检查globalVar.exitCode符合条件结束该线程（程序）'''
 
     def wrapper(*args, **kw):
-        if(globalVar.exitCode != 0):
+        if(globalVar.exitCode == -1):
             raise userStopError("用户主动终止程序")
 
         # 真正函数
         func(*args, **kw)
 
-        if(globalVar.exitCode != 0):
+        if(globalVar.exitCode == -1):
             raise userStopError("用户主动终止程序")
 
     return wrapper

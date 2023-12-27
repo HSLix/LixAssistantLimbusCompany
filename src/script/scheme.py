@@ -36,22 +36,29 @@ def scriptTasks():
     # 全流程
     # 初始化游戏窗口
     win.winTask()
+
     # 从Start界面到主菜单界面
     trans.ScriptGameStart()
     trans.ScriptBackToInitMenu()
+
     # 狂气购买脑啡肽
     trans.buyEnkephalin()
+
     # 脑啡肽换饼
     trans.convertPai()
+
     # EXP
     lux.ScriptTaskEXP()
     # 每完成一次任务，获取完成次数
     globalVar.exeResult["EXPFinishCount"] = lux.getEXPFinishCount()
+
     # Thread
     lux.ScriptTaskThread()
     globalVar.exeResult["ThreadFinishCount"] = lux.getThreadFinishCount()
+    
     # Mirror
     mir.start()
     globalVar.exeResult["MirrorFinishCount"] = mir.getMirrorFinishCount()
+    
     # Prize
     prize.getPrize()

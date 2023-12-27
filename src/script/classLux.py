@@ -10,6 +10,7 @@
 from src.script.classTask import _task, checkAndExit, beginAndFinishLog
 from src.common.myTime import mySleep
 from src.log.myLog import myLog
+import globalVar
 
 from src.script.classScript import _script
 
@@ -58,6 +59,7 @@ class _Luxcavation(_script):
 
             if(self.EXPPrize()):
                 self.EXPFinishCount += 1
+                globalVar.exeResult["EXPFinishCount"] += 1
                 msg = "EXP Success " + str(self.EXPFinishCount) + " Times!"
                 myLog("info", msg)
                 
@@ -84,6 +86,7 @@ class _Luxcavation(_script):
 
             if(self.ThreadPrize()):
                 self.ThreadFinishCount += 1
+                globalVar.exeResult["ThreadFinishCount"] += 1
                 msg = "Thread Success "  + str(self.ThreadFinishCount) + " Times!"
                 myLog("info", msg)
 
@@ -96,37 +99,7 @@ class _Luxcavation(_script):
         '''负责进入副本后选人到进入战斗
         :param result:是否成功进入战斗
         '''
-        result = False
-        i = 1
-        self.cap_win()
-        while(not self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) and\
-            self.is_find("./pic/team/Announcer.png", "prepareBattle")):
-            if(i > 12):
-                i = 1
-            if(i < 7):
-                addX = i * 140
-                addY = 0
-            else:
-                addX = (i - 6) * 140
-                addY = 200
-
-            self.cap_win()
-            self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
-            self.cap_win()
-            i += 1
-            
-        self.cap_win()
-        self.single_target_click("./pic/team/Announcer.png", "ToBattle", 1000, 400, 5)
-        self.cap_win()
-        if(self.is_find("./pic/Wait.png", "Wait Sign")):
-                self.myWait()
-
-        self.cap_win()
-        if(self.single_target_click("./pic/battle/Start.png", "Start", 0, 0, 0.7, 1, 0.7) or\
-        self.single_target_click("./pic/battle/WinRate.png", "WinRate") or\
-        self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
-            result = True
-        return result
+        self.prepareBattle()
         
 
     
@@ -159,7 +132,7 @@ class _Luxcavation(_script):
             self.cap_win()
             self.single_target_click("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
             self.cap_win()
-            self.single_target_click("./pic/luxcavation/EXPHard.png", "EXPHard", 0, 0, 3)
+            self.single_target_click("./pic/luxcavation/EXPDifficultyLv38.png", "Lv38", 0, 0, 3)
         result = self.EXPOrThreadPrepareBattle()
         return result
 
@@ -219,7 +192,7 @@ class _Luxcavation(_script):
             self.cap_win()
             self.single_target_click("./pic/luxcavation/Enter.png", "Enter")
             self.cap_win()
-            self.single_target_click("./pic/luxcavation/ThreadHard.png", "ThreadHard", 0, 0, 3)
+            self.single_target_click("./pic/luxcavation/ThreadDifficultyLv40.png", "Lv40",0, 0, 3, 1, 0.90)
         result = self.EXPOrThreadPrepareBattle()
         return result
 

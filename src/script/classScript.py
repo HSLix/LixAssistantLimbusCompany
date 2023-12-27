@@ -20,9 +20,6 @@ class _script(_task):
     def __init__(self):
        pass 
         
-        
-
-
 
     @checkAndExit
     def errorRetry(self):
@@ -42,78 +39,62 @@ class _script(_task):
         loopCount = 0
         self.cap_win()
         while(not self.single_target_click("./pic/initMenu/Window.png", "mainMenuSign")):
+            
 
-            # 战斗或事件中
-            if(self.is_find("./pic/battle/WinRate.png", "battleSign1") or
-               self.is_find("./pic/battle/Start.png", "battleSign2")):
+            self.cap_win()
+            
+            # 战斗中,完成
+            if(self.is_find("./pic/battle/WinRate.png", "battleSign")):
                 self.allWinRateBattle()
-                loopCount = 0
-            elif(self.is_find("./pic/event/Skip.png", "Skip")):
-                # 事件过程
-                self.eventPart()
-                loopCount = 0
-            elif self.single_target_click("./pic/battle/confirm.png", "Confirm"):
-                # 战斗结算
-                loopCount = 0
-            elif self.single_target_click("./pic/battle/levelUpConfirm.png", "LevelUpConfirm"):
-                # 升级结算
-                loopCount = 0
-            elif self.single_target_click("./pic/scene/QuitScene.png", "QuitScene"):
-                # 剧情退出
+            
+            # 镜本中途的返回主界面
+            if self.single_target_click("./pic/back/To Window.png", "To Window"):
                 self.cap_win()
-                self.single_target_click("./pic/scene/SkipScene.png", "SkipScene")
-                self.cap_win()
-                self.single_target_click("./pic/scene/SkipConfirm.png", "SkipConfirm")
-                loopCount = 0
-            elif(self.single_target_click("./pic/team/LeftArrow.png", "ExitPrepareTeam")):
-                # 组队过程中
-                loopCount = 0
-            elif(self.single_target_click("./pic/mirror/mirror2/ego/egoGift.png", "ChooseEgoGift")):
-                # 选择ego
-                self.cap_win()
-                self.single_target_click("./pic/mirror/mirror2/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 6)
-                loopCount = 0
+                self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
 
+            # 战斗结算的确认
+            self.single_target_click("./pic/back/blackBackGroundConfirm.png", "blackCOnfirm")
+
+            # 在剧情中退出
+            if self.single_target_click("./pic/back/SceneSetting.png", "SceneSetting"):
+                self.press_key("esc")
+                self.cap_win()
+                self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
+
+            # 镜本结算
+            if self.single_target_click("./pic/mirror/mirror3/ClaimRewards.png","ClaimRewards"):
+                for i in range(5):
+                    self.press_key("enter")
+                    
+            # 在ego选择退出
+            if self.single_target_click("./pic/back/settingGear.png", "settingGear"):
+                continue
+
+            
+
+            
             # 等待加载情况
             if(self.is_find("./pic/Wait.png", "Wait Sign")):
-                self.myWait()
+                self.myWait()   
+
+            if(self.is_find("./pic/back/mainMenuSetting.png", "main menu setting")):
+                self.press_key("esc")
 
             self.cap_win()
-            # 经验本或者纽本的情况
-            if(self.is_find("./pic/luxcavation/ThreadEntrance.png", "ThreadEntrance")):
-                self.single_target_click("./pic/goBack/leftArrow.png", "leftArrow")
-                loopCount = 0
-            # 镜牢的情况
-            elif(self.is_find("./pic/mirror/mirror2/way/mirror2MapSign.png", "mirror2MapSign")
-                 or self.is_find("./pic/mirror/mirror2/EGOGiftOwned.png", "EGOGiftOwned")):
-                if self.single_target_click("./pic/mirror/mirror2/Gear.png", "ExitGear"):
-                    self.cap_win()
-                    self.single_target_click(
-                        "./pic/mirror/mirror2/LeftArrow.png", "ToWindow")
-                    self.cap_win()
-                    self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm", 0, 0, 5)
-                    loopCount = 0
-                elif self.single_target_click("./pic/mirror/mirror2/ClaimRewards.png","ClaimRewards", 0, 0, 0.7, 1, 0.7):
-                    self.cap_win()
-                    self.single_target_click("./pic/mirror/mirror2/Receive.png","Receive")
-                    self.cap_win()
-                    if self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png","FirstConfirm"):
-                        self.cap_win()
-                        if self.single_target_click("./pic/mirror/mirror2/way/Confirm.png","SecondConfirm"):
-                            loopCount = 0
-                            
+            # 退出的通用步骤esc
+            self.press_key("esc")
+
+            loopCount += 1
+             
             #在循环里必须有应对错误的情况
             self.errorRetry()
-            self.cap_win()
-
             # 第二次也不行时，一定是出现了脚本中没有的情况
-            if loopCount > 2:
+            if loopCount > 30:
                 myLog(
                     "warning", "Can't Find The Way MainMenu. Must be Unknown Situation. Please Restart the Game and the Script")
                 raise backMainWinError("无法返回主界面，不能进行下一步")
 
 
-            loopCount += 1
 
     def allWinRateBattle(self):
         '''全部采用WinRate战斗'''
@@ -126,7 +107,7 @@ class _script(_task):
                 self.is_find("./pic/battle/Start.png", "StartBattle")):
 
                 self.press_key("p")
-                #self.single_target_click("./pic/battle/WinRate.png", "WinRate")
+                #self.is_find("./pic/battle/WinRate.png", "WinRate")
                 self.press_key("enter")
                 condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
@@ -161,7 +142,14 @@ class _script(_task):
             
             self.cap_win()
             self.single_target_click("./pic/event/Skip.png", "Skip", 0, 0, 0.3, 3)
+
+            # 对bus/chair的出口第一时间反应
+            self.cap_win()
+            if(self.single_target_click("./pic/event/Leave.png", "Leave")):
+                self.cap_win()
+                self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
             
+
             #对判定事件的处理，优先择高概率
             self.cap_win()
             if(self.is_find("./pic/event/ChooseCheck.png","ChooseCheck")):
@@ -184,9 +172,6 @@ class _script(_task):
             if(self.is_find("./pic/event/Choices.png","Choices")):
                 self.copeWithWhateverEvent()
 
-            if(self.single_target_click("./pic/event/Leave.png", "Leave")):
-                self.cap_win()
-                self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
             mySleep(1)
 
             if(not self.is_find("./pic/event/Skip.png", "Skip")):
@@ -251,9 +236,100 @@ class _script(_task):
         result = False
         if(self.is_find("./pic/Wait.png", "Wait Sign")):
             result = True
-        elif(self.is_find("./pic/WholeBlack.png", "WholeBlack")):
-            result = True
-        elif(self.is_find("./pic/CONNECTING.png", "CONNECTING")):
+        elif(self.is_find("./pic/WholeBlack.png", "WholeBlack", 0.99)):
             result = True
         return result
 
+
+    #根据已选人数和队伍可容纳人数做情况分类
+    #检测3/3;4/4;5/5；6/6；7/7最好就一个标准，能省不少时间
+    def judTeamCondition(self):
+        '''判断当前队伍状况'''
+        resultCondition = -1
+        if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+            self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+            self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+            self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+            self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
+            resultCondition = 0
+        elif(self.is_find("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.94)):
+            resultCondition = 1
+        elif(self.is_find("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.94)):
+            resultCondition = 2
+        elif(self.is_find("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94)):
+            resultCondition = 3
+        elif(self.is_find("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.94)):
+            resultCondition = 4
+        elif(self.is_find("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.94)):
+            resultCondition = False
+        return resultCondition
+
+
+    #满队标准
+    def judFullTeam(self,condition):
+        '''判断队伍是否人满'''
+        result = False
+        if(condition == 0):
+            result = True
+        elif(condition == 1):
+            if(self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
+                result = True
+        elif(condition == 2):
+            if(self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94)):
+                result = True
+        elif(condition == 3):
+            if(self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
+                result = True
+        elif(condition == 4):
+            if(self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94)):
+                result = True
+        elif(condition == 5):
+            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94)):
+                result = True
+        else:
+            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+                self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+                self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+                self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+                self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
+                result = True
+        return result
+
+
+    @checkAndExit
+    @beginAndFinishLog
+    def prepareBattle(self):
+        '''准备战斗的流程'''
+        self.cap_win()
+        i = 1
+        countFlag = 0
+        condition = self.judTeamCondition()
+        while(not self.judFullTeam(condition)):
+            #i的归零
+            if(i > 12):
+                i = 1
+                countFlag += 1
+                if(countFlag > 1):
+                    myLog("warning","Can't make team full")
+                    break
+            self.cap_win()
+            if(i < 7):
+                addX = i * 140
+                addY = 0
+            else:
+                addX = (i - 6) * 140
+                addY = 200
+
+            self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
+            self.cap_win()
+            i += 1
+
+        self.press_key("enter")
+        mySleep(5)
+        # self.single_target_click("./pic/team/Announcer.png", "ToBattle", 1000, 400, 5)
+        self.cap_win()
+        if(self.is_find("./pic/Wait.png", "Wait Sign")):
+                self.myWait()
