@@ -47,6 +47,10 @@ class _bridgeGuiAndScript(Thread):
 
         try:
             self._run()
+        except serverCloseError as e:
+            with lock:
+                globalVar.exitCode = 14
+            self.exception = e
         except screenScaleError as e:
             with lock:
                 globalVar.exitCode = 13
@@ -103,10 +107,12 @@ class _bridgeGuiAndScript(Thread):
             with lock:
                 globalVar.exitCode = 1
             self.exception = e
+            myLog("error", e)
         finally:
-            self.exc_traceback = ''.join(
-                format_exception(*exc_info()))
-            myLog('error', self.exc_traceback)
+            if(self.exc_traceback != ''):
+                self.exc_traceback = ''.join(
+                    format_exception(*exc_info()))
+                myLog('error', self.exc_traceback)
 
     def kill(self):
         '''终止函数'''

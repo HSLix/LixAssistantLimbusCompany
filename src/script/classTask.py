@@ -6,7 +6,7 @@
 * Project   :LixAssistantLimbusCompany
 * Function  :将脚本任务抽象为一个类
 '''
-from src.common.autoFindOrClick import autoFind, autoMulClick, autoSinClick
+from src.common.autoFindOrClick import autoFind, autoMulClick, autoSinClick,clickAndDragTo
 from src.common.pressKey import pressKey
 from src.common.getPic import winCap
 from src.error.myError import userStopError
@@ -35,8 +35,11 @@ class _task():
         """
         return autoSinClick(img_model_path, name, addX, addY,waitTime, clickCount, correctRate)
 
-    def press_key(self,key):
-        pressKey(key)
+    def press_key(self,key, waitTime = 0.3, pressCount = 1):
+        i = pressCount
+        while i > 0:
+            pressKey(key, waitTime)
+            i -= 1
 
     def multiple_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.5, clickCount = 1, correctRate = 0.75):
         """
@@ -67,6 +70,22 @@ class _task():
         :param return: 是否在截屏中找到目标模板
         """
         return autoFind(img_model_path, name, correctRate)
+
+    def click_drag_to(self,img_model_path, name, changeX = 0, changeY = 0, addX=0, addY=0,waitTime = 0.9, correctRate = 0.7):
+        """
+        输入一个图片模板，自动点击截图中一个
+        :param img_model_path: 图片模板相对坐标
+        :param name:当前进程名字/代号
+        :param changeX:x坐标拖拽，默认为0
+        :param changeY:y坐标拖拽，默认为0
+        :param addX:x坐标偏移，默认为0
+        :param addY:y坐标偏移，默认为0
+        :param waitTime:点击一次后的等待时间
+        :param correctRate:准确率，0.7起步会比较准确
+        :return: 是否完成点击
+        """
+        return clickAndDragTo(img_model_path, name, changeX, changeY, addX, addY,waitTime, correctRate)
+
 
 def beginAndFinishLog(func):
     '''一个任务开始与结束的日志'''

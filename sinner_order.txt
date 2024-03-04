@@ -1,0 +1,16 @@
+Meursault,Faust,YiSang,Sinclair,Outis,DonQuixote,Ryoshu,HongLu,Heathcliff,Ishmael,Rodion,Gregor
+
+上面第一行从前往后是罪人选择顺序，罪人之间只用”英文输入法“的逗号分隔，下面是中英文对照
+保险起见，请把十二个罪人都排上
+YiSang		李箱
+Faust			浮士德
+DonQuixote	堂吉诃德
+Ryoshu		良秀
+Meursault		默尔索
+HongLu		鸿路
+Heathcliff		希斯克里夫
+Ishmael		以实玛丽
+Rodion		罗佳
+Sinclair		辛克莱
+Outis			奥提斯
+Gregor		格里高尔

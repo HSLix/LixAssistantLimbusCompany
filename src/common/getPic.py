@@ -2,7 +2,7 @@
 '''
 * Author: LuYaoQi
 * Time  : 2023/9/16 9:25
-* File  : main.py
+* File  : getPic.py
 * Project   :LixAssistantLimbusCompany
 * Function  :迅速截屏并保存
 '''

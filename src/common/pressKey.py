@@ -16,7 +16,7 @@ from src.common.myTime import mySleep
 asciiCode = {'p': 0x50, 'space': 0x20, 'esc': 0x1b, 'enter': 0x0D}
 scanCode = {'p': 0x19, 'space':0x39, 'esc': 0x01, 'enter':0x1c}
 
-def pressKey(key):
+def pressKey(key, waitTime = 0.3):
     """
     输入一个字符，形成模拟键盘信号
     :param key: 想输入的字符
@@ -31,6 +31,6 @@ def pressKey(key):
     keybd_event(asciiIndex,scanIndex,0,0) 
     mySleep(0.2) 
     keybd_event(asciiIndex,scanIndex,KEYEVENTF_KEYUP,0)  
-    mySleep(0.2) 
+    mySleep(waitTime) 
     
 

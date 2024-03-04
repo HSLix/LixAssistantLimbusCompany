@@ -32,6 +32,10 @@ class _script(_task):
         elif(self.is_find("./pic/error/errorOccurred.png", "errorSign")):
             self.single_target_click("./pic/error/Retry.png", "Retry", 0, 0, 10)
 
+        elif(self.is_find("./pic/error/ServerUnderMaintenance.png", "ServerCloseSign")):
+            self.single_target_click("./pic/error/Close.png", "Close")
+            raise serverCloseError("服务器维护中")
+
     @checkAndExit
     @beginAndFinishLog
     def ScriptBackToInitMenu(self):
@@ -40,9 +44,11 @@ class _script(_task):
         self.cap_win()
         while(not self.single_target_click("./pic/initMenu/Window.png", "mainMenuSign")):
             
-
             self.cap_win()
-            
+
+            #在循环里必须有应对错误的情况
+            self.errorRetry()
+
             # 战斗中,完成
             if(self.is_find("./pic/battle/WinRate.png", "battleSign")):
                 self.allWinRateBattle()
@@ -71,8 +77,6 @@ class _script(_task):
                 continue
 
             
-
-            
             # 等待加载情况
             if(self.is_find("./pic/Wait.png", "Wait Sign")):
                 self.myWait()   
@@ -86,12 +90,10 @@ class _script(_task):
 
             loopCount += 1
              
-            #在循环里必须有应对错误的情况
-            self.errorRetry()
+            
             # 第二次也不行时，一定是出现了脚本中没有的情况
             if loopCount > 30:
-                myLog(
-                    "warning", "Can't Find The Way MainMenu. Must be Unknown Situation. Please Restart the Game and the Script")
+                myLog("warning", "Can't Find The Way MainMenu. Must be Unknown Situation. Please Restart the Game and the Script")
                 raise backMainWinError("无法返回主界面，不能进行下一步")
 
 
@@ -105,13 +107,12 @@ class _script(_task):
             condition = False
             if (self.is_find("./pic/battle/WinRate.png", "WinRate") or 
                 self.is_find("./pic/battle/Start.png", "StartBattle")):
-
                 self.press_key("p")
                 #self.is_find("./pic/battle/WinRate.png", "WinRate")
                 self.press_key("enter")
                 condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
-                mySleep(3)
+                mySleep(2)
                 condition = True
             elif(self.is_find("./pic/event/Skip.png", "Skip")):
                 self.eventPart()
@@ -119,15 +120,24 @@ class _script(_task):
             elif(self.is_find("./pic/Wait.png", "Wait Sign")):
                 self.myWait()
                 condition = True
+            elif(self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
+                condition = True
+            # 接下来是战斗停止的标识
+            elif(self.single_target_click("./pic/battle/blackWordConfirm.png", "Level Increased!")):
+                break
+            elif(self.single_target_click("./pic/battle/confirm.png", "Confirm")):
+                break
+            elif(self.is_find("./pic/mirror/mirror3/way/mirror3MapSign.png", "mirror3MapSign") ):
+                break
+            elif(self.is_find("./pic/mirror/mirror3/ego/egoGift.png", "ChooseEgoGift")):
+                break
+
+
             mySleep(1)
             if(not condition):
                 loopCount += 1
-                if(loopCount > 2):
+                if(loopCount > 20):
                     break
-                elif(self.single_target_click("./pic/battle/blackWordConfirm.png", "Level Increased!")):
-                    loopCount = 0
-                elif(self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
-                    loopCount = 0
             else:
                 loopCount = 0
 
@@ -142,6 +152,10 @@ class _script(_task):
             
             self.cap_win()
             self.single_target_click("./pic/event/Skip.png", "Skip", 0, 0, 0.3, 3)
+
+            # 点击一定获取ego的事件
+            self.cap_win()
+            self.single_target_click("./pic/event/PassToGainEGO.png", "PassToGainEGO")
 
             # 对bus/chair的出口第一时间反应
             self.cap_win()
@@ -167,7 +181,9 @@ class _script(_task):
             self.single_target_click("./pic/event/Continue.png", "Continue")
             self.single_target_click("./pic/event/Proceed.png", "Proceed")
             self.single_target_click("./pic/event/ToBattle.png", "ToBattle!")
+            self.single_target_click("./pic/event/CommenceBattle.png", "CommenceBattle")
 
+            self.cap_win()
             #没有点到事件出口的情况下跳转到对应异想体的专门处理
             if(self.is_find("./pic/event/Choices.png","Choices")):
                 self.copeWithWhateverEvent()
@@ -307,6 +323,7 @@ class _script(_task):
         i = 1
         countFlag = 0
         condition = self.judTeamCondition()
+        self.get_sinner_order()
         while(not self.judFullTeam(condition)):
             #i的归零
             if(i > 12):
@@ -316,11 +333,12 @@ class _script(_task):
                     myLog("warning","Can't make team full")
                     break
             self.cap_win()
-            if(i < 7):
-                addX = i * 140
+            j = globalVar.sinnerNumber[globalVar.sinnerOrder[i - 1]]
+            if(j < 7):
+                addX = j * 140
                 addY = 0
             else:
-                addX = (i - 6) * 140
+                addX = (j - 6) * 140
                 addY = 200
 
             self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
@@ -333,3 +351,10 @@ class _script(_task):
         self.cap_win()
         if(self.is_find("./pic/Wait.png", "Wait Sign")):
                 self.myWait()
+
+    def get_sinner_order(self):
+        # 先读取文件第一行
+        with open("./sinner_order.txt", 'r', encoding='utf-8') as f:
+            first_line = f.readline().rstrip()
+            globalVar.sinnerOrder = first_line.split(",")
+            print(globalVar.sinnerOrder)

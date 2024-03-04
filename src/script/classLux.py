@@ -100,7 +100,7 @@ class _Luxcavation(_script):
         :param result:是否成功进入战斗
         '''
         self.prepareBattle()
-        
+        return True
 
     
     def EXPPart(self):
@@ -128,7 +128,7 @@ class _Luxcavation(_script):
         self.cap_win()
         switch = self.is_find("./pic/team/Announcer.png", "prepareBattle")
         if not switch:
-            self.single_target_click("./pic/initMenu/drive.png", "Drive")
+            self.single_target_click("./pic/initMenu/drive.png", "Drive", 0, 0, 3)
             self.cap_win()
             self.single_target_click("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
             self.cap_win()
@@ -184,7 +184,7 @@ class _Luxcavation(_script):
         self.cap_win()
         switch = self.is_find("./pic/team/Announcer.png", "prepareBattle")
         if not switch:
-            self.single_target_click("./pic/initMenu/drive.png", "Drive")
+            self.single_target_click("./pic/initMenu/drive.png", "Drive", 0, 0, 3)
             self.cap_win()
             self.single_target_click("./pic/luxcavation/luxcavationEntrance.png", "luxcavationEntrance")
             self.cap_win()

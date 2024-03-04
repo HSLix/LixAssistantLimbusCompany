@@ -20,8 +20,8 @@ def scriptGUI():
     checkScreenScale()
 
     # 测试识图
-    # tryFind("./pic/event/ToBattle.png", "ToBattle!", 0.80)
-    # tryClick("./pic/event/ToBattle.png", "ToBattle!", 0, 0, 0.7, 1, 0.80)
+    # tryFind("./pic/mirror/mirror3/way/Encounter/EncounterLH.png", "Test")
+    tryClick("./pic/mirror/mirror3/way/Encounter/EncounterRH.png", "Test", 0, 0, 0.7, 1)
     
     
     gui = myGUI()

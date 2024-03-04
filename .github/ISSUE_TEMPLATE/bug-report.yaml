@@ -7,11 +7,11 @@ body:
     attributes:
       label: 应该确定的
       options:
-      - label: 已尝试使用搜索引擎，且不能解决我的问题
+      - label: 已尝试使用搜索引擎，且不能解决我的问题 | I have google it and can hardly find any solution.
         required: true
-      - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等
+      - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等 | The title is clear rather than "A advice".
         required: true
-      - label: 我使用的程序版本已为最新版
+      - label: 我使用的程序版本已为最新版 | The programme is the latest version.
         required: true
   - type: textarea
     id: describe
@@ -31,14 +31,14 @@ body:
     id: log
     attributes:
       label: 日志文件
-      description: 上传debugLog.log与warningLog.log
+      description: 上传log文件夹下所有.log文件
     validations:
       required: true
   - type: textarea
     id: screenshots
     attributes:
-      label: 截图
-      description: 上传你发生此问题时的截图
+      label: 视频/截图
+      description: 上传你发生此问题时的视频/截图
     validations:
       required: false
   - type: textarea

@@ -12,6 +12,7 @@ import win32gui, win32con
 from ctypes import windll
 from src.log.myLog import myLog
 from src.error.myError import withOutGameWinError,screenScaleError
+from globalVar import screenHeigh, screenWidth, winLeft, winTop
 
 
 
@@ -43,6 +44,9 @@ class _win():
         # 排除缩放干扰
         windll.user32.SetProcessDPIAware()
         _win.winLeft, _win.winTop, _win.winRight, _win.winBottom = win32gui.GetWindowRect(_win.hWnd)
+        global winTop, winLeft
+        winLeft = _win.winLeft
+        winTop = _win.winTop
 
 
 
@@ -61,6 +65,9 @@ class _win():
         width = gdi32.GetDeviceCaps(dc, 118)  # 原始分辨率的宽度
         height = gdi32.GetDeviceCaps(dc, 117)  # 原始分辨率的高度
         scale = width / widthScale
+        global screenWidth, screenHeigh
+        screenHeigh = height
+        screenWidth = width
         msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(scale)
         myLog("debug", msg)
         if(not(scale > 1.49 and scale < 1.51)):

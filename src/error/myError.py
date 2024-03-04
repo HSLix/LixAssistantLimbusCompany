@@ -174,3 +174,13 @@ class noSuchGlobalVarError(Exception):
     def __str__(self):
         return self.errorInfo
 
+class serverCloseError(Exception):
+    '''服务器关闭'''
+    __slots__ = ()
+    def __init__(self, ErrorInfo):
+        # 初始化父类
+        super().__init__(self)
+        self.errorInfo = ErrorInfo
+    
+    def __str__(self):
+        return self.errorInfo

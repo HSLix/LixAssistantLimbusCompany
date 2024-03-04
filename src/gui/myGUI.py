@@ -434,9 +434,9 @@ class myGUI:
         if(ExitCode == -1):
             msg = "程序被手动终止"
         elif(ExitCode == 0):
-            msg = "程序无显式报错结束"
+            msg = "程序无显式报错结束(可能有关卡提前退出)"
         elif(ExitCode == 1):
-            msg = "未知情况错误，请另存日志文件并提交Issue\nexitCode:" + str(ExitCode)
+            msg = "未知情况错误，请另存日志文件并提交Issue"
         elif(ExitCode == 2):
             msg = "没有管理员权限，程序不能稳定运行"
         elif(ExitCode == 3):
@@ -461,6 +461,10 @@ class myGUI:
             msg = "请自行决定是否领取上周的奖励，本程序不能自作主张"
         elif(ExitCode == 13):
             msg = "请设置屏幕的缩放为150%后再启动程序"
+        elif(ExitCode == 14):
+            msg = "游戏服务器正在维护中，程序自动终止"
+        else:
+            msg = "未知exitCode:" + str(ExitCode)
 
 
         msg += "\nEXP:{} Thread:{} Mirror:{} Activity:{}".format(

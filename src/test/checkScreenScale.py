@@ -28,8 +28,8 @@ def checkScreenScale():
         scale = width / widthScale * 100
         msg = "屏幕状况 (排除缩放后)宽x高 缩放： " + str(width) + " x " + str(height) + " " + str(int(scale)) + "%"
         myLog("debug", msg)
-        if(not(scale > 99 and scale < 151)):
-            msg += "\n最好将缩放调整至100%-150%，最好是150%"
+        if(not(scale > 149 and scale < 151)):
+            msg += "\n最好将缩放调整至150%\n否则稳定性难以保障"
             myLog("warning", msg)
             top = tk.Tk()
             top.geometry('0x0+999999+0')

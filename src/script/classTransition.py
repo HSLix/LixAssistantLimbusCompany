@@ -27,17 +27,13 @@ class _transition(_script):
         while(not self.is_find("./pic/initMenu/Window.png", "MainMenuSign", 0.8)):
 
             self.cap_win()
-            if( self.single_target_click("./pic/login/Clear all caches.png", "Clear all caches", 300, -300, 10, 1)):
-                loopCount = 0
-                continue
-            elif(self.single_target_click("./pic/initMenu/downloadConfirm.png", "downloadConfirm", 0, 0, 1, 1, 0.9)):
+            if(self.single_target_click("./pic/initMenu/downloadConfirm.png", "downloadConfirm", 0, 0, 1, 1, 0.9)):
                 myLog("error", "It's too boring to wait! Call me later.")
                 raise notWaitError("下载中，程序自动终止，请稍后再启动")
             elif(self.is_find("./pic/initMenu/NetWorkUnstable.png", "NetWorkUnstable", 0.8)):
                 myLog("error", "NetWorkUnstable! Call me later.")
                 raise netWorkUnstableError("网络不行，重开罢")
-            elif(self.is_find("./pic/Wait.png", "Wait Sign")):
-                self.myWait()
+            elif( self.single_target_click("./pic/login/Clear all caches.png", "Clear all caches", 300, -300, 10, 1)):
                 loopCount = 0
             else:
                 self.errorRetry()
@@ -87,7 +83,7 @@ class _transition(_script):
         self.cap_win()
         self.single_target_click("./pic/initMenu/UseLunary.png", "UseLunary")
         self.cap_win()
-        if(self.is_find("./pic/initMenu/FirstBuy.png", "26Lunary", 0.85)):
+        if(self.is_find("./pic/initMenu/FirstBuy.png", "26Lunary", 0.90)):
             self.single_target_click("./pic/initMenu/confirm.png", "confirm")
         self.single_target_click("./pic/initMenu/cancel.png", "cancel")
         
