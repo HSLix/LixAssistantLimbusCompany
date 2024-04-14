@@ -40,7 +40,7 @@ version = "V2.1.11_Debug"
 exitCode = 0
 
 # 镜牢3关卡，按顺序索图
-enemyList = ['EventQuestionMark', 'QuestionMark','Chair', 'Bus', 'Fight', 'EventEncounter',  'EventBoss', 'Boss', 'Battle', 'Encounter', 'EventFight', 'EventBattle']
+enemyList = ['EventQuestionMark', 'QuestionMark','Chair', 'Bus', 'Fight', 'EventEncounter',  'Boss','EventBoss' , 'Battle', 'Encounter', 'EventFight', 'EventBattle']
 
 # 用户屏幕分辨率
 screenWidth = 2560

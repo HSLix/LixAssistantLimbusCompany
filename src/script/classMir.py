@@ -229,7 +229,7 @@ class _MirrorOfTheLake(_script):
         gift_flag = 0
         while not gift_flag:
             self.cap_win()
-            self.single_target_click("./pic/mirror/mirror3/gift/Poise/Poise.png", "Poise", 0, 0, 1, 1, 0.9)
+            self.single_target_click("./pic/mirror/mirror3/gift/Poise/Poise.png", "Poise", 0, 0, 2, 1, 0.9)
             self.cap_win()
             if self.single_target_click("./pic/mirror/mirror3/gift/Poise/Mebulizer.png", "Mebulizer", 0, 0, 1):
                 gift_flag = 1
@@ -279,7 +279,7 @@ class _MirrorOfTheLake(_script):
             raise mirrorInProgressError("有其他镜牢未结束")
         if(self.single_target_click("./pic/mirror/mirror3/Enter.png", "Enter", 0, 0, 2)):
             self.cap_win()
-            self.single_target_click("./pic/mirror/mirror3/firstWishConfirm.png", "firstWishConfirm")
+            self.single_target_click("./pic/mirror/mirror3/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1.5)
             self.cap_win()
             self.getGiftSwitch()
             if globalVar.gift_switch:

@@ -1,27 +1,16 @@
-system window11 64位
-python 3.9
-
-
-# 就是pywin32，opencv-python，pyinstaller，numpy，kuai_log, pynput
-
-
-Package                   Version
-------------------------- --------
-altgraph                  0.17.4
-importlib-metadata        6.8.0
-kuai-log                  0.8
-numpy                     1.26.1
-opencv-python             4.8.1.78
-packaging                 23.2
-pefile                    2023.2.7
-pip                       22.0.4
-pyinstaller               6.1.0
-pyinstaller-hooks-contrib 2023.10
-pynput                    1.7.6
-pywin32                   306
-pywin32-ctypes            0.2.2
-setuptools                58.1.0
-six                       1.16.0
-tzdata                    2023.3
-tzlocal                   5.2
-zipp                      3.17.0
+altgraph==0.17.4
+importlib_metadata==7.0.2
+kuai-log==0.8
+numpy==1.26.4
+opencv-python==4.9.0.80
+packaging==24.0
+pefile==2023.2.7
+pyinstaller==6.5.0
+pyinstaller-hooks-contrib==2024.3
+pynput==1.7.6
+pywin32==306
+pywin32-ctypes==0.2.2
+six==1.16.0
+tzdata==2024.1
+tzlocal==5.2
+zipp==3.18.1

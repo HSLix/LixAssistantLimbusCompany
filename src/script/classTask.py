@@ -94,25 +94,28 @@ def beginAndFinishLog(func):
         myLog("info", msg)
 
         #真正函数
-        func(*args, **kw)
+        result = func(*args, **kw)
 
         msg = "Finish " + func.__name__
         myLog("info", msg)
+        return result
     return wrapper
 
 def checkAndExit(func):
     '''检查globalVar.exitCode符合条件结束该线程（程序）'''
 
     def wrapper(*args, **kw):
+
         if(globalVar.exitCode == -1):
             raise userStopError("用户主动终止程序")
 
         # 真正函数
-        func(*args, **kw)
+        result = func(*args, **kw)
 
         if(globalVar.exitCode == -1):
             raise userStopError("用户主动终止程序")
 
+        return result
     return wrapper
     
    
