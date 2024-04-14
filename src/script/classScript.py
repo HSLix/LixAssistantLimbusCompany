@@ -262,24 +262,24 @@ class _script(_task):
     def judTeamCondition(self):
         '''判断当前队伍状况'''
         resultCondition = -1
-        if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.8) or\
-            self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.8) or\
-            self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.8) or\
-            self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.8) or\
-            self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.8)):
+        if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+            self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+            self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+            self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+            self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
             resultCondition = 0
-        elif(self.is_find("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.8)):
+        elif(self.is_find("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.94)):
             resultCondition = 1
-        elif(self.is_find("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.8) or\
-        self.is_find("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.8)):
+        elif(self.is_find("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.94)):
             resultCondition = 2
-        elif(self.is_find("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.8)):
+        elif(self.is_find("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.94)):
             resultCondition = 3
-        elif(self.is_find("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.8) or\
-        self.is_find("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.8)):
+        elif(self.is_find("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.94)):
             resultCondition = 4
-        elif(self.is_find("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.8) or\
-        self.is_find("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.8)):
+        elif(self.is_find("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.94) or\
+        self.is_find("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.94)):
             resultCondition = False
         return resultCondition
 
@@ -291,26 +291,26 @@ class _script(_task):
         if(condition == 0):
             result = True
         elif(condition == 1):
-            if(self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.8)):
+            if(self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
                 result = True
         elif(condition == 2):
-            if(self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.8)):
+            if(self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94)):
                 result = True
         elif(condition == 3):
-            if(self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.8)):
+            if(self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94)):
                 result = True
         elif(condition == 4):
-            if(self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.8)):
+            if(self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94)):
                 result = True
         elif(condition == 5):
-            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.8)):
+            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94)):
                 result = True
         else:
-            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.8) or\
-                self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.8) or\
-                self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.8) or\
-                self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.8) or\
-                self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.8)):
+            if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.94) or\
+                self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.94) or\
+                self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.94) or\
+                self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.94) or\
+                self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.94)):
                 result = True
         return result
 
