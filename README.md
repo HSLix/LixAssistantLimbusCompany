@@ -3,14 +3,12 @@
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [简介](#简介)
   - [视频教程](#视频教程)
-  - [图示样例](#图示样例)
-      - [开始界面](#开始界面)
-      - [关于界面](#关于界面)
   - [实用功能和亮点](#实用功能和亮点)
-  - [注意](#注意)
   - [下载方式](#下载方式)
   - [使用说明](#使用说明)
-  - [问题处理](#问题处理)
+  - [图示样例](#图示样例（图片仅供参考，还请以实例为准）)
+      - [开始界面](#开始界面)
+      - [关于界面](#关于界面)
   - [致谢](#致谢)
   - [声明](#声明)
   - [待办开发](#待办开发)
@@ -34,110 +32,39 @@
 ## 视频教程
 [![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://youtu.be/ZKsNTLM-IT4)
 
----
-## 图示样例
-#### 开始界面
-![image](/pic/example/mainPage.png)
-#### 关于界面
-![image](/pic/example/aboutPage.png)
-
-
 
 ---
 ## 实用功能和亮点
 
 - 自动刷取**经验本**EXP
 - 自动刷取**纽本**Thread
-- 自动刷取**镜牢**Mirror，可选镜牢1或镜牢2
-- 自动转换体力，和购买26狂气的体力
+- 自动刷取**镜牢**Mirror
+- 自动转换体力，和购买体力
 - ~~确实没啥功能~~
 - 只有60m左右大小，下不了上当，下不了吃亏
 - 不用辛苦配置环境
 - 使用方式简单明了
 
 ---
-## 注意
-
-- 屏幕缩放须定为150%
-- 游戏内更改语言设置后，须重启游戏才能使设置生效
-- 如有点击异常现象，请尝试自行“用管理员模式运行”尝试修复
-- 根据反馈，零协的汉化很可能需要彻底卸载并重启游戏，才能免除其影响
-
-
-
----
 ## 下载方式
 
-点击右方的realease即可下载最新版
-![image](/pic/example/githubDownloadExample.gif)
+点击[realease](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版
 
 ---
 ## 使用说明
 
-点击下方"Start"按钮即可启动软件
-
-点击下方"Stop"按钮即可停止软件并获取软件运行情况
-
-为确保稳定性，该停止按钮不会立即生效
-
-但可按ESC键立即停止
-
-为了确保软件运行顺利
-
-请在64位Windows系统下运行本软件
-
-不要关闭此窗口
-
-将游戏语言设置为英语
-
-请勿遮挡游戏画面
-
-尽量不要在运行过程中使用鼠标
-
-游戏窗口大小设置为 1280*720
-
-游戏窗口位置默认设置为 左上角(0,0)
-
-默认将脑啡肽转成绿饼和购买第一次体力
-
-
-Click the Start Button
-
-Press ESC can interrupt the program immediately
-
-Don't turn this window off
-
-Set Game Language English
-
-Keep The Screen Clear
-
-Had Better not use Mouse
-
+如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki)
+如果发现问题，先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
+当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
 ---
-## 问题处理
 
-如遇到软件运行异常
-
-请点击"Stop"按钮获取软件运行情况
-
-保存好文件夹log内的日志文件
-
-~~自行查看常见Q&A~~，如仍没能解决
-
-请在GitHub的Issue里提交问题
-
-
-When error occur
-
-Click the "Stop" Button
-
-Save the logs
-
-~~Check Q&A~~
-
-Please send the Problem to the Issue in GitHub
-
+## 图示样例（图片仅供参考，还请以实例为准）
+### 开始界面
+![image](/pic/example/mainPage.png)
+### 关于界面
+![image](/pic/example/aboutPage.png)
 ---
+
 ## 致谢
 
 直接或间接参与到本软件开发的所有人员
