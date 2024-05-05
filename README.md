@@ -90,7 +90,8 @@
 ---
 ## 加入开发
 
-LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始
+LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始。
+
 后续会有专门面向开发者的模块，敬请期待啦
 
 ---
@@ -109,11 +110,11 @@ https://github.com/Xie-Tiao/Limbus-Scripts
 https://github.com/Janrilw/limbus-company-auto
 ---
 ## 赞赏
-LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信或支付宝赞赏送作者一杯咖啡☕当然点个Star已经是对本项目的大力支持！
+LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信或支付宝赞赏送作者一杯咖啡☕当然点个Star已经是对本项目的大力支持！你的支持就是作者开发和维护项目的动力🚀
 
-你的支持就是作者开发和维护项目的动力🚀
-![image](/pic/example/wechat.png)
-![image](/pic/example/alipay.png)
+![image](/pic/example/wechat.jpg)
+
+![image](/pic/example/alipay.jpg)
 
 ---
 ## 最后
