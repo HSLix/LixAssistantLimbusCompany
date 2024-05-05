@@ -13,7 +13,7 @@
   - [声明](#声明)
   - [加入开发](#加入开发)
   - [友链](#友链)
-  - [赞赏](#赞赏)
+  - [打赏](#打赏)
   - [最后](#最后)
 
 ---
@@ -54,8 +54,10 @@
 ---
 ## 使用说明
 
-如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki)
-如果发现问题，先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
+如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki)来了解基本使用方式
+
+如果发现问题，可以先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
+
 当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
 
 ---
@@ -114,8 +116,16 @@ https://github.com/Xie-Tiao/Limbus-Scripts
 https://github.com/Janrilw/limbus-company-auto
 
 ---
-## 赞赏
-LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信或支付宝赞赏送作者一杯咖啡☕当然点个Star已经是对本项目的大力支持！你的支持就是作者开发和维护项目的动力🚀
+## 打赏
+如果您有打赏的想法，请尽量看完下面的说明
+
+首先，LALC的下载与使用完全免费，所以不必付费；
+
+其次，金钱来之不易，而且作者并不急需打赏，作者更像您能帮忙给本项目点个Star，这已经是大力支持了！；
+
+最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
+
+如果您仍有打赏的想法，那我再拒绝就不好意思啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
 
 ![image](/pic/example/wechat.jpg)
 
