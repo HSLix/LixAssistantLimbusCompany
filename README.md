@@ -57,6 +57,7 @@
 如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki)
 如果发现问题，先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
 当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
+
 ---
 
 ## 图示样例（图片仅供参考，还请以实例为准）
@@ -129,6 +130,7 @@ LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信�
 
 ~~悄悄更个图，应该没人发现吧~~
 
+---
 ## Star History
 
 <a href="https://star-history.com/#HSLix/LixAssistantLimbusCompany&Date">
