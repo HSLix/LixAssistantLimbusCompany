@@ -102,13 +102,17 @@ LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.c
 
 ### MAALimbus
 正统MAA传承，经典配方，满足安卓模拟器上一键长草的梦想
+
 https://github.com/hxdnshx/MAALimbusCompany
 
 ### Limbus-Script
+PC端全自动！！！yyds
+
 https://github.com/Xie-Tiao/Limbus-Scripts
 
 ### limbus-company-auto
 https://github.com/Janrilw/limbus-company-auto
+
 ---
 ## 赞赏
 LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信或支付宝赞赏送作者一杯咖啡☕当然点个Star已经是对本项目的大力支持！你的支持就是作者开发和维护项目的动力🚀
