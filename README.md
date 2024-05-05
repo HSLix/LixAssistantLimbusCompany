@@ -11,8 +11,9 @@
       - [关于界面](#关于界面)
   - [致谢](#致谢)
   - [声明](#声明)
-  - [待办开发](#待办开发)
+  - [加入开发](#加入开发)
   - [友链](#友链)
+  - [赞赏](#赞赏)
   - [最后](#最后)
 
 ---
@@ -87,12 +88,10 @@
 软件图标素材来源网图，不属于GPL协议开源的内容，如有侵权，请及时联系作者删除
 
 ---
-## 待办开发
+## 加入开发
 
-- [ ] 英语之外的游戏语言支持
-- [ ] 更快识图，多进程之类
-- [ ] 联网自动更新
-- [ ] ……
+LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始
+后续会有专门面向开发者的模块，敬请期待啦
 
 ---
 ## 友链
@@ -108,8 +107,13 @@ https://github.com/Xie-Tiao/Limbus-Scripts
 
 ### limbus-company-auto
 https://github.com/Janrilw/limbus-company-auto
+---
+## 赞赏
+LALC的使用是完全免费的，不过如果喜欢本项目，可以用微信或支付宝赞赏送作者一杯咖啡☕当然点个Star已经是对本项目的大力支持！
 
-
+你的支持就是作者开发和维护项目的动力🚀
+![image](/pic/example/wechat.png)
+![image](/pic/example/alipay.png)
 
 ---
 ## 最后
