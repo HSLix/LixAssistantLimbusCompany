@@ -115,6 +115,12 @@ PC端全自动！！！yyds
 
 https://github.com/Xie-Tiao/Limbus-Scripts
 
+### LimbusCompute
+https://github.com/MusicOnline/LimbusCompute
+
+### AutoLuxcavation-Limbus-Company
+https://github.com/LoGundes/AutoLuxcavation-Limbus-Company
+
 ### limbus-company-auto
 https://github.com/Janrilw/limbus-company-auto
 
