@@ -60,6 +60,8 @@
 
 当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
 
+如果你对作者的开发动态或其他方面感兴趣，可以点击[网址](https://space.bilibili.com/384632772/dynamic)查看
+
 ---
 
 ## 图示样例（图片仅供参考，还请以实例为准）
@@ -67,6 +69,7 @@
 ![image](/pic/example/mainPage.png)
 ### 关于界面
 ![image](/pic/example/aboutPage.png)
+
 ---
 
 ## 致谢
@@ -121,7 +124,7 @@ https://github.com/Janrilw/limbus-company-auto
 
 首先，LALC的下载与使用完全免费，所以不必付费；
 
-其次，金钱来之不易，而且作者并不急需打赏，作者更像您能帮忙给本项目点个Star，这已经是大力支持了！；
+其次，金钱来之不易，而且作者并不急需打赏，作者更希望看到您能帮忙给本项目点个Star，这对本项目已经是大力支持了！！！
 
 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
