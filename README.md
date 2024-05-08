@@ -15,9 +15,9 @@
     <img alt="license" src="https://img.shields.io/badge/license-AGPL3.0-orange">
 </div>
 <div>
-    <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany">
-    <img alt="forks" src="https://img.shields.io/github/forks/HSLix/LixAssistantLimbusCompany">
-    <img alt="watching" src="https://img.shields.io/github/watchers/HSLix/LixAssistantLimbusCompany">
+    <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany.svg">
+    <img alt="forks" src="https://img.shields.io/github/forks/HSLix/LixAssistantLimbusCompany.svg">
+    <img alt="watching" src="https://img.shields.io/github/watchers/HSLix/LixAssistantLimbusCompany.svg">
 </div>
 <br>
 
@@ -32,7 +32,6 @@ LALC是LixAssistantLimbusCompany各取大写字母的缩写
 </div>
 
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
- 
   - [实用功能和亮点 Feature](#实用功能和亮点)
   - [下载方式 Download](#下载方式)
   - [使用说明 How to use](#使用说明)
@@ -62,7 +61,7 @@ LALC是LixAssistantLimbusCompany各取大写字母的缩写
 ---
 ## 下载方式
 
-点击[realease](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.exe的。
+点击[Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.zip的。
 
 ---
 ## 使用说明
@@ -73,7 +72,7 @@ LALC是LixAssistantLimbusCompany各取大写字母的缩写
 
 当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
 
-如果你对作者的开发动态或其他方面感兴趣，可以点击[网址](https://space.bilibili.com/384632772/dynamic)查看
+如果你对作者的开发动态或其他方面感兴趣，可以到[作者动态](https://space.bilibili.com/384632772/dynamic)看看更新预告什么的
 
 ---
 
