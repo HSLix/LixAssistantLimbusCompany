@@ -1,38 +1,51 @@
+<div align="center">
+
+![image](/pic/example/MagicGirl.png)
+
+<br>
+
 # LixAssistantLimbusCompany
 
+<br>
+<div>
+    <img alt="Language" src="https://img.shields.io/badge/Language-Python-blue">
+</div>
+<div>
+    <img alt="platform" src="https://img.shields.io/badge/platform-Windows-purple">
+    <img alt="license" src="https://img.shields.io/badge/license-AGPL3.0-orange">
+</div>
+<div>
+    <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany">
+    <img alt="forks" src="https://img.shields.io/github/forks/HSLix/LixAssistantLimbusCompany">
+    <img alt="watching" src="https://img.shields.io/github/watchers/HSLix/LixAssistantLimbusCompany">
+</div>
+<br>
+
+LALC是LixAssistantLimbusCompany各取大写字母的缩写
+
+是月计次世代(~~大嘘~~)手游(?)LimbusCompany的助手
+
+基于图像识别，一键代肝
+
+~~看项目星星数与本人心情~~飞速更新中
+
+</div>
+
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
-  - [简介](#简介)
-  - [视频教程](#视频教程)
-  - [实用功能和亮点](#实用功能和亮点)
-  - [下载方式](#下载方式)
-  - [使用说明](#使用说明)
-  - [图示样例](#图示样例（图片仅供参考，还请以实例为准）)
+ 
+  - [实用功能和亮点 Feature](#实用功能和亮点)
+  - [下载方式 Download](#下载方式)
+  - [使用说明 How to use](#使用说明)
+  - [声明 Disclaimer](#声明)
+  - [加入开发 Develop](#加入开发)
+  - [图示样例 Pic](#图示样例)
       - [开始界面](#开始界面)
       - [关于界面](#关于界面)
-  - [致谢](#致谢)
-  - [声明](#声明)
-  - [加入开发](#加入开发)
-  - [友链](#友链)
-  - [打赏](#打赏)
-  - [最后](#最后)
-
----
-## 简介
-- LALC是LixAssistantLimbusCompany各取大写字母的缩写
-- 这是一款思想源于MAA的边狱巴士游戏小助手
-- ~~但真实制作动机是作者因潜水过久~~
-- ~~被全自动镜本脚本测试群踢出来后进群失败~~
-- 本软件在**PC端Window11/10 64位**下即可运行
-- 无需下载其它软件或者配置环境，**解压即撸**
-- 基于图像识别，通过鼠标操作
-- 主打**全自动**，点击一次，一直刷关
-- ~~看项目星星数与本人心情~~飞速更新中
-
-
----
-## 视频教程
-[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://youtu.be/ZKsNTLM-IT4)
-
+  - [视频教程 Video](#视频教程)
+  - [致谢 Thanks](#致谢)
+  - [友链 Other Assistant](#友链)
+  - [打赏 Sponsors](#打赏)
+  - [最后 Last](#最后)
 
 ---
 ## 实用功能和亮点
@@ -49,14 +62,14 @@
 ---
 ## 下载方式
 
-点击[realease](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版
+点击[realease](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.exe的。
 
 ---
 ## 使用说明
 
-如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki)来了解基本使用方式
+如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)(How to use)来了解基本使用方式
 
-如果发现问题，可以先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/LALC-Wiki),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
+如果发现问题，可以先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)(FAQ),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
 
 当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
 
@@ -64,23 +77,6 @@
 
 ---
 
-## 图示样例（图片仅供参考，还请以实例为准）
-### 开始界面
-![image](/pic/example/mainPage.png)
-### 关于界面
-![image](/pic/example/aboutPage.png)
-
----
-
-## 致谢
-
-直接或间接参与到本软件开发的所有人员
-
-包括在网络上分享各种教程的大佬们
-
-还有开源自己代码的巨佬们！
-
----
 ## 声明
 
 本软件开源、免费，仅供学习交流使用。
@@ -96,14 +92,39 @@
 ---
 ## 加入开发
 
-LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始。
-
-后续会有专门面向开发者的模块，敬请期待啦
+LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始，也可参考这个专门面向开发者的[WikiPage](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)。
 
 ---
+
+## 图示样例
+（图片仅供参考，还请以实例为准）
+
+### 开始界面
+![image](/pic/example/mainPage.png)
+### 关于界面
+![image](/pic/example/aboutPage.png)
+
+---
+## 视频教程
+[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://youtu.be/ZKsNTLM-IT4)
+
+---
+
+## 致谢
+
+直接或间接参与到本软件开发的所有人员
+
+包括在网络上分享各种教程的大佬们
+
+还有开源自己代码的巨佬们！
+
+---
+
 ## 友链
 
 除我以外，还有其它开发者也致力于limbus脚本的开发，可以的话，也希望大家多多支持！！
+
+(虽然有的项目没有放我的链接，但我还是放了他们的，QWQ。特别指出LCAA，连我应援的评论的删了，我还发动态支持LCAA的视频，QWQ）
 
 ### MAALimbus
 正统MAA传承，经典配方，满足安卓模拟器上一键长草的梦想
@@ -111,7 +132,7 @@ LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.c
 https://github.com/hxdnshx/MAALimbusCompany
 
 ### Limbus-Script
-PC端全自动！！！yyds
+也是PC端全自动！！！yyds
 
 https://github.com/Xie-Tiao/Limbus-Scripts
 
@@ -134,11 +155,19 @@ https://github.com/Janrilw/limbus-company-auto
 
 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
-如果您仍有打赏的想法，那我再拒绝就不好意思啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
-
-![image](/pic/example/wechat.jpg)
-
-![image](/pic/example/alipay.jpg)
+如果您仍有打赏的想法，那我再拒绝就礼貌啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
+<div align="center">
+  
+  ![image](/pic/example/wechat.jpg)
+  
+  wechat
+  <br>
+  
+  ![image](/pic/example/alipay.jpg)
+  
+  alipay
+  <br>
+</div>
 
 ---
 ## 最后
@@ -148,6 +177,10 @@ https://github.com/Janrilw/limbus-company-auto
 同时也希望有大佬把这个依托答辩的代码进行狠狠地优化
 
 本作者就是看不惯有些收费的脚本或者封闭自萌的脚本，自己就要做一个免费、开源的，最好能有大神加入开发继续发扬。
+
+~~但真实制作动机是作者因潜水过久~~
+
+~~被全自动镜本脚本测试群踢出来后进群失败~~
 
 希望这个软件能帮助大家减少limbus游玩过程中反复乏味的部分，享受里面精彩的表演，有趣的机制就够了，游戏就是要笑着玩的嘛(:
 
