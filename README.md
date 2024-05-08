@@ -8,16 +8,16 @@
 
 <br>
 <div>
-    <img alt="Language" src="https://img.shields.io/badge/Language-Python-blue">
+    <img alt="language" src="https://img.shields.io/badge/Language-Python-blue">
 </div>
 <div>
     <img alt="platform" src="https://img.shields.io/badge/platform-Windows-purple">
     <img alt="license" src="https://img.shields.io/badge/license-AGPL3.0-orange">
 </div>
 <div>
-    <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany.svg">
-    <img alt="forks" src="https://img.shields.io/github/forks/HSLix/LixAssistantLimbusCompany.svg">
-    <img alt="watching" src="https://img.shields.io/github/watchers/HSLix/LixAssistantLimbusCompany.svg">
+    <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany?style=social">
+    <img alt="forks" src="https://img.shields.io/github/forks/HSLix/LixAssistantLimbusCompany?style=social">
+    <img alt="watching" src="https://img.shields.io/github/watchers/HSLix/LixAssistantLimbusCompany?style=social">
 </div>
 <br>
 
