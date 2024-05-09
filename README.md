@@ -157,7 +157,7 @@ Contributors:
         <a href="https://github.com/liuaj22">
             <img src="https://avatars.githubusercontent.com/u/113166755?v=4" width="100;" alt="liuaj22"/>
             <br />
-            <sub><b>liuaj22</b></sub>
+            <sub><b>Liuaj22</b></sub>
         </a>
     </td></tr>
 </table>
