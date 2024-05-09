@@ -37,8 +37,6 @@ LALC是LixAssistantLimbusCompany各取大写字母的缩写
   - [使用说明 How to use](#使用说明)
   - [声明 Disclaimer](#声明)
   - [图示样例 Pic](#图示样例)
-      - [开始界面](#开始界面)
-      - [关于界面](#关于界面)
   - [视频教程 Video](#视频教程)
   - [加入开发 Develop](#加入开发)
   - [致谢 Thanks](#致谢)
