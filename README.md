@@ -63,7 +63,7 @@ Features
 ## 下载方式
 Download
 
-点击[Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.zip的。
+点击[Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.zip的，解压后运行LALCSetup.exe安装即可。
 
 ---
 ## 使用说明
