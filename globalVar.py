@@ -33,7 +33,7 @@ sinnerOrder = []
 
 # 版本
 # 样例：V2.1.9_Realease
-version = "V2.1.11_Debug"
+version = "V2.1.12_Debug"
 
 
 # 退出状态

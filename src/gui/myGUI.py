@@ -316,9 +316,9 @@ class myGUI:
                  anchor="w").place(width=180, height=20, x=0, y=320)
 
         self.SetMirror = ttk.Combobox(self.taskFrame)
-        self.SetMirror['values'] = ["镜牢1", "镜牢2Normal", "镜牢3Normal"]
+        self.SetMirror['values'] = ["镜牢1", "镜牢2Normal", "镜牢3Normal", "镜牢4Normal"]
         self.SetMirror.configure(state="readonly")
-        self.SetMirror.current(2)
+        self.SetMirror.current(3)
         self.SetMirror.place(width=180, height=40, x=0, y=345)
 
         self.MirrorSpin = tk.Spinbox(self.taskFrame, from_=0, to=maxCount, width=10, textvariable=self.MirrorCount,
@@ -540,6 +540,8 @@ class myGUI:
             globalVar.exeCfg["MirrorSwitch"] = 2
         elif(strSetMirror == "镜牢3Normal"):
             globalVar.exeCfg["MirrorSwitch"] = 3
+        elif(strSetMirror == "镜牢4Normal"):
+            globalVar.exeCfg["MirrorSwitch"] = 4
 
         # print(str(globalVar.exeCfg["WinSwitch"]) + " " + str(globalVar.exeCfg["PrizeSwitch"]))
 

@@ -6,7 +6,7 @@
 * Project   :LixAssistantLimbusCompany
 * Function  :将脚本任务抽象为一个类
 '''
-from src.common.autoFindOrClick import autoFind, autoMulClick, autoSinClick,clickAndDragTo
+from src.common.autoFindOrClick import autoFind, autoMulClick, autoSinClick,clickAndDragTo,pure_click, pure_click_and_darg
 from src.common.pressKey import pressKey
 from src.common.getPic import winCap
 from src.error.myError import userStopError
@@ -20,6 +20,12 @@ import globalVar
 class _task():
     '''在这里做前后台的切换'''
     __slots__ = ()
+
+    def click_locate(self, cx, cy, name, wait_time = 0.9, clickCount = 1):
+        pure_click(cx, cy, name, wait_time, clickCount)
+
+    def click_locate_and_drag_to(self, begin_x, begin_y, end_x, end_y, name, wait_time = 0.9):
+        pure_click_and_darg(begin_x, begin_y, end_x, end_y, name, wait_time)
     
     def single_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.8, clickCount = 1, correctRate = 0.75):
         """

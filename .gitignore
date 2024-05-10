@@ -37,3 +37,5 @@ packUpCode.txt
 /src/error/__pycache__/
 
 /pythonlogs/
+
+/test/
