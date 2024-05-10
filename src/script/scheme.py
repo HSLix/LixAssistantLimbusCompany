@@ -36,7 +36,7 @@ def scriptTasks():
     # 全流程
     # 初始化游戏窗口
     win.winTask()
-
+    
     # 从Start界面到主菜单界面
     trans.ScriptGameStart()
     trans.ScriptBackToInitMenu()

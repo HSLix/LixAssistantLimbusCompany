@@ -39,6 +39,8 @@ class _Mirror(_script):
             self.ScriptTaskMirror2Normal()
         elif(self.mirrorSwitch == 3):
             self.ScriptTaskMirror3Normal()
+        elif(self.mirrorSwitch == 4):
+            self.ScriptTaskMirror4Normal()
         else:
             raise unexpectNumError("镜牢选择数字未设置")
 
@@ -46,6 +48,43 @@ class _Mirror(_script):
     def getMirrorFinishCount(self):
         '''返回镜牢完成次数'''
         return self.mirrorFinishCount
+    
+
+    @checkAndExit
+    @beginAndFinishLog
+    def ScriptTaskMirror4Normal(self):
+        '''镜牢4一次流程'''
+        mir = _MirrorOfTheWuthering()
+        loopCount = 0
+        while(self.mirrorFinishCount < self.mirrorCount):
+            self.errorRetry()
+            # print("mirror LoopCount :" + str(loopCount))
+            if not mir.mirror4():
+                loopCount += 1
+                if loopCount == 2:
+                    mir.mirror4Leave()
+                    self.ScriptBackToInitMenu()
+            else:
+                loopCount = 0
+
+            if(mir.mirror4Prize()):
+                loopCount = 0
+                self.mirrorFinishCount += 1
+                msg = "mirror4 Success "  + str(self.mirrorFinishCount) + " Times!"
+                globalVar.exeResult["MirrorFinishCount"] += 1
+                myLog("info", msg)
+                self.ScriptBackToInitMenu()
+                continue
+
+            if loopCount > 4:
+                myLog("warning","Hard to continue! Next Mission!")
+                #离开进入函数
+                self.mirrorCount = 0
+
+            msg = "mirror4 Loop " + str(loopCount) + " Times!"
+            myLog("info", msg) 
+
+
     
     @checkAndExit
     @beginAndFinishLog
@@ -158,6 +197,331 @@ class _Mirror(_script):
             msg = "Mirror1 Loop " + str(loopCount) + " Times!"
             myLog("info", msg) 
             # mySleep(2)
+
+
+class _MirrorOfTheWuthering(_script):
+    '''镜牢4的相关函数'''
+    __slots__ = {"noWayFlag"}
+
+    def mirror4(self):
+        '''镜牢4进入、寻路、处理交互的集合'''
+        result = False
+        self.noWayFlag = False
+        self.mirror4Entry()
+        #有地图标识才寻路，否则仅作事件处理
+        self.cap_win()
+        if(self.is_find("./pic/mirror/mirror4/way/mirror4MapSign.png", "mirror4MapSign") and\
+            self.is_find("./pic/mirror/mirror4/way/Self.png", "Self", 0.8)):
+            self.noWayFlag = self.mirror4SinCoreFindWay()
+
+        result = self.mirror4Cope()
+        
+        return result
+
+
+    def mirror4PurchaseEGO(self):
+        '''镜牢4购买EGO的流程'''
+        #windll.user32.SetCursorPos(930,350)
+        #windll.user32.SetCursorPos(1130,350)
+        #windll.user32.SetCursorPos(780,450)
+        loc_x = [930, 1130, 780, 930, 1130]
+        loc_y = [350, 350, 450, 450, 450]
+        for x, y in zip(loc_x, loc_y):
+            log_str = "PurchaseEGO at ({}, {})".format(x, y)
+            self.click_locate(x, y, str(log_str))
+            self.cap_win()
+            if self.single_target_click("./pic/mirror/mirror4/ProductCatalogue/ConfirmPurchase.png", "ConfirmPurchase", 0, 0, 1):
+                self.cap_win()
+                self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirmEGOGift")
+
+        # 对bus/chair的出口第一时间反应
+        self.cap_win()
+        if(self.single_target_click("./pic/event/Leave.png", "Leave")):
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
+    
+    def mirror4Prize(self):
+        '''镜牢4获取奖励的流程'''
+        result = False
+        self.cap_win()
+        self.single_target_click("./pic/battle/confirm.png", "Final_Fight")
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/ClaimRewards.png","ClaimRewards"):
+            self.press_key('enter', 0.3, 5)
+            result = True
+
+        '''self.single_target_click("./pic/mirror/mirror4/ClaimRewards.png","ClaimRewards")
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/Receive.png","Receive")
+        self.cap_win()
+        if self.single_target_click("./pic/mirror/mirror4/whiteConfirm.png","FirstConfirm"):
+            self.cap_win()
+            if self.single_target_click("./pic/mirror/mirror4/way/Confirm.png","SecondConfirm"):
+                result = True'''
+        return result
+
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4Leave(self):
+        '''镜牢4离开时处理notFullFlag'''
+        global notFullFlag 
+        notFullFlag = 0
+
+    
+    def mirror4HaltAndEnter(self):
+        self.press_key("esc", 1)
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/mirror4Normal.png", "mirror4Normal", 0, 0, 2)
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/HaltExploration.png", "HaltExploration", 0, 0, 1, 1, 0.6)
+        self.press_key("enter", 1)
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/GiveUpRewards.png", "GiveUpRewards")
+        self.press_key("enter")
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4GetStartGift(self):
+        '''刷取饰品'''
+        gift_flag = 0
+        while not gift_flag:
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/gift/Poise/Poise.png", "Poise", 0, 0, 2, 1, 0.9)
+            self.cap_win()
+            if self.single_target_click("./pic/mirror/mirror4/gift/Poise/Mebulizer.png", "Mebulizer", 0, 0, 1):
+                gift_flag = 1
+                if self.single_target_click("./pic/mirror/mirror4/gift/Poise/CigaretteHolder.png", "CigaretteHolder", 0, 0, 1):
+                    pass
+                if self.single_target_click("./pic/mirror/mirror4/gift/Poise/OrnamentalHorseshoe.png", "OrnamentalHorseshoe", 0, 0, 1):
+                    pass
+            
+            # 卡住来测试该函数的
+            # gift_flag = 0
+            if not gift_flag:
+                self.mirror4HaltAndEnter()
+                self.cap_win()
+                self.single_target_click("./pic/mirror/mirror4/mirror4Normal.png", "mirror4Normal")
+                self.press_key("enter")
+                self.cap_win()
+                self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1)      
+    
+
+    def getGiftSwitch(self):
+        f = open("gift_switch.txt")
+        line = f.readline().strip()
+        line = int(line)
+        globalVar.gift_switch = line
+        f.close()
+
+
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4Entry(self):
+        '''进入镜牢4流程'''
+        if(self.is_find("./pic/mirror/mirror4/way/mirror4MapSign.png", "mirror4MapSign")):
+            return
+        self.cap_win()
+        self.single_target_click("./pic/initMenu/drive.png", "Drive")
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/MirrorDungeons.png", "MirrorDungeons", 0, 0, 1, 1, 0.9)
+        self.cap_win()
+        if(self.is_find("./pic/mirror/previousClaimReward.png", "previousClaimReward")):
+            raise previousClaimRewardError("有上周的镜牢奖励未领取")
+        self.single_target_click("./pic/mirror/mirror4/mirror4Normal.png", "mirror4Normal")
+        self.cap_win()
+        if(self.is_find("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):
+            raise mirrorInProgressError("有其他镜牢未结束")
+        if(self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2)):
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1.5)
+            self.cap_win()
+            self.getGiftSwitch()
+            if globalVar.gift_switch:
+                self.mirror4GetStartGift()
+            else:
+                self.single_target_click("./pic/mirror/mirror4/ego/RandomEGOGift.png", "egoGift")
+                self.cap_win()
+                self.multiple_target_click("./pic/mirror/mirror4/ego/confirmRandomEGOGift.png", "EGOGift")
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)
+            self.press_key('enter', 0.4, 3) # confirm the ego
+            self.press_key('enter', 3) # enter
+            self.cap_win()
+        else:
+            self.single_target_click("./pic/mirror/mirror4/Resume.png", "Resume", 0, 0, 5)
+        if(self.is_find("./pic/team/Announcer.png", "Member")
+           and self.is_find("./pic/mirror/mirror4/firstTeamConfirm.png", "firstTeamConfirm", 0.5)):
+            self.press_key('enter')
+        if(self.is_find("./pic/Wait.png", "Wait Sign")):
+            self.myWait()
+        
+
+    def mirror4SelectEncounterRewardCard(self):
+        self.cap_win()
+        if (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/EGOGiftCard.png", "EGOGiftCard")):
+            mySleep(1)
+            self.press_key('enter', 1)
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirm ego gift", 0, 0, 0.4, 3)
+        elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/CostCard.png", "CostCard")):
+            mySleep(1)
+            self.press_key('enter', 1)
+        elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/StarlightCard.png", "StarlightCard")):
+            mySleep(1)
+            self.press_key('enter', 1)
+        elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/EGOResourceCard.png", "EGOResourceCard")):
+            mySleep(1)
+            self.press_key('enter', 1)
+        else:
+            self.press_key('enter', 1)
+            self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirm ego gift", 0, 0, 0.4, 3)
+
+        mySleep(5)
+
+    
+    def mirror4ChooseThemePack(self):
+        # 先默认拉第一个好了，之后再搞选择
+        self.click_locate_and_drag_to(300, 250, 300, 600, "FirstThemePack")
+        mySleep(6)
+
+    def mirror4Chair(self):
+        self.single_target_click("./pic/mirror/mirror4/ProductCatalogue/ChairHealSinner.png", "Heal Sinner")
+        self.cap_win()
+        self.single_target_click("./pic/mirror/mirror4/ProductCatalogue/AllSinnerRest.png", "AllSinnerRest")
+        self.cap_win()
+        self.single_target_click("./pic/event/Skip.png", "Skip", 0, 0, 0.3, 2)
+        self.cap_win()
+        if (not self.single_target_click("./pic/event/Continue.png", "Continue")):
+            # For the situation that sinner all healthy
+            self.single_target_click("./pic/mirror/mirror4/ProductCatalogue/DontPurchase.png", "NoSinnerNeedRestSign")
+        # 对bus/chair的出口第一时间反应
+        self.cap_win()
+        if(self.single_target_click("./pic/event/Leave.png", "Leave")):
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
+    def mirror4Cope(self): 
+        '''处理镜牢4交互的各种情况'''
+        result = False
+        self.cap_win()
+        # 确保能显现各种事件的正体
+        if self.single_target_click("./pic/event/Skip.png", "Skip", 0, 0, 0.4, 3):
+            self.cap_win()
+
+        if(self.is_find("./pic/team/Announcer.png", "Announcer")):
+            self.mirror4PrepareBattle()
+            self.mirror4BattlePart()
+            result = True
+        elif(self.is_find("./pic/battle/WinRate.png", "battleSign")):
+            self.mirror4BattlePart()
+            result = True
+        elif(self.is_find("./pic/mirror/mirror4/ProductCatalogue/ProductCatalogue.png", "ProductCatalogue")
+             and self.single_target_click("./pic/event/Skip.png", "Skip", 0, 0, 0.4, 3)):
+            if (self.is_find("./pic/mirror/mirror4/ProductCatalogue/FuseGifts.png", "ChairSign")):
+                self.mirror4Chair()
+            elif (self.is_find("./pic/mirror/mirror4/ProductCatalogue/PurchaseEGO.png", "PurchaseEGOSign")):
+                self.mirror4PurchaseEGO()
+            result = True
+        elif(self.is_find("./pic/event/Skip.png", "Skip")):
+            self.eventPart()
+            result = True
+        elif(self.is_find("./pic/mirror/mirror4/way/RewardCard/RewardCardSign.png", "RewardCardSign")):
+            mySleep(3)
+            self.mirror4SelectEncounterRewardCard()
+            result = True
+        elif(self.is_find("./pic/mirror/mirror4/way/Confirm.png", "EGOGift")):
+            #self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirmEGOGift")
+            self.press_key('enter')
+            result = True
+        elif(self.single_target_click("./pic/mirror/mirror4/ego/egoGift.png", "ChooseEgoGift")):
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift")
+            self.press_key('enter')
+            result = True
+        elif(self.single_target_click("./pic/mirror/mirror4/way/Enter.png", "Enter", 0, 0, 2)):
+            result = True
+        elif(self.is_find("./pic/mirror/mirror4/way/ThemePack/SelectFloor.png", "SelectFloor")
+             and self.is_find("./pic/mirror/mirror4/way/ThemePack/ThemePack.png", "ThemePack")):
+            self.mirror4ChooseThemePack()
+            result = True
+        elif(self.is_find("./pic/Wait.png", "Wait Sign")):
+            self.myWait()
+            result = True
+            
+        return result
+
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4PrepareBattle(self):
+        '''镜牢4准备战斗的流程'''
+        self.prepareBattle()
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4BattlePart(self):
+        self.allWinRateBattle()
+        
+
+
+    @checkAndExit
+    @beginAndFinishLog
+    def mirror4SinCoreFindWay(self):
+        '''镜牢4单进程寻路流程'''
+
+        '''
+        # 滚动滑轮以保持视图大小不变
+        littleUpScroll()
+
+        self.single_target_click("./pic/mirror/mirror4/way/Self.png", "Self", 0, 0, 0.8, 1, 0.7)
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+            self.press_key('enter')
+            return True
+        
+        base_path = "./pic/mirror/mirror4/way/"
+        for target in globalVar.enemyList:
+            path = base_path + target
+            for root,dirs,files in walk(path):
+                for i in range(len(files)):
+                    if(files[i][-3:] == 'png'):
+                        file_path = root + '/' + files[i]
+                        if self.single_target_click(file_path, target + files[i][-6:-4], 0, -10):
+                            self.cap_win()
+                            if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+                                self.press_key('enter', 2)
+                                return True
+                            
+        self.click_drag_to("./pic/mirror/mirror4/way/Self.png", "DragSelf", globalVar.winLeft + 638, globalVar.winTop + 370, -100, 100, 0.9, 0.7)
+        '''
+        self.single_target_click("./pic/mirror/mirror4/way/Self.png", "Self")
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+            self.press_key('enter')
+            return True
+
+        self.click_locate(740, 340, "Middle way")
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+            self.press_key('enter', 2)
+            return True
+
+        self.click_locate(740, 125, "High way")
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+            self.press_key('enter', 2)
+            return True
+        
+        self.click_locate(740, 550, "Low way")
+        self.cap_win()
+        if self.is_find("./pic/mirror/mirror4/way/Enter.png", "Enter"):
+            self.press_key('enter', 2)
+            return True
+        
+        
+        return False
+
 
 
 class _MirrorOfTheLake(_script):

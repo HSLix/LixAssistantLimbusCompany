@@ -13,8 +13,50 @@ from src.common.picLocate import *
 from src.common.myTime import mySleep
 from src.common.classWin import _win
 from src.log.myLog import myLog
-from src.common.dragMouse import drag_mouse
+from src.common.dragMouse import drag_mouse, drag_to
 
+
+
+def pure_click(cx, cy, name, wait_time = 0.9, clickCount = 1):
+    addX = 0
+    addY = 0
+    #随机数点击
+    addX += uniform(-10, 10)
+    addY += uniform(-10, 10)
+    msg = "Auto Clicking " + str(name)
+    myLog("debug",msg)
+    cx = int(cx + addX) + _win.winLeft
+    cy = int(cy + addY) + _win.winTop
+    windll.user32.SetCursorPos(cx,cy)
+    while(clickCount > 0):
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN,cx,cy,0,0)
+        win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP,cx,cy,0,0)
+        clickCount -= 1
+        mySleep(wait_time)
+
+    #归零避免妨碍识图
+    windll.user32.SetCursorPos(1,1)
+    mySleep(0.1)
+
+
+def pure_click_and_darg(begin_x, begin_y, end_x, end_y, name, wait_time = 0.9):
+    #随机数点击
+    addX = uniform(-10, 10)
+    addY = uniform(-10, 10)
+    msg = "Auto Draging " + name
+    myLog("debug",msg)
+    begin_x = int(begin_x + addX) + _win.winLeft
+    begin_y = int(begin_y + addY) + _win.winTop
+
+    addX = uniform(-10, 10)
+    addY = uniform(-10, 10)
+    end_x = int(end_x + addX) + _win.winLeft
+    end_y = int(end_y + addY) + _win.winTop
+    
+    drag_to(begin_x, begin_y, end_x, end_y)
+    mySleep(wait_time)
+
+    
 
 
 
@@ -47,7 +89,6 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount
     myLog("debug",msg)
     cx = int(center[0] + addX) + _win.winLeft
     cy = int(center[1] + addY) + _win.winTop
-
     
     
     try:
