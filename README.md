@@ -63,6 +63,8 @@ Download
 
 点击[Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.zip的，解压后运行LALCSetup.exe安装即可。
 
+如果时第一次安装电脑软件，可以看看这个[堂吉诃德都能学会的安装指引](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E8%AF%A6%E7%BB%86%E6%AD%A5%E9%AA%A4)
+
 ---
 ## 使用说明
 How to use
