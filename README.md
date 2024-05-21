@@ -21,13 +21,13 @@
 </div>
 <br>
 
-LALC是LixAssistantLimbusCompany各取大写字母的缩写
+LALC 是 LixAssistantLimbusCompany 各取大写字母的缩写
 
-是月计次世代(~~大嘘~~)手游(?)LimbusCompany的助手
+是月计次世代~~大嘘~~ 手游(?) LimbusCompany 的助手
 
 基于图像识别，一键代肝
 
-~~看项目星星数与本人心情~~飞速更新中
+~~看项目星星数与本人心情~~ 飞速更新中
 
 </div>
 
@@ -48,9 +48,9 @@ LALC是LixAssistantLimbusCompany各取大写字母的缩写
 ## 实用功能和亮点
 Features
 
-- 自动刷取**经验本**EXP
-- 自动刷取**纽本**Thread
-- 自动刷取**镜牢**Mirror
+- 自动刷取 **经验本** EXP
+- 自动刷取 **纽本** Thread
+- 自动刷取 **镜牢** Mirror
 - 自动转换体力，和购买体力
 - ~~确实没啥功能~~
 - 只有60m左右大小，下不了上当，下不了吃亏
@@ -61,21 +61,22 @@ Features
 ## 下载方式
 Download
 
-点击[Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases)并下载最新版中叫LALCSetup.zip的，解压后运行LALCSetup.exe安装即可。
+点击 [Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases) 并下载最新版中叫 LALCSetup.zip 的，解压后运行 LALCSetup.exe 安装即可。
 
-如果时第一次安装电脑软件，可以看看这个[堂吉诃德都能学会的安装指引](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E8%AF%A6%E7%BB%86%E6%AD%A5%E9%AA%A4)
+如果是第一次安装电脑软件，可以看看 [堂吉诃德都能学会的安装指引](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%B8%8B%E8%BD%BD%E5%AE%89%E8%A3%85%E8%AF%A6%E7%BB%86%E6%AD%A5%E9%AA%A4)
 
 ---
 ## 使用说明
 How to use
 
-如果第一次使用LALC，推荐查看一下[使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)(How to use)来了解基本使用方式
+如果是第一次使用LALC，推荐查看一下 [使用说明](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E4%BD%BF%E7%94%A8%E8%AF%B4%E6%98%8E)(How to use) 来了解基本使用方式
 
-如果发现问题，可以先看看[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)(FAQ),然后可以通过[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)反馈，也欢迎在[Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions)讨论
+如果发现问题，可以先看看 [常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)(FAQ)，再看看 [Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues) 中有无类似问题反馈，然后可以在 [Discussions](https://github.com/HSLix/LixAssistantLimbusCompany/discussions) 讨论 ，也欢迎通过
+[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues) 反馈
 
-当然也欢迎提交[PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)
+如果有想法与精力，当然也欢迎提交 [PR](https://github.com/HSLix/LixAssistantLimbusCompany/pulls)，比较详细的 CONTRIBUTE.md 贡献规范什么的还是在我把代码梳理明白了再搞吧，现在的代码要是去掉注释，就只有上帝才能看懂了
 
-如果你对作者的开发动态或其他方面感兴趣，可以到[作者动态](https://space.bilibili.com/384632772/dynamic)看看更新预告什么的
+如果你对作者的开发动态或其他方面感兴趣，可以到 [作者动态](https://space.bilibili.com/384632772/dynamic) 看看更新预告什么的
 
 ---
 
@@ -88,9 +89,9 @@ Disclaimer
 
 获取管理员权限是为了确保运行顺利
 
-该版本离线，只能到github自助更新
+该版本离线，只能到 Github 自助更新
 
-软件图标素材来源网图，不属于GPL协议开源的内容，如有侵权，请及时联系作者删除
+软件图标素材来源网图，不属于 GPL 协议开源的内容，如有侵权，请及时联系作者删除
 
 ---
 
@@ -113,7 +114,7 @@ Pic
 ## 加入开发
 Develop
 
-LALC的开发欢迎所有开发者加入，可参考[该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75)开始，也可参考这个专门面向开发者的[WikiPage](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)。
+LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75) 开始，也可参考这个专门面向开发者的 [WikiPage](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)。
 
 ---
 ## 致谢
@@ -168,17 +169,17 @@ Contributors:
 ## 友链
 Other Assistants
 
-除我以外，还有其它开发者也致力于limbus脚本的开发，可以的话，也希望大家多多支持！！
+除我以外，还有其它开发者也致力于 limbus 脚本的开发，可以的话，也希望大家多多支持！！
 
 (虽然有项目没有放我的链接，但我还是放了他们的，QWQ。特别“表扬”LCAA，连我应援的评论都删了，亏我还发动态支持LCAA的视频，QWQ）
 
 ### MAALimbus
-正统MAA传承，经典配方，满足安卓模拟器上一键长草的梦想
+正统 MAA 传承，经典配方，满足安卓模拟器上一键长草的梦想
 
 https://github.com/hxdnshx/MAALimbusCompany
 
 ### Limbus-Script
-也是PC端全自动！！！yyds
+也是 PC 端全自动！！！yyds
 
 https://github.com/Xie-Tiao/Limbus-Scripts
 
@@ -197,9 +198,9 @@ Sponsors
 
 如果您有打赏的想法，请尽量看完下面的说明
 
-首先，LALC的下载与使用完全免费，所以不必付费；
+首先，LALC 的下载与使用完全免费，所以不必付费；
 
-其次，金钱来之不易，而且作者并不急需打赏，作者更希望看到您能帮忙给本项目点个Star，这对本项目已经是大力支持了！！！
+其次，金钱来之不易，而且作者并不急需打赏，作者更希望看到您能帮忙给本项目点个 Star，这对本项目已经是大力支持了！！！
 
 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
@@ -221,7 +222,7 @@ Sponsors
 ## 最后
 Last
 
-如果你觉得该软件对你有帮助，请帮忙点个Star吧，这个网页右上角小星星对我们是最好的支持！
+如果你觉得该软件对你有帮助，请帮忙点个 Star 吧，这个网页右上角小星星对我们是最好的支持！
 
 同时也希望有大佬把这个依托答辩的代码进行狠狠地优化
 
@@ -231,7 +232,7 @@ Last
 
 ~~被全自动镜本脚本测试群踢出来后进群失败~~
 
-希望这个软件能帮助大家减少limbus游玩过程中反复乏味的部分，享受里面精彩的表演，有趣的机制就够了，游戏就是要笑着玩的嘛(:
+希望这个软件能帮助大家减少 limbus 游玩过程中反复乏味的部分，享受里面精彩的表演，有趣的机制就够了，游戏就是要笑着玩的嘛(:
 
 ~~悄悄更个图，应该没人发现吧~~
 
