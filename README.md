@@ -101,13 +101,17 @@ Pic
 （图片仅供参考，还请以实例为准）
 
 ### 开始界面
-![image](/pic/example/mainPage.png)
+<img src="https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/pic/example/mainPage.png" width="300">
+
 ### 关于界面
-![image](/pic/example/aboutPage.png)
+<img src="https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/pic/example/aboutPage.png" width="300">
+
 
 ---
 ## 视频教程
-[![IMAGE ALT TEXT](/pic/example/videoPic.png)](https://youtu.be/ZKsNTLM-IT4)
+<a href="https://youtu.be/ZKsNTLM-IT4">
+    <img src="https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/pic/example/videoPic.png" width="300">
+</a>
 
 ---
 
@@ -204,15 +208,15 @@ Sponsors
 
 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
-如果您仍有打赏的想法，那我再拒绝就礼貌啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
+如果您仍有打赏的想法，那我再拒绝就不礼貌啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
 <div align="center">
   
-  ![image](/pic/example/wechat.jpg)
+  <img src="https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/pic/example/wechat.jpg" width="300">
   
   wechat
   <br>
-  
-  ![image](/pic/example/alipay.jpg)
+
+  <img src="https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/pic/example/alipay.jpg" width="300">
   
   alipay
   <br>
