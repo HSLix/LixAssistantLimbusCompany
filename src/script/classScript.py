@@ -91,6 +91,9 @@ class _script(_task):
                 self.press_key("esc")
 
             self.cap_win()
+            if self.single_target_click("./pic/initMenu/Window.png", "mainMenuSign"):
+                break
+            
             # 退出的通用步骤esc
             self.press_key("esc")
 
@@ -98,9 +101,11 @@ class _script(_task):
              
             
             # 第二次也不行时，一定是出现了脚本中没有的情况
-            if loopCount > 30:
+            if loopCount > 10:
                 myLog("warning", "Can't Find The Way MainMenu. Must be Unknown Situation. Please Restart the Game and the Script")
                 raise backMainWinError("无法返回主界面，不能进行下一步")
+
+            mySleep(3)
 
 
 
@@ -116,6 +121,9 @@ class _script(_task):
                 self.press_key("p")
                 #self.is_find("./pic/battle/WinRate.png", "WinRate")
                 self.press_key("enter")
+                self.cap_win()
+                if (self.single_target_click("./pic/battle/WinRate.png", "WinRate")):
+                    self.press_key("enter")
                 condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
                 mySleep(2)

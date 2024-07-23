@@ -323,7 +323,7 @@ class _MirrorOfTheWuthering(_script):
         if(self.is_find("./pic/mirror/mirror4/way/mirror4MapSign.png", "mirror4MapSign")):
             return
         self.cap_win()
-        self.single_target_click("./pic/initMenu/drive.png", "Drive")
+        self.single_target_click("./pic/initMenu/drive.png", "Drive",0, 0, 2)
         self.cap_win()
         self.single_target_click("./pic/mirror/mirror4/MirrorDungeons.png", "MirrorDungeons", 0, 0, 1, 1, 0.9)
         self.cap_win()
@@ -333,17 +333,18 @@ class _MirrorOfTheWuthering(_script):
         self.cap_win()
         if(self.is_find("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):
             raise mirrorInProgressError("有其他镜牢未结束")
-        if(self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2)):
+        if(self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 3)):
             self.cap_win()
-            self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1.5)
+            self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 3)
             self.cap_win()
             self.getGiftSwitch()
-            if globalVar.gift_switch:
+            if globalVar.gift_switch == 1:
                 self.mirror4GetStartGift()
             else:
-                self.single_target_click("./pic/mirror/mirror4/ego/RandomEGOGift.png", "egoGift")
+                address = "./pic/mirror/mirror4/ego/" + globalVar.mirror_start_ego + "EGOGift.png"
+                self.single_target_click(address, "SelectMirrorStartTendency", 0, 0, 0.7, 2, 0.9)
                 self.cap_win()
-                self.multiple_target_click("./pic/mirror/mirror4/ego/confirmRandomEGOGift.png", "EGOGift")
+                self.multiple_target_click("./pic/mirror/mirror4/ego/StartSelectedGift.png",  "EGOSign", -200, 0, 0.5, 1, 0.7)
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)
             self.press_key('enter', 0.4, 3) # confirm the ego
@@ -360,17 +361,17 @@ class _MirrorOfTheWuthering(_script):
 
     def mirror4SelectEncounterRewardCard(self):
         self.cap_win()
-        if (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/EGOGiftCard.png", "EGOGiftCard")):
-            mySleep(1)
-            self.press_key('enter', 1)
-            self.cap_win()
-            self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirm ego gift", 0, 0, 0.4, 3)
-        elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/CostCard.png", "CostCard")):
+        if (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/CostCard.png", "CostCard")):
             mySleep(1)
             self.press_key('enter', 1)
         elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/StarlightCard.png", "StarlightCard")):
             mySleep(1)
             self.press_key('enter', 1)
+        elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/EGOGiftCard.png", "EGOGiftCard")):
+            mySleep(1)
+            self.press_key('enter', 1)
+            self.cap_win()
+            self.single_target_click("./pic/mirror/mirror4/way/Confirm.png", "confirm ego gift", 0, 0, 0.4, 3)
         elif (self.single_target_click("./pic/mirror/mirror4/way/RewardCard/EGOResourceCard.png", "EGOResourceCard")):
             mySleep(1)
             self.press_key('enter', 1)
@@ -383,7 +384,7 @@ class _MirrorOfTheWuthering(_script):
     
     def mirror4ChooseThemePack(self):
         # 先默认拉第一个好了，之后再搞选择
-        self.click_locate_and_drag_to(300, 250, 300, 600, "FirstThemePack")
+        self.click_locate_and_drag_to(400, 250, 400, 600, "FirstThemePack")
         mySleep(6)
 
     def mirror4Chair(self):
@@ -649,9 +650,10 @@ class _MirrorOfTheLake(_script):
             if globalVar.gift_switch:
                 self.mirror3GetStartGift()
             else:
-                self.single_target_click("./pic/mirror/mirror3/ego/RandomEGOGift.png", "egoGift")
+                address = "./pic/mirror/mirror4/ego/" + globalVar.mirror_start_ego + "EGOGift.png"
+                self.single_target_click(address, "SelectMirrorStartTendency", 0, 0, 0.8, 1, 0.9)
                 self.cap_win()
-                self.multiple_target_click("./pic/mirror/mirror3/ego/confirmRandomEGOGift.png", "EGOGift")
+                self.multiple_target_click("./pic/mirror/mirror4/ego/StartSelectedGift.png",  "TestEGOSign", -200)
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror3/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)
             self.press_key('enter', 0.4, 3) # confirm the ego

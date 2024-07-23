@@ -53,3 +53,8 @@ winTop = 0
 # 是否刷取饰品
 # 在2.1.11起至某版本，仅刷取呼吸器或呼吸烟斗，并只能通过文件config更改
 gift_switch = 0
+
+# 流派倾向
+tribal_tendency = ["Poise", "Keywordless"]
+mirror_start_ego = "Random"
+

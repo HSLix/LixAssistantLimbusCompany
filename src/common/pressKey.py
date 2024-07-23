@@ -11,6 +11,7 @@ from win32api import keybd_event
 from win32con import KEYEVENTF_KEYUP
 from src.log.myLog import myLog
 from src.common.myTime import mySleep
+from src.common.classWin import _win
 
 
 asciiCode = {'p': 0x50, 'space': 0x20, 'esc': 0x1b, 'enter': 0x0D}
@@ -23,6 +24,7 @@ def pressKey(key, waitTime = 0.3):
     :目前支持字符有：p, space(空格),esc,enter
     :return: 无
     """
+    #_win.focus_win()
     msg = "pressing thg key " + key
     myLog("debug",msg)
     asciiIndex = asciiCode[key]

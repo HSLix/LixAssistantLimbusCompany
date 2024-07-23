@@ -9,11 +9,15 @@
 from src.common import getPic, autoFindOrClick as afc
 from src.common import picLocate
 from ctypes import windll
+import globalVar
 
 def tryClick(img_model_path, name, addX=0, addY=0,waitTime = 0.7, clickCount = 1, correctRate = 0.8):
-    # getPic.winCap()
+    getPic.winCap()
 
-    
+    address = "./pic/mirror/mirror4/ego/" + globalVar.mirror_start_ego + "EGOGift.png"
+    afc.autoSinClick(address, "SelectMirrorStartTendency", 0, 0, 0.7, 1, 0.9)
+    print(address)
+    #afc.autoMulClick("./pic/mirror/mirror4/ego/StartSelectedGift.png",  "TestEGOSign", -200, 0, 0.5, 1, 0.7)
     #afc.autoSinClick(img_model_path, name, addX, addY,waitTime, clickCount , correctRate)
     # afc.autoSinClick("./pic/mirror/mirror3/way/Self.png", "Self")
     '''center = picLocate.getSinCenXY("./pic/mirror/mirror4/way/TestHighLoc.png", 0.6)                

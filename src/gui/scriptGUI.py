@@ -21,7 +21,7 @@ def scriptGUI():
 
     # 测试识图
     # tryFind("./pic/mirror/mirror3/way/Encounter/EncounterLH.png", "Test")
-    tryClick("./pic/mirror/mirror3/way/Encounter/EncounterRH.png", "Test", 0, 0, 0.7, 1)
+    # tryClick("./pic/mirror/mirror3/way/Encounter/EncounterRH.png", "Test", 0, 0, 0.7, 1)
     
     
     gui = myGUI()
