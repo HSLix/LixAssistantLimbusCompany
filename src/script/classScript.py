@@ -57,6 +57,7 @@ class _script(_task):
             if self.single_target_click("./pic/back/To Window.png", "To Window"):
                 self.cap_win()
                 self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
+                continue
 
             # 战斗结算的确认
             self.single_target_click("./pic/back/blackBackGroundConfirm.png", "blackCOnfirm")
@@ -66,9 +67,10 @@ class _script(_task):
                 self.press_key("esc")
                 self.cap_win()
                 self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
+                continue
 
             # 镜本结算
-            if self.single_target_click("./pic/mirror/mirror3/ClaimRewards.png","ClaimRewards"):
+            if self.single_target_click("./pic/mirror/mirror4/ClaimRewards.png","ClaimRewards"):
                 for i in range(5):
                     self.press_key("enter")
                     
@@ -116,6 +118,9 @@ class _script(_task):
                 self.press_key("p")
                 #self.is_find("./pic/battle/WinRate.png", "WinRate")
                 self.press_key("enter")
+                self.cap_win()
+                if (self.single_target_click("./pic/battle/WinRate.png", "WinRate")):
+                    self.press_key("enter")
                 condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
                 mySleep(2)
@@ -127,7 +132,7 @@ class _script(_task):
                 self.myWait()
                 condition = True
             elif(not self.is_find("./pic/mirror/mirror4/way/mirror4MapSign.png", "mirror4MapSign") 
-                 and self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
+                    and self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
                 condition = True
             # 接下来是战斗停止的标识
             elif(self.single_target_click("./pic/battle/blackWordConfirm.png", "Level Increased!")):
@@ -141,7 +146,6 @@ class _script(_task):
             elif(self.is_find("./pic/mirror/mirror4/way/RewardCard/RewardCardSign.png", "RewardCardSign")):
                 break
 
-
             mySleep(1)
             if(not condition):
                 loopCount += 1
@@ -149,6 +153,7 @@ class _script(_task):
                     break
             else:
                 loopCount = 0
+
 
         
     @beginAndFinishLog
