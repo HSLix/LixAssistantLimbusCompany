@@ -149,7 +149,7 @@ class _script(_task):
             mySleep(1)
             if(not condition):
                 loopCount += 1
-                if(loopCount > 10):
+                if(loopCount > 3):
                     break
             else:
                 loopCount = 0

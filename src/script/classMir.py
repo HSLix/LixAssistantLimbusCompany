@@ -333,7 +333,8 @@ class _MirrorOfTheWuthering(_script):
         self.cap_win()
         if(self.is_find("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):
             raise mirrorInProgressError("有其他镜牢未结束")
-        if(self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2)):
+        if (self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2) or
+            self.single_target_click("./pic/mirror/mirror4/Resume.png", "Resume", 0, 0, 5)):
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1.5)
             self.cap_win()
@@ -346,12 +347,11 @@ class _MirrorOfTheWuthering(_script):
                 self.cap_win()
                 self.multiple_target_click("./pic/mirror/mirror4/ego/confirmRandomEGOGift.png", "EGOGift")
             self.cap_win()
-            self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)
-            self.press_key('enter', 0.4, 3) # confirm the ego
-            self.press_key('enter', 3) # enter
+            if (self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)):
+                self.press_key('enter', 0.4, 3) # confirm the ego
+                self.press_key('enter', 3) # enter
             self.cap_win()
-        else:
-            self.single_target_click("./pic/mirror/mirror4/Resume.png", "Resume", 0, 0, 5)
+            
         if(self.is_find("./pic/team/Announcer.png", "Member")
            and self.is_find("./pic/mirror/mirror4/firstTeamConfirm.png", "firstTeamConfirm", 0.5)):
             self.press_key('enter')
@@ -542,6 +542,7 @@ class _MirrorOfTheWuthering(_script):
         if(self.single_target_click("./pic/event/Leave.png", "Leave")):
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
+
     def mirror4Cope(self): 
         '''处理镜牢4交互的各种情况'''
         result = False
@@ -577,15 +578,9 @@ class _MirrorOfTheWuthering(_script):
             result = True
         elif(self.single_target_click("./pic/mirror/mirror4/ego/egoGift.png", "ChooseEgoGift")):
             self.cap_win()
-            # CheckBossGift and Refuse to get negative debuff
-            if(self.is_find("./pic/mirror/mirror4/ego/negative.png", "Negative")):
-                self.single_target_click("./pic/mirror/mirror4/ego/refuse.png", "RefuseGift")
-                self.press_key('enter')
-                result = True
-            else:
-                self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift")
-                self.press_key('enter')
-                result = True
+            self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift")
+            self.press_key('enter')
+            result = True
         elif(self.single_target_click("./pic/mirror/mirror4/way/Enter.png", "Enter", 0, 0, 2)):
             result = True
         elif(self.is_find("./pic/mirror/mirror4/way/ThemePack/SelectFloor.png", "SelectFloor")
