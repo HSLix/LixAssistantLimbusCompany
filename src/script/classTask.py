@@ -24,8 +24,8 @@ class _task():
     def click_locate(self, cx, cy, name, wait_time = 0.9, clickCount = 1):
         pure_click(cx, cy, name, wait_time, clickCount)
 
-    def click_locate_and_drag_to(self, begin_x, begin_y, end_x, end_y, name, wait_time = 0.9):
-        pure_click_and_darg(begin_x, begin_y, end_x, end_y, name, wait_time)
+    def click_locate_and_drag_to(self,img_model_path, name, wait_time = 0.9):
+        pure_click_and_darg(img_model_path, name, wait_time,correctRate = 0.6)
     
     def single_target_click(self,img_model_path, name, addX=0, addY=0,waitTime = 0.8, clickCount = 1, correctRate = 0.75):
         """

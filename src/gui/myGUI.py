@@ -346,7 +346,7 @@ class myGUI:
         self.SetWin = ttk.Combobox(self.taskFrame)
         self.SetWin['values'] = ["位置+大小", "大小", "位置", "无"]
         self.SetWin.configure(state="readonly")
-        self.SetWin.current(0)
+        self.SetWin.current(1)
         self.SetWin.place(width=180, height=40, x=0, y=30)
 
 
