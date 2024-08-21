@@ -57,6 +57,7 @@ class _script(_task):
             if self.single_target_click("./pic/back/To Window.png", "To Window"):
                 self.cap_win()
                 self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
+                continue
 
             # 战斗结算的确认
             self.single_target_click("./pic/back/blackBackGroundConfirm.png", "blackCOnfirm")
@@ -66,9 +67,10 @@ class _script(_task):
                 self.press_key("esc")
                 self.cap_win()
                 self.single_target_click("./pic/back/whiteBackGroundConfirm.png", "whiteConfirm")
+                continue
 
             # 镜本结算
-            if self.single_target_click("./pic/mirror/mirror3/ClaimRewards.png","ClaimRewards"):
+            if self.single_target_click("./pic/mirror/mirror4/ClaimRewards.png","ClaimRewards"):
                 for i in range(5):
                     self.press_key("enter")
                     
@@ -116,6 +118,9 @@ class _script(_task):
                 self.press_key("p")
                 #self.is_find("./pic/battle/WinRate.png", "WinRate")
                 self.press_key("enter")
+                self.cap_win()
+                if (self.single_target_click("./pic/battle/WinRate.png", "WinRate")):
+                    self.press_key("enter")
                 condition = True
             elif(self.is_find("./pic/battle/battlePause.png", "Fighting Sign")):
                 mySleep(2)
@@ -127,7 +132,7 @@ class _script(_task):
                 self.myWait()
                 condition = True
             elif(not self.is_find("./pic/mirror/mirror4/way/mirror4MapSign.png", "mirror4MapSign") 
-                 and self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
+                    and self.single_target_click("./pic/battle/trianglePause.png", "Continue Fight!")):
                 condition = True
             # 接下来是战斗停止的标识
             elif(self.single_target_click("./pic/battle/blackWordConfirm.png", "Level Increased!")):
@@ -141,14 +146,14 @@ class _script(_task):
             elif(self.is_find("./pic/mirror/mirror4/way/RewardCard/RewardCardSign.png", "RewardCardSign")):
                 break
 
-
             mySleep(1)
             if(not condition):
                 loopCount += 1
-                if(loopCount > 10):
+                if(loopCount > 3):
                     break
             else:
                 loopCount = 0
+
 
         
     @beginAndFinishLog
@@ -271,42 +276,13 @@ class _script(_task):
         return result
 
 
-    #根据已选人数和队伍可容纳人数做情况分类
-    #检测3/3;4/4;5/5；6/6；7/7最好就一个标准，能省不少时间
-    def judTeamCondition(self):
-        '''判断当前队伍状况'''
-        resultCondition = -1
-        if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.95) or\
-            self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.95) or\
-            self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.95) or\
-            self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.95) or\
-            self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.95)):
-            resultCondition = 0
-        elif(self.is_find("./pic/team/EmptyTeam03.png", "EmptyTeam0/3", 0.95)):
-            resultCondition = 1
-        elif(self.is_find("./pic/team/EmptyTeam04.png", "EmptyTeam0/4", 0.95) or\
-        self.is_find("./pic/team/NotFullTeam34.png", "NotFullTeam3/4", 0.95)):
-            resultCondition = 2
-        elif(self.is_find("./pic/team/EmptyTeam05.png", "EmptyTeam0/5", 0.95)):
-            resultCondition = 3
-        elif(self.is_find("./pic/team/EmptyTeam06.png", "EmptyTeam0/6", 0.95) or\
-        self.is_find("./pic/team/NotFullTeam56.png", "NotFullTeam5/6", 0.95)):
-            resultCondition = 4
-        elif(self.is_find("./pic/team/EmptyTeam07.png", "EmptyTeam0/7", 0.95) or\
-        self.is_find("./pic/team/NotFullTeam67.png", "NotFullTeam6/7", 0.95)):
-            resultCondition = False
-        return resultCondition
 
 
     #满队标准
     def judFullTeam(self):
         '''判断队伍是否人满'''
         result = False
-        if(self.is_find("./pic/team/FullTeam77.png", "FullTeam7/7", 0.95) or\
-            self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.95) or\
-            self.is_find("./pic/team/FullTeam55.png", "FullTeam5/5", 0.95) or\
-            self.is_find("./pic/team/FullTeam44.png", "FullTeam4/4", 0.95) or\
-            self.is_find("./pic/team/FullTeam33.png", "FullTeam3/3", 0.95)):
+        if(self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.96)):
             result = True
         return result
 
@@ -317,29 +293,30 @@ class _script(_task):
         '''准备战斗的流程'''
         self.cap_win()
         i = 1
-        countFlag = 0
         #condition = self.judTeamCondition()
-        self.get_sinner_order()
-        while(not self.judFullTeam()):
-            #i的归零
-            if(i > 12):
-                i = 1
-                countFlag += 1
-                if(countFlag > 0):
+        if (not self.judFullTeam()):
+            self.single_target_click("./pic/team/ClearSelection.png", "ClearSelection")
+            self.press_key('enter')
+            self.cap_win()
+            self.get_sinner_order()
+            while(not self.judFullTeam()):
+                #i的归零
+                if(i > 12):
+                    i = 1
                     myLog("warning","Can't make team full")
                     break
-            self.cap_win()
-            j = globalVar.sinnerNumber[globalVar.sinnerOrder[i - 1]]
-            if(j < 7):
-                addX = j * 140
-                addY = 0
-            else:
-                addX = (j - 6) * 140
-                addY = 200
+                self.cap_win()
+                j = globalVar.sinnerNumber[globalVar.sinnerOrder[i - 1]]
+                if(j < 7):
+                    addX = j * 140
+                    addY = 0
+                else:
+                    addX = (j - 6) * 140
+                    addY = 200
 
-            self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
-            self.cap_win()
-            i += 1
+                self.single_target_click("./pic/team/Announcer.png", "Member", addX, addY + 100, 0.2)
+                self.cap_win()
+                i += 1
 
         self.press_key("enter")
         mySleep(5)

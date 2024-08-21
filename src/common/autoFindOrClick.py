@@ -14,6 +14,7 @@ from src.common.myTime import mySleep
 from src.common.classWin import _win
 from src.log.myLog import myLog
 from src.common.dragMouse import drag_mouse, drag_to
+from globalVar import screenWidth
 
 
 
@@ -35,25 +36,36 @@ def pure_click(cx, cy, name, wait_time = 0.9, clickCount = 1):
         mySleep(wait_time)
 
     #归零避免妨碍识图
-    windll.user32.SetCursorPos(1,1)
+    windll.user32.SetCursorPos(screenWidth - 1,1)
     mySleep(0.1)
 
 
-def pure_click_and_darg(begin_x, begin_y, end_x, end_y, name, wait_time = 0.9):
+def pure_click_and_darg(img_model_path, name, wait_time = 0.9,correctRate = 0.6):
+
     #随机数点击
     addX = uniform(-10, 10)
     addY = uniform(-10, 10)
     msg = "Auto Draging " + name
     myLog("debug",msg)
-    begin_x = int(begin_x + addX) + _win.winLeft
-    begin_y = int(begin_y + addY) + _win.winTop
 
     addX = uniform(-10, 10)
     addY = uniform(-10, 10)
-    end_x = int(end_x + addX) + _win.winLeft
-    end_y = int(end_y + addY) + _win.winTop
+ 
+
+    #图像定位
     
-    drag_to(begin_x, begin_y, end_x, end_y)
+    # GetCenterOfImageFoundAndDragTheme
+
+    center = getSinCenXY(img_model_path, correctRate)
+    msg = "Auto Clicking " + name
+    myLog("debug",msg)
+    cx = int(center[0] + addX) + _win.winLeft
+    cy = int(center[1] + addY) + _win.winTop
+
+    end_x = int(cx + addX) + _win.winLeft
+    end_y = int(cy + 350 + addY) + _win.winTop
+
+    drag_to(cx, cy, end_x, end_y)
     mySleep(wait_time)
 
     
@@ -104,7 +116,8 @@ def autoSinClick(img_model_path, name, addX=0, addY=0,waitTime = 0.9, clickCount
 
     #归零避免妨碍识图
     try:
-        windll.user32.SetCursorPos(1,1)
+        
+        windll.user32.SetCursorPos(screenWidth - 1,1)
         mySleep(0.1)
     except:
         myLog("error","The Mouse is used by other man.")
@@ -159,7 +172,7 @@ def autoMulClick(img_model_path, name, addX=0, addY=0, waitTime = 0.5, clickCoun
 
     #归零避免妨碍识图
     try:
-        windll.user32.SetCursorPos(1,1)
+        windll.user32.SetCursorPos(screenWidth - 1,1)
     except:
         myLog("error","The Mouse is used by other man.")
     #win32api.SetCursorPos((1,1))
@@ -205,6 +218,7 @@ def clickAndDragTo(img_model_path, name, targetX = 0, targetY = 0, addX=0, addY=
     addX += uniform(-10, 10)
     addY += uniform(-10, 10)
     #图像定位
+
     center = getSinCenXY(img_model_path, correctRate)
     if center == None:
         msg = "Can't Find " + name

@@ -23,7 +23,6 @@ if __name__ == '__main__':
     if GetLastError() > 0:
         exit(0)
 
-    
     #图形化操作界面
     scriptGUI()
 

@@ -333,7 +333,8 @@ class _MirrorOfTheWuthering(_script):
         self.cap_win()
         if(self.is_find("./pic/mirror/MirrorInProgress.png", "MirrorInProgress")):
             raise mirrorInProgressError("有其他镜牢未结束")
-        if(self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2)):
+        if (self.single_target_click("./pic/mirror/mirror4/Enter.png", "Enter", 0, 0, 2) or
+            self.single_target_click("./pic/mirror/mirror4/Resume.png", "Resume", 0, 0, 5)):
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror4/firstWishConfirm.png", "firstWishConfirm", 0, 0, 1.5)
             self.cap_win()
@@ -341,16 +342,16 @@ class _MirrorOfTheWuthering(_script):
             if globalVar.gift_switch:
                 self.mirror4GetStartGift()
             else:
-                self.single_target_click("./pic/mirror/mirror4/ego/RandomEGOGift.png", "egoGift")
+                # self.single_target_click("./pic/mirror/mirror4/ego/RandomEGOGift.png", "egoGift")
+                self.single_target_click("./pic/mirror/mirror4/ego/PoiseEGOGift.png", "egoGift")
                 self.cap_win()
                 self.multiple_target_click("./pic/mirror/mirror4/ego/confirmRandomEGOGift.png", "EGOGift")
             self.cap_win()
-            self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)
-            self.press_key('enter', 0.4, 3) # confirm the ego
-            self.press_key('enter', 3) # enter
+            if (self.single_target_click("./pic/mirror/mirror4/ego/SelectEGOGift.png", "SelectEGOGift", 0, 0, 5)):
+                self.press_key('enter', 0.4, 3) # confirm the ego
+                self.press_key('enter', 3) # enter
             self.cap_win()
-        else:
-            self.single_target_click("./pic/mirror/mirror4/Resume.png", "Resume", 0, 0, 5)
+            
         if(self.is_find("./pic/team/Announcer.png", "Member")
            and self.is_find("./pic/mirror/mirror4/firstTeamConfirm.png", "firstTeamConfirm", 0.5)):
             self.press_key('enter')
@@ -383,7 +384,147 @@ class _MirrorOfTheWuthering(_script):
     
     def mirror4ChooseThemePack(self):
         # 先默认拉第一个好了，之后再搞选择
-        self.click_locate_and_drag_to(300, 250, 300, 600, "FirstThemePack")
+        self.cap_win()
+        theme_selected = 0
+        reset_flag = 0
+        mySleep(2)
+        while not theme_selected:
+            # You Can Change Event_Theme.png depend on Event New Theme If you want to avoid Event Theme Pack Then Copy Any Theme And Rename It to Event_Theme.png
+            if(self.is_find("./pic/mirror/mirror4/theme/EventTheme.png", "Event_Theme")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/EventTheme.png", "Event_Theme")
+                theme_selected = 1
+            # ThemeSelectedByOrderPriorityFrom1
+            elif(self.is_find("./pic/mirror/mirror4/theme/1.png", "theme_1")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/1.png", "theme_1")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/2.png", "theme_2")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/2.png", "theme_2")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/3.png", "theme_3")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/3.png", "theme_3")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/4.png", "theme_4")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/4.png", "theme_4")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/5.png", "theme_5")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/5.png", "theme_5")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/6.png", "theme_6")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/6.png", "theme_6")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/7.png", "theme_7")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/7.png", "theme_7")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/8.png", "theme_8")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/8.png", "theme_8")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/9.png", "theme_9")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/9.png", "theme_9")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/10.png", "theme_10")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/10.png", "theme_10")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/11.png", "theme_11")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/11.png", "theme_11")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/12.png", "theme_12")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/12.png", "theme_12")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/13.png", "theme_13")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/13.png", "theme_13")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/14.png", "theme_14")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/14.png", "theme_14")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/15.png", "theme_15")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/15.png", "theme_15")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/16.png", "theme_16")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/16.png", "theme_16")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/17.png", "theme_17")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/17.png", "theme_17")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/18.png", "theme_18")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/18.png", "theme_18")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/19.png", "theme_19")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/19.png", "theme_19")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/20.png", "theme_20")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/20.png", "theme_20")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/21.png", "theme_21")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/21.png", "theme_21")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/22.png", "theme_22")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/22.png", "theme_22")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/23.png", "theme_23")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/23.png", "theme_23")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/24.png", "theme_24")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/24.png", "theme_24")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/25.png", "theme_25")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/25.png", "theme_25")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/26.png", "theme_26")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/26.png", "theme_26")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/27.png", "theme_27")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/27.png", "theme_27")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/28.png", "theme_28")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/28.png", "theme_28")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/29.png", "theme_29")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/29.png", "theme_29")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/30.png", "theme_30")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/30.png", "theme_30")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/31.png", "theme_31")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/31.png", "theme_31")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/32.png", "theme_32")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/32.png", "theme_32")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/33.png", "theme_33")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/33.png", "theme_33")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/34.png", "theme_34")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/34.png", "theme_34")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/35.png", "theme_35")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/35.png", "theme_35")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/36.png", "theme_36")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/36.png", "theme_36")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/37.png", "theme_37")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/37.png", "theme_37")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/38.png", "theme_38")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/38.png", "theme_38")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/39.png", "theme_39")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/39.png", "theme_39")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/40.png", "theme_40")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/40.png", "theme_40")
+                theme_selected = 1
+            elif(self.is_find("./pic/mirror/mirror4/theme/41.png", "theme_41")):
+                self.click_locate_and_drag_to("./pic/mirror/mirror4/theme/41.png", "theme_41")
+                theme_selected = 1
+            elif reset_flag == 1:
+                self.single_target_click("./pic/mirror/mirror4/theme/LBIcon.png", "randomTheme")
+                theme_selected = 1
+            # ResetIfNoFoundPreferedTheme
+            elif self.is_find("./pic/mirror/mirror4/theme/refresh.png", "refresh") and reset_flag == 0:
+                self.single_target_click("./pic/mirror/mirror4/theme/refresh.png", "refresh")
+                reset_flag = 1
+                mySleep(2)
         mySleep(6)
 
     def mirror4Chair(self):
@@ -401,6 +542,7 @@ class _MirrorOfTheWuthering(_script):
         if(self.single_target_click("./pic/event/Leave.png", "Leave")):
             self.cap_win()
             self.single_target_click("./pic/mirror/mirror2/whiteConfirm.png", "Confirm")
+
     def mirror4Cope(self): 
         '''处理镜牢4交互的各种情况'''
         result = False

@@ -122,5 +122,8 @@ class _win():
         windll.user32.ReleaseDC(_win.hWnd)
 
         return result
+
+    def focus_win(self):
+        win32gui.SetForegroundWindow(_win.hWnd)
     
 
