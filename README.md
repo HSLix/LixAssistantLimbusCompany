@@ -156,7 +156,7 @@ Contributors:
         <a href="https://github.com/pasathornpGStudio">
             <img src="https://avatars.githubusercontent.com/u/126454008?v=4" width="100;" alt="pasathornpGStudio"/>
             <br />
-            <sub><b>pasathornpGStudio</b></sub>
+            <sub><b>PasathornpGStudio</b></sub>
         </a>
     </td>
     <td align="center">
