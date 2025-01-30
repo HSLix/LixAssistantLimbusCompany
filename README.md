@@ -153,6 +153,20 @@ Contributors:
         </a>
     </td>
     <td align="center">
+        <a href="https://github.com/pasathornpGStudio">
+            <img src="https://avatars.githubusercontent.com/u/126454008?v=4" width="100;" alt="pasathornpGStudio"/>
+            <br />
+            <sub><b>pasathornpGStudio</b></sub>
+        </a>
+    </td>
+    <td align="center">
+        <a href="https://github.com/PasathornP">
+            <img src="https://avatars.githubusercontent.com/u/113973351?v=4" width="100;" alt="PasathornP"/>
+            <br />
+            <sub><b>PasathornP</b></sub>
+        </a>
+    </td>
+    <td align="center">
         <a href="https://github.com/1353587086">
             <img src="https://avatars.githubusercontent.com/u/24757168?v=4" width="100;" alt="1353587086"/>
             <br />
