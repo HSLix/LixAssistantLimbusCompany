@@ -8,7 +8,8 @@
 
 <br>
 <div>
-    <img alt="language" src="https://img.shields.io/badge/Language-Python-blue">
+    <img alt="downloads" src="https://img.shields.io/github/downloads/HSLix/LixAssistantLimbusCompany/total">
+
 </div>
 <div>
     <img alt="platform" src="https://img.shields.io/badge/platform-Windows-purple">

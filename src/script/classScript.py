@@ -282,7 +282,8 @@ class _script(_task):
     def judFullTeam(self):
         '''判断队伍是否人满'''
         result = False
-        if(self.is_find("./pic/team/FullTeam66.png", "FullTeam6/6", 0.96)):
+        if(self.is_find("./pic/team/MirFullTeam66.png", "MirFullTeam6/6", 0.96)
+            or self.is_find("./pic/team/LuxFullTeam66.png", "LuxFullTeam6/6", 0.96)):
             result = True
         return result
 
