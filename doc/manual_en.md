@@ -1,0 +1,16 @@
+# Manual
+[中文版](manual_cn.md)
+## Computer Requirements
+- Please run the software under 64-bit Windows system.
+- The screen zoom should be set to 150%, otherwise the software may run abnormally.
+- In-game language requirement is English
+## Tutorial
+- In the main screen, click the button below to start the software.
+- In the working interface, click on the pause and stop buttons below to pause and stop running respectively.
+- To ensure stability, the pause and stop buttons do not take effect immediately.
+- Team Edit is a sub-button of Team Rotation, you need to click to save the order of the teams, otherwise, it will only be according to the last saved result.
+## Exception Handling Tutorial
+- After changing the language setting in the game, you need to restart the game for the setting to take effect.
+- If there are any clicking anomalies, please try to fix them by ‘running in administrator mode’.
+- According to the feedback, the Chinese version of ZeroAssociate may need to be completely uninstalled and restarted to avoid the effect.
+- If you encounter any abnormalities in the software, please save the log file and video file of the day (you can open the folders in the Settings screen respectively), and then report the bug in the Issue section of GitHub.
