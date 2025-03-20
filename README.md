@@ -66,7 +66,9 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 ---
 ## 下载方式
 
-- 点击 [Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases) 并下载最新版中叫 LALC.zip 的，解压后运行 `LixAssistantLimbusCompany.exe` 安装即可。
+
+- 点击 [Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases) 并下载最新版中叫 LALC.zip 的，解压后运行 `LixAssistantLimbusCompany.exe` 即可。
+
 
 - 如果是第一次安装电脑软件，可以看看 [堂吉诃德都能学会的安装指引](./doc/download_guide_cn.md)
 
@@ -260,3 +262,4 @@ Last
 ~~悄悄更个图，应该没人发现吧~~
 
 [![Star History Chart](https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date)](https://www.star-history.com/#HSLix/LixAssistantLimbusCompany&Date)
+
