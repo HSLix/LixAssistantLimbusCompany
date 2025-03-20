@@ -216,10 +216,4 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 
 ## Star History
 
-<a href="https://star-history.com/#HSLix/LixAssistantLimbusCompany&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date" />
- </picture>
-</a>
+[![Star History Chart](https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date)](https://www.star-history.com/#HSLix/LixAssistantLimbusCompany&Date)
