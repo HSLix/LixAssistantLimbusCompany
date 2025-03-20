@@ -23,8 +23,8 @@
 </div>
 
 
-**简体中文** | [English](.README_en.md)
-
+**简体中文** | [English](README_en.md)
+          
 <br>
 
 LALC 是 LixAssistantLimbusCompany 各取大写字母的缩写
