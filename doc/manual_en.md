@@ -14,3 +14,8 @@
 - If there are any clicking anomalies, please try to fix them by ‘running in administrator mode’.
 - According to the feedback, the Chinese version of ZeroAssociate may need to be completely uninstalled and restarted to avoid the effect.
 - If you encounter any abnormalities in the software, please save the log file and video file of the day (you can open the folders in the Settings screen respectively), and then report the bug in the Issue section of GitHub.
+## ShortCuts
+- FullAuto Start：Ctrl+Enter+F
+- SemiAuto Start：Ctrl+Enter+S
+- Pause/Resume：Ctrl+P
+- Stop：Ctrl+Q
