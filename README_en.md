@@ -217,3 +217,4 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 ## Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date)](https://www.star-history.com/#HSLix/LixAssistantLimbusCompany&Date)
+
