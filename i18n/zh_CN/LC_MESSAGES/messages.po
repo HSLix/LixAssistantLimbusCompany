@@ -1,0 +1,450 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: 软件包版本\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-03-19 22:49+0800\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: 全名 <EMAIL@ADDRESS>\n"
+"Language-Team: 语言 <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: graphical_user_interface.py:90
+msgid ""
+"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
+"\n"
+msgstr ""
+"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
+"\n"
+
+#: graphical_user_interface.py:91
+msgid ""
+"这是对陆爻齐莫大的肯定，谢谢啦！\n"
+"\n"
+msgstr ""
+"这是对陆爻齐莫大的肯定，谢谢啦！\n"
+"\n"
+
+#: graphical_user_interface.py:92
+msgid ""
+"PS：如果能打赏一点点就更好了哈哈\n"
+"\n"
+msgstr ""
+"PS：如果能打赏一点点就更好了哈哈\n"
+"\n"
+
+#: graphical_user_interface.py:93
+msgid ""
+"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"\n"
+msgstr ""
+"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"\n"
+
+#: graphical_user_interface.py:94
+msgid "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
+msgstr "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
+
+#: graphical_user_interface.py:100
+msgid "还有<nobr><b>6</b></nobr>秒。"
+msgstr "还有<nobr><b>6</b></nobr>秒。"
+
+#: graphical_user_interface.py:106
+msgid "现在就去"
+msgstr "现在就去"
+
+#: graphical_user_interface.py:107 graphical_user_interface.py:395
+msgid "下次一定"
+msgstr "下次一定"
+
+#: graphical_user_interface.py:140 graphical_user_interface.py:150
+#, python-format
+msgid "还有<nobr><b>%d</b></nobr>秒。"
+msgstr "还有<nobr><b>%d</b></nobr>秒。"
+
+#: graphical_user_interface.py:149
+msgid ""
+"谢谢 !祝你生活愉快！✨\n"
+"\n"
+"不管你到底有没有给 Star\n"
+"\n"
+"谢谢你愿意多了解一点 LALC"
+msgstr ""
+"谢谢 !祝你生活愉快！✨\n"
+"\n"
+"不管你到底有没有给 Star\n"
+"\n"
+"谢谢你愿意多了解一点 LALC"
+
+#: graphical_user_interface.py:161
+msgid "也祝你生活愉快！(^_−)☆"
+msgstr "也祝你生活愉快！(^_−)☆"
+
+#: graphical_user_interface.py:180
+msgid "NotRecommandAction"
+msgstr "不推荐的操作"
+
+#: graphical_user_interface.py:181
+msgid "You had better keep one team enabled at least."
+msgstr "你最好至少启用一个队伍。"
+
+#: graphical_user_interface.py:190
+msgid "TaskFinished"
+msgstr "任务完成"
+
+#: graphical_user_interface.py:191
+#, python-brace-format
+msgid "{0} have finished {1} time(s)"
+msgstr "{0} 已完成 {1} 次"
+
+#: graphical_user_interface.py:221
+msgid "所有任务顺利执行"
+msgstr "所有任务顺利执行"
+
+#: graphical_user_interface.py:225
+msgid "任务执行已暂停"
+msgstr "任务执行已暂停"
+
+#: graphical_user_interface.py:228
+msgid "任务执行已继续"
+msgstr "任务执行已继续"
+
+#: graphical_user_interface.py:283
+msgid "Home"
+msgstr "主页"
+
+#: graphical_user_interface.py:284
+msgid "Working"
+msgstr "运行界面"
+
+#: graphical_user_interface.py:288
+msgid "Teams"
+msgstr "队伍管理界面"
+
+#: graphical_user_interface.py:289
+msgid "Team1"
+msgstr "队伍1"
+
+#: graphical_user_interface.py:290
+msgid "Team2"
+msgstr "队伍2"
+
+#: graphical_user_interface.py:291
+msgid "Team3"
+msgstr "队伍3"
+
+#: graphical_user_interface.py:292
+msgid "Team4"
+msgstr "队伍4"
+
+#: graphical_user_interface.py:298 graphical_user_interface.py:301
+msgid "Support"
+msgstr "支持"
+
+#: graphical_user_interface.py:314
+msgid "Settings"
+msgstr "设置"
+
+#: graphical_user_interface.py:390
+msgid "支持作者🥰"
+msgstr "支持作者🥰"
+
+#: graphical_user_interface.py:391
+msgid ""
+"个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
+"就是作者开发和维护项目的动力🚀"
+msgstr ""
+"个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
+"就是作者开发和维护项目的动力🚀"
+
+#: graphical_user_interface.py:394
+msgid "来啦老弟"
+msgstr "来啦老弟"
+
+#: graphical_user_interface.py:411
+#, python-format
+msgid ""
+"捕获到未知，是否打开日志查看？\n"
+"%s"
+msgstr ""
+"捕获到未知，是否打开日志查看？\n"
+"%s"
+
+#: gui/full_auto_page.py:22 gui/semi_auto_page.py:21
+msgid "任务设置"
+msgstr "任务设置"
+
+#: gui/full_auto_page.py:27 gui/semi_auto_page.py:26
+msgid "配置设置"
+msgstr "配置设置"
+
+#: gui/full_auto_page.py:81
+msgid "游戏窗口大小"
+msgstr "游戏窗口大小"
+
+#: gui/full_auto_page.py:124
+msgid "Init"
+msgstr "初始化"
+
+#: gui/full_auto_page.py:126
+msgid "EXP"
+msgstr "经验本"
+
+#: gui/full_auto_page.py:129
+msgid "Thread"
+msgstr "纽本"
+
+#: gui/full_auto_page.py:132
+msgid "Mirror"
+msgstr "镜牢"
+
+#: gui/full_auto_page.py:135
+msgid "Reward"
+msgstr "获取奖励"
+
+#: gui/full_auto_page.py:137 gui/semi_auto_page.py:150
+msgid "Start"
+msgstr "开始"
+
+#: gui/full_auto_page.py:228
+msgid "录屏完成"
+msgstr "录屏完成"
+
+#: gui/full_auto_page.py:228
+#, python-format
+msgid "录屏已保存至:%s"
+msgstr "录屏已保存至:%s"
+
+#: gui/home_page.py:25
+msgid "FullAuto"
+msgstr "全自动"
+
+#: gui/home_page.py:26
+msgid "SemiAuto"
+msgstr "半自动"
+
+#: gui/semi_auto_page.py:92
+msgid "Select \"Ego\" Choice"
+msgstr "选择“Ego”选项"
+
+#: gui/semi_auto_page.py:136
+msgid "Auto P Battle"
+msgstr "自动 P 过战斗"
+
+#: gui/semi_auto_page.py:138
+msgid "Skip Event"
+msgstr "跳过事件"
+
+#: gui/semi_auto_page.py:140
+msgid "Auto Click Next Stage"
+msgstr "自动点击下一关"
+
+#: gui/semi_auto_page.py:142
+msgid "Auto Select Reward Card"
+msgstr "自动选择奖励卡"
+
+#: gui/semi_auto_page.py:144
+msgid "Auto Skip EgoGiftGet"
+msgstr "自动跳过 Ego 礼物获取"
+
+#: gui/semi_auto_page.py:146
+msgid "Auto Enter Mirror(Begin)"
+msgstr "自动进入镜牢（开始）"
+
+#: gui/setting_page.py:42
+msgid "语言设置"
+msgstr "语言设置"
+
+#: gui/setting_page.py:49
+msgid "Language"
+msgstr "语言"
+
+#: gui/setting_page.py:50
+msgid "设置你偏好的 UI 语言"
+msgstr "设置你偏好的 UI 语言"
+
+#: gui/setting_page.py:74
+msgid "录屏设置"
+msgstr "录屏设置"
+
+#: gui/setting_page.py:77
+msgid "是否录屏"
+msgstr "是否录屏"
+
+#: gui/setting_page.py:78
+msgid "开启或关闭录屏功能"
+msgstr "开启或关闭录屏功能"
+
+#: gui/setting_page.py:90
+msgid "打开录屏文件夹"
+msgstr "打开录屏文件夹"
+
+#: gui/setting_page.py:92
+msgid "录屏文件夹"
+msgstr "录屏文件夹"
+
+#: gui/setting_page.py:93
+msgid "点击打开录屏文件夹"
+msgstr "点击打开录屏文件夹"
+
+#: gui/setting_page.py:100 gui/setting_page.py:104
+msgid "日志文件夹"
+msgstr "日志文件夹"
+
+#: gui/setting_page.py:102
+msgid "打开日志文件夹"
+msgstr "打开日志文件夹"
+
+#: gui/setting_page.py:105
+msgid "点击打开日志文件夹"
+msgstr "点击打开日志文件夹"
+
+#: gui/setting_page.py:112
+msgid "帮助与反馈"
+msgstr "帮助与反馈"
+
+#: gui/setting_page.py:115
+msgid "打开帮助页面"
+msgstr "打开帮助页面"
+
+#: gui/setting_page.py:117
+msgid "帮助"
+msgstr "帮助"
+
+#: gui/setting_page.py:118
+msgid "发现新功能并学习有关本应用的有用提示"
+msgstr "发现新功能并学习有关本应用的有用提示"
+
+#: gui/setting_page.py:123
+msgid "前往反馈"
+msgstr "前往反馈"
+
+#: gui/setting_page.py:125
+msgid "提供反馈"
+msgstr "提供反馈"
+
+#: gui/setting_page.py:126
+msgid "通过提供反馈帮助改进本应用"
+msgstr "通过提供反馈帮助改进本应用"
+
+#: gui/setting_page.py:133
+msgid "关于"
+msgstr "关于"
+
+#: gui/setting_page.py:136
+msgid "点击前往更新应用"
+msgstr "点击前往更新应用"
+
+#: gui/setting_page.py:163
+#, python-format
+msgid "无法打开文件夹：%s"
+msgstr "无法打开文件夹：%s"
+
+#: gui/team_edit_page.py:37
+msgid "恢复顺序"
+msgstr "恢复顺序"
+
+#: gui/team_edit_page.py:41
+msgid "全部取消"
+msgstr "全部取消"
+
+#: gui/team_edit_page.py:45
+msgid "保存队伍"
+msgstr "保存队伍"
+
+#: gui/team_edit_page.py:235
+#, python-format
+msgid "编辑队伍: %s"
+msgstr "编辑队伍: %s"
+
+#: gui/team_manage_page.py:23
+msgid "Burn"
+msgstr "燃烧"
+
+#: gui/team_manage_page.py:24
+msgid "Bleed"
+msgstr "流血"
+
+#: gui/team_manage_page.py:25
+msgid "Tremor"
+msgstr "震颤"
+
+#: gui/team_manage_page.py:26
+msgid "Rupture"
+msgstr "破裂"
+
+#: gui/team_manage_page.py:27
+msgid "Sinking"
+msgstr "沉沦"
+
+#: gui/team_manage_page.py:28
+msgid "Poise"
+msgstr "呼吸法"
+
+#: gui/team_manage_page.py:29
+msgid "Charge"
+msgstr "充能"
+
+#: gui/team_manage_page.py:37
+msgid "队伍名"
+msgstr "队伍名"
+
+#: gui/team_manage_page.py:37
+msgid "是否启用"
+msgstr "是否启用"
+
+#: gui/team_manage_page.py:37
+msgid "队伍流派"
+msgstr "队伍流派"
+
+#: gui/team_manage_page.py:37
+msgid "首发队伍"
+msgstr "首发队伍"
+
+#: gui/working_page.py:24 gui/working_page.py:121 gui/working_page.py:151
+msgid "Pause"
+msgstr "暂停"
+
+#: gui/working_page.py:26
+msgid "Stop"
+msgstr "停止"
+
+#: gui/working_page.py:28
+msgid "Open Log Folder"
+msgstr "打开日志文件夹"
+
+#: gui/working_page.py:36
+msgid "Current Team:"
+msgstr "当前队伍:"
+
+#: gui/working_page.py:39
+msgid "Next Team:"
+msgstr "下一个队伍:"
+
+#: gui/working_page.py:110
+msgid "正在暂停任务"
+msgstr "正在暂停任务"
+
+#: gui/working_page.py:135
+msgid "正在停止任务"
+msgstr "正在停止任务"
+
+#: gui/working_page.py:143
+msgid "Resume"
+msgstr "继续"
+
+#: gui/working_page.py:146
+msgid "任务已暂停"
+msgstr "任务已暂停"
+
+#: gui/working_page.py:152
+msgid "任务已停止"
+msgstr "任务已停止"
