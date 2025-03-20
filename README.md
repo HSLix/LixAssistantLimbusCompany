@@ -22,7 +22,7 @@
     <img alt="license" src="https://img.shields.io/badge/license-AGPL3.0-orange">
 </div>
 
-**简体中文** | [English](.README_EN.md)
+**简体中文** | [English](.README_en.md)
 <br>
 
 LALC 是 LixAssistantLimbusCompany 各取大写字母的缩写
