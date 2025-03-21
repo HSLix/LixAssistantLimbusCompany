@@ -7,6 +7,7 @@ from numpy import average, where
 from globals import TEMPLATE_DIR, ignoreScaleAndDpi
 import os
 from time import sleep
+from copy import deepcopy
 
 from .logger import lalc_logger
 from .screenshot import captureLimbusCompanyWindow
@@ -94,8 +95,7 @@ class EYE:
             raise FileNotFoundError(pic_path)
         
         
-        screenshot_img = self.screenshot
-        print(id(screenshot_img) == id(self.screenshot))
+        screenshot_img = deepcopy(self.screenshot)
 
         if recognize_area != [0, 0, 0, 0]:
             screenshot_img = EYE.cropImg(screenshot_img, recognize_area)
@@ -210,7 +210,7 @@ class EYE:
             raise FileNotFoundError(pic_path)
 
         
-        
+        screenshot_img = deepcopy(self.screenshot)
         screenshot_img = EYE.getGreyNormalizedPic(image=screenshot_img)
         
         # 裁剪到指定区域
