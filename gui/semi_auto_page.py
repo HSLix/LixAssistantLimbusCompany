@@ -148,6 +148,7 @@ class SemiAutoPage(QFrame):
 
         # 创建设置开始按钮
         self.StartButton = PushButton(_("Start"))
+        self.StartButton.setToolTip("Ctrl+Enter+S")
         self.StartButton.setFixedSize(200, 50)
 
         # 创建水平布局并将复选框和按钮添加到其中

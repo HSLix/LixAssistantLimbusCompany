@@ -578,9 +578,10 @@
     "FullAutoInitMirrorInitTeam": {
         "recognition":"TemplateMatch",
         "template":"mirror_init_teams.png",
+        "recognize_area":[70, 615, 180, 85],
         "action":"Custom",
         "custom_name":"choose_team",
-        "next":"FullAutoInitMirrorInitStarBuff",
+        "next":["FullAutoInitMirrorInitStarBuff", "FullAutoMirrorCircleCenter"],
         "post_delay":4
     },
     "FullAutoInitMirrorInitStarBuff": {
@@ -589,7 +590,7 @@
         "action":"Custom",
         "custom_name":"choose_star_buff",
         "post_delay":2,
-        "next":"FullAutoInitMirrorInitStartEgoGift"
+        "next":["FullAutoInitMirrorInitStartEgoGift", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoInitMirrorInitStartEgoGift": {
         "recognition":"TemplateMatch",

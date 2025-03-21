@@ -135,6 +135,7 @@ class FullAutoPage(QFrame):
         self.checkBox4 = CheckBox(_("Reward"), self)
         self.toolButton4 = ToolButton(FIF.SETTING)
         self.StartButton = PushButton(_("Start"))
+        self.StartButton.setToolTip("Ctrl+Enter+F")
         self.StartButton.setFixedSize(200, 50)
 
         self.checkBox0.setChecked(True)

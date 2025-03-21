@@ -264,7 +264,7 @@ class Window(FramelessWindow):
             orient=Qt.Horizontal,
             isClosable=False if msg_type != "error" else True,
             position=InfoBarPosition.TOP,
-            duration=3000 if msg_type != 'error' else -1,
+            duration=5000 if msg_type != 'error' else -1,
             parent=self
         )
 

@@ -283,16 +283,22 @@ class Task:
         """执行检测，把检测结果保存自身"""
         # print(f"eye编号：{id(self.eye)}")
         if (self.recognition == "DirectHit"):
+            lalc_logger.log_task(
+                    "INFO",
+                    self.name,
+                    f"DirectHit Not Recognize"
+                    )
             return
+        lalc_logger.log_task(
+                    "INFO",
+                    self.name,
+                    f"Execute Recognize"
+                    )
         self.recognize_center, self.recognize_score = self.recognition_function(self.template, threshold=self.threshold, recognize_area=self.recognize_area)
         if(self.recognize_center == None):
             return
         print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
-        lalc_logger.log_task(
-                    "DEBUG",
-                    self.name,
-                    f"recognize_center:[{self.recognize_center}];recognize_score:[{self.recognize_score}]"
-                    )
+        
 
     def update_screenshot(self):
         self.eye.captureScreenShot()
@@ -304,13 +310,13 @@ class Task:
         self.eye.waitFreeze(self.pre_wait_freezes)
         sleep(self.pre_delay)
         self.mk.updateMouseBasepoint()
+        lalc_logger.log_task(
+            "INFO",
+            self.name,
+            f"Action: {self.action}"
+            )
+        print(f"[{self.name}] 执行动作: {self.action}")
         if (self.action != "DoNothing"):
-            print(f"[{self.name}] 执行动作: {self.action}")
-            lalc_logger.log_task(
-                "DEBUG",
-                self.name,
-                f"Action: {self.action}"
-                )
             activateWindow()
             if (self.action=="Custom" or self.action=="Checkpoint"):
                 self.action_function(**kwargs)
