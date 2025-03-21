@@ -344,8 +344,7 @@
         "recognition":"TemplateMatch",
         "template":"battle_pause.png",
         "next":["SemiAutoWaitFinishBattle", "SemiAutoCircleCenter"],
-        "post_wait_freezes": 1,
-        "post_delay": 2
+        "post_wait_freezes": 1
     },
     "SemiAutoSkipEvent":{
         "recognition": "TemplateMatch",
@@ -712,8 +711,7 @@
         "recognition":"TemplateMatch",
         "template":"battle_pause.png",
         "next":["FullAutoWaitFinishBattle", "FullAutoMirrorCircleCenter"],
-        "post_wait_freezes": 1,
-        "post_delay": 1
+        "post_wait_freezes": 1
     },
     "FullAutoSkipEvent":{
         "recognition": "TemplateMatch",

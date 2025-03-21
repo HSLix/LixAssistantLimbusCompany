@@ -387,6 +387,7 @@ def initCustomAction():
     def choose_start_ego_gift(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
+
         if (team_style == "Burn"):
             mk.moveClick([260, 510])
         elif (team_style == "Bleed"):
@@ -497,9 +498,9 @@ def initCustomAction():
         # 计算有效队伍的数量
         num_enabled_teams = len(enabled_teams)
         
-        # 如果没有任何有效队伍，返回 -1
+        # 如果没有任何有效队伍，返回 -1, 不应存在
         if num_enabled_teams == 0:
-            return -1
+            raise IndexError("No Enabled Team")
         
         # 计算传入数字对应的队伍索引
         team_index = (index + offset) % num_enabled_teams

@@ -123,3 +123,9 @@ dist_lalc_log_dir = os.path.join(dist_dir, 'lalc/log')
 os.makedirs(dist_lalc_log_dir, exist_ok=True)
 dist_lalc_video_dir = os.path.join(dist_dir, 'lalc/video')
 os.makedirs(dist_lalc_video_dir, exist_ok=True)
+
+# --------------------
+# 压缩 lalc 文件夹
+# --------------------
+archive_name = os.path.join(dist_dir, 'lalc')
+shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')

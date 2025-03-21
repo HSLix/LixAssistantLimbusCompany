@@ -244,6 +244,14 @@ class Window(FramelessWindow):
         control_unit.team_info_updated.connect(
             lambda current_team_name, next_team_name: self.workingInterface.update_team_info(current_team_name, next_team_name)
         )
+        control_unit.team_info_updated.connect(
+            lambda current_team_name, next_team_name: lalc_logger.log_task(
+                "INFO",
+                "UpdateTeamRotate",
+                "SUCCESS",
+                "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
+            )
+        )
 
 
     def show_message(self, msg_type, title, content):
