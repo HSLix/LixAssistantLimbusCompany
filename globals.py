@@ -22,8 +22,8 @@ VERSION = "3.0.0"
 
 
 # 支持网址
-ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany?tab=readme-ov-file#%E5%8F%8B%E9%93%BE"
-EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany?tab=readme-ov-file#%E5%8F%8B%E9%93%BE"
+ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
+EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 
 
 MOUSE_BASEPOINT = [0,0]

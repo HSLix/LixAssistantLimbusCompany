@@ -66,7 +66,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 
 ## Download
 
-- Download the latest `LALC.zip` from [Releases](https://github.com/HSLix/LixAssistantLimbusCompany/releases), extract and run `LixAssistantLimbusCompany.exe`  
+- Download the latest `LALC.zip` from [Latest Releases](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest), extract and run `LixAssistantLimbusCompany.exe`  
 - First-time software users can refer to [Installation Guide for Everyone](./doc/download_guide_cn.md)
 
 
@@ -195,10 +195,12 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 <div align="center">
   
   <img src="./resource/github/wechat.png" width="300">  
+
   WeChat  
   <br>
 --- 
   <img src="./resource/github/alipay.png" width="300">  
+  
   Alipay  
 ---
   <br>
