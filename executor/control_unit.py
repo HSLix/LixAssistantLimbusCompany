@@ -207,7 +207,7 @@ class ControlUnit(QThread):
         while self.is_running:
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
-                initWindowSize([1600, 1200])
+                initWindowSize([1600, 900])
                 with self.condition:
                     # 暂停
                     if self.is_paused:

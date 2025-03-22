@@ -20,6 +20,7 @@
         "AutoSelectRewardCard": true,
         "AutoSkipEgoGiftGet": false,
         "AutoEnterMirror": false,
+        "SemiAutoFullTeamToBattle": true,
         "SemiAutoEventMakeChoiceGetEgo": false
     }
 }

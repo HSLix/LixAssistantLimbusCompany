@@ -1,0 +1,1002 @@
+{
+    "End":{
+
+    },
+    
+    "TouchToStart": {
+        "recognition":"TemplateMatch",
+        "template":"clear_all_caches.png",
+        "action":"Click",
+        "target_offset":[300, -500]
+    },
+
+    
+    "GetPassMissionCoinStart":{
+        "action":"Click",
+        "target":[850, 1150],
+        "next":"GetPassMissionCoinEnterPass",
+        "post_delay":1,
+        "log_level":"INFO"
+    },
+    "GetPassMissionCoinEnterPass": {
+        "action":"Click",
+        "target":[1350, 480],
+        "next":"GetPassMissionCoinClickPassMissions",
+        "post_delay":1
+    },
+    "GetPassMissionCoinClickPassMissions":{
+        "action":"Click",
+        "target":[480, 115],
+        "next":"GetPassMissionCoinGainDaily",
+        "post_delay":1
+    },
+    "GetPassMissionCoinGainDaily":{
+        "action":"Custom",
+        "custom_name":"click_all_pass_mission_coin",
+        "next":"GetPassMissionCoinClickWeekly"
+    },
+    "GetPassMissionCoinClickWeekly":{
+        "action":"Click",
+        "target":[345, 690],
+        "next":"GetPassMissionCoinGainWeekly",
+        "post_delay":1
+    },
+    "GetPassMissionCoinGainWeekly":{
+        "action":"Custom",
+        "custom_name":"click_all_pass_mission_coin"
+    },
+
+    "EXPEntrance":{
+        "next":["SkipEXPLuxcavationStart", "ThreadEntrance"]
+    },
+    "SkipEXPLuxcavationStart": {
+        "action":"Click",
+        "target":[1100, 1150],
+        "next":"SkipEXPLuxcavationEnter",
+        "post_delay":1
+    },
+    "SkipEXPLuxcavationEnter": {
+        "action":"Click",
+        "target":[550,380],
+        "next":"SkipEXPLuxcavationClickSkipBattle",
+        "post_delay":1
+    },
+    "SkipEXPLuxcavationClickSkipBattle":{
+        "action":"Click",
+        "target":[1400,840],
+        "next":"SkipEXPLuxcavationConfirmSkipBattle",
+        "post_delay":1,
+        "interrupt":"EXPEntrance"
+    },
+    "SkipEXPLuxcavationConfirmSkipBattle": {
+        "recognition":"TemplateMatch",
+        "template":"luxcavation_confirm_skip_battle.png",
+        "recognize_area":[800, 750, 300, 150],
+        "action":"Key",
+        "key":"enter",
+        "action_count":2,
+        "action_rest":3,
+        "next":"EXPCheckpoint"        
+    },
+    "EXPCheckpoint": {
+        "action":"Checkpoint",
+        "next":"",
+        "target_task_count_name":"EXP",
+        "current_task_name":"EXPEntrance",
+        "next_task_name":"ThreadEntrance",
+        "log_level":"INFO"
+    },
+
+    "ThreadEntrance": {
+        "next":["SkipThreadLuxcavationStart", "MirrorEntrance"]
+    },
+    "SkipThreadLuxcavationStart": {
+        "action":"Click",
+        "target":[1100, 1150],
+        "next":"SkipThreadLuxcavationEnter",
+        "post_delay":1
+    },
+    "SkipThreadLuxcavationEnter": {
+        "action":"Click",
+        "target":[550,380],
+        "next":"SkipThreadLuxcavationChooseThread",
+        "post_delay":1
+    },
+    "SkipThreadLuxcavationChooseThread": {
+        "action":"Click",
+        "target":[200,600],
+        "next":"SkipThreadLuxcavationClickSkipBattle",
+        "post_delay":1
+    },
+    "SkipThreadLuxcavationClickSkipBattle":{
+        "action":"Click",
+        "target":[470,830],
+        "next":"SkipThreadLuxcavationChooseHighestStage",
+        "post_delay":1
+    },
+    "SkipThreadLuxcavationChooseHighestStage":{
+        "action":"Click",
+        "target":[810,800],
+        "next":"SkipThreadLuxcavationConfirmSkipBattle",
+        "post_delay":1,
+        "interrupt":"ThreadEntrance"
+    },
+    "SkipThreadLuxcavationConfirmSkipBattle": {
+        "recognition":"TemplateMatch",
+        "template":"luxcavation_confirm_skip_battle.png",
+        "recognize_area":[800, 750, 300, 150],
+        "action":"Key",
+        "key":"enter",
+        "action_count":2,
+        "action_rest":3,
+        "next":"ThreadCheckpoint"
+    },
+    "ThreadCheckpoint": {
+        "action":"Checkpoint",
+        "next":"",
+        "target_task_count_name":"Thread",
+        "current_task_name":"ThreadEntrance",
+        "next_task_name":"MirrorEntrance",
+        "log_level":"INFO"
+    },
+
+
+    "test":{
+        "action":"Custom",
+        "custom_name": "test_task_executed_time"
+    },
+
+    "SemiAutoEntrance":{
+        "next":"SemiAutoCircleCenter"
+    },
+    "SemiAutoCircleCenter": {
+        "pre_delay": 1,
+        "next": [
+            "SemiAutoReadyEnterMirror",
+            "SemiAutoPEncounter",
+            "SemiAutoEnterEncounter",
+            "SemiAutoSkipEvent",
+            "SemiAutoReadyFindWay",
+            "SemiAutoReadySelectRewardCard",
+            "SemiAutoPassEgoGiftGet",
+            "SemiAutoRechargeEnkephalin",
+            "SemiAutoAssembleEnkephalinModules",
+            "SemiWaitConnecting",
+            "SemiWaitCombatTips",
+            "SemiErrorRetry",
+            "SemiAutoCircleCenter"
+        ],
+        "log_level":"INFO"
+    },
+    "SemiWaitConnecting":{
+        "recognition":"TemplateMatch",
+        "template":"connecting.png",
+        "post_delay":1,
+        "next":["SemiWaitConnecting", "SemiAutoCircleCenter"]
+    },
+    "SemiWaitCombatTips":{
+        "recognition":"TemplateMatch",
+        "template":"combat_tips.png",
+        "post_delay":1,
+        "next":["SemiWaitCombatTips", "SemiAutoCircleCenter"]
+    },
+    "SemiErrorRetry":{
+        "recognition":"TemplateMatch",
+        "template":"retry.png",
+        "threshold":0.85,
+        "action":"Click",
+        "post_delay":5,
+        "next":"SemiAutoCircleCenter"
+    },
+    "SemiAutoReadyEnterMirror":{
+        "recognition":"TemplateMatch",
+        "recognize_area":[1040, 1100, 110, 100],
+        "template":"menu_drive.png",
+        "action":"Click",
+        "post_delay":2,
+        "next":"SemiAutoEnterMirror"
+    },
+    "SemiAutoEnterMirror": {
+        "action":"Click",
+        "target":[650, 590],
+        "action_count":2,
+        "action_rest":0.5,
+        "post_delay":0.5,
+        "next":"SemiAutoEnterOrResumeMirror"
+    },
+    "SemiAutoEnterOrResumeMirror": {
+        "action":"Key",
+        "key":"enter",
+        "next":"SemiAutoCircleCenter"
+    },
+    "SemiAutoAssembleEnkephalinModules":{
+        "enabled":false,
+        "recognition":"TemplateMatch",
+        "template": "enkephalin_module.png",
+        "action":"Click",
+        "post_wait_freezes":1,
+        "next":"SemiAutoSelectAllEnkephalin"
+    },
+    "SemiAutoSelectAllEnkephalin":{
+        "action":"Click",
+        "target":[1010,610],
+        "next":"SemiAutoConfirmAssembleEnkephalinModules"
+    },
+    "SemiAutoConfirmAssembleEnkephalinModules": {
+        "action":"Key",
+        "key":["enter", "esc"],
+        "action_rest":6,
+        "next":"SemiAutoCircleCenter",
+        "post_wait_freezes":1
+    },
+    "SemiAutoRechargeEnkephalin": {
+        "enabled":false,
+        "recognition":"TemplateMatch",
+        "template": "enkephalin_module.png",
+        "action":"Click",
+        "post_wait_freezes":1,
+        "next":"SemiAutoClickUseLunary"
+    },
+    "SemiAutoClickUseLunary": {
+        "recognition":"TemplateMatch",
+        "template":"use_lunary.png",
+        "action":"Click",
+        "post_wait_freezes":1,
+        "next":"SemiAutoComsume26Lunary",
+        "interrupt":"SemiAutoCircleCenter"
+    },  
+    "SemiAutoComsume26Lunary":{
+        "recognition":"TemplateMatch",
+        "template":"lunary_26.png",
+        "action":"Key",
+        "key":["enter", "esc"],
+        "action_rest":2,
+        "next":"SemiAutoCircleCenter",
+        "post_wait_freezes":1
+    },
+    "SemiAutoConfirmRewardCard":{
+        "action":"Key",
+        "key":"enter",
+        "next":"SemiAutoCircleCenter",
+        "post_wait_freezes":1
+    },
+    "SemiAutoPassEgoGiftGet":{
+        "recognition":"TemplateMatch",
+        "template":"ego_gift_get.png",
+        "threshold":0.85,
+        "action":"Key",
+        "key":"esc",
+        "next":["SemiAutoPassEgoGiftGetConfirm", "SemiAutoCircleCenter"],
+        "post_delay":1
+    },
+    "SemiAutoPassEgoGiftGetConfirm":{
+        "recognition":"TemplateMatch",
+        "template":"ego_gift_get_confirm.png",
+        "action":"Click",
+        "next":"SemiAutoCircleCenter",
+        "post_delay":2
+    },
+    "SemiAutoReadySelectRewardCard":{
+        "recognition":"TemplateMatch",
+        "template": "select_encounter_reward_card.png",
+        "next": [
+            "SemiAutoSelectRewardCardCoin",
+            "SemiAutoSelectRewardCardCoinEgo",
+            "SemiAutoSelectRewardCardEgoGift",
+            "SemiAutoSelectRewardCardEgoResource"
+        ],
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoSelectRewardCardCoin":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_coin.png",
+        "action":"Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardCoinEgo":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_coin_ego.png",
+        "action":"Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardEgoGift":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_ego_gift.png",
+        "action":"Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardEgoResource":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_ego_resource.png",
+        "action":"Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoPEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold":0.85,
+        "action": "Key",
+        "key": "p",
+        "action_rest":0.5,
+        "next": [
+            "SemiAutoEnterEncounter",
+            "SemiAutoClickEncounter",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoClickEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold": 0.85,
+        "action": "Click",
+        "action_count":2,
+        "action_rest":0.5,
+        "target": true,
+        "next":["SemiAutoEnterEncounter", "SemiAutoCircleCenter"]
+    },
+    "SemiAutoEnterEncounter": {
+        "recognition": "TemplateMatch",
+        "template":"win_rate_selected.png",
+        "action": "Key",
+        "key": "enter",
+        "next": ["SemiAutoWaitFinishBattle","SemiAutoCircleCenter"],
+        "post_delay":1
+    },
+    "SemiAutoWaitFinishBattle":{
+        "recognition":"TemplateMatch",
+        "template":"battle_pause.png",
+        "next":["SemiAutoWaitFinishBattle", "SemiAutoCircleCenter"],
+        "post_wait_freezes": 1
+    },
+    "SemiAutoSkipEvent":{
+        "recognition": "TemplateMatch",
+        "template": "skip.png",
+        "action": "Click",
+        "action_count": 5,
+        "target": true,
+        "next": [
+            "SemiAutoEventMakeChoiceGetEgo",
+            "SemiAutoPassVeryHighCheck",
+            "SemiAutoPassHighCheck",
+            "SemiAutoPassNormalCheck",
+            "SemiAutoPassLowCheck",
+            "SemiAutoPassVeryLowCheck",
+            "SemiAutoDealEventResult",
+            "SemiAutoEventMakeFirstChoice",
+            "SemiAutoClickEventRightBottom"
+        ]
+    },
+    "SemiAutoDealEventResult":{
+        "recognition":"TemplateMatch",
+        "template":"event_result.png",
+        "threshold":0.9,
+        "action": "Click",
+        "target": [1400, 1150],
+        "next": [
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ],
+        "post_wait_freezes": 2
+    },
+    "SemiAutoEventMakeChoiceGetEgo":{
+        "recognition":"TemplateMatch",
+        "template":"choices_ego.png",
+        "action":"Click",
+        "next":[
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoEventMakeFirstChoice":{
+        "recognition":"TemplateMatch",
+        "template":"event_choices.png",
+        "threshold":0.8,
+        "action":"Click",
+        "target":[1160, 465],
+        "next":[
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoPassVeryHighCheck":{
+        "recognition": "TemplateMatch",
+        "template": "very_high.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoPassHighCheck":{
+        "recognition": "TemplateMatch",
+        "template": "high.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoPassNormalCheck":{
+        "recognition": "TemplateMatch",
+        "template": "normal.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoPassLowCheck":{
+        "recognition": "TemplateMatch",
+        "template": "low.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoPassVeryLowCheck":{
+        "recognition": "TemplateMatch",
+        "template": "very_low.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt":"SemiAutoCircleCenter"
+    },
+    "SemiAutoClickEventRightBottom":{
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1400, 1150],
+        "next": [
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ],
+        "post_wait_freezes": 2
+    },
+    
+    "SemiAutoReadyFindWay": {
+        "recognition": "TemplateMatch",
+        "template": "legend.png",
+        "recognize_area": [1500, 0, 99, 300],
+        "action": "DoNothing",
+        "next":"SemiAutoFindMiddleWay"
+    },
+    "SemiAutoFindMiddleWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 520],
+        "next": ["SemiAutoEnterMirrorStage", "SemiAutoFindBottomWay"],
+        "post_wait_freezes":0.5
+    },
+    "SemiAutoFindBottomWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 250],
+        "next": ["SemiAutoEnterMirrorStage", "SemiAutoFindTopWay"],
+        "post_wait_freezes":0.5
+    },
+    "SemiAutoFindTopWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 790],
+        "next": ["SemiAutoEnterMirrorStage", "SemiAutoFindSelfWay"],
+        "post_wait_freezes":0.5
+    },
+    "SemiAutoFindSelfWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [590, 520],
+        "next": "SemiAutoEnterMirrorStage",
+        "interrupt": "SemiAutoCircleCenter",
+        "post_wait_freezes":0.5
+    },
+    "SemiAutoEnterMirrorStage":{
+        "recognition": "TemplateMatch",
+        "template": "enter_mirror_stage.png",
+        "action": "Key",
+        "key":"enter",
+        "next":"SemiAutoCircleCenter"
+    },
+
+
+    "FullAutoEntrance":{
+        "next":"EXPEntrance"
+    },
+    "MirrorEntrance":{
+        "next":["FullAutoMirrorCircleCenter", "MirrorCheckpoint"]
+    },
+    "FullAutoMirrorCircleCenter": {
+        "pre_wait_freezes":1,
+        "next":[
+            "FullAutoMirrorDealDownload",
+            "FullAutoMirrorTouchToStart",
+            "FullAutoMirrorStart",
+            "FullAutoInitMirrorInitTeam",
+            "FullAutoInitMirrorInitStarBuff",
+            "FullAutoInitMirrorInitStartEgoGift",
+            "FullAutoMirrorCancelHardMode",
+            "FullAutoMirrorSelectRandomThemePack",
+            "FullAutoPassEgoGiftGet",
+            "FullAutoReadySelectRewardCard",
+            "FullAutoPEncounter",
+            "FullAutoEnterEncounter",
+            "FullAutoSkipEvent",
+            "FullAutoReadyFindWay",
+            "FullAutoReadyBattle",
+            "FullAutoMirrorShopStart",
+            "FullAutoMirrorSelectAcquireEgo",
+            "FullAutoMirrorFinishVictory",
+            "FullAutoMirrorFinishDefeat",
+            "FullAutoContinueEncounter",
+            "FullAutoMirrorWaitConnecting",
+            "FullAutoMirrorWaitCombatTips",
+            "FullAutoMirrorErrorRetry",
+            "FullAutoMirrorTopLeftArrow",
+            "FullAutoMirrorManagerLevelIncreased",
+            "MirrorEntrance"
+        ]
+    },
+    "FullAutoMirrorDealDownload":{
+        "recognition":"TemplateMatch",
+        "template":"download_message.png",
+        "action":"Click",
+        "target":[945, 775],
+        "action_rest":3,
+        "next":["FullAutoMirrorWaitDownload", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoMirrorWaitDownload": {
+        "recognition":"TemplateMatch",
+        "template":"the_city_and_the_nests.png",
+        "post_delay":3,
+        "next":["FullAutoMirrorWaitDownload", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoMirrorTouchToStart": {
+        "recognition":"TemplateMatch",
+        "template":"clear_all_caches.png",
+        "action":"Click",
+        "target_offset":[300, -500],
+        "next":"FullAutoMirrorCircleCenter",
+        "post_delay":15
+    },
+    "FullAutoMirrorStart":{
+        "recognition":"TemplateMatch",
+        "recognize_area":[1040, 1100, 110, 100],
+        "template":"menu_drive.png",
+        "action":"Click",
+        "post_delay":2,
+        "next":"FullAutoEnterMirror"
+    },
+    "FullAutoEnterMirror": {
+        "action":"Click",
+        "target":[650, 590],
+        "action_count":2,
+        "action_rest":0.5,
+        "post_delay":0.5,
+        "next":"FullAutoInitMirrorStartOrResume"
+    },
+    "FullAutoInitMirrorStartOrResume": {
+        "action":"Key",
+        "key":"enter",
+        "next":"FullAutoMirrorCircleCenter",
+        "post_wait_freezes":1,
+        "post_delay":2
+    },
+    "FullAutoInitMirrorInitTeam": {
+        "recognition":"TemplateMatch",
+        "template":"mirror_init_teams.png",
+        "recognize_area":[70, 615, 180, 85],
+        "action":"Custom",
+        "custom_name":"choose_team",
+        "next":["FullAutoInitMirrorInitStarBuff", "FullAutoMirrorCircleCenter"],
+        "post_delay":4
+    },
+    "FullAutoInitMirrorInitStarBuff": {
+        "recognition":"TemplateMatch",
+        "template":"mirror_init_grace_star.png",
+        "action":"Custom",
+        "custom_name":"choose_star_buff",
+        "post_delay":2,
+        "next":["FullAutoInitMirrorInitStartEgoGift", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoInitMirrorInitStartEgoGift": {
+        "recognition":"TemplateMatch",
+        "template":"mirror_init_selected_ego_gift.png",
+        "action":"Custom",
+        "custom_name":"choose_start_ego_gift",
+        "post_delay":10,
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoMirrorSelectRandomThemePack":{
+        "recognition":"TemplateMatch",
+        "template":"theme_pack_info.png",
+        "action":"Swipe",
+        "begin_offset":[-50, 50],
+        "end_offset":[0, 800],
+        "next":"FullAutoMirrorCircleCenter",
+        "post_delay":6
+    },
+    "FullAutoMirrorCancelHardMode":{
+        "recognition":"TemplateMatch",
+        "template":"mirror_hard_mode.png",
+        "action":"Click",
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPassEgoGiftGet":{
+        "recognition":"TemplateMatch",
+        "template":"ego_gift_get.png",
+        "action":"Key",
+        "key":"esc",
+        "next":["FullAutoPassEgoGiftGetConfirm", "FullAutoMirrorCircleCenter"],
+        "post_delay":2
+    },
+    "FullAutoPassEgoGiftGetConfirm":{
+        "recognition":"TemplateMatch",
+        "template":"ego_gift_get_confirm.png",
+        "action":"Click",
+        "next":"FullAutoMirrorCircleCenter",
+        "post_delay":2
+    },
+    "FullAutoReadySelectRewardCard":{
+        "pre_delay":1,
+        "recognition":"TemplateMatch",
+        "template": "select_encounter_reward_card.png",
+        "next": [
+            "FullAutoSelectRewardCardCoin",
+            "FullAutoSelectRewardCardCoinEgo",
+            "FullAutoSelectRewardCardEgoGift",
+            "FullAutoSelectRewardCardEgoResource"
+        ],
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoSelectRewardCardCoin":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_coin.png",
+        "action":"Click",
+        "next": "FullAutoSelectRewardCardConfirm"
+    },
+    "FullAutoSelectRewardCardCoinEgo":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_coin_ego.png",
+        "action":"Click",
+        "next": "FullAutoSelectRewardCardConfirm"
+    },
+    "FullAutoSelectRewardCardEgoGift":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_ego_gift.png",
+        "action":"Click",
+        "next": "FullAutoSelectRewardCardConfirm"
+    },
+    "FullAutoSelectRewardCardEgoResource":{
+        "recognition":"TemplateMatch",
+        "template": "reward_card_ego_resource.png",
+        "action":"Click",
+        "next": "FullAutoSelectRewardCardConfirm"
+    },
+    "FullAutoSelectRewardCardConfirm":{
+        "action":"Key",
+        "key":"enter",
+        "next":"FullAutoMirrorCircleCenter",
+        "post_delay":3
+    },
+    "FullAutoContinueEncounter": {
+        "recognition":"TemplateMatch",
+        "template": "battle_continue.png",
+        "recognize_area":[1435, 50, 100, 100],
+        "action":"Click",
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold":0.85,
+        "action": "Key",
+        "key": "p",
+        "action_rest":0.5,
+        "next": [
+            "FullAutoEnterEncounter",
+            "FullAutoClickEncounter",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoClickEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold": 0.85,
+        "action": "Click",
+        "action_count":2,
+        "action_rest":0.5,
+        "target": true,
+        "next":["FullAutoEnterEncounter", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoEnterEncounter": {
+        "recognition": "TemplateMatch",
+        "template":"win_rate_selected.png",
+        "action": "Key",
+        "key": "enter",
+        "next": ["FullAutoWaitFinishBattle","FullAutoMirrorCircleCenter"],
+        "post_delay":1
+    },
+    "FullAutoWaitFinishBattle":{
+        "recognition":"TemplateMatch",
+        "template":"battle_pause.png",
+        "next":["FullAutoWaitFinishBattle", "FullAutoMirrorCircleCenter"],
+        "post_wait_freezes": 1
+    },
+    "FullAutoSkipEvent":{
+        "recognition": "TemplateMatch",
+        "template": "skip.png",
+        "recognize_area":[700, 540, 100, 80],
+        "action": "Click",
+        "action_count": 5,
+        "target": true,
+        "next": [
+            "FullAutoEventMakeChoiceGetEgo",
+            "FullAutoPassVeryHighCheck",
+            "FullAutoPassHighCheck",
+            "FullAutoPassNormalCheck",
+            "FullAutoPassLowCheck",
+            "FullAutoPassVeryLowCheck",
+            "FullAutoEventMakeFirstChoice",
+            "FullAutoDealEventResult",
+            "FullAutoClickEventRightBottom"
+        ]
+    },
+    "FullAutoDealEventResult":{
+        "recognition":"TemplateMatch",
+        "template":"event_result.png",
+        "threshold":0.9,
+        "action": "Click",
+        "target": [1400, 1150],
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ],
+        "post_wait_freezes": 2
+    },
+    "FullAutoEventMakeChoiceGetEgo":{
+        "recognition":"TemplateMatch",
+        "template":"choices_ego.png",
+        "action":"Click",
+        "next":[
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoEventMakeFirstChoice":{
+        "recognition":"TemplateMatch",
+        "template":"event_choices.png",
+        "threshold":0.9,
+        "action":"Click",
+        "target":[1160, 465],
+        "next":[
+            "FullAutoEventMakeSecondChoice"
+        ]
+    },
+    "FullAutoEventMakeSecondChoice":{
+        "action":"Click",
+        "target":[1160, 680],
+        "next":[
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoPassVeryHighCheck":{
+        "recognition": "TemplateMatch",
+        "template": "very_high.png",
+        "action": "Click",
+        "target": true,
+        "next": "FullAutoClickEventRightBottom",
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPassHighCheck":{
+        "recognition": "TemplateMatch",
+        "template": "high.png",
+        "action": "Click",
+        "target": true,
+        "next": "FullAutoClickEventRightBottom",
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPassNormalCheck":{
+        "recognition": "TemplateMatch",
+        "template": "normal.png",
+        "action": "Click",
+        "target": true,
+        "next": "FullAutoClickEventRightBottom",
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPassLowCheck":{
+        "recognition": "TemplateMatch",
+        "template": "low.png",
+        "action": "Click",
+        "target": true,
+        "next": "FullAutoClickEventRightBottom",
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoPassVeryLowCheck":{
+        "recognition": "TemplateMatch",
+        "template": "very_low.png",
+        "action": "Click",
+        "target": true,
+        "next": "FullAutoClickEventRightBottom",
+        "interrupt":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoClickEventRightBottom":{
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1400, 1150],
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ],
+        "post_wait_freezes": 2
+    },
+    "FullAutoReadyFindWay": {
+        "recognition": "TemplateMatch",
+        "template": "legend.png",
+        "recognize_area": [1500, 0, 99, 300],
+        "action": "DoNothing",
+        "next":"FullAutoFindMiddleWay"
+    },
+    "FullAutoFindMiddleWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 520],
+        "next": ["FullAutoEnterMirrorStage", "FullAutoFindBottomWay"],
+        "post_wait_freezes":0.5
+    },
+    "FullAutoFindBottomWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 250],
+        "next": ["FullAutoEnterMirrorStage", "FullAutoFindTopWay"],
+        "post_wait_freezes":0.5
+    },
+    "FullAutoFindTopWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [910, 790],
+        "next": ["FullAutoEnterMirrorStage", "FullAutoFindSelfWay"],
+        "post_wait_freezes":0.5
+    },
+    "FullAutoFindSelfWay":{
+        "recognition":"DirectHit",
+        "action": "Click",
+        "target": [590, 520],
+        "next": ["FullAutoEnterMirrorStage", "FullAutoMirrorCircleCenter"],
+        "post_wait_freezes":0.5
+    },
+    "FullAutoEnterMirrorStage":{
+        "recognition": "TemplateMatch",
+        "template": "enter_mirror_stage.png",
+        "action": "Key",
+        "key":"enter",
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoReadyBattle": {
+        "recognition":"TemplateMatch",
+        "template":"total_participants.png",
+        "action":"Custom",
+        "custom_name":"clear_and_edit_team_member_selections",
+        "next":"FullAutoMirrorCircleCenter",
+        "post_wait_freezes":2,
+        "post_delay":8
+    },
+    "FullAutoMirrorShopStart":{
+        "recognition":"TemplateMatch",
+        "template":"mirror_shop.png",
+        "next":"FullAutoMirrorShopSellEgoGift"
+    },
+    "FullAutoMirrorShopSellEgoGift":{
+        "action":"Custom",
+        "custom_name":"sell_unwanted_ego_gift",
+        "next":"FullAutoMirrorShopHealSinner"
+    },
+    "FullAutoMirrorShopHealSinner":{
+        "action":"Custom",
+        "custom_name":"heal_all_sinner",
+        "next":"FullAutoMirrorShopPurchaseEgoGift"
+    },
+    "FullAutoMirrorShopPurchaseEgoGift": {
+        "action":"Custom",
+        "custom_name":"purchase_wanted_ego_gift",
+        "next":"FullAutoMirrorShopEnhanceEgo"
+    },
+    "FullAutoMirrorShopEnhanceEgo":{
+        "action":"Custom",
+        "custom_name":"enhance_wanted_ego_gift",
+        "next":"FullAutoMirrorShopLeaveClick"
+    },
+    "FullAutoMirrorShopLeaveClick":{
+        "action":"Click",
+        "target":[1400, 1150],
+        "action_rest":2,
+        "next":"FullAutoMirrorShopLeaveConfirm"
+    },
+    "FullAutoMirrorShopLeaveConfirm":{
+        "action":"Key",
+        "key":"enter",
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoMirrorSelectAcquireEgo":{
+        "recognition":"TemplateMatch",
+        "template":"acquire_ego_gift.png",
+        "action":"Click",
+        "next":"FullAutoMirrorSelectAcquireEgoConfirm"
+    },
+    "FullAutoMirrorSelectAcquireEgoConfirm":{
+        "action":"Key",
+        "key":"enter",
+        "post_delay":3,
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoMirrorFinishVictory":{
+        "recognition":"TemplateMatch",
+        "template":"mirror_victory.png",
+        "action":"Key",
+        "key":"enter",
+        "action_count":6,
+        "action_rest":1,
+        "post_delay":8,
+        "next":"MirrorCheckpoint"
+    },
+    "FullAutoMirrorFinishDefeat":{
+        "recognition":"TemplateMatch",
+        "template":"mirror_defeat.png",
+        "action":"Key",
+        "key":"enter",
+        "action_count":2,
+        "action_rest":1,
+        "post_delay":1,
+        "next":"FullAutoMirrorGiveUpRewards"
+    },
+    "FullAutoMirrorGiveUpRewards":{
+        "action":"Click",
+        "target":[500, 880],
+        "post_delay":2,
+        "next":"FullAutoMirrorGiveUpRewardsConfirm"
+    },
+    "FullAutoMirrorGiveUpRewardsConfirm":{
+        "action":"Key",
+        "key":"enter",
+        "post_delay":8,
+        "next":"MirrorEntrance"
+    },
+    "MirrorCheckpoint":{
+        "action":"Checkpoint",
+        "next":"",
+        "target_task_count_name":"Mirror",
+        "current_task_name":"MirrorEntrance",
+        "next_task_name":"End",
+        "log_level":"INFO"
+    },
+    "FullAutoMirrorWaitConnecting":{
+        "recognition":"TemplateMatch",
+        "template":"connecting.png",
+        "post_delay":1,
+        "next":["FullAutoMirrorWaitConnecting", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoMirrorWaitCombatTips":{
+        "recognition":"TemplateMatch",
+        "template":"combat_tips.png",
+        "post_delay":1,
+        "next":["FullAutoMirrorWaitCombatTips", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoMirrorErrorRetry":{
+        "recognition":"TemplateMatch",
+        "template":"retry.png",
+        "threshold":0.85,
+        "action":"Click",
+        "post_delay":5,
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoMirrorTopLeftArrow":{
+        "recognition":"TemplateMatch",
+        "template":"top_left_arrow.png",
+        "action":"Click",
+        "post_delay":2,
+        "next":"FullAutoMirrorCircleCenter"
+    },
+    "FullAutoMirrorManagerLevelIncreased":{
+        "recognition":"TemplateMatch",
+        "template":"manager_level_increased.png",
+        "action":"Key",
+        "key":"enter",
+        "post_delay":1,
+        "next":"FullAutoMirrorCircleCenter"
+    }
+}

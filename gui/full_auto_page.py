@@ -80,7 +80,7 @@ class FullAutoPage(QFrame):
         # 创建标签
         game_window_size_label = StrongBodyLabel(_("游戏窗口大小"), page)
         game_window_size = ComboBox()
-        game_window_size.addItems(['1600,1200'])
+        game_window_size.addItems(['1600,900'])
         game_window_size.setEnabled(False)
 
         # 创建水平布局来放置标签和多选框

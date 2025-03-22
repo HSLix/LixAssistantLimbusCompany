@@ -142,7 +142,6 @@ class EYE:
                             f"模板匹配失败: 目标图片 {pic_path}, 当前匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
 
         if is_show_result:
-            
             # 显示图像
             imshow("Target Image", target_color)
             imshow("Matched Area (Red Box)", template_color)
