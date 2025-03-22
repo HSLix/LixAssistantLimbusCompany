@@ -8,8 +8,12 @@
 
 <br>
 <div>
+    <a href="https://discord.gg/7UwBbjUGS3">
+        <img src="https://cdn.simpleicons.org/discord" alt="Discord" width="24" height="24">
+    </a>
+</div>
+<div>
     <img alt="downloads" src="https://img.shields.io/github/downloads/HSLix/LixAssistantLimbusCompany/total">
-
 </div>
 <div>
     <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany?style=social">

@@ -1,14 +1,17 @@
 # FAQ
 cn | [EnglishVersion](FAQ_en.md)
 ---
-- Q:LALC必须占用鼠标吗？
-- A:是的，所以LALC运行期间不建议用设备做其他事情，可以考虑虚拟机或者远程桌面。可以参考该[文章](https://www.bilibili.com/opus/805995851989123075)
+- Q:LALC 必须占用鼠标吗？
+- A:是的，所以 LALC 运行期间不建议用设备做其他事情。如果有运行LALC时，想同时正常使用键鼠的需求，可以考虑使用虚拟机或者远程桌面。具体方法可以参考该[文章](https://www.bilibili.com/opus/805995851989123075)
 ---
 - Q:屏幕的缩放对 LALC 有影响吗？
-- A:该LALC最适配的缩放为150%，虽然其他相近分辨率不是不可以使用，但效果可能没那么稳定。
+- A:该 LALC 最适配的缩放为 **150%**，虽然其他相近分辨率不是不可以使用，但效果可能没那么稳定。
 ---
 - Q:LALC 运行异常，点击错误/长时间不动/弹出错误窗口，怎么办？
-- A:1. 保存 LALC 安装文件夹中 log 文件夹下当天的log文件；2. 保存运行时产生的录像；3. 然后按照 Issue 模板中 Report Bug 的要求提 Issue
+- A:1. 保存 LALC 安装文件夹中 log 文件夹下当天的log文件；2. 保存运行时产生的录像；3. 然后按照 Issue 模板中 Report Bug 的要求提 Issue，并提供所有日志文件夹（debug、info、warning）以及对应的视频文件（可以在 [dicord 群](https://discord.gg/7UwBbjUGS3) 提供）。
 ---
 - Q:打开LALC时出现的错误中有“UnicodeEncodeError: 'charmap' codec can't encode characters……”之类的，怎么办？
 - A:可以参考该[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues/26)中，陆爻齐提供的解决方案
+---
+- Q:使用 LALC 后，内存莫名奇妙少了不少，怎么回事？
+- A:很可能是因为录屏之后的视频文件没有及时清理，请自行从“设置界面”打开录屏文件夹定时清理，或者关闭录屏的功能。请注意，录屏对于程序错误的排查有十分重要的作用。根据过去的经验，失去录屏后所发生的程序错误光凭日志文件往往**难以修复**。

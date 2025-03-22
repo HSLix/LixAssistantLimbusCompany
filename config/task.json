@@ -329,6 +329,8 @@
         "template": "win_rate.png",
         "threshold": 0.85,
         "action": "Click",
+        "action_count":2,
+        "action_rest": 0.5,
         "target": true,
         "next":["SemiAutoEnterEncounter", "SemiAutoCircleCenter"]
     },
@@ -442,7 +444,7 @@
         "target": [1400, 1150],
         "next": [
             "SemiAutoSkipEvent",
-            "FullAutoMirrorCircleCenter"
+            "SemiAutoCircleCenter"
         ],
         "post_wait_freezes": 2
     },
@@ -696,6 +698,8 @@
         "template": "win_rate.png",
         "threshold": 0.85,
         "action": "Click",
+        "action_count":2,
+        "action_rest":0.5,
         "target": true,
         "next":["FullAutoEnterEncounter", "FullAutoMirrorCircleCenter"]
     },
@@ -759,6 +763,13 @@
         "threshold":0.9,
         "action":"Click",
         "target":[1160, 465],
+        "next":[
+            "FullAutoEventMakeSecondChoice"
+        ]
+    },
+    "FullAutoEventMakeSecondChoice":{
+        "action":"Click",
+        "target":[1160, 680],
         "next":[
             "FullAutoSkipEvent",
             "FullAutoMirrorCircleCenter"
@@ -893,12 +904,13 @@
     "FullAutoMirrorShopLeaveClick":{
         "action":"Click",
         "target":[1400, 1150],
-        "action_rest":2,
+        "action_rest":1,
         "next":"FullAutoMirrorShopLeaveConfirm"
     },
     "FullAutoMirrorShopLeaveConfirm":{
         "action":"Key",
         "key":"enter",
+        "action_rest":2,
         "next":"FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorSelectAcquireEgo":{

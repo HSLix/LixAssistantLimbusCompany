@@ -106,97 +106,97 @@ class ScreenRecorderThread(QThread):
 screen_record_thread = ScreenRecorderThread()
 
 
-class ScreenRecorderDemo(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.initUI()
-        self.recording = False
-        self.out = None
-        self.sct = mss.mss()
-        self.recording_enabled = False
+# class ScreenRecorderDemo(QWidget):
+#     def __init__(self):
+#         super().__init__()
+#         self.initUI()
+#         self.recording = False
+#         self.out = None
+#         self.sct = mss.mss()
+#         self.recording_enabled = False
 
-    def set_recording_enabled(self, enabled):
-        """设置录屏功能是否启用"""
-        self.recording_enabled = enabled
+#     def set_recording_enabled(self, enabled):
+#         """设置录屏功能是否启用"""
+#         self.recording_enabled = enabled
 
-    def get_output_path():
-        return VIDEO_DIR
+#     def get_output_path():
+#         return VIDEO_DIR
 
-    def initUI(self):
-        self.start_button = QPushButton('开始录制', self)
-        self.start_button.clicked.connect(self.start_recording)
+#     def initUI(self):
+#         self.start_button = QPushButton('开始录制', self)
+#         self.start_button.clicked.connect(self.start_recording)
 
-        self.stop_button = QPushButton('停止录制', self)
-        self.stop_button.clicked.connect(self.stop_recording)
-        self.stop_button.setEnabled(False)
+#         self.stop_button = QPushButton('停止录制', self)
+#         self.stop_button.clicked.connect(self.stop_recording)
+#         self.stop_button.setEnabled(False)
 
-        layout = QVBoxLayout()
-        layout.addWidget(self.start_button)
-        layout.addWidget(self.stop_button)
+#         layout = QVBoxLayout()
+#         layout.addWidget(self.start_button)
+#         layout.addWidget(self.stop_button)
 
-        self.setLayout(layout)
-        self.setWindowTitle('屏幕录制')
-        self.show()
+#         self.setLayout(layout)
+#         self.setWindowTitle('屏幕录制')
+#         self.show()
 
-    def start_recording(self):
-        if not self.recording:
-            self.recording = True
-            self.start_button.setEnabled(False)
-            self.stop_button.setEnabled(True)
+#     def start_recording(self):
+#         if not self.recording:
+#             self.recording = True
+#             self.start_button.setEnabled(False)
+#             self.stop_button.setEnabled(True)
 
-            # 获取屏幕尺寸
-            desktop = QApplication.desktop().availableGeometry()
-            w, h = desktop.width(), desktop.height()
-            monitor = {"top": 0, "left": 0, "width": w, "height": h}
+#             # 获取屏幕尺寸
+#             desktop = QApplication.desktop().availableGeometry()
+#             w, h = desktop.width(), desktop.height()
+#             monitor = {"top": 0, "left": 0, "width": w, "height": h}
 
-            # 定义视频编码器和输出文件
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
-            if not os.path.exists(VIDEO_DIR):
-                os.makedirs(VIDEO_DIR)
-            # 按指定格式命名视频
-            now = datetime.now()
-            output_file = os.path.join(VIDEO_DIR, now.strftime("%Y-%m-%d-%H-%M-%S") + '.avi')  # 使用 .avi 格式
-            self.out = cv2.VideoWriter(output_file, fourcc, 8, (w, h))
+#             # 定义视频编码器和输出文件
+#             fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
+#             if not os.path.exists(VIDEO_DIR):
+#                 os.makedirs(VIDEO_DIR)
+#             # 按指定格式命名视频
+#             now = datetime.now()
+#             output_file = os.path.join(VIDEO_DIR, now.strftime("%Y-%m-%d-%H-%M-%S") + '.avi')  # 使用 .avi 格式
+#             self.out = cv2.VideoWriter(output_file, fourcc, 6, (w, h))
 
-            # 开始录制循环
-            while self.recording:
-                # 截取屏幕
-                sct_img = self.sct.grab(monitor)
-                frame = np.array(sct_img)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+#             # 开始录制循环
+#             while self.recording:
+#                 # 截取屏幕
+#                 sct_img = self.sct.grab(monitor)
+#                 frame = np.array(sct_img)
+#                 frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
-                # 添加水印
-                text = "LixAssistantLimbusCompany"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 4
-                font_color = (128, 128, 128)
-                thickness = 15
-                text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-                text_x = (frame.shape[1] - text_size[0]) // 2
-                text_y = (frame.shape[0] + text_size[1]) // 2
-                overlay = frame.copy()
-                cv2.putText(overlay, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
-                alpha = 0.2
-                frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+#                 # 添加水印
+#                 text = "LixAssistantLimbusCompany"
+#                 font = cv2.FONT_HERSHEY_SIMPLEX
+#                 font_scale = 4
+#                 font_color = (128, 128, 128)
+#                 thickness = 15
+#                 text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+#                 text_x = (frame.shape[1] - text_size[0]) // 2
+#                 text_y = (frame.shape[0] + text_size[1]) // 2
+#                 overlay = frame.copy()
+#                 cv2.putText(overlay, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
+#                 alpha = 0.2
+#                 frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
 
-                # 写入视频帧
-                self.out.write(frame)
-                QApplication.processEvents()
-            return VIDEO_DIR
+#                 # 写入视频帧
+#                 self.out.write(frame)
+#                 QApplication.processEvents()
+#             return VIDEO_DIR
 
-    def stop_recording(self):
-        if self.recording:
-            self.recording = False
-            self.start_button.setEnabled(True)
-            self.stop_button.setEnabled(False)
-            # 释放视频写入器
-            if self.out:
-                self.out.release()
-            self.sct.close()
+#     def stop_recording(self):
+#         if self.recording:
+#             self.recording = False
+#             self.start_button.setEnabled(True)
+#             self.stop_button.setEnabled(False)
+#             # 释放视频写入器
+#             if self.out:
+#                 self.out.release()
+#             self.sct.close()
 
 
-if __name__ == '__main__':
-    ignoreScaleAndDpi()
-    app = QApplication(sys.argv)
-    recorder = ScreenRecorderDemo()
-    sys.exit(app.exec_())
+# if __name__ == '__main__':
+#     ignoreScaleAndDpi()
+#     app = QApplication(sys.argv)
+#     recorder = ScreenRecorderDemo()
+#     sys.exit(app.exec_())

@@ -17,60 +17,60 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: graphical_user_interface.py:90
-msgid ""
-"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
-"\n"
-msgstr ""
-"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
-"\n"
-
-#: graphical_user_interface.py:91
-msgid ""
-"这是对陆爻齐莫大的肯定，谢谢啦！\n"
-"\n"
-msgstr ""
-"这是对陆爻齐莫大的肯定，谢谢啦！\n"
-"\n"
-
-#: graphical_user_interface.py:92
-msgid ""
-"PS：如果能打赏一点点就更好了哈哈\n"
-"\n"
-msgstr ""
-"PS：如果能打赏一点点就更好了哈哈\n"
-"\n"
-
 #: graphical_user_interface.py:93
 msgid ""
-"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
 msgstr ""
-"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
 
 #: graphical_user_interface.py:94
+msgid ""
+"这是对陆爻齐莫大的肯定，谢谢啦！\n"
+"\n"
+msgstr ""
+"这是对陆爻齐莫大的肯定，谢谢啦！\n"
+"\n"
+
+#: graphical_user_interface.py:95
+msgid ""
+"PS：如果能打赏一点点就更好了哈哈\n"
+"\n"
+msgstr ""
+"PS：如果能打赏一点点就更好了哈哈\n"
+"\n"
+
+#: graphical_user_interface.py:96
+msgid ""
+"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"\n"
+msgstr ""
+"(不打赏也没关系，但一定要过好自己的生活哦)\n"
+"\n"
+
+#: graphical_user_interface.py:97
 msgid "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
 msgstr "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
 
-#: graphical_user_interface.py:100
+#: graphical_user_interface.py:103
 msgid "还有<nobr><b>6</b></nobr>秒。"
 msgstr "还有<nobr><b>6</b></nobr>秒。"
 
-#: graphical_user_interface.py:106
+#: graphical_user_interface.py:109
 msgid "现在就去"
 msgstr "现在就去"
 
-#: graphical_user_interface.py:107 graphical_user_interface.py:395
+#: graphical_user_interface.py:110 graphical_user_interface.py:419
 msgid "下次一定"
 msgstr "下次一定"
 
-#: graphical_user_interface.py:140 graphical_user_interface.py:150
+#: graphical_user_interface.py:143 graphical_user_interface.py:153
 #, python-format
 msgid "还有<nobr><b>%d</b></nobr>秒。"
 msgstr "还有<nobr><b>%d</b></nobr>秒。"
 
-#: graphical_user_interface.py:149
+#: graphical_user_interface.py:152
 msgid ""
 "谢谢 !祝你生活愉快！✨\n"
 "\n"
@@ -84,80 +84,84 @@ msgstr ""
 "\n"
 "谢谢你愿意多了解一点 LALC"
 
-#: graphical_user_interface.py:161
+#: graphical_user_interface.py:164
 msgid "也祝你生活愉快！(^_−)☆"
 msgstr "也祝你生活愉快！(^_−)☆"
 
-#: graphical_user_interface.py:180
+#: graphical_user_interface.py:183
 msgid "NotRecommandAction"
 msgstr "不推荐的操作"
 
-#: graphical_user_interface.py:181
+#: graphical_user_interface.py:184
 msgid "You had better keep one team enabled at least."
 msgstr "你最好至少启用一个队伍。"
 
-#: graphical_user_interface.py:190
+#: graphical_user_interface.py:193
 msgid "TaskFinished"
 msgstr "任务完成"
 
-#: graphical_user_interface.py:191
+#: graphical_user_interface.py:194
 #, python-brace-format
 msgid "{0} have finished {1} time(s)"
 msgstr "{0} 已完成 {1} 次"
 
-#: graphical_user_interface.py:221
+#: graphical_user_interface.py:234
 msgid "所有任务顺利执行"
 msgstr "所有任务顺利执行"
 
-#: graphical_user_interface.py:225
+#: graphical_user_interface.py:238
 msgid "任务执行已暂停"
 msgstr "任务执行已暂停"
 
-#: graphical_user_interface.py:228
+#: graphical_user_interface.py:241
 msgid "任务执行已继续"
 msgstr "任务执行已继续"
 
-#: graphical_user_interface.py:283
+#: graphical_user_interface.py:306
 msgid "Home"
 msgstr "主页"
 
-#: graphical_user_interface.py:284
+#: graphical_user_interface.py:307
 msgid "Working"
 msgstr "运行界面"
 
-#: graphical_user_interface.py:288
+#: graphical_user_interface.py:311
 msgid "Teams"
 msgstr "队伍管理界面"
 
-#: graphical_user_interface.py:289
+#: graphical_user_interface.py:312
 msgid "Team1"
 msgstr "队伍1"
 
-#: graphical_user_interface.py:290
+#: graphical_user_interface.py:313
 msgid "Team2"
 msgstr "队伍2"
 
-#: graphical_user_interface.py:291
+#: graphical_user_interface.py:314
 msgid "Team3"
 msgstr "队伍3"
 
-#: graphical_user_interface.py:292
+#: graphical_user_interface.py:315
 msgid "Team4"
 msgstr "队伍4"
 
-#: graphical_user_interface.py:298 graphical_user_interface.py:301
+#: graphical_user_interface.py:316
+msgid "Team5"
+msgstr "队伍5"
+
+#: graphical_user_interface.py:322 graphical_user_interface.py:325
 msgid "Support"
 msgstr "支持"
 
-#: graphical_user_interface.py:314
+#: graphical_user_interface.py:338
 msgid "Settings"
 msgstr "设置"
 
-#: graphical_user_interface.py:390
+#: graphical_user_interface.py:414
 msgid "支持作者🥰"
 msgstr "支持作者🥰"
 
-#: graphical_user_interface.py:391
+#: graphical_user_interface.py:415
 msgid ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
@@ -165,11 +169,11 @@ msgstr ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
 
-#: graphical_user_interface.py:394
+#: graphical_user_interface.py:418
 msgid "来啦老弟"
 msgstr "来啦老弟"
 
-#: graphical_user_interface.py:411
+#: graphical_user_interface.py:440
 #, python-format
 msgid ""
 "捕获到未知，是否打开日志查看？\n"
@@ -214,11 +218,11 @@ msgstr "获取奖励"
 msgid "Start"
 msgstr "开始"
 
-#: gui/full_auto_page.py:228
+#: gui/full_auto_page.py:229
 msgid "录屏完成"
 msgstr "录屏完成"
 
-#: gui/full_auto_page.py:228
+#: gui/full_auto_page.py:229
 #, python-format
 msgid "录屏已保存至:%s"
 msgstr "录屏已保存至:%s"
@@ -360,7 +364,7 @@ msgstr "全部取消"
 msgid "保存队伍"
 msgstr "保存队伍"
 
-#: gui/team_edit_page.py:235
+#: gui/team_edit_page.py:250
 #, python-format
 msgid "编辑队伍: %s"
 msgstr "编辑队伍: %s"
@@ -409,7 +413,7 @@ msgstr "队伍流派"
 msgid "首发队伍"
 msgstr "首发队伍"
 
-#: gui/working_page.py:24 gui/working_page.py:121 gui/working_page.py:151
+#: gui/working_page.py:24 gui/working_page.py:125 gui/working_page.py:155
 msgid "Pause"
 msgstr "暂停"
 
@@ -421,30 +425,30 @@ msgstr "停止"
 msgid "Open Log Folder"
 msgstr "打开日志文件夹"
 
-#: gui/working_page.py:36
+#: gui/working_page.py:40
 msgid "Current Team:"
 msgstr "当前队伍:"
 
-#: gui/working_page.py:39
+#: gui/working_page.py:43
 msgid "Next Team:"
 msgstr "下一个队伍:"
 
-#: gui/working_page.py:110
+#: gui/working_page.py:114
 msgid "正在暂停任务"
 msgstr "正在暂停任务"
 
-#: gui/working_page.py:135
+#: gui/working_page.py:139
 msgid "正在停止任务"
 msgstr "正在停止任务"
 
-#: gui/working_page.py:143
+#: gui/working_page.py:147
 msgid "Resume"
 msgstr "继续"
 
-#: gui/working_page.py:146
+#: gui/working_page.py:150
 msgid "任务已暂停"
 msgstr "任务已暂停"
 
-#: gui/working_page.py:152
+#: gui/working_page.py:156
 msgid "任务已停止"
 msgstr "任务已停止"

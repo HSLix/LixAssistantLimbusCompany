@@ -45,7 +45,7 @@ class TeamManagePage(QFrame):
         self.radio_buttons = []
         self.switch_buttons = []
         self.comboboxes = []
-        for i in range(1, 5):
+        for i in range(1, 6):
             self.add_team_row(f"Team{i}", i)
 
         # 加载初始状态
@@ -111,7 +111,7 @@ class TeamManagePage(QFrame):
         try:
             with open(os.path.join(CONFIG_DIR, "team.json"), "r+") as f:
                 teams = json.load(f)
-                enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4"]
+                enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4", "Team5"]
                                  if teams[t]["enabled"]]
 
                 # 找出当前被选中的首发队伍
@@ -129,7 +129,7 @@ class TeamManagePage(QFrame):
                     # 如果当前选中队伍未启用，将第一个启用队伍设为首发
                     new_offset = 0
                     teams["TeamOffset"] = new_offset
-                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4"].index(enabled_teams[new_offset])].setChecked(True)
+                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5"].index(enabled_teams[new_offset])].setChecked(True)
                 else:
                     teams["TeamOffset"] = 0
 
@@ -160,7 +160,7 @@ class TeamManagePage(QFrame):
             try:
                 with open(os.path.join(CONFIG_DIR, "team.json"), "r+") as f:
                     teams = json.load(f)
-                    enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4"]
+                    enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4", "Team5"]
                                      if teams[t]["enabled"]]
                     if team_name in enabled_teams:
                         teams["TeamOffset"] = enabled_teams.index(team_name)
@@ -177,7 +177,7 @@ class TeamManagePage(QFrame):
                 teams = json.load(f)
 
                 # 加载开关状态
-                for i, team in enumerate(["Team1", "Team2", "Team3", "Team4"]):
+                for i, team in enumerate(["Team1", "Team2", "Team3", "Team4", "Team5"]):
                     self.switch_buttons[i].setChecked(teams[team]["enabled"])
                     self.comboboxes[i].setEnabled(teams[team]["enabled"])
                     self.radio_buttons[i].setEnabled(teams[team]["enabled"])
@@ -186,12 +186,12 @@ class TeamManagePage(QFrame):
                     )
 
                 # 加载offset
-                enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4"]
+                enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4", "Team5"]
                                  if teams[t]["enabled"]]
                 if enabled_teams:
                     offset = teams["TeamOffset"]
                     if offset < len(enabled_teams):
-                        self.radio_buttons[["Team1", "Team2", "Team3", "Team4"].index(
+                        self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5"].index(
                             enabled_teams[offset]
                         )].setChecked(True)
         except Exception as e:

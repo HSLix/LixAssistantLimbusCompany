@@ -28,6 +28,9 @@ class EYE:
     def captureScreenShot(self):
         self.screenshot = captureLimbusCompanyWindow()
 
+    def getScreenShot(self):
+        return deepcopy(self.screenshot)
+
     @staticmethod
     def getGreyNormalizedPic(image=None, is_show_pic: bool = False):
         """图片预处理"""
@@ -95,13 +98,13 @@ class EYE:
             raise FileNotFoundError(pic_path)
         
         
-        screenshot_img = deepcopy(self.screenshot)
+        template = self.getScreenShot()
 
         if recognize_area != [0, 0, 0, 0]:
-            screenshot_img = EYE.cropImg(screenshot_img, recognize_area)
+            template = EYE.cropImg(template, recognize_area)
 
         
-        template = EYE.getGreyNormalizedPic(image=screenshot_img)
+        template = EYE.getGreyNormalizedPic(image=template)
         if template is None:
             return (None, None)
         
@@ -110,7 +113,7 @@ class EYE:
         
         if h_template < h_target or w_template < w_target:
             lalc_logger.log_task("ERROR", "templateMatch", "FAILED", 
-                            f"模板匹配失败: 裁剪后的区域尺寸小于目标图像，无法匹配。截图模板尺寸: {h_template}x{w_template}, 目标图片尺寸: {h_target}x{w_target}, 裁剪区域: {recognize_area}")
+                            f"模板匹配失败: 裁剪后的区域尺寸小于目标图像，无法匹配。目标图片：{pic_path}; 截图模板尺寸: {w_template}x{h_template}, 目标图片尺寸: {w_target}x{h_target}, 裁剪区域: {recognize_area}")
             raise ValueError("裁剪后的区域尺寸小于目标图像，无法匹配。")
 
         
@@ -124,7 +127,7 @@ class EYE:
             center = [x_center, y_center]
             result = (center, max_val)
             lalc_logger.log_task("DEBUG", "templateMatch", "SUCCESS", 
-                            f"模板匹配成功: 目标图片 {pic_path}, 匹配中心坐标 {center}, 匹配值 {max_val:.4f}, 目标匹配值 {threshold}, 裁剪区域: {recognize_area}")
+                            f"模板匹配成功: 目标图片: {pic_path}, 匹配中心坐标: {center}, 匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
             # 在模板图像绘制红框
             if is_show_result:
                 # 将灰度图转为BGR用于显示颜色
@@ -136,7 +139,7 @@ class EYE:
                 
         else:
             lalc_logger.log_task("DEBUG", "templateMatch", "FAILED", 
-                            f"模板匹配失败: 目标图片 {pic_path}, 当前匹配值 {max_val:.4f}, 目标匹配值 {threshold}, 裁剪区域: {recognize_area}")
+                            f"模板匹配失败: 目标图片 {pic_path}, 当前匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
 
         if is_show_result:
             
@@ -190,12 +193,13 @@ class EYE:
         # if (freeze_time == 0):
         #     return
         self.captureScreenShot()
-        old_screenshot_img = EYE.getGreyNormalizedPic(self.screenshot)
-
+        old_screenshot_img = self.getScreenShot()
+        old_screenshot_img = EYE.getGreyNormalizedPic(old_screenshot_img)
         while True:
             sleep(freeze_time)
             self.captureScreenShot()
-            new_screenshot_img = EYE.getGreyNormalizedPic(self.screenshot)
+            new_screenshot_img = self.getScreenShot()
+            new_screenshot_img = EYE.getGreyNormalizedPic(new_screenshot_img)
             if (not EYE.isPicDif(old_screenshot_img, new_screenshot_img)):
                 break
             old_screenshot_img = new_screenshot_img
@@ -210,14 +214,13 @@ class EYE:
             raise FileNotFoundError(pic_path)
 
         
-        screenshot_img = deepcopy(self.screenshot)
-        screenshot_img = EYE.getGreyNormalizedPic(image=screenshot_img)
+        template = self.getScreenShot()
+        template = EYE.getGreyNormalizedPic(image=template)
         
         # 裁剪到指定区域
         if recognize_area != [0, 0, 0, 0]:
-            screenshot_img = EYE.cropImg(screenshot_img, recognize_area)
+            template = EYE.cropImg(template, recognize_area)
         
-        template = self.screenshot
         if template is None:
             raise ValueError("templateMultiMatch teamplate is None")
         
@@ -300,7 +303,7 @@ class EYE:
         return global_points
 
 
-    def templateMactchExist(self, pic_path, threshold:int=0.7, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
+    def templateMactchExist(self, pic_path, threshold:int=0.8, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
         center, score = self.templateMatch(pic_path, threshold, recognize_area, is_show_result)
         if (score == None):
             return False

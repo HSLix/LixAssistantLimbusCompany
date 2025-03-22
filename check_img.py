@@ -10,5 +10,6 @@ if __name__ == "__main__":
     sleep(1)
     eye = get_eye()
     eye.captureScreenShot()
-    c = eye.templateMatch("mirror_init_teams.png", is_show_result=True, threshold=0)
+    # c = eye.templateMatch("shop_scroll_block.png", is_show_result=True, threshold=0, recognize_area=[1375, 455, 55, 370])
+    c = eye.templateMatch("mirror_init_teams.png", recognize_area=[70, 615, 180, 65], threshold=0, is_show_result=False)
     print(c)
