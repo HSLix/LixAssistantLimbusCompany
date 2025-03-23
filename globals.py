@@ -14,11 +14,14 @@ VIDEO_DIR = path.join(WORK_DIR, "video")
 DLL_DIR = path.join(RESOURCE_DIR, "dll")
 CONFIG_DIR = path.join(WORK_DIR, "config")
 
+# 仓库
+GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
+
 # 事件名称
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "3.0.0"
+VERSION = "V3.0.2"
 
 
 # 支持网址
