@@ -1,10 +1,10 @@
 # coding:utf-8
 import sys
 import os
-from PyQt5.QtCore import Qt,  QUrl, QTimer, QSize
+from PyQt5.QtCore import Qt,  QUrl, QTimer
 from PyQt5.QtGui import QIcon, QDesktopServices
-from PyQt5.QtWidgets import (QApplication, QFrame, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
-from qfluentwidgets import (NavigationInterface, NavigationItemPosition, NavigationWidget, MessageBox, ImageLabel,InfoBar, InfoBarIcon, SplashScreen,
+from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
+from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
                             InfoBarPosition, isDarkTheme, setTheme, Theme, NavigationAvatarWidget, Dialog, BodyLabel)
 from qfluentwidgets import FluentIcon as FIF
 from qframelesswindow import FramelessWindow, StandardTitleBar
@@ -15,14 +15,15 @@ from ctypes import windll
 from win32api import GetLastError
 from winerror import ERROR_ALREADY_EXISTS
 from win32event import CreateEvent
-from time import sleep
+from requests import get
 
 
-from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION
+from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY
 from config_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
 from executor import ControlUnit, lalc_logger
+
 
 
 
@@ -77,6 +78,52 @@ class Window(FramelessWindow):
         self.showSupportDialog()
 
         # self.splashScreen.finish()
+
+        self.show()
+
+        self.check_for_updates()  # 调用版本检测函数
+
+    def check_for_updates(self):
+        """检测当前版本是否是最新版本"""
+        def get_latest_release(repo):
+            url = f"https://api.github.com/repos/{repo}/releases/latest"
+            try:
+                response = get(url)
+                if response.status_code == 200:
+                    release_info = response.json()
+                    latest_release = release_info["tag_name"]
+                    return latest_release
+                else:
+                    return None
+            except Exception as e:
+                print(f"Failed to fetch release information: {e}")
+                return None
+
+        repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
+        latest_release = get_latest_release(repo)
+
+        if latest_release:
+            if latest_release == VERSION:
+                # 当前版本是最新版本
+                self.show_message(
+                    'success',
+                    _('Update Check Successful'),
+                    _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                )
+            else:
+                # 当前版本落后
+                self.show_message(
+                    'error',
+                    _('Update Check Successful'),
+                    _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                )
+        else:
+            # 网络检测失败
+            self.show_message(
+                'error',
+                _('Update Check Failed'),
+                _('Failed to check for updates. \nPlease check your internet connection.')
+            )
 
 
     def showSupportDialog(self):
@@ -503,7 +550,6 @@ def main(*args, **kwargs):
     sys.excepthook = my_excepthook
     # shutdown_splash()
     w = Window()
-    w.show()
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
