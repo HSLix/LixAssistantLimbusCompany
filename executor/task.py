@@ -591,7 +591,7 @@ def initCustomAction():
 
                 sellable = True
 
-                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 310, 200])):
+                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
                     sellable = True
                 else:
                     for gift in target_pic:
@@ -666,7 +666,7 @@ def initCustomAction():
     @custom_action_dict.register
     def purchase_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 745, 160, 90]):
+        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
 
@@ -735,24 +735,32 @@ def initCustomAction():
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
         for c in gift_places:
-            mk.moveClick(c, rest_time=0.2)
+            mk.moveClick(c, rest_time=0.5)
             eye.captureScreenShot()
 
             enhance_able = False
 
             if (not eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                 continue
-
-            if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
-                continue
+            
 
             for gift in target_pic:
                 if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200])):
                     enhance_able = True
                     break
-
+            
             if (enhance_able):
-                mk.pressKey("enter", press_count=4, rest_time=1)
+                mk.pressKey("enter", press_count=1, rest_time=1)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
+                    mk.pressKey("esc")
+                    continue
+                mk.pressKey("enter", press_count=1, rest_time=1)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
+                    mk.pressKey("esc")
+                    continue
+                mk.pressKey("enter", press_count=2, rest_time=1)
                 sleep(2)
             
             eye.captureScreenShot()
@@ -763,9 +771,9 @@ def initCustomAction():
     @custom_action_dict.register
     def enhance_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-            lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
-            return
+        # if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+        #     lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
+        #     return
         mk.moveClick([215,540], rest_time=1)
 
         team_index = get_team_by_index(kwargs.get("executed_time"))
