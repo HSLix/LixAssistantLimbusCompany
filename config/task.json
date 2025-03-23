@@ -408,7 +408,7 @@
         "threshold": 0.85,
         "action": "Key",
         "key": "p",
-        "action_rest": 0.5,
+        "action_rest": 1,
         "next": [
             "SemiAutoEnterEncounter",
             "SemiAutoClickEncounter",
@@ -430,7 +430,8 @@
     },
     "SemiAutoEnterEncounter": {
         "recognition": "TemplateMatch",
-        "template": "win_rate_selected.png",
+        "template": "battle_start.png",
+        "threshold":0.7,
         "action": "Key",
         "key": "enter",
         "next": [
@@ -866,7 +867,7 @@
         "threshold": 0.85,
         "action": "Key",
         "key": "p",
-        "action_rest": 0.5,
+        "action_rest": 1,
         "next": [
             "FullAutoEnterEncounter",
             "FullAutoClickEncounter",
@@ -888,7 +889,8 @@
     },
     "FullAutoEnterEncounter": {
         "recognition": "TemplateMatch",
-        "template": "win_rate_selected.png",
+        "template": "battle_start.png",
+        "threshold":0.7,
         "action": "Key",
         "key": "enter",
         "next": [

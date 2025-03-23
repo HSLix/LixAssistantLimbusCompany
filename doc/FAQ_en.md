@@ -19,3 +19,6 @@ en | [中文版](FAQ_cn.md)
 ---
 - Q:After using LALC, the memory has been lost for some reason, what's wrong?
 - A:It's probably because the video files are not cleaned up in time after recording, please open the recording folder from the ‘Settings’ interface to clean up the folder regularly, or disable the function of recording. Please note that screen recording is very important for troubleshooting programme errors. According to the past experience, it is **often difficult** to fix the errors that occurred after losing the screen recording just by the log file.
+---
+- Q:Why is it that I've been using LALC to fully automate the Mirror for a long time, but in the end I find that it doesn't clear?
+- A:It's most likely because every time when you entry the Mirror, it fails, and then LALC will choose to give up the rewarding. Please check the screen recording and logs to make sure. If this is not the case, please refer to the FAQ for bug feedback.

@@ -804,11 +804,11 @@ def initCustomAction():
         while True:
             search_place_enhance_ego(gift_places, target_pic)
             eye.captureScreenShot()
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 455, 55, 370])):
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
                 break
             if (len(gift_places) != 10):
                 gift_places = gift_places[5:]
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 745, 55, 80])):
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
                 mk.scroll([0,-1], 5, rest_time=0.2)
             else:
                 break

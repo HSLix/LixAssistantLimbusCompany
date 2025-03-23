@@ -44,13 +44,17 @@ class ScreenRecorderThread(QThread):
             monitor = {"top": 0, "left": 0, "width": w, "height": h}
 
             # 定义视频编码器和输出文件
-            fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
+            # fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 MPEG 编码器
             if not os.path.exists(self.output_path):
                 os.makedirs(self.output_path)
             # 按指定格式命名视频
             now = datetime.now()
-            output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.avi')  # 使用 .avi 格式
+            # output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.avi')  # 使用 .avi 格式
+            output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.mp4')  # 使用 .mp4 格式
             self.out = cv2.VideoWriter(output_file, fourcc, 8, (w, h))
+            # self.out.set(cv2.VIDEOWRITER_PROP_QUALITY, 10)
+            
 
             # 开始录制循环
             while self.recording:
