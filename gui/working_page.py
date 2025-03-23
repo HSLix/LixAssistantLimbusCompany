@@ -28,6 +28,10 @@ class WorkingPage(QFrame):
         self.OpenLogButton = PushButton(_("Open Log Folder"))
         self.OpenLogButton.setFixedSize(160, 40)
 
+        # 设置快捷键提示
+        self.PauseButton.setToolTip("Ctrl+P")
+        self.StopButton.setToolTip("Ctrl+Q")
+
         # 初始禁用按钮
         self.PauseButton.setEnabled(False)
         self.StopButton.setEnabled(False)

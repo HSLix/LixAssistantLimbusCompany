@@ -29,13 +29,13 @@ def captureLimbusCompanyWindow(is_save_pic: bool = False, is_pic_gray: bool = Tr
             output_path = join(RESOURCE_DIR, "limbus_company_screenshot.png")
             mss.tools.to_png(screenshot.rgb, screenshot.size, output=output_path)
 
-    img_array = np.array(screenshot)
+    screenshot = np.array(screenshot)
 
     if is_pic_gray:
-        img_array = cv2.cvtColor(img_array, cv2.COLOR_BGRA2GRAY)
+        screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2GRAY)
 
 
-    return img_array
+    return screenshot
 
 
 

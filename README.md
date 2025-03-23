@@ -8,8 +8,12 @@
 
 <br>
 <div>
+    <a href="https://discord.gg/7UwBbjUGS3">
+        <img src="https://cdn.simpleicons.org/discord" alt="Discord" width="24" height="24">
+    </a>
+</div>
+<div>
     <img alt="downloads" src="https://img.shields.io/github/downloads/HSLix/LixAssistantLimbusCompany/total">
-
 </div>
 <div>
     <img alt="stars" src="https://img.shields.io/github/stars/HSLix/LixAssistantLimbusCompany?style=social">
@@ -69,7 +73,7 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 ## 下载方式
 
 
-- 点击 [Realeases](https://github.com/HSLix/LixAssistantLimbusCompany/releases) 并下载最新版中叫 LALC.zip 的，解压后运行 `LixAssistantLimbusCompany.exe` 即可。
+- 点击 [最新版本](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest) 并下载最新版中叫 LALC.zip 的，解压后运行 `LixAssistantLimbusCompany.exe` 即可。
 
 
 - 如果是第一次安装电脑软件，可以看看 [堂吉诃德都能学会的安装指引](./doc/download_guide_cn.md)

@@ -132,7 +132,7 @@ class SettingPage(ScrollArea):
         # 更新组
         self.updateGroup = SettingCardGroup(_("关于"), self.scrollWidget)
         self.updateCard = HyperlinkCard(
-            "https://github.com/HSLix/LixAssistantLimbusCompany/releases",
+            "https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest",
             _("点击前往更新应用"),
             FIF.INFO,
             "LixAssistantLimbusCompany",

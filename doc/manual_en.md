@@ -4,6 +4,7 @@
 - Please run the software under 64-bit Windows system.
 - The screen zoom should be set to 150%, otherwise the software may run abnormally.
 - In-game language requirement is English
+- The screen are required to over the 1600x900, or with the virtual mechime, which can make the screen big enough to suit the requirement.
 ## Tutorial
 - In the main screen, click the button below to start the software.
 - In the working interface, click on the pause and stop buttons below to pause and stop running respectively.

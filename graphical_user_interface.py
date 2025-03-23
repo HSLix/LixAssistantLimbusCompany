@@ -56,6 +56,7 @@ class Window(FramelessWindow):
         self.team2EditInterface = TeamEditPage("Team2EditInterface", "Team2")
         self.team3EditInterface = TeamEditPage("Team3EditInterface", "Team3")
         self.team4EditInterface = TeamEditPage("Team4EditInterface", "Team4")
+        self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
 
         # initialize layout
         self.initLayout()
@@ -244,6 +245,14 @@ class Window(FramelessWindow):
         control_unit.team_info_updated.connect(
             lambda current_team_name, next_team_name: self.workingInterface.update_team_info(current_team_name, next_team_name)
         )
+        control_unit.team_info_updated.connect(
+            lambda current_team_name, next_team_name: lalc_logger.log_task(
+                "INFO",
+                "UpdateTeamRotate",
+                "SUCCESS",
+                "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
+            )
+        )
 
 
     def show_message(self, msg_type, title, content):
@@ -252,7 +261,7 @@ class Window(FramelessWindow):
         msg_type:info,success,warning,error
         """
         # 创建新消息条
-        info_bar = InfoBar(
+        self.info_bar = InfoBar(
             icon={
                 'info': InfoBarIcon.INFORMATION,
                 'success': InfoBarIcon.SUCCESS,
@@ -264,12 +273,12 @@ class Window(FramelessWindow):
             orient=Qt.Horizontal,
             isClosable=False if msg_type != "error" else True,
             position=InfoBarPosition.TOP,
-            duration=3000 if msg_type != 'error' else -1,
+            duration=5000 if msg_type != 'error' else -1,
             parent=self
         )
 
         # 显示消息条
-        info_bar.show()
+        self.info_bar.show()
 
 
         # 根据消息类型触发 GIF 播放
@@ -304,6 +313,7 @@ class Window(FramelessWindow):
         self.addSubInterface(self.team2EditInterface, FIF.BUS, _('Team2'), parent=self.teamManageInterface)
         self.addSubInterface(self.team3EditInterface, FIF.BUS, _('Team3'), parent=self.teamManageInterface)
         self.addSubInterface(self.team4EditInterface, FIF.BUS, _('Team4'), parent=self.teamManageInterface)
+        self.addSubInterface(self.team5EditInterface, FIF.BUS, _('Team5'), parent=self.teamManageInterface)
 
 
         self.navigationInterface.addItem(
@@ -422,6 +432,11 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
             "UNEXPECTED ERROR",
             f"{error_msg}"
         )
+    print(exc_type)
+    if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
+        # 忽略特定错误
+        pass
+
     msg_box = Dialog("Unexpected Error", _("捕获到未知，是否打开日志查看？\n%s") % (error_msg))
 
     if msg_box.exec_():

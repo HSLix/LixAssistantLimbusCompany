@@ -76,10 +76,11 @@ class SemiAutoPage(QFrame):
     def init_semi_auto_p_battle_config_page(self):
         page = QWidget()
         page_layout = QVBoxLayout(page)
-
+        self.full_team_to_battle_box = CheckBox(_("Full(12/12) Team to Battle"))
+        page_layout.addWidget(self.full_team_to_battle_box)
         # 创建标签
-        label = StrongBodyLabel("Semi Auto Setting 1\nNo Custom Setting for now", page)
-        page_layout.addWidget(label)
+        # label = StrongBodyLabel("Semi Auto Setting 1\nNo Custom Setting for now", page)
+        # page_layout.addWidget(label)
         return page
 
     def init_semi_auto_skip_event_config_page(self):
@@ -148,6 +149,7 @@ class SemiAutoPage(QFrame):
 
         # 创建设置开始按钮
         self.StartButton = PushButton(_("Start"))
+        self.StartButton.setToolTip("Ctrl+Enter+S")
         self.StartButton.setFixedSize(200, 50)
 
         # 创建水平布局并将复选框和按钮添加到其中
@@ -259,6 +261,7 @@ class SemiAutoPage(QFrame):
             'AutoSelectRewardCard': self.checkBox4.isChecked(),  # Auto Select Reward Card
             'AutoSkipEgoGiftGet': self.checkBox5.isChecked(),  # Auto Skip EgoGiftGet
             'AutoEnterMirror': self.checkBox6.isChecked(),
+            "SemiAutoFullTeamToBattle":self.full_team_to_battle_box.isChecked(),
             "SemiAutoEventMakeChoiceGetEgo": self.event_select_ego_box.isChecked()
         }
 

@@ -34,6 +34,7 @@ class GifPlayer(QLabel):
         self.frame_timer.timeout.connect(self._update_frame)
         self._load_gif(self.loop_gif)
 
+        self.set_gif_config("magic_girl_heart.gif", QPoint(15, 30), QSize(640, 400))
         self.set_gif_config("magic_girl_waiting.gif", QPoint(20, 100), QSize(500, 300))
         self.set_gif_config("magic_girl_shaking_hand.gif", QPoint(40, 100), QSize(510, 300))
         self.set_gif_config("magic_girl_blow_kiss.gif", QPoint(0, 30), QSize(640, 370))
@@ -85,9 +86,11 @@ class GifPlayer(QLabel):
             self.wait_count = 0
 
     def _add_random_gif(self):
-        choices = ["shaking_hand",
+        choices = [
+                    "shaking_hand",
                     "blow_kiss", 
-                    # "black1"
+                    # "black1",
+                    # "heart"
                     ]
         self.push_gif_to_queue(random.choice(choices))
 

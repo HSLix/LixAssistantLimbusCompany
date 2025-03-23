@@ -31,7 +31,7 @@ folders_to_empty = ['log', 'video']
 # --------------------
 # 计算 splash 文字位置（含中英文）
 # --------------------
-splash_image_path = 'C:\\Users\\Li\\Documents\\Code\\QtLALC\\resource\\gui\\MagicGirl_White.png'
+splash_image_path = 'C:\\Users\\Li\\Documents\\Code\\LixAssistantLimbusCompany\\resource\\gui\\MagicGirl_White.png'
 splash_text = "正在初始化（少女祈祷中）  Initializing"  # 中英文换行
 text_size = 20  # 增大文字大小
 text_color = 'black'  # 建议浅色文字适配深色背景
@@ -54,7 +54,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['sip'],
+    hiddenimports=['PyQt5.sip'],
     runtime_hooks=[],
     excludes=[],
     noarchive=False,
@@ -77,7 +77,7 @@ exe = EXE(
     a.scripts,
     name='LixAssistantLimbusCompany',
     console=False,
-    icon="C:\\Users\\Li\\Documents\\Code\\QtLALC\\MagicAndWonder.ico",
+    icon="C:\\Users\\Li\\Documents\\Code\\LixAssistantLimbusCompany\\MagicAndWonder.ico",
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -123,3 +123,9 @@ dist_lalc_log_dir = os.path.join(dist_dir, 'lalc/log')
 os.makedirs(dist_lalc_log_dir, exist_ok=True)
 dist_lalc_video_dir = os.path.join(dist_dir, 'lalc/video')
 os.makedirs(dist_lalc_video_dir, exist_ok=True)
+
+# --------------------
+# 压缩 lalc 文件夹
+# --------------------
+archive_name = os.path.join(dist_dir, 'lalc')
+shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')

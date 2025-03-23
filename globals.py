@@ -22,8 +22,8 @@ VERSION = "3.0.0"
 
 
 # 支持网址
-ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany?tab=readme-ov-file#%E5%8F%8B%E9%93%BE"
-EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany?tab=readme-ov-file#%E5%8F%8B%E9%93%BE"
+ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
+EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 
 
 MOUSE_BASEPOINT = [0,0]
@@ -35,8 +35,8 @@ window_size = [1600, 1200]
 
 # 人物选择对应坐标
 sinner_place = {
-    "YiSang":[375,500], "Faust":[540,500], "DonQuixote":[700,500], "Ryoshu":[880,500], "Meursault":[1030,500], "HongLu":[1210,500],
-    "Heathcliff":[375, 740], "Ishmael":[540, 740], "Rodion":[700, 740], "Sinclair":[880, 740], "Outis":[1030, 740], "Gregor":[1210, 740]
+    "YiSang":[375,340], "Faust":[540,340], "DonQuixote":[700,340], "Ryoshu":[880,340], "Meursault":[1030,340], "HongLu":[1210,340],
+    "Heathcliff":[375, 590], "Ishmael":[540, 590], "Rodion":[700, 590], "Sinclair":[880, 590], "Outis":[1030, 590], "Gregor":[1210, 590]
 }
 
 sinner_name = [  # 固定十二个人物列表

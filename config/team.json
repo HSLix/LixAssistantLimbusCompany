@@ -1,19 +1,19 @@
 {
-    "TeamOffset": 2,
+    "TeamOffset": 3,
     "Team1": {
         "enabled": true,
         "style": "Bleed",
         "YiSang": 4,
-        "Faust": 7,
+        "Faust": 9,
         "DonQuixote": 1,
         "Ryoshu": 2,
-        "Meursault": 8,
-        "HongLu": 9,
-        "Heathcliff": 10,
+        "Meursault": 10,
+        "HongLu": 11,
+        "Heathcliff": 8,
         "Ishmael": 5,
         "Rodion": 3,
-        "Sinclair": 11,
-        "Outis": 12,
+        "Sinclair": 12,
+        "Outis": 7,
         "Gregor": 6
     },
     "Team2": {
@@ -55,13 +55,29 @@
         "Faust": 1,
         "DonQuixote": 3,
         "Ryoshu": 2,
-        "Meursault": 9,
-        "HongLu": 10,
+        "Meursault": 7,
+        "HongLu": 8,
         "Heathcliff": 6,
-        "Ishmael": 7,
-        "Rodion": 11,
-        "Sinclair": 12,
+        "Ishmael": 12,
+        "Rodion": 9,
+        "Sinclair": 10,
         "Outis": 4,
-        "Gregor": 8
+        "Gregor": 11
+    },
+    "Team5": {
+        "enabled": true,
+        "style": "Sinking",
+        "YiSang": 3,
+        "Faust": 1,
+        "DonQuixote": 9,
+        "Ryoshu": 7,
+        "Meursault": 12,
+        "HongLu": 6,
+        "Heathcliff": 2,
+        "Ishmael": 4,
+        "Rodion": 5,
+        "Sinclair": 8,
+        "Outis": 10,
+        "Gregor": 11
     }
 }

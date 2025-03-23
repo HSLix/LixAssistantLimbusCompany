@@ -283,16 +283,22 @@ class Task:
         """执行检测，把检测结果保存自身"""
         # print(f"eye编号：{id(self.eye)}")
         if (self.recognition == "DirectHit"):
+            lalc_logger.log_task(
+                    "INFO",
+                    self.name,
+                    f"DirectHit Not Recognize"
+                    )
             return
+        lalc_logger.log_task(
+                    "INFO",
+                    self.name,
+                    f"Execute Recognize"
+                    )
         self.recognize_center, self.recognize_score = self.recognition_function(self.template, threshold=self.threshold, recognize_area=self.recognize_area)
         if(self.recognize_center == None):
             return
         print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
-        lalc_logger.log_task(
-                    "DEBUG",
-                    self.name,
-                    f"recognize_center:[{self.recognize_center}];recognize_score:[{self.recognize_score}]"
-                    )
+        
 
     def update_screenshot(self):
         self.eye.captureScreenShot()
@@ -304,13 +310,13 @@ class Task:
         self.eye.waitFreeze(self.pre_wait_freezes)
         sleep(self.pre_delay)
         self.mk.updateMouseBasepoint()
+        lalc_logger.log_task(
+            "INFO",
+            self.name,
+            f"Action: {self.action}"
+            )
+        print(f"[{self.name}] 执行动作: {self.action}")
         if (self.action != "DoNothing"):
-            print(f"[{self.name}] 执行动作: {self.action}")
-            lalc_logger.log_task(
-                "DEBUG",
-                self.name,
-                f"Action: {self.action}"
-                )
             activateWindow()
             if (self.action=="Custom" or self.action=="Checkpoint"):
                 self.action_function(**kwargs)
@@ -352,28 +358,33 @@ def initCustomAction():
     def choose_team(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
         if (team_index == 1):
-            mk.moveClick([150, 705])
+            mk.moveClick([150, 555])
         elif (team_index == 2):
-            mk.moveClick([150, 760])
+            mk.moveClick([150, 600])
         elif (team_index == 3):
-            mk.moveClick([150, 800])
+            mk.moveClick([150, 650])
         elif (team_index == 4):
-            mk.moveClick([150, 850])
+            mk.moveClick([150, 700])
+        elif (team_index == 5):
+            mk.moveClick([150, 725])
         else:
             raise ValueError("Over Index in choose_team")
+        sleep(0.2)
+
         mk.pressKey("enter")
 
         mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
-        mk.moveClick([1040, 520])
-        mk.moveClick([810, 810])
-        mk.moveClick([1280, 520])
-        mk.moveClick([350, 520])
+        mk.moveClick([1040, 400])
+        mk.moveClick([810, 665])
+        mk.moveClick([585, 665])
+        mk.moveClick([1280, 400])
+        mk.moveClick([350, 400])
         # 下面是结算
-        mk.moveClick([1440, 1210], rest_time=2)
-        mk.moveClick([945, 875])
+        mk.moveClick([1440, 900], rest_time=2)
+        mk.moveClick([945, 720])
         mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
 
     
@@ -381,26 +392,27 @@ def initCustomAction():
     def choose_start_ego_gift(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
+
         if (team_style == "Burn"):
-            mk.moveClick([260, 510])
+            mk.moveClick([260, 360])
         elif (team_style == "Bleed"):
-            mk.moveClick([450, 510])
+            mk.moveClick([450, 360])
         elif (team_style == "Tremor"):
-            mk.moveClick([650, 510])
+            mk.moveClick([650, 360])
         elif (team_style == "Rupture"):
-            mk.moveClick([830, 510])
+            mk.moveClick([830, 360])
         elif (team_style == "Sinking"):
-            mk.moveClick([260, 770])
+            mk.moveClick([260, 630])
         elif (team_style == "Poise"):
-            mk.moveClick([450, 770])
+            mk.moveClick([450, 630])
         elif (team_style == "Charge"):
-            mk.moveClick([650, 770])
+            mk.moveClick([650, 630])
         else:
             raise ValueError("Over Team Style in choose_start_ego_gift")
         
-        mk.moveClick([1045, 525], rest_time=0.5)
-        mk.moveClick([1045, 660], rest_time=0.5)
-        mk.moveClick([1045, 790], rest_time=0.5)
+        mk.moveClick([1045, 380], rest_time=0.5)
+        mk.moveClick([1045, 510], rest_time=0.5)
+        mk.moveClick([1045, 650], rest_time=0.5)
         mk.pressKey("enter", press_count=3, rest_time=1)
 
 
@@ -491,9 +503,9 @@ def initCustomAction():
         # 计算有效队伍的数量
         num_enabled_teams = len(enabled_teams)
         
-        # 如果没有任何有效队伍，返回 -1
+        # 如果没有任何有效队伍，返回 -1, 不应存在
         if num_enabled_teams == 0:
-            return -1
+            raise IndexError("No Enabled Team")
         
         # 计算传入数字对应的队伍索引
         team_index = (index + offset) % num_enabled_teams
@@ -515,7 +527,7 @@ def initCustomAction():
             return
         
         # clear selection
-        mk.moveClick([1440, 800], rest_time=1)
+        mk.moveClick([1440, 650], rest_time=1)
         eye.captureScreenShot()
         center, score = eye.templateMatch("reset_deployment_order.png")
         if (score != None):
@@ -570,10 +582,34 @@ def initCustomAction():
 
         return sorted_members
     
+    
+    def search_place_sell_gift(gift_places:list, target_pic:list):
+        for c in gift_places:
+            while True:
+                mk.moveClick(c)
+                eye.captureScreenShot()
+
+                sellable = True
+
+                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
+                    sellable = True
+                else:
+                    for gift in target_pic:
+                        if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
+                            sellable = False
+                            break
+
+                if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
+                    mk.pressKey("enter", press_count=2, rest_time=1)
+                    sleep(2)
+                    continue
+                
+                break
+
 
     @custom_action_dict.register
     def sell_unwanted_ego_gift(**kwargs):
-        mk.moveClick([505, 680], rest_time=1)
+        mk.moveClick([505, 540], rest_time=1)
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
 
@@ -600,51 +636,44 @@ def initCustomAction():
 
         gift_places = []
         x = 860
-        y = 520
+        y = 370
         x_step = 115
         y_step = 120
         for i in range(3):
             for j in range(5):
                 gift_places.append([x + j*x_step, y + i*y_step])
 
-        
-        for c in gift_places:
-            while True:
-                mk.moveClick(c)
-                eye.captureScreenShot()
 
-                sellable = True
-
-                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[180, 380, 530, 220])):
-                    sellable = True
-                else:
-                    for gift in target_pic:
-                        if (eye.templateMactchExist(gift, recognize_area=[180, 380, 530, 220], threshold=0.7)):
-                            sellable = False
-                            break
-
-                if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1225, 295, 160, 65])):
-                    mk.pressKey("enter", press_count=2, rest_time=1)
-                    sleep(2)
-                    continue
-                
+        while True:
+            search_place_sell_gift(gift_places, target_pic)
+            eye.captureScreenShot()
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
                 break
+            if (len(gift_places) != 10):
+                gift_places = gift_places[5:]
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
+                mk.scroll([0,-1], 5, rest_time=0.2)
+            else:
+                break
+         
             
         mk.pressKey("esc", rest_time=2)
+
+
 
 
     
     @custom_action_dict.register
     def purchase_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 745, 160, 90]):
+        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
 
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
 
-        goods_places = [[985, 520], [1175, 520], [1365, 520], [785, 705], [985, 705], [1175, 705], [1365, 705]]
+        goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550], [1365, 550]]
 
         target_pic = []
 
@@ -667,44 +696,85 @@ def initCustomAction():
         
         
         target_pic.append("shop_purchase_keywordless.png")
-        
+
+        purchased_count = 0
 
         for place in goods_places:
-            mk.moveClick(place, rest_time=1)
+            if goods_places.index(place) < purchased_count:
+                continue
+            mk.moveClick(place, rest_time=1.5)
             eye.captureScreenShot()
             for gift in target_pic:
-                if (eye.templateMactchExist(gift, recognize_area=[450, 450, 200, 200])):
-                    mk.moveClick([945, 800], rest_time=2)
-                    mk.pressKey("enter", rest_time=1)
+                if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                    mk.moveClick([945, 660], rest_time=2)
+                    # mk.pressKey("enter", rest_time=1)
+                    purchased_count += 1
                     break
             mk.pressKey("enter", rest_time=1)
 
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 745, 160, 90]):
+        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
-        mk.moveClick([1260, 350], rest_time=3)
+        mk.moveClick([1260, 200], rest_time=3)
 
         for place in goods_places:
-            mk.moveClick(place, rest_time=1)
+            if goods_places.index(place) < purchased_count:
+                continue
+            mk.moveClick(place, rest_time=1.5)
             eye.captureScreenShot()
             for gift in target_pic:
-                if (eye.templateMactchExist(gift, recognize_area=[450, 450, 200, 200])):
-                    mk.moveClick([945, 800], rest_time=2)
+                if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                    mk.moveClick([945, 660], rest_time=2)
                     mk.pressKey("enter", rest_time=1)
+                    purchased_count += 1
                     break
             mk.pressKey("enter", rest_time=1)
 
 
-        
+    
+    def search_place_enhance_ego(gift_places:list, target_pic:list):
+        for c in gift_places:
+            mk.moveClick(c, rest_time=0.5)
+            eye.captureScreenShot()
+
+            enhance_able = False
+
+            if (not eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
+                continue
+            
+
+            for gift in target_pic:
+                if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200])):
+                    enhance_able = True
+                    break
+            
+            if (enhance_able):
+                mk.pressKey("enter", press_count=1, rest_time=1)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
+                    mk.pressKey("esc")
+                    continue
+                mk.pressKey("enter", press_count=1, rest_time=1)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
+                    mk.pressKey("esc")
+                    continue
+                mk.pressKey("enter", press_count=2, rest_time=1)
+                sleep(2)
+            
+            eye.captureScreenShot()
+            if (not eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
+                mk.pressKey("esc", rest_time=1)
+
 
     @custom_action_dict.register
     def enhance_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 745, 160, 90]):
-            lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
-            return
-        mk.moveClick([215,685], rest_time=1)
+        # if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+        #     lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
+        #     return
+        mk.moveClick([215,540], rest_time=1)
 
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
@@ -731,7 +801,7 @@ def initCustomAction():
 
         gift_places = []
         x = 860
-        y = 520
+        y = 370
         x_step = 115
         y_step = 120
         for i in range(3):
@@ -739,41 +809,32 @@ def initCustomAction():
                 gift_places.append([x + j*x_step, y + i*y_step])
 
         
-        for c in gift_places:
-            mk.moveClick(c, rest_time=0.2)
+        while True:
+            search_place_enhance_ego(gift_places, target_pic)
             eye.captureScreenShot()
-
-            enhance_able = False
-
-            if (not eye.templateMactchExist("shop_triangle.png", recognize_area=[1225, 295, 160, 65])):
-                continue
-
-            for gift in target_pic:
-                if (eye.templateMactchExist(gift, recognize_area=[180, 380, 530, 220])):
-                    enhance_able = True
-                    break
-
-            if (enhance_able):
-                mk.pressKey("enter", press_count=4, rest_time=1)
-                sleep(2)
-            
-            eye.captureScreenShot()
-            if (not eye.templateMactchExist("power_up.png", recognize_area=[820, 885, 330, 100])):
-                mk.pressKey("esc", rest_time=1)
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
+                break
+            if (len(gift_places) != 10):
+                gift_places = gift_places[5:]
+            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
+                mk.scroll([0,-1], 5, rest_time=0.2)
+            else:
+                break
+        
 
         mk.pressKey("esc", rest_time=1)
 
     @custom_action_dict.register
     def heal_all_sinner(**kwargs):
         eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 745, 160, 100]):
+        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "heal_all_sinner", "FAILED", "Not Enough Cost")
             return
-        mk.moveClick([255, 785], rest_time=2)
+        mk.moveClick([255, 640], rest_time=2)
         eye.captureScreenShot()
         if eye.templateMactchExist("heal_sinners.png", recognize_area=[125, 60, 325, 110]):
-            mk.moveClick([1280, 615], rest_time=2)
-            mk.moveClick([1415, 1150], rest_time=2)
+            mk.moveClick([1280, 460], rest_time=2)
+            mk.moveClick([1415, 860], rest_time=2)
 
     
 
