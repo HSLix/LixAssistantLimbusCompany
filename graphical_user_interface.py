@@ -224,7 +224,7 @@ class Window(FramelessWindow):
         # 倒计时定时器
         self.timer = QTimer(self.supportDialog)
         self.timer.timeout.connect(self.updateCountdown)
-        self.remaining_seconds = 6
+        self.remaining_seconds = 4
         self.timer.start(1000)
         self.updateCountdown()  # 初始显示
 
