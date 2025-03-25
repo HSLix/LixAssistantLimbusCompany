@@ -215,10 +215,17 @@ class ControlUnit(QThread):
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
                 initWindowSize([1600, 900])
+                initWindowSize([1600, 900])
                 with self.condition:
                     # 暂停
                     if self.is_paused:
                         self.pause_completed.emit()
+                        lalc_logger.log_task(
+                            "INFO",
+                            "ContainUnitRun",
+                            'SUCCESS',
+                            "cu pause  with task[{0}]".format(self.cur_task.name)
+                        )
                         lalc_logger.log_task(
                             "INFO",
                             "ContainUnitRun",
@@ -360,6 +367,12 @@ class ControlUnit(QThread):
                 'SUCCESS',
                 "cu stop with final task[{0}]".format(self.cur_task.name)
             )
+            lalc_logger.log_task(
+                "INFO",
+                "ContainUnitStop",
+                'SUCCESS',
+                "cu stop with final task[{0}]".format(self.cur_task.name)
+            )
             self.next_task = None
             self.pending_task_stack.clear()
             self.is_running = False
@@ -369,6 +382,12 @@ class ControlUnit(QThread):
     def complete(self):
         """完成所有任务"""
         with self.condition:
+            lalc_logger.log_task(
+                "INFO",
+                "ContainUnitComplete",
+                'SUCCESS',
+                "cu complete with final task[{0}]".format(self.cur_task.name)
+            )
             lalc_logger.log_task(
                 "INFO",
                 "ContainUnitComplete",

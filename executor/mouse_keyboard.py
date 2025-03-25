@@ -31,6 +31,7 @@ class MOUSE_KEYBOARD:
     def updateMouseBasepoint(self):
         self.mouse_basepoint = initMouseBasePoint()
     
+    
     def dragMouse(self, coordinate:list, drag_time:float = 0.3):
         """
         从按住鼠标起点坐标到终点坐标移动
@@ -91,6 +92,17 @@ class MOUSE_KEYBOARD:
             self.ms.scroll(offset[0], offset[1])
             sleep(rest_time)
 
+    def scroll(self, offset:list, scroll_count:int = 1, rest_time:float=0.1):
+        """
+        模拟鼠标滚动
+        offset: [0,-1]即下滚动一单位，也就是滚动一下滚轮的效果
+        scroll_count: 滚动次数，默认一次
+        rest_time: 滚动后的休息时间，默认 0.1 s，滚动次数为 0 时不生效
+        """
+        for _ in range(scroll_count):
+            self.ms.scroll(offset[0], offset[1])
+            sleep(rest_time)
+
 
     def pressKey(self, key:str, press_count:int = 1, rest_time:float=0.1):
         """
@@ -128,6 +140,11 @@ class MOUSE_KEYBOARD:
         def on_scroll(x, y, dx, dy):
             print('{0}滚动中... 从({1},{2})滚动({3},{4})'.format('向下：' if dy < 0 else '向上：', x, y, dx, dy))
 
+
+        # 滚动监听
+        def on_scroll(x, y, dx, dy):
+            print('{0}滚动中... 从({1},{2})滚动({3},{4})'.format('向下：' if dy < 0 else '向上：', x, y, dx, dy))
+
         def on_press(key):
             # 按下任意键时停止监听
             print("检测到按键，停止监听鼠标点击。")
@@ -138,6 +155,7 @@ class MOUSE_KEYBOARD:
         print("Start Listenning")
 
         # 启动鼠标点击监听
+        mouse_listener = mouse.Listener(on_click=on_click, on_scroll=on_scroll)
         mouse_listener = mouse.Listener(on_click=on_click, on_scroll=on_scroll)
         mouse_listener.start()
 

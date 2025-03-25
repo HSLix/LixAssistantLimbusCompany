@@ -253,9 +253,11 @@ msgid "Start"
 msgstr "开始"
 
 #: gui/full_auto_page.py:229
+#: gui/full_auto_page.py:229
 msgid "录屏完成"
 msgstr "录屏完成"
 
+#: gui/full_auto_page.py:229
 #: gui/full_auto_page.py:229
 #, python-format
 msgid "录屏已保存至:%s"
@@ -403,6 +405,7 @@ msgid "保存队伍"
 msgstr "保存队伍"
 
 #: gui/team_edit_page.py:250
+#: gui/team_edit_page.py:250
 #, python-format
 msgid "编辑队伍: %s"
 msgstr "编辑队伍: %s"
@@ -452,6 +455,7 @@ msgid "首发队伍"
 msgstr "首发队伍"
 
 #: gui/working_page.py:24 gui/working_page.py:125 gui/working_page.py:155
+#: gui/working_page.py:24 gui/working_page.py:125 gui/working_page.py:155
 msgid "Pause"
 msgstr "暂停"
 
@@ -464,29 +468,36 @@ msgid "Open Log Folder"
 msgstr "打开日志文件夹"
 
 #: gui/working_page.py:40
+#: gui/working_page.py:40
 msgid "Current Team:"
 msgstr "当前队伍:"
 
+#: gui/working_page.py:43
 #: gui/working_page.py:43
 msgid "Next Team:"
 msgstr "下一个队伍:"
 
 #: gui/working_page.py:114
+#: gui/working_page.py:114
 msgid "正在暂停任务"
 msgstr "正在暂停任务"
 
+#: gui/working_page.py:139
 #: gui/working_page.py:139
 msgid "正在停止任务"
 msgstr "正在停止任务"
 
 #: gui/working_page.py:147
+#: gui/working_page.py:147
 msgid "Resume"
 msgstr "继续"
 
 #: gui/working_page.py:150
+#: gui/working_page.py:150
 msgid "任务已暂停"
 msgstr "任务已暂停"
 
+#: gui/working_page.py:156
 #: gui/working_page.py:156
 msgid "任务已停止"
 msgstr "任务已停止"

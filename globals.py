@@ -17,6 +17,9 @@ CONFIG_DIR = path.join(WORK_DIR, "config")
 # 仓库
 GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 
+# 仓库
+GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
+
 # 事件名称
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
@@ -25,6 +28,8 @@ VERSION = "V3.0.3"
 
 
 # 支持网址
+ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
+EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
 EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 
@@ -40,6 +45,8 @@ window_size = [1600, 1200]
 
 # 人物选择对应坐标
 sinner_place = {
+    "YiSang":[375,340], "Faust":[540,340], "DonQuixote":[700,340], "Ryoshu":[880,340], "Meursault":[1030,340], "HongLu":[1210,340],
+    "Heathcliff":[375, 590], "Ishmael":[540, 590], "Rodion":[700, 590], "Sinclair":[880, 590], "Outis":[1030, 590], "Gregor":[1210, 590]
     "YiSang":[375,340], "Faust":[540,340], "DonQuixote":[700,340], "Ryoshu":[880,340], "Meursault":[1030,340], "HongLu":[1210,340],
     "Heathcliff":[375, 590], "Ishmael":[540, 590], "Rodion":[700, 590], "Sinclair":[880, 590], "Outis":[1030, 590], "Gregor":[1210, 590]
 }

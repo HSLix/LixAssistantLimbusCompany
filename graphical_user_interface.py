@@ -2,7 +2,10 @@
 import sys
 import os
 from PyQt5.QtCore import Qt,  QUrl, QTimer
+from PyQt5.QtCore import Qt,  QUrl, QTimer
 from PyQt5.QtGui import QIcon, QDesktopServices
+from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
+from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
 from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
                             InfoBarPosition, isDarkTheme, setTheme, Theme, NavigationAvatarWidget, Dialog, BodyLabel)
@@ -16,6 +19,7 @@ from win32api import GetLastError
 from winerror import ERROR_ALREADY_EXISTS
 from win32event import CreateEvent
 from requests import get
+from requests import get
 
 
 from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK
@@ -23,6 +27,7 @@ from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
 from executor import ControlUnit, lalc_logger
+
 
 
 
@@ -58,6 +63,7 @@ class Window(FramelessWindow):
         self.team3EditInterface = TeamEditPage("Team3EditInterface", "Team3")
         self.team4EditInterface = TeamEditPage("Team4EditInterface", "Team4")
         self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
+        self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
 
         # initialize layout
         self.initLayout()
@@ -78,6 +84,52 @@ class Window(FramelessWindow):
         self.showSupportDialog()
 
         # self.splashScreen.finish()
+
+        self.show()
+
+        self.check_for_updates()  # 调用版本检测函数
+
+    def check_for_updates(self):
+        """检测当前版本是否是最新版本"""
+        def get_latest_release(repo):
+            url = f"https://api.github.com/repos/{repo}/releases/latest"
+            try:
+                response = get(url)
+                if response.status_code == 200:
+                    release_info = response.json()
+                    latest_release = release_info["tag_name"]
+                    return latest_release
+                else:
+                    return None
+            except Exception as e:
+                print(f"Failed to fetch release information: {e}")
+                return None
+
+        repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
+        latest_release = get_latest_release(repo)
+
+        if latest_release:
+            if latest_release == VERSION:
+                # 当前版本是最新版本
+                self.show_message(
+                    'success',
+                    _('Update Check Successful'),
+                    _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                )
+            else:
+                # 当前版本落后
+                self.show_message(
+                    'error',
+                    _('Update Check Successful'),
+                    _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                )
+        else:
+            # 网络检测失败
+            self.show_message(
+                'error',
+                _('Update Check Failed'),
+                _('Failed to check for updates. \nPlease check your internet connection.')
+            )
 
         self.show()
 
@@ -300,6 +352,14 @@ class Window(FramelessWindow):
                 "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
             )
         )
+        control_unit.team_info_updated.connect(
+            lambda current_team_name, next_team_name: lalc_logger.log_task(
+                "INFO",
+                "UpdateTeamRotate",
+                "SUCCESS",
+                "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
+            )
+        )
 
 
     def show_message(self, msg_type, title, content):
@@ -308,6 +368,7 @@ class Window(FramelessWindow):
         msg_type:info,success,warning,error
         """
         # 创建新消息条
+        self.info_bar = InfoBar(
         self.info_bar = InfoBar(
             icon={
                 'info': InfoBarIcon.INFORMATION,
@@ -321,10 +382,12 @@ class Window(FramelessWindow):
             isClosable=False if msg_type != "error" else True,
             position=InfoBarPosition.TOP,
             duration=5000 if msg_type != 'error' else -1,
+            duration=5000 if msg_type != 'error' else -1,
             parent=self
         )
 
         # 显示消息条
+        self.info_bar.show()
         self.info_bar.show()
 
 
@@ -488,6 +551,11 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
             "UNEXPECTED ERROR",
             f"{error_msg}"
         )
+    print(exc_type)
+    if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
+        # 忽略特定错误
+        pass
+
     print(exc_type)
     if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
         # 忽略特定错误
