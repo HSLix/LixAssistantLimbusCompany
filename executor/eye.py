@@ -1,16 +1,19 @@
 # coding: utf-8
 from cv2 import (imread, createCLAHE, IMREAD_GRAYSCALE, imshow, waitKey, destroyAllWindows,
                  matchTemplate, TM_CCOEFF_NORMED, minMaxLoc, rectangle, cvtColor, COLOR_GRAY2BGR,
-                 absdiff, resize, COLOR_BGR2GRAY, COLOR_BGRA2BGR)
+                 absdiff, resize, COLOR_BGR2GRAY, COLOR_BGRA2BGR, polylines)
 # import numpy as np
-from numpy import average, where
+from numpy import average, where, array, int32
 from globals import TEMPLATE_DIR, ignoreScaleAndDpi
 import os
 from time import sleep
 from copy import deepcopy
+from re import sub
 
+from globals import RESOURCE_DIR
 from .logger import lalc_logger
 from .screenshot import captureLimbusCompanyWindow
+from rapidocr_onnxruntime import RapidOCR
 
 eye = None
 
@@ -23,7 +26,10 @@ def get_eye():
 
 class EYE:
     def __init__(self):
-        self.captureScreenShot()
+        # self.captureScreenShot()
+        self.screenshot = imread(os.path.join(RESOURCE_DIR, "limbus_company_screenshot.png"))
+        self.ocr = RapidOCR()
+        self.ocr_dict = {}
 
     def captureScreenShot(self):
         self.screenshot = captureLimbusCompanyWindow()
@@ -308,6 +314,83 @@ class EYE:
             return False
         else:
             return True
+
+
+    def screenshotOcr(self, recognize_area=[0, 0, 0, 0], is_show_result=False):
+        self.ocr_dict = {}
+
+        screenshot = self.getScreenShot()
+
+        if recognize_area != [0, 0, 0, 0]:
+            screenshot = EYE.cropImg(screenshot, recognize_area)
+        screenshot = EYE.getGreyNormalizedPic(screenshot)
+
+        result, _ = self.ocr(screenshot)
+        if not result:
+            lalc_logger.log_task("DEBUG", "screenshotocr", "FAILED", "未识别到文字。")
+            self.ocr_dict = {}
+            return
+
+        center_coordinates = []
+        recognized_texts = []
+
+        if is_show_result:
+            for line in result:
+                box = array(line[0], dtype=int32).reshape((-1, 1, 2))
+                polylines(screenshot, [box], True, (0, 0, 255), 2)
+                x_coords = [point[0] for point in line[0]]
+                y_coords = [point[1] for point in line[0]]
+                center_x = int(sum(x_coords) / len(x_coords) + recognize_area[0])
+                center_y = int(sum(y_coords) / len(y_coords) + recognize_area[1])
+                center_coordinates.append((center_x, center_y))
+                recognized_texts.append(line[1])
+        else:
+            for line in result:
+                x_coords = [point[0] for point in line[0]]
+                y_coords = [point[1] for point in line[0]]
+                center_x = int(sum(x_coords) / len(x_coords) + recognize_area[0])
+                center_y = int(sum(y_coords) / len(y_coords) + recognize_area[1])
+                center_coordinates.append((center_x, center_y))
+                recognized_texts.append(line[1])
+
+        if is_show_result:
+            imshow('Text Recognition', screenshot)
+            waitKey(0)
+            destroyAllWindows()
+       
+        for center, text in zip(center_coordinates, recognized_texts):
+            processed_text = self.process_text(text)
+            self.ocr_dict[processed_text] = center
+
+        # for key, value in self.ocr_dict.items():
+        #     print("{0}:{1};".format(key, value))
+
+        lalc_logger.log_task("DEBUG", "screenshotocr", "SUCCESS", f"识别到 {len(self.ocr_dict)} 个文字区域。\n识别到:{self.ocr_dict}")
+
+
+    @staticmethod
+    def process_text(text):
+        text = sub(r'[^a-zA-Z0-9]', '', text)
+        text = text.lower()
+        return text
+
+    def queryOcrDict(self, query_text):
+        processed_query = self.process_text(query_text)
+        for key, value in self.ocr_dict.items():
+            if processed_query in key:
+                lalc_logger.log_task("DEBUG", "query_ocr_dict", "SUCCESS", f"找到匹配项: {key}, 坐标: {value}")
+                return value
+        lalc_logger.log_task("DEBUG", "query_ocr_dict", "FAILED", f"未找到匹配项: {processed_query}")
+        return None
+
+    def ocrGetFirstNum(self):
+        for key in self.ocr_dict.keys():
+            if key.isdigit():
+                num = float(key)
+                lalc_logger.log_task("DEBUG", "ocrGetFirstNum", "SUCCESS", f"找到第一个数字: {num}")
+                return num
+        lalc_logger.log_task("DEBUG", "ocrGetFirstNum", "FAILED", "未找到全是数字的字符串。")
+        return None
 
 
 if __name__ == "__main__":

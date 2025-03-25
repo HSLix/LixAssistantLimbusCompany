@@ -1,5 +1,5 @@
 # coding: utf-8
-from config_manager import config_manager
+from json_manager import config_manager
 # import gettext
 from gettext import translation
 

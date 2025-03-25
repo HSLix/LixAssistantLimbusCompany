@@ -8,6 +8,8 @@ from globals import RESOURCE_DIR
 from os.path import join
 import cv2
 import time
+
+from .game_window import getWindow
     
 
 def captureLimbusCompanyWindow(is_save_pic: bool = False, is_pic_gray: bool = True):
@@ -15,7 +17,7 @@ def captureLimbusCompanyWindow(is_save_pic: bool = False, is_pic_gray: bool = Tr
     查找名为 "LimbusCompany" 的窗口，根据缩放比例调整窗口数据，并截屏。
     """
     try:
-        window = gw.getWindowsWithTitle("LimbusCompany")[0]
+        window = getWindow()
     except IndexError:
         return None
 

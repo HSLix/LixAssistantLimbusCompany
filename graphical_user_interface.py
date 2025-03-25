@@ -18,8 +18,8 @@ from win32event import CreateEvent
 from requests import get
 
 
-from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY
-from config_manager import config_manager
+from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK
+from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
 from executor import ControlUnit, lalc_logger
@@ -362,6 +362,15 @@ class Window(FramelessWindow):
         self.addSubInterface(self.team4EditInterface, FIF.BUS, _('Team4'), parent=self.teamManageInterface)
         self.addSubInterface(self.team5EditInterface, FIF.BUS, _('Team5'), parent=self.teamManageInterface)
 
+        self.navigationInterface.addItem(
+            routeKey='discord',
+            icon=FIF.CHAT,
+            text=_("Chat"),
+            onClick=lambda : QDesktopServices.openUrl(QUrl(DISCORD_LINK)),
+            selectable=False,
+            tooltip=_("Chat"),
+            position=NavigationItemPosition.BOTTOM
+        )
 
         self.navigationInterface.addItem(
             routeKey='price',

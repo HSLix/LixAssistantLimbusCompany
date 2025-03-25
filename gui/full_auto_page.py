@@ -8,7 +8,7 @@ import json
 
 
 from executor import ControlUnit, screen_record_thread
-from config_manager import config_manager  
+from json_manager import config_manager  
 from i18n import _
 
 

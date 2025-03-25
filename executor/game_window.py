@@ -1,17 +1,10 @@
 # coding: utf-8
 import pygetwindow as gw
+import mss
 
 from globals import ignoreScaleAndDpi
+from .logger import lalc_logger
 
-
-def initSet():
-    """
-    需要初始化的函数集合
-    TODO 消除这样的函数，内部的东西应该在某个构造函数做合适的初始化
-    """
-    initMouseBasePoint()
-    initWindowSize()
-    activateWindow()
 
 
 def initMouseBasePoint():
@@ -23,12 +16,20 @@ def initMouseBasePoint():
 
     # 获取窗口的位置和大小
     left, top = window.left, window.top
-    # MOUSE_BASEPOINT[0], MOUSE_BASEPOINT[1] = left, top
     
     # print("基点：")
     #print((left, top))
     return (left, top)
+    
 
+def initMouseHomePoint():
+    """
+    初始化鼠标的归宿
+    """
+    with mss.mss() as sct:
+        monitor = sct.monitors[0]
+        w = monitor['width']
+    return (w, 0)
 
 
 

@@ -646,7 +646,7 @@
             "FullAutoInitMirrorInitStarBuff",
             "FullAutoInitMirrorInitStartEgoGift",
             "FullAutoMirrorCancelHardMode",
-            "FullAutoMirrorSelectRandomThemePack",
+            "FullAutoMirrorSelectThemePack",
             "FullAutoPassEgoGiftGet",
             "FullAutoReadySelectRewardCard",
             "FullAutoPEncounter",
@@ -699,7 +699,7 @@
             -500
         ],
         "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 15
+        "post_delay": 5
     },
     "FullAutoMirrorStart": {
         "recognition": "TemplateMatch",
@@ -768,6 +768,13 @@
         "post_delay": 10,
         "next": "FullAutoMirrorCircleCenter"
     },
+    "FullAutoMirrorSelectThemePack": {
+        "recognition": "TemplateMatch",
+        "template": "theme_pack_info.png",
+        "action": "Custom",
+        "custom_name": "select_theme_pack",
+        "next": ["FullAutoMirrorSelectRandomThemePack", "FullAutoMirrorCircleCenter"]
+    },
     "FullAutoMirrorSelectRandomThemePack": {
         "recognition": "TemplateMatch",
         "template": "theme_pack_info.png",
@@ -778,7 +785,7 @@
         ],
         "end_offset": [
             0,
-            800
+            500
         ],
         "next": "FullAutoMirrorCircleCenter",
         "post_delay": 6

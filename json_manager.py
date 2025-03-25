@@ -37,6 +37,26 @@ class ConfigManager(JSONManager):
 class TeamManager(JSONManager):
     JSON_FILE = "teams.json"  # 假设队伍数据存储在teams.json
 
+class ThemePackManager(JSONManager):
+    JSON_FILE = "theme_pack.json"
+
+    def __init__(self):
+        self.weight_dict = {}
+        self._generate_weight_dict()
+
+    def _generate_weight_dict(self):
+        for theme, data in self._config.items():
+            if theme and 'keyword' in data and 'weight' in data:
+                weight = data['weight']
+                keyword = data['keyword']
+                if weight not in self.weight_dict:
+                    self.weight_dict[weight] = []
+                self.weight_dict[weight].append(keyword)
+
+    def get_keywords_by_weight(self, weight):
+        return self.weight_dict.get(weight, [])
+
 # 初始化单例实例
 config_manager = ConfigManager()
 team_manager = TeamManager()
+theme_pack_manager = ThemePackManager()

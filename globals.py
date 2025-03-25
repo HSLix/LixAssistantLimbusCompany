@@ -28,6 +28,8 @@ VERSION = "V3.0.2"
 ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
 EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 
+# Discord
+DISCORD_LINK = "https://discord.gg/7UwBbjUGS3"
 
 MOUSE_BASEPOINT = [0,0]
 

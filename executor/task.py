@@ -6,12 +6,13 @@ from random import uniform
 from copy import deepcopy
 from os.path import join
 
-from .eye import get_eye
-from globals import MOUSE_HOME, sinner_place, sinner_name, CONFIG_DIR
+from executor.eye import get_eye
+from globals import sinner_place, sinner_name, CONFIG_DIR
 from .game_window import activateWindow
 from .custom_action_dict import CustomActionDict
 from .mouse_keyboard import get_mouse_keyboard
 from .logger import lalc_logger
+from json_manager import theme_pack_manager
 
     
 
@@ -199,10 +200,10 @@ class Task:
             click_center[0] += self.target_offset[0] + generate_random_num(-7, 7)
             click_center[1] += self.target_offset[1] + generate_random_num(-7, 7)
             self.mk.moveClick(click_center, click_count=self.action_count, rest_time=self.action_rest)
-            self.mk.moveClick(MOUSE_HOME, 0)
+            self.mk.mouseBackHome()
         else:
             # TODO 完善剩下的多点部分
-            self.mk.moveClick(MOUSE_HOME, 0)
+            self.mk.mouseBackHome()
 
 
     def swipe_action(self):
@@ -223,7 +224,7 @@ class Task:
         end[1] += self.end_offset[1] + generate_random_num(-7,7)
 
         self.mk.dragMouse([start[0], start[1], end[0], end[1]], self.duration)
-        self.mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
+        self.mk.mouseBackHome()
 
 
     def key_action(self):
@@ -373,7 +374,7 @@ def initCustomAction():
 
         mk.pressKey("enter")
 
-        mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
+        mk.mouseBackHome()
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
@@ -385,7 +386,7 @@ def initCustomAction():
         # 下面是结算
         mk.moveClick([1440, 900], rest_time=2)
         mk.moveClick([945, 720])
-        mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
+        mk.mouseBackHome()
 
     
     @custom_action_dict.register
@@ -540,7 +541,7 @@ def initCustomAction():
 
         for sinner in members:
             mk.moveClick(sinner_place[sinner])
-        mk.moveClick([MOUSE_HOME[0], MOUSE_HOME[1]])
+        mk.mouseBackHome()
         mk.pressKey("enter")
         
 
@@ -704,13 +705,18 @@ def initCustomAction():
                 continue
             mk.moveClick(place, rest_time=1.5)
             eye.captureScreenShot()
-            for gift in target_pic:
-                if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                    mk.moveClick([945, 660], rest_time=2)
-                    # mk.pressKey("enter", rest_time=1)
-                    purchased_count += 1
-                    break
+            if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
+                for gift in target_pic:
+                    if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                        mk.moveClick([945, 660], rest_time=2)
+                        # mk.pressKey("enter", rest_time=1)
+                        purchased_count += 1
+                        break
             mk.pressKey("enter", rest_time=1)
+            eye.captureScreenShot()
+            if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+                lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
+                return
 
         eye.captureScreenShot()
         if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
@@ -723,14 +729,18 @@ def initCustomAction():
                 continue
             mk.moveClick(place, rest_time=1.5)
             eye.captureScreenShot()
-            for gift in target_pic:
-                if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                    mk.moveClick([945, 660], rest_time=2)
-                    mk.pressKey("enter", rest_time=1)
-                    purchased_count += 1
-                    break
+            if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
+                for gift in target_pic:
+                    if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                        mk.moveClick([945, 660], rest_time=2)
+                        # mk.pressKey("enter", rest_time=1)
+                        purchased_count += 1
+                        break
             mk.pressKey("enter", rest_time=1)
-
+            eye.captureScreenShot()
+            if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+                lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
+                return
 
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
@@ -771,9 +781,9 @@ def initCustomAction():
     @custom_action_dict.register
     def enhance_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
-        # if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-        #     lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
-        #     return
+        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+            lalc_logger.log_task("DEBUG", "enhance_wanted_ego_gift", "FAILED", "Not Enough Cost")
+            return
         mk.moveClick([215,540], rest_time=1)
 
         team_index = get_team_by_index(kwargs.get("executed_time"))
@@ -836,7 +846,47 @@ def initCustomAction():
             mk.moveClick([1280, 460], rest_time=2)
             mk.moveClick([1415, 860], rest_time=2)
 
+    @custom_action_dict.register
+    def select_theme_pack(**kwargs):
+        eye.captureScreenShot()
+        eye.screenshotOcr(recognize_area=[210, 580, 1200, 80])
+        
+        simple_keyword = theme_pack_manager.get_keywords_by_weight(1)
+        hard_keyword = theme_pack_manager.get_keywords_by_weight(100)
+
+        if find_choose_simple_theme_pack(simple_keyword):
+            sleep(4)
+            return
+        
+        if find_hard_theme_pack(hard_keyword):
+            mk.moveClick([1370, 100])
+            sleep(4)
+
+        eye.screenshotOcr(recognize_area=[210, 580, 1200, 80])
+        if find_choose_simple_theme_pack(simple_keyword):
+            sleep(4)
+            return
+
+        
+
     
+    def find_choose_simple_theme_pack(simple_keyword:list):
+        for keyword in simple_keyword:
+            center = eye.queryOcrDict(keyword)
+            if center != None:
+                mk.dragMouse([center[0], center[1], center[0], center[1]+400])
+                return True
+            
+        return False
+
+    def find_hard_theme_pack(hard_keyword:list):
+        for keyword in hard_keyword:
+            center = eye.queryOcrDict(keyword)
+            if center != None:
+                mk.dragMouse([center[0], center[1], center[0], center[1]+400])
+                return True
+            
+        return False
 
 
     

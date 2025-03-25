@@ -6,18 +6,52 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: 软件包版本\n"
+"Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-03-19 22:49+0800\n"
+"POT-Creation-Date: 2025-03-23 11:00+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
-"Last-Translator: 全名 <EMAIL@ADDRESS>\n"
-"Language-Team: 语言 <LL@li.org>\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
 "Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: graphical_user_interface.py:93
+#: graphical_user_interface.py:110 graphical_user_interface.py:117
+msgid "Update Check Successful"
+msgstr "更新检查成功"
+
+#: graphical_user_interface.py:111
+#, python-brace-format
+msgid ""
+"You are using the latest version.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"当前版本就是最新版本。\n"
+"当前版本: {0}，GitHub 版本: {1}"
+
+#: graphical_user_interface.py:118
+#, python-brace-format
+msgid ""
+"Your version is outdated. Please update.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"当前版本已过时，请及时更新。\n"
+"当前版本: {0}，GitHub 版本: {1}"
+
+#: graphical_user_interface.py:124
+msgid "Update Check Failed"
+msgstr "更新检查失败"
+
+#: graphical_user_interface.py:125
+msgid ""
+"Failed to check for updates. \n"
+"Please check your internet connection."
+msgstr ""
+"检查更新失败。\n"
+"请检查你的网络连接。"
+
+#: graphical_user_interface.py:140
 msgid ""
 "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
@@ -25,7 +59,7 @@ msgstr ""
 "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
 
-#: graphical_user_interface.py:94
+#: graphical_user_interface.py:141
 msgid ""
 "这是对陆爻齐莫大的肯定，谢谢啦！\n"
 "\n"
@@ -33,7 +67,7 @@ msgstr ""
 "这是对陆爻齐莫大的肯定，谢谢啦！\n"
 "\n"
 
-#: graphical_user_interface.py:95
+#: graphical_user_interface.py:142
 msgid ""
 "PS：如果能打赏一点点就更好了哈哈\n"
 "\n"
@@ -41,7 +75,7 @@ msgstr ""
 "PS：如果能打赏一点点就更好了哈哈\n"
 "\n"
 
-#: graphical_user_interface.py:96
+#: graphical_user_interface.py:143
 msgid ""
 "(不打赏也没关系，但一定要过好自己的生活哦)\n"
 "\n"
@@ -49,28 +83,28 @@ msgstr ""
 "(不打赏也没关系，但一定要过好自己的生活哦)\n"
 "\n"
 
-#: graphical_user_interface.py:97
+#: graphical_user_interface.py:144
 msgid "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
 msgstr "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
 
-#: graphical_user_interface.py:103
+#: graphical_user_interface.py:150
 msgid "还有<nobr><b>6</b></nobr>秒。"
 msgstr "还有<nobr><b>6</b></nobr>秒。"
 
-#: graphical_user_interface.py:109
+#: graphical_user_interface.py:156
 msgid "现在就去"
 msgstr "现在就去"
 
-#: graphical_user_interface.py:110 graphical_user_interface.py:419
+#: graphical_user_interface.py:157 graphical_user_interface.py:466
 msgid "下次一定"
 msgstr "下次一定"
 
-#: graphical_user_interface.py:143 graphical_user_interface.py:153
+#: graphical_user_interface.py:190 graphical_user_interface.py:200
 #, python-format
 msgid "还有<nobr><b>%d</b></nobr>秒。"
 msgstr "还有<nobr><b>%d</b></nobr>秒。"
 
-#: graphical_user_interface.py:152
+#: graphical_user_interface.py:199
 msgid ""
 "谢谢 !祝你生活愉快！✨\n"
 "\n"
@@ -84,84 +118,84 @@ msgstr ""
 "\n"
 "谢谢你愿意多了解一点 LALC"
 
-#: graphical_user_interface.py:164
+#: graphical_user_interface.py:211
 msgid "也祝你生活愉快！(^_−)☆"
 msgstr "也祝你生活愉快！(^_−)☆"
 
-#: graphical_user_interface.py:183
+#: graphical_user_interface.py:230
 msgid "NotRecommandAction"
 msgstr "不推荐的操作"
 
-#: graphical_user_interface.py:184
+#: graphical_user_interface.py:231
 msgid "You had better keep one team enabled at least."
 msgstr "你最好至少启用一个队伍。"
 
-#: graphical_user_interface.py:193
+#: graphical_user_interface.py:240
 msgid "TaskFinished"
 msgstr "任务完成"
 
-#: graphical_user_interface.py:194
+#: graphical_user_interface.py:241
 #, python-brace-format
 msgid "{0} have finished {1} time(s)"
 msgstr "{0} 已完成 {1} 次"
 
-#: graphical_user_interface.py:234
+#: graphical_user_interface.py:281
 msgid "所有任务顺利执行"
 msgstr "所有任务顺利执行"
 
-#: graphical_user_interface.py:238
+#: graphical_user_interface.py:285
 msgid "任务执行已暂停"
 msgstr "任务执行已暂停"
 
-#: graphical_user_interface.py:241
+#: graphical_user_interface.py:288
 msgid "任务执行已继续"
 msgstr "任务执行已继续"
 
-#: graphical_user_interface.py:306
+#: graphical_user_interface.py:353
 msgid "Home"
 msgstr "主页"
 
-#: graphical_user_interface.py:307
+#: graphical_user_interface.py:354
 msgid "Working"
 msgstr "运行界面"
 
-#: graphical_user_interface.py:311
+#: graphical_user_interface.py:358
 msgid "Teams"
 msgstr "队伍管理界面"
 
-#: graphical_user_interface.py:312
+#: graphical_user_interface.py:359
 msgid "Team1"
 msgstr "队伍1"
 
-#: graphical_user_interface.py:313
+#: graphical_user_interface.py:360
 msgid "Team2"
 msgstr "队伍2"
 
-#: graphical_user_interface.py:314
+#: graphical_user_interface.py:361
 msgid "Team3"
 msgstr "队伍3"
 
-#: graphical_user_interface.py:315
+#: graphical_user_interface.py:362
 msgid "Team4"
 msgstr "队伍4"
 
-#: graphical_user_interface.py:316
+#: graphical_user_interface.py:363
 msgid "Team5"
 msgstr "队伍5"
 
-#: graphical_user_interface.py:322 graphical_user_interface.py:325
+#: graphical_user_interface.py:369 graphical_user_interface.py:372
 msgid "Support"
 msgstr "支持"
 
-#: graphical_user_interface.py:338
+#: graphical_user_interface.py:385
 msgid "Settings"
 msgstr "设置"
 
-#: graphical_user_interface.py:414
+#: graphical_user_interface.py:461
 msgid "支持作者🥰"
 msgstr "支持作者🥰"
 
-#: graphical_user_interface.py:415
+#: graphical_user_interface.py:462
 msgid ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
@@ -169,11 +203,11 @@ msgstr ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
 
-#: graphical_user_interface.py:418
+#: graphical_user_interface.py:465
 msgid "来啦老弟"
 msgstr "来啦老弟"
 
-#: graphical_user_interface.py:440
+#: graphical_user_interface.py:487
 #, python-format
 msgid ""
 "捕获到未知，是否打开日志查看？\n"
@@ -214,7 +248,7 @@ msgstr "镜牢"
 msgid "Reward"
 msgstr "获取奖励"
 
-#: gui/full_auto_page.py:137 gui/semi_auto_page.py:150
+#: gui/full_auto_page.py:137 gui/semi_auto_page.py:151
 msgid "Start"
 msgstr "开始"
 
@@ -235,31 +269,35 @@ msgstr "全自动"
 msgid "SemiAuto"
 msgstr "半自动"
 
-#: gui/semi_auto_page.py:92
+#: gui/semi_auto_page.py:79
+msgid "Full(12/12) Team to Battle"
+msgstr "满员（12/12）队伍出战"
+
+#: gui/semi_auto_page.py:93
 msgid "Select \"Ego\" Choice"
 msgstr "选择“Ego”选项"
 
-#: gui/semi_auto_page.py:136
+#: gui/semi_auto_page.py:137
 msgid "Auto P Battle"
 msgstr "自动 P 过战斗"
 
-#: gui/semi_auto_page.py:138
+#: gui/semi_auto_page.py:139
 msgid "Skip Event"
 msgstr "跳过事件"
 
-#: gui/semi_auto_page.py:140
+#: gui/semi_auto_page.py:141
 msgid "Auto Click Next Stage"
 msgstr "自动点击下一关"
 
-#: gui/semi_auto_page.py:142
+#: gui/semi_auto_page.py:143
 msgid "Auto Select Reward Card"
 msgstr "自动选择奖励卡"
 
-#: gui/semi_auto_page.py:144
+#: gui/semi_auto_page.py:145
 msgid "Auto Skip EgoGiftGet"
 msgstr "自动跳过 Ego 礼物获取"
 
-#: gui/semi_auto_page.py:146
+#: gui/semi_auto_page.py:147
 msgid "Auto Enter Mirror(Begin)"
 msgstr "自动进入镜牢（开始）"
 

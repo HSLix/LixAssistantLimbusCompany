@@ -3,7 +3,7 @@ from pynput import mouse, keyboard
 from pynput.mouse import Button
 from time import sleep
 
-from .game_window import initMouseBasePoint
+from .game_window import initMouseBasePoint, initMouseHomePoint
 from globals import ignoreScaleAndDpi
 
 
@@ -21,7 +21,12 @@ class MOUSE_KEYBOARD:
     def __init__(self):
         self.kb = keyboard.Controller()
         self.ms = mouse.Controller()
+        self.mouse_basepoint = [0, 0]
+        self.mouse_homepoint = initMouseHomePoint()
         # ignoreScaleAndDpi()
+
+    def mouseBackHome(self):
+        self.ms.position = (self.mouse_homepoint[0], self.mouse_homepoint[1])
         
     def updateMouseBasepoint(self):
         self.mouse_basepoint = initMouseBasePoint()

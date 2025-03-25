@@ -10,7 +10,7 @@ from enum import Enum
 import os
 
 from executor import screen_record_thread
-from config_manager import config_manager  
+from json_manager import config_manager  
 from globals import LOG_DIR, VIDEO_DIR, VERSION
 from i18n import _
 

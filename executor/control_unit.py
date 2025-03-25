@@ -1,5 +1,5 @@
 # coding: utf-8
-import threading
+from threading import Condition
 from collections import deque
 from time import sleep, time
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -45,7 +45,7 @@ class ControlUnit(QThread):
             return
         super().__init__(parent)
         self.task_dict = task_dict  # 初始化任务字典
-        self.condition = threading.Condition()  # 线程条件变量
+        self.condition = Condition()  # 线程条件变量
         self.is_paused = False  # 是否暂停
         self.is_stoped = False # 是否停止
         self.is_running = False  # 是否运行
@@ -179,7 +179,7 @@ class ControlUnit(QThread):
                 task.enabled = enable
 
     def init_target_task_count(self):
-        """预处理函数，根据task_params修改task_dict里相关任务的enable设置"""
+        """预处理函数，根据task_params修改task_dict里相关任务的count设置"""
         self.target_task_count = {}
         for task_name, target_count in self.task_params.items():
             if (type(target_count) != int):
@@ -204,6 +204,13 @@ class ControlUnit(QThread):
             'SUCCESS',
             "cu start working with task[{0}]".format(self.start_task_name)
         )
+        if self.mode == "FullAuto":
+            # 获取当前队伍和下一个队伍的信息
+            current_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count)
+            next_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count + 1)
+            self.team_info_updated.emit(current_team_name, next_team_name)
+        elif self.mode == "SemiAuto":
+            self.team_info_updated.emit("-", "-")
         while self.is_running:
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
@@ -261,11 +268,13 @@ class ControlUnit(QThread):
                         f"For {self.task_executed_count} Times"
                     )
 
-                if self.mode == "FullAuto":
-                    # 获取当前队伍和下一个队伍的信息
-                    current_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count)
-                    next_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count + 1)
-                    self.team_info_updated.emit(current_team_name, next_team_name)
+                    if self.mode == "FullAuto":
+                        # 获取当前队伍和下一个队伍的信息
+                        current_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count)
+                        next_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count + 1)
+                        self.team_info_updated.emit(current_team_name, next_team_name)
+                    elif self.mode == "SemiAuto":
+                        self.team_info_updated.emit("-", "-")
 
                 if self.cur_task.name == "End":
                     self.complete()

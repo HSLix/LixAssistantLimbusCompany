@@ -122,10 +122,23 @@ Development contributions welcome! Start with [this guide](https://github.com/HS
 ### General Thanks
 All direct/indirect contributors, tutorial creators, and open-source code sharers
 
+### The main Repository used in this project
+| Repository Name | Content |
+| - | - |
+| [opencv-python](https://github.com/opencv/opencv-python) | Open source image-related algorithms repository, although LALC only uses a little bit of this functionality, this little bit of functionality forms the basis of the whole project - image recognition |
+| [pynput](https://github.com/moses-palmer/pynput) | Open source mouse and keyboard related repository, simulates mouse clicks and keyboard input |
+| [python-mss](https://github.com/BoboTiG/python-mss) | Open source screenshot repository, screenshot good and fast |
+| [pyqt](https://pypi.org/project/PyQt5/) | Classic cross-platform GUI repository, old school, needless to say, if the size can be smaller, it would be better | [python-mss](https://pypi.org/project/PyQt5/) | [python-mss](https://pypi.org/project/PyQt5/) | Open source screenshot repository, good and fast screenshot
+| [qt-fluent-widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) | qt's third-party components, those who have used it say it looks good, LALC uses the free components, also follows the GPL | [pyinstaller](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) | [pyqt](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) | [pyqt](https://github.com/zhiyiYo/PyQt-Fluent-Widgets)
+| [pyinstaller](https://pypi.org/project/pyinstaller/) | Classic packaging repository, easy to use even though the packages are big |
+| ...... | ...... | ......
+
+Translated with DeepL.com (free version)
+
 ### Sponsors
-| Sponsor | Date | Message | Amount |
-| - | - | - | - |
-| **锋** | 2024-10-12 | None | 30￥ |
+| Sponsor | Date | Message |
+| - | - | - |
+| **锋** | 2024-10-12 | None |
 
 ### Contributors:
 <!-- readme: collaborators,contributors -start -->

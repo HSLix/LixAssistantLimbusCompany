@@ -92,7 +92,6 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 ---
 
 ## 声明
-Disclaimer
 
 - 本软件开源、免费，仅供学习交流使用。
 
@@ -125,13 +124,11 @@ Disclaimer
 ---
 
 ## 加入开发
-Develop
 
 LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75) 开始，也可参考这个专门面向开发者的 [WikiPage](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)。
 
 ---
 ## 致谢
-Thanks
 
 ### 统一致谢
 直接或间接参与到本软件开发的所有人员
@@ -140,13 +137,24 @@ Thanks
 
 还有开源自己代码的巨佬们！
 
+### 本项目主要使用的库
+| 库名 | 内容 |
+| - | - |
+| [opencv-python](https://github.com/opencv/opencv-python) | 开源图像相关算法库，尽管 LALC 只是使用其中一点功能，但这一点功能构成了整个项目的基础——识图 |
+| [pynput](https://github.com/moses-palmer/pynput) | 开源的鼠标和键盘相关库，模拟鼠标点击和键盘输入 |
+| [python-mss](https://github.com/BoboTiG/python-mss) | 开源的截屏库，截图又好又快 |
+| [pyqt](https://pypi.org/project/PyQt5/) | 经典的跨平台 GUI 库，老牌劲旅，不用多说，要是体积能小点就更好了 |
+| [qt-fluent-widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) | qt的第三方组件，用过的人都说好看，LALC 使用其中免费的组件，也遵循了 GPL 协议发布 |
+| [pyinstaller](https://pypi.org/project/pyinstaller/) | 经典的打包库，尽管打出的包很大，但使用方便 |
+| …… | …… |
+
+
 ### 打赏者
-| 打赏者 | 打赏时间 | 留言 | 打赏金额
-| - | - | - | - |
-| **锋 | 2024-10-12 | 无 | 30￥
+| 打赏者 | 打赏时间 | 留言 | 
+| - | - | - |
+| **锋 | 2024-10-12 | 无 | 
 
 ### 贡献者
-Contributors:
 
 <!-- readme: collaborators,contributors -start -->
 <table>
@@ -199,7 +207,6 @@ Contributors:
 ---
 
 ## 友链
-Other Assistants
 
 除我以外，还有其它开发者也致力于 limbus 脚本的开发，可以的话，也希望大家多多支持！！
 
@@ -219,7 +226,6 @@ Other Assistants
 
 ---
 ## 打赏
-Sponsors
 
 - 如果您有打赏的想法，请尽量看完下面的说明
 

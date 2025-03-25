@@ -52,8 +52,8 @@ class ScreenRecorderThread(QThread):
             now = datetime.now()
             # output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.avi')  # 使用 .avi 格式
             output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.mp4')  # 使用 .mp4 格式
-            self.out = cv2.VideoWriter(output_file, fourcc, 8, (w, h))
-            # self.out.set(cv2.VIDEOWRITER_PROP_QUALITY, 10)
+            self.out = cv2.VideoWriter(output_file, fourcc, 6, (w, h))
+            # self.out.set(cv2.CAP_PROP_BITRATE, 10000)
             
 
             # 开始录制循环
@@ -64,24 +64,15 @@ class ScreenRecorderThread(QThread):
                 frame = np.array(sct_img)
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
 
-                # 添加水印
                 text = "LixAssistantLimbusCompany"
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 font_scale = 4
-                font_color = (128, 128, 128)
-                thickness = 15
+                font_color = (128, 128, 128)  # 水印颜色
+                thickness = 15  # 水印厚度
                 text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-                text_x = (frame.shape[1] - text_size[0]) // 2
-                text_y = (frame.shape[0] + text_size[1]) // 2
-                overlay = frame.copy()
-                cv2.putText(overlay, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
-
-                # 确保 overlay 和 frame 的大小相等
-                if overlay.shape != frame.shape:
-                    overlay = cv2.resize(overlay, (frame.shape[1], frame.shape[0]))
-
-                alpha = 0.2
-                frame = cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0)
+                text_x = (frame.shape[1] - text_size[0]) // 2  # 水平居中
+                text_y = (frame.shape[0] + text_size[1]) // 2  # 垂直居中
+                cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
 
                 # 添加时间水印
                 current_time = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
