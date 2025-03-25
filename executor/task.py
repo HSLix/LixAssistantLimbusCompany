@@ -739,9 +739,6 @@ def initCustomAction():
             if goods_places.index(place) < purchased_count:
                 continue
             mk.moveClick(place, rest_time=1.5)
-            if goods_places.index(place) < purchased_count:
-                continue
-            mk.moveClick(place, rest_time=1.5)
             eye.captureScreenShot()
             if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
                 for gift in target_pic:
