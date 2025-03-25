@@ -46,8 +46,6 @@ class ScreenRecorderThread(QThread):
             # 定义视频编码器和输出文件
             # fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 MPEG 编码器
-            # fourcc = cv2.VideoWriter_fourcc(*'XVID')  # 使用 XVID 编码器
-            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # 使用 MPEG 编码器
             if not os.path.exists(self.output_path):
                 os.makedirs(self.output_path)
             # 按指定格式命名视频

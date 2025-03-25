@@ -65,8 +65,6 @@ class EYE:
         if (len(recognize_area) < 4):
             lalc_logger.log_task("ERROR", "cropImg", "FAILED", 
                                 f"裁剪区域设置不足四个值: {recognize_area}")
-            lalc_logger.log_task("ERROR", "cropImg", "FAILED", 
-                                f"裁剪区域设置不足四个值: {recognize_area}")
             raise ValueError("限定区域的设置不足四个")
         
         left = recognize_area[0]
@@ -87,17 +85,12 @@ class EYE:
         if width <= 0 or height <= 0:
             lalc_logger.log_task("ERROR", "cropImg", "FAILED", 
                                 f"无效的裁剪区域: 原图尺寸 {img_width}x{img_height}, 裁剪区域 {left}, {top}, {width}, {height}")
-            lalc_logger.log_task("ERROR", "cropImg", "FAILED", 
-                                f"无效的裁剪区域: 原图尺寸 {img_width}x{img_height}, 裁剪区域 {left}, {top}, {width}, {height}")
             raise ValueError("无效的裁剪区域。")
         
         # 记录裁剪区域信息
         lalc_logger.log_task("DEBUG", "cropImg", "SUCCESS", 
                             f"裁剪区域: 原图尺寸 {img_width}x{img_height}, 裁剪区域 {left}, {top}, {width}, {height}")
         
-        # 记录裁剪区域信息
-        lalc_logger.log_task("DEBUG", "cropImg", "SUCCESS", 
-                            f"裁剪区域: 原图尺寸 {img_width}x{img_height}, 裁剪区域 {left}, {top}, {width}, {height}")
         
         screenshot_img = screenshot_img[top:bottom, left:right]
         return screenshot_img
@@ -116,14 +109,11 @@ class EYE:
         
         
         template = self.getScreenShot()
-        template = self.getScreenShot()
 
         if recognize_area != [0, 0, 0, 0]:
             template = EYE.cropImg(template, recognize_area)
-            template = EYE.cropImg(template, recognize_area)
 
         
-        template = EYE.getGreyNormalizedPic(image=template)
         template = EYE.getGreyNormalizedPic(image=template)
         if template is None:
             return (None, None)
@@ -134,8 +124,6 @@ class EYE:
         if h_template < h_target or w_template < w_target:
             lalc_logger.log_task("ERROR", "templateMatch", "FAILED", 
                             f"模板匹配失败: 裁剪后的区域尺寸小于目标图像，无法匹配。目标图片：{pic_path}; 截图模板尺寸: {w_template}x{h_template}, 目标图片尺寸: {w_target}x{h_target}, 裁剪区域: {recognize_area}")
-            lalc_logger.log_task("ERROR", "templateMatch", "FAILED", 
-                            f"模板匹配失败: 裁剪后的区域尺寸小于目标图像，无法匹配。目标图片：{pic_path}; 截图模板尺寸: {w_template}x{h_template}, 目标图片尺寸: {w_target}x{h_target}, 裁剪区域: {recognize_area}")
             raise ValueError("裁剪后的区域尺寸小于目标图像，无法匹配。")
 
 
@@ -144,15 +132,10 @@ class EYE:
         _, max_val, _, max_loc = minMaxLoc(match)
         
         result = (None, None)
-        result = (None, None)
         if max_val >= threshold:
             x_center = max_loc[0] + w_target // 2 + recognize_area[0]
             y_center = max_loc[1] + h_target // 2 + recognize_area[1]
             center = [x_center, y_center]
-            result = (center, max_val)
-            lalc_logger.log_task("DEBUG", "templateMatch", "SUCCESS", 
-                            f"模板匹配成功: 目标图片: {pic_path}, 匹配中心坐标: {center}, 匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
-            # 在模板图像绘制红框
             result = (center, max_val)
             lalc_logger.log_task("DEBUG", "templateMatch", "SUCCESS", 
                             f"模板匹配成功: 目标图片: {pic_path}, 匹配中心坐标: {center}, 匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
@@ -178,17 +161,6 @@ class EYE:
         
         return result
 
-            lalc_logger.log_task("DEBUG", "templateMatch", "FAILED", 
-                            f"模板匹配失败: 目标图片 {pic_path}, 当前匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
-
-        if is_show_result:
-            # 显示图像
-            imshow("Target Image", target_color)
-            imshow("Matched Area (Red Box)", template_color)
-            waitKey(0)
-            destroyAllWindows()
-        
-        return result
 
         
     @staticmethod
@@ -199,7 +171,6 @@ class EYE:
         """
         # 检查图片是否为 None
         if pic1 is None or pic2 is None:
-            raise ValueError("isPicDif:pic1 or pic2 is None")
             raise ValueError("isPicDif:pic1 or pic2 is None")
 
         # 确保两张图片的尺寸和通道数相等
@@ -230,20 +201,12 @@ class EYE:
 
 
     def waitFreeze(self, freeze_time:int = 2):
-        # if (freeze_time == 0):
-        #     return
-        # if (freeze_time == 0):
-        #     return
         self.captureScreenShot()
-        old_screenshot_img = self.getScreenShot()
-        old_screenshot_img = EYE.getGreyNormalizedPic(old_screenshot_img)
         old_screenshot_img = self.getScreenShot()
         old_screenshot_img = EYE.getGreyNormalizedPic(old_screenshot_img)
         while True:
             sleep(freeze_time)
             self.captureScreenShot()
-            new_screenshot_img = self.getScreenShot()
-            new_screenshot_img = EYE.getGreyNormalizedPic(new_screenshot_img)
             new_screenshot_img = self.getScreenShot()
             new_screenshot_img = EYE.getGreyNormalizedPic(new_screenshot_img)
             if (not EYE.isPicDif(old_screenshot_img, new_screenshot_img)):
@@ -262,17 +225,16 @@ class EYE:
         
         template = self.getScreenShot()
         template = EYE.getGreyNormalizedPic(image=template)
-        template = self.getScreenShot()
-        template = EYE.getGreyNormalizedPic(image=template)
+
         
         # 裁剪到指定区域
         if recognize_area != [0, 0, 0, 0]:
             template = EYE.cropImg(template, recognize_area)
-            template = EYE.cropImg(template, recognize_area)
+            
         
         if template is None:
             raise ValueError("templateMultiMatch teamplate is None")
-            raise ValueError("templateMultiMatch teamplate is None")
+            
         
         h_target, w_target = target.shape[:2]
         h_template, w_template = template.shape[:2]
@@ -281,7 +243,6 @@ class EYE:
 
             raise ValueError("裁剪后的区域尺寸小于目标图像，无法匹配。")
 
-            raise ValueError("裁剪后的区域尺寸小于目标图像，无法匹配。")
         
         # 执行模板匹配
         match = matchTemplate(template, target, TM_CCOEFF_NORMED)
@@ -355,7 +316,6 @@ class EYE:
         return global_points
 
 
-    def templateMactchExist(self, pic_path, threshold:int=0.8, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
     def templateMactchExist(self, pic_path, threshold:int=0.8, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
         center, score = self.templateMatch(pic_path, threshold, recognize_area, is_show_result)
         if (score == None):

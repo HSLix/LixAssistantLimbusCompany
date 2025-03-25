@@ -289,17 +289,7 @@ class Task:
                     self.name,
                     f"DirectHit Not Recognize"
                     )
-            lalc_logger.log_task(
-                    "INFO",
-                    self.name,
-                    f"DirectHit Not Recognize"
-                    )
             return
-        lalc_logger.log_task(
-                    "INFO",
-                    self.name,
-                    f"Execute Recognize"
-                    )
         lalc_logger.log_task(
                     "INFO",
                     self.name,
@@ -322,13 +312,6 @@ class Task:
         self.eye.waitFreeze(self.pre_wait_freezes)
         sleep(self.pre_delay)
         self.mk.updateMouseBasepoint()
-        lalc_logger.log_task(
-            "INFO",
-            self.name,
-            f"Action: {self.action}"
-            )
-        print(f"[{self.name}] 执行动作: {self.action}")
-        if (self.action != "DoNothing"):
         lalc_logger.log_task(
             "INFO",
             self.name,
@@ -378,24 +361,18 @@ def initCustomAction():
         team_index = get_team_by_index(kwargs.get("executed_time"))
         if (team_index == 1):
             mk.moveClick([150, 555])
-            mk.moveClick([150, 555])
         elif (team_index == 2):
             mk.moveClick([150, 600])
-            mk.moveClick([150, 600])
         elif (team_index == 3):
-            mk.moveClick([150, 650])
             mk.moveClick([150, 650])
         elif (team_index == 4):
             mk.moveClick([150, 700])
         elif (team_index == 5):
             mk.moveClick([150, 725])
-            mk.moveClick([150, 700])
         elif (team_index == 5):
             mk.moveClick([150, 725])
         else:
             raise ValueError("Over Index in choose_team")
-        sleep(0.2)
-
         sleep(0.2)
 
         mk.pressKey("enter")
@@ -404,11 +381,6 @@ def initCustomAction():
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
-        mk.moveClick([1040, 400])
-        mk.moveClick([810, 665])
-        mk.moveClick([585, 665])
-        mk.moveClick([1280, 400])
-        mk.moveClick([350, 400])
         mk.moveClick([1040, 400])
         mk.moveClick([810, 665])
         mk.moveClick([585, 665])
@@ -428,24 +400,17 @@ def initCustomAction():
 
         if (team_style == "Burn"):
             mk.moveClick([260, 360])
-            mk.moveClick([260, 360])
         elif (team_style == "Bleed"):
-            mk.moveClick([450, 360])
             mk.moveClick([450, 360])
         elif (team_style == "Tremor"):
             mk.moveClick([650, 360])
-            mk.moveClick([650, 360])
         elif (team_style == "Rupture"):
-            mk.moveClick([830, 360])
             mk.moveClick([830, 360])
         elif (team_style == "Sinking"):
             mk.moveClick([260, 630])
-            mk.moveClick([260, 630])
         elif (team_style == "Poise"):
             mk.moveClick([450, 630])
-            mk.moveClick([450, 630])
         elif (team_style == "Charge"):
-            mk.moveClick([650, 630])
             mk.moveClick([650, 630])
         else:
             raise ValueError("Over Team Style in choose_start_ego_gift")
@@ -453,10 +418,7 @@ def initCustomAction():
         mk.moveClick([1045, 380], rest_time=0.5)
         mk.moveClick([1045, 510], rest_time=0.5)
         mk.moveClick([1045, 650], rest_time=0.5)
-        mk.moveClick([1045, 380], rest_time=0.5)
-        mk.moveClick([1045, 510], rest_time=0.5)
-        mk.moveClick([1045, 650], rest_time=0.5)
-        mk.pressKey("enter", press_count=3, rest_time=1)
+        mk.pressKey("enter", press_count=4, rest_time=1)
 
 
         
@@ -547,10 +509,9 @@ def initCustomAction():
         num_enabled_teams = len(enabled_teams)
         
         # 如果没有任何有效队伍，返回 -1, 不应存在
-        # 如果没有任何有效队伍，返回 -1, 不应存在
         if num_enabled_teams == 0:
             raise IndexError("No Enabled Team")
-            raise IndexError("No Enabled Team")
+
         
         # 计算传入数字对应的队伍索引
         team_index = (index + offset) % num_enabled_teams
@@ -572,7 +533,6 @@ def initCustomAction():
             return
         
         # clear selection
-        mk.moveClick([1440, 650], rest_time=1)
         mk.moveClick([1440, 650], rest_time=1)
         eye.captureScreenShot()
         center, score = eye.templateMatch("reset_deployment_order.png")
@@ -681,7 +641,6 @@ def initCustomAction():
     @custom_action_dict.register
     def sell_unwanted_ego_gift(**kwargs):
         mk.moveClick([505, 540], rest_time=1)
-        mk.moveClick([505, 540], rest_time=1)
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
 
@@ -717,16 +676,6 @@ def initCustomAction():
                 gift_places.append([x + j*x_step, y + i*y_step])
 
 
-        while True:
-            search_place_sell_gift(gift_places, target_pic)
-            eye.captureScreenShot()
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
-                break
-            if (len(gift_places) != 10):
-                gift_places = gift_places[5:]
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
-                mk.scroll([0,-1], 5, rest_time=0.2)
-            else:
 
         while True:
             search_place_sell_gift(gift_places, target_pic)
@@ -754,14 +703,12 @@ def initCustomAction():
     def purchase_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
         if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
 
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
 
-        goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550], [1365, 550]]
         goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550], [1365, 550]]
 
         target_pic = []
@@ -788,8 +735,6 @@ def initCustomAction():
 
         purchased_count = 0
 
-        purchased_count = 0
-
         for place in goods_places:
             if goods_places.index(place) < purchased_count:
                 continue
@@ -813,10 +758,9 @@ def initCustomAction():
 
         eye.captureScreenShot()
         if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
-        mk.moveClick([1260, 200], rest_time=3)
+
         mk.moveClick([1260, 200], rest_time=3)
 
         for place in goods_places:
@@ -917,8 +861,6 @@ def initCustomAction():
         
         while True:
             search_place_enhance_ego(gift_places, target_pic)
-        while True:
-            search_place_enhance_ego(gift_places, target_pic)
             eye.captureScreenShot()
             if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
                 break
@@ -945,10 +887,8 @@ def initCustomAction():
     def heal_all_sinner(**kwargs):
         eye.captureScreenShot()
         if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
             lalc_logger.log_task("DEBUG", "heal_all_sinner", "FAILED", "Not Enough Cost")
             return
-        mk.moveClick([255, 640], rest_time=2)
         mk.moveClick([255, 640], rest_time=2)
         eye.captureScreenShot()
         if eye.templateMactchExist("heal_sinners.png", recognize_area=[125, 60, 325, 110]):

@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt,  QUrl, QTimer
 from PyQt5.QtCore import Qt,  QUrl, QTimer
 from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
-from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
+from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon)
 from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
                             InfoBarPosition, isDarkTheme, setTheme, Theme, NavigationAvatarWidget, Dialog, BodyLabel)
@@ -369,7 +369,6 @@ class Window(FramelessWindow):
         """
         # 创建新消息条
         self.info_bar = InfoBar(
-        self.info_bar = InfoBar(
             icon={
                 'info': InfoBarIcon.INFORMATION,
                 'success': InfoBarIcon.SUCCESS,
@@ -381,7 +380,6 @@ class Window(FramelessWindow):
             orient=Qt.Horizontal,
             isClosable=False if msg_type != "error" else True,
             position=InfoBarPosition.TOP,
-            duration=5000 if msg_type != 'error' else -1,
             duration=5000 if msg_type != 'error' else -1,
             parent=self
         )
