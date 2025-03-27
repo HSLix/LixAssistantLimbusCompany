@@ -141,9 +141,16 @@ class Task:
         """初始化识别算法相关参数"""
         # 模板匹配参数
         if self.recognition == "TemplateMatch":
-            self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  # 全屏需后续处理
+            self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  
             self.template: str = config.get('template', '')
             self.threshold: Union[float, List[float]] = config.get('threshold', 0.8)
+        # 颜色匹配
+        elif self.recognition == "ColorMatch":
+            self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  
+            self.color_point: List[int] = config.get('color_point')
+            self.lower : int = config.get("lower", 0)
+            self.upper : int = config.get("upper", 255)
+
 
 
     def _init_action_params(self, config: dict):
@@ -266,6 +273,8 @@ class Task:
         """根据识别类型初始化识别函数"""
         if self.recognition == "TemplateMatch":
             return self.eye.templateMatch
+        elif self.recognition == "ColorMatch":
+            return self.eye.rgbDetection
         else:
             return lambda:(None, None)
 
@@ -293,13 +302,30 @@ class Task:
         lalc_logger.log_task(
                     "INFO",
                     self.name,
-                    f"Execute Recognize"
+                    f"Execute Recognize:[{self.recognition}]"
                     )
-        self.recognize_center, self.recognize_score = self.recognition_function(self.template, threshold=self.threshold, recognize_area=self.recognize_area)
-        if(self.recognize_center == None):
-            return
-        print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
-        
+        if self.recognition == "TemplateMatch":
+            self.recognize_center, self.recognize_score = self.recognition_function(self.template, threshold=self.threshold, recognize_area=self.recognize_area)
+            lalc_logger.log_task(
+                    "DEBUG",
+                    self.name,
+                    f"[{self.recognition}] FINISH, recognize_center:[{self.recognize_center}]; recognize_score:[{self.recognize_score}]"
+                    )
+            if(self.recognize_center == None):
+                return
+            print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
+        elif self.recognition == "ColorMatch":
+            self.recognize_score = self.recognition_function(coordinate=self.color_point, recognize_area=self.recognize_area)
+            lalc_logger.log_task(
+                    "DEBUG",
+                    self.name,
+                    f"[{self.recognition}] FINISH, recognize_score:[{self.recognize_score}]; lower:[{self.lower}]; upper:[{self.upper}]"
+                    )
+            if self.recognize_score < self.lower or self.recognize_score > self.upper:
+                self.recognize_score = -1
+                return
+        else:
+            raise ValueError("Unexpected recognition: {0}".format(self.recognition))
         
 
     def update_screenshot(self):
@@ -617,11 +643,9 @@ def initCustomAction():
     def search_place_sell_gift(gift_places:list, target_pic:list):
         for c in gift_places:
             while True:
-                mk.moveClick(c)
+                mk.moveClick(c, rest_time=0.2)
                 eye.captureScreenShot()
-
                 sellable = True
-
                 if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
                     sellable = True
                 else:
@@ -709,7 +733,7 @@ def initCustomAction():
         team_index = get_team_by_index(kwargs.get("executed_time"))
         team_style = get_style_by_team(team_index)
 
-        goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550], [1365, 550]]
+        goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550]]
 
         target_pic = []
 
@@ -730,63 +754,39 @@ def initCustomAction():
         else:
             raise ValueError("Unknown team style: %s" % (team_style))
         
-        
         target_pic.append("shop_purchase_keywordless.png")
 
         purchased_count = 0
 
-        for place in goods_places:
-            if goods_places.index(place) < purchased_count:
-                continue
-            mk.moveClick(place, rest_time=1.5)
-            if goods_places.index(place) < purchased_count:
-                continue
-            mk.moveClick(place, rest_time=1.5)
-            eye.captureScreenShot()
-            if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
-                for gift in target_pic:
-                    if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                        mk.moveClick([945, 660], rest_time=2)
-                        # mk.pressKey("enter", rest_time=1)
-                        purchased_count += 1
-                        break
-            mk.pressKey("enter", rest_time=1)
-            eye.captureScreenShot()
-            if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-                lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
-                return
-
-        eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-            lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
-            return
-
-        mk.moveClick([1260, 200], rest_time=3)
-
-        for place in goods_places:
-            if goods_places.index(place) < purchased_count:
-                continue
-            mk.moveClick(place, rest_time=1.5)
-            eye.captureScreenShot()
-            if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
-                for gift in target_pic:
-                    if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                        mk.moveClick([945, 660], rest_time=2)
-                        # mk.pressKey("enter", rest_time=1)
-                        purchased_count += 1
-                        break
-            mk.pressKey("enter", rest_time=1)
-            eye.captureScreenShot()
-            if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-                lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
-                return
+        while (True):
+            for place in goods_places:
+                if goods_places.index(place) < purchased_count:
+                    continue
+                mk.moveClick(place, rest_time=1)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
+                    for gift in target_pic:
+                        if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                            mk.moveClick([945, 660], rest_time=2)
+                            purchased_count += 1
+                            break
+                mk.pressKey("enter", rest_time=1)
+                eye.captureScreenShot()
+                if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+                    lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
+                    return
+            
+            eye.screenshotOcr(recognize_area=[660, 185, 170, 75])
+            rest_cost = eye.ocrGetFirstNum()
+            if (purchased_count > 2 or (rest_cost < 800)):
+                break
+            mk.moveClick([1260, 200], rest_time=3)
 
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
         for c in gift_places:
-            mk.moveClick(c, rest_time=0.5)
+            mk.moveClick(c, rest_time=0.2)
             eye.captureScreenShot()
-
             enhance_able = False
 
             if (not eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
@@ -871,15 +871,6 @@ def initCustomAction():
             else:
                 break
         
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
-                break
-            if (len(gift_places) != 10):
-                gift_places = gift_places[5:]
-            if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
-                mk.scroll([0,-1], 5, rest_time=0.2)
-            else:
-                break
-        
 
         mk.pressKey("esc", rest_time=1)
 
@@ -911,10 +902,10 @@ def initCustomAction():
             mk.moveClick([1370, 100])
             sleep(4)
 
-        eye.screenshotOcr(recognize_area=[210, 580, 1200, 80])
-        if find_choose_simple_theme_pack(simple_keyword):
-            sleep(4)
-            return
+            eye.screenshotOcr(recognize_area=[210, 580, 1200, 80])
+            if find_choose_simple_theme_pack(simple_keyword):
+                sleep(4)
+                return
 
         
 

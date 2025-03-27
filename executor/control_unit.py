@@ -105,6 +105,8 @@ class ControlUnit(QThread):
         """判断任务是否识别成功"""
         if task.recognition == "TemplateMatch":
             return task.recognize_score is not None
+        elif task.recognition == "ColorMatch":
+            return task.recognize_score > 0
         elif task.recognition == "DirectHit":
             return True
         return False

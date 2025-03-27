@@ -712,6 +712,36 @@
         "template": "menu_drive.png",
         "action": "Click",
         "post_delay": 2,
+        "next": ["FullAutoAssembleEnkephalinModules", "FullAutoEnterMirror"]
+    },
+    "FullAutoAssembleEnkephalinModules": {
+        "recognition": "ColorMatch",
+        "color_point": [575, 885],
+        "lower":100, 
+        "upper":170,
+        "next": ["FullAutoAssembleEnkephalinModulesEnter", "FullAutoMirrorCircleCenter"]
+    },
+    "FullAutoAssembleEnkephalinModulesEnter":{
+        "recognition": "TemplateMatch",
+        "template": "enkephalin_module.png",
+        "action": "Click",
+        "next": "FullAutoSelectAllEnkephalin"
+    },
+    "FullAutoSelectAllEnkephalin": {
+        "action": "Click",
+        "target": [
+            1020,
+            450
+        ],
+        "next": "FullAutoConfirmAssembleEnkephalinModules"
+    },
+    "FullAutoConfirmAssembleEnkephalinModules": {
+        "action": "Key",
+        "key": [
+            "enter",
+            "esc"
+        ],
+        "action_rest": 6,
         "next": "FullAutoEnterMirror"
     },
     "FullAutoEnterMirror": {
@@ -1168,7 +1198,7 @@
     "FullAutoMirrorSelectAcquireEgoConfirm": {
         "action": "Key",
         "key": "enter",
-        "post_delay": 3,
+        "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorFinishVictory": {
@@ -1244,7 +1274,7 @@
         "recognition": "TemplateMatch",
         "template": "top_left_arrow.png",
         "action": "Click",
-        "post_delay": 2,
+        "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorManagerLevelIncreased": {

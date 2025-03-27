@@ -84,11 +84,25 @@ class FullAutoPage(QFrame):
         game_window_size.setEnabled(False)
 
         # 创建水平布局来放置标签和多选框
-        h_layout = QHBoxLayout()
-        h_layout.addWidget(game_window_size_label)
-        h_layout.addWidget(game_window_size)
+        h_layout1 = QHBoxLayout()
+        h_layout1.addWidget(game_window_size_label)
+        h_layout1.addWidget(game_window_size)
 
-        page_layout.addLayout(h_layout)
+        page_layout.addLayout(h_layout1)
+
+        # 创建标签
+        assemble_enkephalin_label = StrongBodyLabel(_("AssembleEnkephalinModules"), page)
+        assemble_enkephalin = ComboBox()
+        assemble_enkephalin.addItems(["80%"])
+        assemble_enkephalin.setEnabled(False)
+
+        # 创建水平布局来放置标签和多选框
+        h_layout2 = QHBoxLayout()
+        h_layout2.addWidget(assemble_enkephalin_label)
+        h_layout2.addWidget(assemble_enkephalin)
+
+        page_layout.addLayout(h_layout2)
+        
         return page
 
     def init_exp_config_page(self):

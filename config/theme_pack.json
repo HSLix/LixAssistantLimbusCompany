@@ -24,15 +24,15 @@
         "weight":1
     },
     "ToBeCleaved":{
-        "keyword":"tobecleaved",
+        "keyword":"cleaved",
         "weight":1
     },
     "ToBePierced":{
-        "keyword":"tobepierced",
+        "keyword":"pierced",
         "weight":1
     },
     "ToBeCrushed":{
-        "keyword":"tobecrushed",
+        "keyword":"crushed",
         "weight":1
     },
     "InsignificantEnvy":{
@@ -44,8 +44,8 @@
         "weight":1
     },
     "VainPride":{
-        "keyword":"VainPride",
-        "weight":1
+        "keyword":"vainpride",
+        "weight":100
     },
     "DegradedGloom":{
         "keyword":"degradedgloom",
@@ -100,7 +100,7 @@
         "weight":100
     },
     "MarderOnTheWARPExpress": {
-        "keyword":"express",
+        "keyword":"murderonthewarp",
         "weight":100
     },
     "LCBRegularCheckUp":{
@@ -110,6 +110,5 @@
     "SlicersDicers":{
         "keyword":"slicersdicers",
         "weight":100
-    },
-    "":{}
+    }
 }

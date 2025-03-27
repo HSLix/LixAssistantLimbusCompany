@@ -12,6 +12,7 @@ GUI_DIR = path.join(RESOURCE_DIR, "gui")
 LOG_DIR = path.join(WORK_DIR, "log")
 VIDEO_DIR = path.join(WORK_DIR, "video")
 CONFIG_DIR = path.join(WORK_DIR, "config")
+FFMPEG_FILE = path.join(RESOURCE_DIR, "ffmpeg/ffmpeg.exe")
 
 # 仓库
 GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"

@@ -76,8 +76,25 @@ template: string
 模板图片路径，暂时默认在 resource/template，所以直接填入对应图片完整名字即可（包括后缀名.png）
 
 threshold: double 
-模板匹配阈值。可选，默认 0.7 。
+模板匹配阈值。可选，默认 0.8 。
 
+### ColorMatch
+颜色匹配，也就是“找色”。
+
+该算法属性需额外部分字段：
+
+recognize_area: array<int, 4> 
+识别区域坐标。可选，默认全屏 [0, 0, 0, 0]。
+array<int, 4>: 识别区域坐标，[left, top, weigh, heigh] 。
+
+color_point: array<int, 2>
+坐标，必选，相对 recognize_area 的左上角而言。
+
+lower：int
+颜色下限值。可选。默认 0.
+
+upper：int
+颜色上限值。可选。默认 255.
 
 
 ## 动作类型
