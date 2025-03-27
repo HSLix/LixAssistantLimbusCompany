@@ -80,7 +80,7 @@ class Window(FramelessWindow):
 
         # 其余窗口初始化事项
         self.initWindow()
-        # self.check_for_updates()  # 调用版本检测函数
+        self.check_for_updates()  # 调用版本检测函数
         self.showSupportDialog()
 
         self.show()
