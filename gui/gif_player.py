@@ -95,7 +95,7 @@ class GifPlayer(QLabel):
         self.push_gif_to_queue(random.choice(choices))
 
     def push_gif_to_queue(self, gif_name):
-        if (len(self.play_queue) > 3):
+        if (len(self.play_queue) > 1):
             return
         gif_path = os.path.join(GUI_DIR, f"magic_girl_{gif_name}.gif")
         self.play_queue.append(gif_path)

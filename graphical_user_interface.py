@@ -26,7 +26,7 @@ from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
-from executor import ControlUnit, lalc_logger
+from executor import ControlUnit, lalc_logger, screen_record_thread
 
 
 
@@ -80,14 +80,12 @@ class Window(FramelessWindow):
 
         # 其余窗口初始化事项
         self.initWindow()
-        
+        # self.check_for_updates()  # 调用版本检测函数
         self.showSupportDialog()
 
-        # self.splashScreen.finish()
-
         self.show()
 
-        self.check_for_updates()  # 调用版本检测函数
+        
 
     def check_for_updates(self):
         """检测当前版本是否是最新版本"""
@@ -100,9 +98,11 @@ class Window(FramelessWindow):
                     latest_release = release_info["tag_name"]
                     return latest_release
                 else:
+                    lalc_logger.log_task("WARNING", "check_for_updates", "FAILED", str(response))
                     return None
             except Exception as e:
                 print(f"Failed to fetch release information: {e}")
+                lalc_logger.log_task("ERROR", "check_for_updates", "FAILED", str(e))
                 return None
 
         repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
@@ -131,51 +131,8 @@ class Window(FramelessWindow):
                 _('Failed to check for updates. \nPlease check your internet connection.')
             )
 
-        self.show()
 
-        self.check_for_updates()  # 调用版本检测函数
 
-    def check_for_updates(self):
-        """检测当前版本是否是最新版本"""
-        def get_latest_release(repo):
-            url = f"https://api.github.com/repos/{repo}/releases/latest"
-            try:
-                response = get(url)
-                if response.status_code == 200:
-                    release_info = response.json()
-                    latest_release = release_info["tag_name"]
-                    return latest_release
-                else:
-                    return None
-            except Exception as e:
-                print(f"Failed to fetch release information: {e}")
-                return None
-
-        repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
-        latest_release = get_latest_release(repo)
-
-        if latest_release:
-            if latest_release == VERSION:
-                # 当前版本是最新版本
-                self.show_message(
-                    'success',
-                    _('Update Check Successful'),
-                    _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
-                )
-            else:
-                # 当前版本落后
-                self.show_message(
-                    'error',
-                    _('Update Check Successful'),
-                    _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
-                )
-        else:
-            # 网络检测失败
-            self.show_message(
-                'error',
-                _('Update Check Failed'),
-                _('Failed to check for updates. \nPlease check your internet connection.')
-            )
 
 
     def showSupportDialog(self):
@@ -352,17 +309,27 @@ class Window(FramelessWindow):
                 "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
             )
         )
-        control_unit.team_info_updated.connect(
-            lambda current_team_name, next_team_name: lalc_logger.log_task(
-                "INFO",
-                "UpdateTeamRotate",
-                "SUCCESS",
-                "Update:CurrentTeam:[{0}]; NextTeam:[{1}]".format(current_team_name, next_team_name)
-            )
+
+        screen_record_thread.video_count_warning.connect(
+            lambda: self.show_message("warning", _("Too Much Video"), _("The amount of Video is about to overcome 11.\nNext time the earlist one would be deleted."))
+        )
+        screen_record_thread.video_count_warning.connect(
+            lambda : lalc_logger.log_task("WARNING", "record_thread_video_count_warning", "COMPLETED", "The amount of Video is about to overcome 12.")
+        )
+        screen_record_thread.video_count_exceeded.connect(
+            lambda : self.show_message("warning", _("WhiteNight"), _("Twelfth, why have I not chosen thee? Because there is among you a devil that hath betrayed his master."), default_gif_config=False)
+        )
+        screen_record_thread.video_count_exceeded.connect(
+            lambda : self.workingInterface.gif_player.push_gif_to_queue("white_night")
+        )
+        screen_record_thread.video_count_exceeded.connect(
+            lambda : self.show_message("warning", _("Delete Video"), _("The earliest Video has been deleted."), default_gif_config=False)
+        )
+        screen_record_thread.video_count_exceeded.connect(
+            lambda : lalc_logger.log_task("WARNING", "record_thread_video_count_exceeded", "COMPLETED", "The earliest Video has been deleted.")
         )
 
-
-    def show_message(self, msg_type, title, content):
+    def show_message(self, msg_type, title, content, default_gif_config = True):
         """
         统一显示消息条
         msg_type:info,success,warning,error
@@ -386,8 +353,11 @@ class Window(FramelessWindow):
 
         # 显示消息条
         self.info_bar.show()
-        self.info_bar.show()
 
+        lalc_logger.log_task("INFO", "show_message", "COMPLETED", "bar [{0}];title [{1}]; show [{2}]".format(msg_type, title, content))
+        
+        if (not default_gif_config):
+            return
 
         # 根据消息类型触发 GIF 播放
         if msg_type == "success":
@@ -395,9 +365,7 @@ class Window(FramelessWindow):
         elif msg_type == "error" or msg_type == "warning":
             self.workingInterface.gif_player.push_gif_to_queue("black1")
 
-        lalc_logger.log_task("INFO", "show_message", "COMPLETED", "bar [{0}];title [{1}]; show [{2}]".format(msg_type, title, content))
-
-
+        
     
 
     def initLayout(self):
@@ -589,7 +557,6 @@ def main(*args, **kwargs):
     shutdown_splash()
     event = CreateEvent(None, 0, 0, EVENT_NAME)
 
-    
     if GetLastError() == ERROR_ALREADY_EXISTS:
         lalc_logger.log_task(
             "WARNING",
@@ -601,10 +568,10 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    if not windll.shell32.IsUserAnAdmin():
-        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-        # shutdown_splash()
-        sys.exit(0)
+    # if not windll.shell32.IsUserAnAdmin():
+    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+    #     # shutdown_splash()
+    #     sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",

@@ -1,7 +1,8 @@
 # coding: utf-8
 from cv2 import (imread, createCLAHE, IMREAD_GRAYSCALE, imshow, waitKey, destroyAllWindows,
                  matchTemplate, TM_CCOEFF_NORMED, minMaxLoc, rectangle, cvtColor, COLOR_GRAY2BGR,
-                 absdiff, resize, COLOR_BGR2GRAY, COLOR_BGRA2BGR, polylines)
+                 absdiff, resize, COLOR_BGR2GRAY, COLOR_BGRA2BGR, polylines, circle, COLOR_RGBA2BGR,
+                 COLOR_GRAY2BGRA)
 # import numpy as np
 from numpy import average, where, array, int32
 from globals import TEMPLATE_DIR, ignoreScaleAndDpi
@@ -32,13 +33,14 @@ class EYE:
         self.ocr_dict = {}
 
     def captureScreenShot(self):
-        self.screenshot = captureLimbusCompanyWindow()
+        self.screenshot = captureLimbusCompanyWindow(is_pic_gray = True)
 
-    def getScreenShot(self):
-        return deepcopy(self.screenshot)
+    def getScreenShot(self, is_pic_grey = True):
+        screenshot = deepcopy(self.screenshot)
+        if not is_pic_grey and len(screenshot.shape) == 2:
+            screenshot = cvtColor(screenshot, COLOR_GRAY2BGR)
+        return screenshot
 
-    def getScreenShot(self):
-        return deepcopy(self.screenshot)
 
     @staticmethod
     def getGreyNormalizedPic(image=None, is_show_pic: bool = False):
@@ -66,7 +68,8 @@ class EYE:
             lalc_logger.log_task("ERROR", "cropImg", "FAILED", 
                                 f"裁剪区域设置不足四个值: {recognize_area}")
             raise ValueError("限定区域的设置不足四个")
-        
+        if (recognize_area == [0, 0, 0, 0]):
+            return screenshot_img
         left = recognize_area[0]
         top = recognize_area[1]
         width = recognize_area[2]
@@ -399,6 +402,40 @@ class EYE:
                 return num
         lalc_logger.log_task("DEBUG", "ocrGetFirstNum", "FAILED", "未找到全是数字的字符串。")
         return None
+    
+    def rgbDetection(self, coordinate: list, recognize_area=[0, 0, 0, 0], is_show_result=False):
+        """
+        对截图中指定坐标区域进行RGB检测
+        :param coordinate: 要检测的坐标 [x, y]（相对于recognize_area的坐标）
+        :param recognize_area: 裁剪区域 [x1, y1, x2, y2]
+        :param is_show_result: 是否显示结果
+        :return: 裁剪区域的RGB值,由于已经灰度了，所以给的其实是亮度
+        """
+        screenshot = self.getScreenShot(is_pic_grey=False)
+        # screenshot = cvtColor(screenshot, COLOR_RGBA2BGR)
+        screenshot = self.cropImg(screenshot, recognize_area)
+        
+        # 检查坐标是否在图像范围内
+        height, width = screenshot.shape[:2]
+        if coordinate[0] < 0 or coordinate[0] >= width or coordinate[1] < 0 or coordinate[1] >= height:
+            raise ValueError(f"rgbDetection 坐标 {coordinate} 超出图像范围 ({width}x{height})")
+        
+        # 获取裁剪区域的RGB值
+        b, g, r = screenshot[recognize_area[1] + coordinate[1], recognize_area[0] + coordinate[0]]
+        
+        if is_show_result:
+            # 创建图像副本用于可视化
+            vis_img = screenshot.copy()
+            # 在坐标处画一个白底黑边的小点
+            point = (recognize_area[0] + coordinate[0], recognize_area[1] + coordinate[1])
+            circle(vis_img, point, 5, (0, 0, 0), 2)  # 黑色边框
+            circle(vis_img, point, 3, (255, 255, 255), -1)  # 白色填充
+            
+            imshow('RGB Detection', vis_img)
+            waitKey(0)
+            destroyAllWindows()
+        
+        return b
 
 
 if __name__ == "__main__":
