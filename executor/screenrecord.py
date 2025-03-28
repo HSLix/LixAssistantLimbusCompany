@@ -8,10 +8,10 @@ import os
 import mss
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, run
 
 from globals import ignoreScaleAndDpi, FFMPEG_FILE
-
+from .logger import lalc_logger
 
 
 
@@ -24,9 +24,7 @@ class ScreenRecorderThread(QThread):
         video_files = [f for f in os.listdir(VIDEO_DIR) if f.endswith('.mp4')]
         video_count = len(video_files)
         if video_count >= 12:
-            # 按创建时间排序
             video_files.sort(key=lambda x: os.path.getctime(os.path.join(VIDEO_DIR, x)))
-            # 删除最旧的视频直到剩下11个
             while len(video_files) > 11:
                 oldest_file = video_files.pop(0)
                 os.remove(os.path.join(VIDEO_DIR, oldest_file))
@@ -42,99 +40,119 @@ class ScreenRecorderThread(QThread):
         super().__init__()
         self.recording = False
         self.output_path = VIDEO_DIR
+        self.safe_encoder = self.get_safe_encoder()
+
+    def get_safe_encoder(self):
+        """自动选择可用的最佳 H.264 编码器"""
+        # 按优先级排序的编码器列表
+        encoder_priority = [
+            'h264_nvenc',    # NVIDIA 显卡（效率最高）
+            'h264_qsv',      # Intel 核显
+            'h264_amf',      # AMD 显卡
+            'libx264'        # 软件后备
+        ]
+        
+        try:
+            # 获取 FFmpeg 支持的编码器列表
+            result = run(
+                [FFMPEG_FILE, '-hide_banner', '-encoders'],
+                stdout=PIPE,
+                stderr=PIPE,
+                text=True
+            )
+            encoders_output = result.stderr
+
+            # 按优先级检查可用编码器
+            for encoder in encoder_priority:
+                if encoder in encoders_output:
+                    return encoder
+        except Exception as e:
+            print(f"检测编码器时出错: {e}")
+        
+        return 'libx264'  # 默认后备
 
     def set_recording_enabled(self, enabled):
         """设置录屏功能是否启用"""
         self.recording = enabled
 
     def run(self):
-        # 启动线程前检查视频数量
         self.remove_exceeded_video()
-
+        lalc_logger.log_task("INFO", "record_fun", "STARTED", "Use Encoder [{0}]".format(self.safe_encoder))
         if not self.recording:
             self.recording = True
 
-            # 获取屏幕尺寸
             with mss.mss() as sct:
                 monitor = sct.monitors[0]
                 w = monitor['width']
                 h = monitor['height']
             monitor = {"top": 0, "left": 0, "width": w, "height": h}
 
-            # 按指定格式命名视频
             now = datetime.now()
-            output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.mp4')  # 使用 .mp4 格式
+            output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.mp4')
 
-            # 构建 ffmpeg 命令
             command = [
                 FFMPEG_FILE,
-                '-y',  # 覆盖已存在的文件
+                '-y',
+                '-threads', '2',
+                '-thread_queue_size', '512',
                 '-f', 'rawvideo',
-                '-pix_fmt', 'rgb24',
+                '-pix_fmt', 'bgr24',
                 '-s', f'{w}x{h}',
                 '-r', '8',
-                '-i', '-',  # 从标准输入读取数据
-                '-an', # 关闭音频
+                '-i', '-',
+                '-an',
+                '-c:v', self.safe_encoder,
                 '-pix_fmt', 'yuv420p',
-                '-vcodec', 'libx264',
                 '-crf', '37',
                 output_file
             ]
-            
 
-            # 启动 ffmpeg 进程
             process = Popen(command, stdin=PIPE)
 
-            # 开始录制循环
             while self.recording:
-                # 截取屏幕
-                with mss.mss() as sct:
-                    sct_img = sct.grab(monitor)
-                frame = np.array(sct_img)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+                try:
+                    with mss.mss() as sct:
+                        sct_img = sct.grab(monitor)
+                    frame = cv2.cvtColor(np.array(sct_img), cv2.COLOR_BGRA2BGR)
 
-                # 添加水印
-                text = "LixAssistantLimbusCompany"
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                font_scale = 4
-                font_color = (128, 128, 128)
-                thickness = 5
-                text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-                text_x = (frame.shape[1] - text_size[0]) // 2
-                text_y = (frame.shape[0] + text_size[1]) // 2
-                cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
+                    # 添加水印
+                    text = "LixAssistantLimbusCompany"
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 4
+                    font_color = (128, 128, 128)
+                    thickness = 5
+                    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+                    text_x = (frame.shape[1] - text_size[0]) // 2
+                    text_y = (frame.shape[0] + text_size[1]) // 2
+                    cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
 
-                # 添加时间水印
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                time_font = cv2.FONT_HERSHEY_SIMPLEX
-                time_font_scale = 2
-                time_font_color = (128, 128, 128)
-                time_thickness = 5
-                time_x = 10
-                time_y = frame.shape[0] - 10
-                cv2.putText(frame, current_time, (time_x, time_y), time_font, time_font_scale,
-                            time_font_color, time_thickness, cv2.LINE_AA)
+                    # 添加时间水印
+                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    time_font = cv2.FONT_HERSHEY_SIMPLEX
+                    time_font_scale = 2
+                    time_font_color = (128, 128, 128)
+                    time_thickness = 5
+                    time_x = 10
+                    time_y = frame.shape[0] - 10
+                    cv2.putText(frame, current_time, (time_x, time_y), time_font, time_font_scale,
+                                time_font_color, time_thickness, cv2.LINE_AA)
 
-                # 写入视频帧
-                process.stdin.write(
-                    cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    .astype(np.uint8)
-                    .tobytes()
-                )
-                QApplication.processEvents()
+                    process.stdin.write(frame.tobytes())
+                    QApplication.processEvents()
+                except Exception as e:
+                    print(f"录制出错: {e}")
+                    continue
 
-            # 停止录制
             if process:
                 process.stdin.close()
                 process.wait()
 
             self.finished.emit()
-            
-            # 录屏结束后检查视频数量
             self.check_video_count_after_recording()
 
     def stop_recording(self):
         self.recording = False
+
 
 screen_record_thread = ScreenRecorderThread()
 

@@ -193,24 +193,15 @@ class Task:
     def click_action(self):
         click_list = None
         if (type(self.target) == list):
-            if (type(self.target[0]) != list):
-                click_center = self.target
-            else:
-                click_list = self.target
+            click_center = deepcopy(self.target)
         else:
-            print(type(self.target))
-            if (self.recognize_center == None):
-                return
             click_center = deepcopy(self.recognize_center)
 
-        if click_list == None:
-            click_center[0] += self.target_offset[0] + generate_random_num(-7, 7)
-            click_center[1] += self.target_offset[1] + generate_random_num(-7, 7)
-            self.mk.moveClick(click_center, click_count=self.action_count, rest_time=self.action_rest)
-            self.mk.mouseBackHome()
-        else:
-            # TODO 完善剩下的多点部分
-            self.mk.mouseBackHome()
+        click_center[0] += self.target_offset[0] + generate_random_num(-7, 7)
+        click_center[1] += self.target_offset[1] + generate_random_num(-7, 7)
+        self.mk.moveClick(click_center, click_count=self.action_count, rest_time=self.action_rest)
+        self.mk.mouseBackHome()
+
 
 
     def swipe_action(self):
@@ -924,7 +915,7 @@ def initCustomAction():
         for keyword in hard_keyword:
             center = eye.queryOcrDict(keyword)
             if center != None:
-                mk.dragMouse([center[0], center[1], center[0], center[1]+400])
+                # mk.dragMouse([center[0], center[1], center[0], center[1]+400])
                 return True
             
         return False
