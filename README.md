@@ -116,8 +116,8 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 | <img src="./resource/github/setting_page_cn.png" width="300"> | <img src="./resource/github/setting_page_en.png" width="300"> |
 ---
 ## 视频教程
-<a href="https://youtu.be/ZKsNTLM-IT4">
-    <h3>Version 2.1.1-2.1.13</h3>
+<h3>Version 2.1.1-2.1.13</h3>
+<a href="https://youtu.be/ZKsNTLM-IT4">    
     <img src="./resource/github/video1Pic.png" width="300">
 </a>
 

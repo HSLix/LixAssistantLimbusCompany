@@ -568,10 +568,10 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    # if not windll.shell32.IsUserAnAdmin():
-    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-    #     # shutdown_splash()
-    #     sys.exit(0)
+    if not windll.shell32.IsUserAnAdmin():
+        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+        # shutdown_splash()
+        sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",

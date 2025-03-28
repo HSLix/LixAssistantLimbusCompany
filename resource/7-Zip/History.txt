@@ -1,0 +1,157 @@
+HISTORY of the 7-Zip
+--------------------
+
+This file contains information about changes for latest versions of 7-Zip.
+The full changelog file can be downloaded here:
+https://7-zip.org/history.txt
+
+
+24.09          2024-11-29
+-------------------------
+- The default dictionary size values for LZMA/LZMA2 compression methods were increased:
+         dictionary size   compression level
+  v24.08  v24.09  v24.09   
+          32-bit  64-bit    
+    8 MB   16 MB   16 MB   -mx4
+   16 MB   32 MB   32 MB   -mx5 : Normal
+   32 MB   64 MB   64 MB   -mx6
+   32 MB   64 MB  128 MB   -mx7 : Maximum
+   64 MB   64 MB  256 MB   -mx8
+   64 MB   64 MB  256 MB   -mx9 : Ultra
+  The default dictionary size values for 32-bit versions of LZMA/LZMA2 don't exceed 64 MB.
+- 7-Zip now can calculate the following hash checksums: SHA-512, SHA-384, SHA3-256 and MD5.
+- APM and HFS support was improved.
+- If an archive update operation uses a temporary archive folder and 
+  the archive is moved to the destination folder, 7-Zip shows the progress of moving 
+  the archive file, as this operation can take a long time if the archive is large.
+- The bug was fixed: 7-Zip File Manager didn't propagate Zone.Identifier stream
+  for extacted files from nested archives (if there is open archive inside another open archive).
+- Some bugs were fixed.
+
+
+24.08          2024-08-11
+-------------------------
+- The bug in 7-Zip 24.00-24.07 was fixed:
+  For creating a zip archive: 7-Zip could write extra zero bytes after the end of the archive,
+  if a file included to archive cannot be compressed to a size smaller than original.
+  The created zip archive is correct except for the useless zero bytes after the end of the archive.
+  When unpacking such a zip archive, 7-Zip displays a warning:
+    "WARNING: There are data after the end of archive".
+- The bug was fixed: there was a leak of GDI objects (internal resources in Windows)
+  in "Confirm File Replace" window, causing problems after 1600 displays of "Confirm File Replace"
+  window from same running 7-Zip process.
+- Some optimizations for displaying file icons in 7-Zip File Manager and in "Confirm File Replace" window.
+- Some bugs were fixed.
+
+
+24.07          2024-06-19
+-------------------------
+- The bug was fixed: 7-Zip could crash for some incorrect ZSTD archives.
+
+
+24.06          2024-05-26
+-------------------------
+- The bug was fixed: 7-Zip could not unpack some ZSTD archives.
+
+
+24.05          2024-05-14
+-------------------------
+- New switch -myv={MMNN} to set decoder compatibility version for 7z archive creating.
+  {MMNN} is 4-digit number that represents the version of 7-Zip without a dot.
+  If -myv={MMNN} switch is specified, 7-Zip will only use compression methods that can
+  be decoded by the specified version {MMNN} of 7-Zip and newer versions.
+  If -myv={MMNN} switch is not specified, -myv=2300 is used, and 7-Zip will only
+  use compression methods that can be decoded by 7-Zip 23.00 and newer versions.
+- New switch -myfa={FilterID} to    allow 7-Zip to use the specified filter method for 7z archive creating.
+- New switch -myfd={FilterID} to disallow 7-Zip to use the specified filter method for 7z archive creating.
+- Some bugs were fixed.
+
+
+24.04          2024-04-05
+-------------------------
+- New menu item in 7-Zip File Manager: "Tools / Delete Temporary Files...".
+  This menu item opens a window showing temporary folders and files
+  created by 7-Zip in the user's "Temp" folder on a Windows system.
+  In this window, the user can delete temporary files.
+
+
+24.03          2024-03-23
+-------------------------
+- 7-Zip now can use new RISCV filter for compression to 7z and xz archives.
+  RISCV filter can increase compression ratio for data containing executable
+  files compiled for RISC-V architecture.
+- The speed for LZMA and LZMA2 decompression in ARM64 version for Windows
+  was increased by 20%-60%.
+- 7-Zip GUI and 7-Zip File Manager can ask user permission to unpack RAR archives that
+  require big amount of memory, if the dictionary size in RAR archive is larger than 4 GB.
+- new switch -smemx{size}g : to set allowed memory usage limit for RAR archive unpacking.
+  RAR archives can use dictionary up 64 GB. Default allowed limit for RAR unpacking is 4 GB.
+- 7zg.exe (7-Zip GUI): -y switch disables user requests and messages.
+- 7-Zip shows hash methods XXH64 and BLAKE2sp in context menu.
+- -slmu switch : to show timestamps as UTC instead of LOCAL TIME.
+- -slsl switch : in console 7-Zip for Windows : to show file paths with
+  linux path separator slash '/' instead of backslash separator '\'.
+- 7-Zip supports .sha256 files that use backslash path separator '\'.
+- Some bugs were fixed.
+
+
+24.01          2024-01-31
+-------------------------
+- 7-Zip now can unpack ZSTD archives (.zst filename extension).
+- 7-Zip now can unpack ZIP, SquashFS and RPM archives that use ZSTD compression method.
+- 7-Zip now supports fast hash algorithm XXH64 that is used in ZSTD.
+- 7-Zip now can unpack RAR archives (that use larger than 4 GB dictionary) created by new WinRAR 7.00.
+- 7-Zip now can unpack DMG archives that use XZ (ULMO/LZMA) compression method.
+- 7-Zip now can unpack NTFS images with cluster size larger than 64 KB.
+- 7-Zip now can unpack MBR and GPT images with 4 KB sectors.
+- Speed optimizations for archive unpacking: rar, cab, wim, zip, gz.
+- Speed optimizations for hash caclulation: CRC-32, CRC-64, BLAKE2sp.
+- The bug was fixed: 7-Zip for Linux could fail for multivolume creation in some cases.
+- Some bugs were fixed.
+
+
+23.01          2023-06-20
+-------------------------
+- The page "Language" in 7-Zip's menu Tools/Options now shows information
+  about selected translation, including the number of translated lines.
+- Some bugs were fixed.
+
+
+23.00          2023-05-07
+-------------------------
+- 7-Zip now can use new ARM64 filter for compression to 7z and xz archives.
+  ARM64 filter can increase compression ratio for data containing executable
+  files compiled for ARM64 (AArch64) architecture.
+  Also 7-Zip now parses executable files (that have exe and dll filename extensions)
+  before compressing, and it selects appropriate filter for each parsed file:
+    - BCJ or BCJ2 filter for x86 executable files,
+    - ARM64 filter for ARM64 executable files.
+  Previous versions by default used x86 filter BCJ or BCJ2 for all exe/dll files.
+- Default section size for BCJ2 filter was changed from 64 MiB to 240 MiB.
+  It can increase compression ratio for executable files larger than 64 MiB.
+- UDF: support was improved.
+- cpio: support for hard links.
+- Some changes and optimizations in WIM creation code.
+- When new 7-Zip creates multivolume archive, 7-Zip keeps in open state
+  only volumes that still can be changed. Previous versions kept all volumes
+  in open state until the end of the archive creation.
+- 7-Zip for Linux and macOS now can reduce the number of simultaneously open files,
+  when 7-Zip opens, extracts or creates multivolume archive. It allows to avoid
+  the failures for cases with big number of volumes, bacause there is a limitation
+  for number of open files allowed for a single program in Linux and macOS.
+- There are optimizations in code for 7-Zip's context menu in Explorer:
+  the speed of preparing of the menu showing was improved for cases when big number of
+  files were selected by external program for context menu that contains 7-Zip menu commands.
+- There are changes in code for the drag-and-drop operations to and from 7-Zip File Manager.
+  And the drag-and-drop operation with right button of mouse now is supported for some cases.
+- The bugs were fixed:
+  - ZIP archives: if multithreaded zip compression was performed with more than one
+      file to stdout stream (-so switch), 7-Zip didn't write "data descriptor" for some files.
+  - ext4 archives: 7-Zip couldn't correctly extract symbolic link to directory from ext4 archives.
+  - HFS and APFS archives: 7-Zip incorrectly decoded uncompressed blocks (64 KiB) in compressed forks.
+  - HFS : zlib without Adler supported
+  - Some another bugs were fixed.
+
+
+==
+End of document

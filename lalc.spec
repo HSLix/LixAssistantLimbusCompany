@@ -3,6 +3,7 @@
 import os
 import shutil
 from PIL import Image
+import subprocess
 
 # 获取当前工作目录
 current_dir = os.getcwd()
@@ -127,5 +128,20 @@ os.makedirs(dist_lalc_video_dir, exist_ok=True)
 # --------------------
 # 压缩 lalc 文件夹
 # --------------------
+#archive_name = os.path.join(dist_dir, 'lalc')
+#shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')
+
+# --------------------
+# 压缩 lalc 文件夹为 7z 格式
+# --------------------
 archive_name = os.path.join(dist_dir, 'lalc')
-shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')
+lalc_folder = os.path.join(dist_dir, 'lalc')
+seven_zip_path = os.path.join(current_dir, 'resource', '7-Zip', '7z.exe')
+
+try:
+    subprocess.run([seven_zip_path, 'a', f'{archive_name}.7z', lalc_folder], check=True)
+    print(f"成功将 {lalc_folder} 压缩为 {archive_name}.7z")
+except subprocess.CalledProcessError as e:
+    print(f"压缩过程中出错: {e}")
+except FileNotFoundError:
+    print(f"未找到 7z.exe 可执行文件，路径为: {seven_zip_path}")

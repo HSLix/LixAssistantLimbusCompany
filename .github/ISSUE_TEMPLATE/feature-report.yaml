@@ -1,5 +1,5 @@
 name: 需求建议 Feature request
-description: 提出你需要的新功能
+description: 提出你需要的新功能 | 
 labels: ['enhancement']
 body:
   - type: checkboxes

@@ -105,9 +105,8 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 
 
 ## Video_Tutorials
-
+<h3>Version 2.1.1-2.1.13</h3>
 <a href="https://youtu.be/ZKsNTLM-IT4">
-    <h3>Version 2.1.1-2.1.13</h3>
     <img src="./resource/github/video1Pic.png" width="300">
 </a>
 

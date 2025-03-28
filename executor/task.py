@@ -713,7 +713,6 @@ def initCustomAction():
             else:
                 break
          
-         
             
         mk.pressKey("esc", rest_time=2)
 
@@ -758,30 +757,31 @@ def initCustomAction():
 
         purchased_count = 0
 
-        for place in goods_places:
-            if goods_places.index(place) < purchased_count:
-                continue
-            mk.moveClick(place, rest_time=1.5)
-            eye.captureScreenShot()
-            if (eye.templateMactchExist("shop_triangle.png", threshold=0.75, recognize_area=[1000, 240, 160, 50])):
-                for gift in target_pic:
-                    if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                        mk.moveClick([945, 660], rest_time=2)
-                        # mk.pressKey("enter", rest_time=1)
-                        purchased_count += 1
-                        break
-            mk.pressKey("enter", rest_time=1)
-            eye.captureScreenShot()
-            if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-                lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
-                return
+        while(True):
+            for place in goods_places:
+                if goods_places.index(place) < purchased_count:
+                    continue
+                mk.moveClick(place, rest_time=1.5)
+                eye.captureScreenShot()
+                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
+                    for gift in target_pic:
+                        if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
+                            mk.moveClick([945, 660], rest_time=2)
+                            # mk.pressKey("enter", rest_time=1)
+                            purchased_count += 1
+                            break
+                mk.pressKey("enter", rest_time=1)
+                eye.captureScreenShot()
+                if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
+                    lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
+                    return
 
-        eye.captureScreenShot()
-        if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
-            lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
-            return
+            eye.screenshotOcr(recognize_area=[665, 190, 160, 55])
+            rest_cost = eye.ocrGetFirstNum()
+            if (rest_cost < 800 or purchased_count>2):
+                break
 
-        mk.moveClick([1260, 200], rest_time=3)
+            mk.moveClick([1260, 200], rest_time=3)
 
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
