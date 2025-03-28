@@ -93,8 +93,6 @@ class ScreenRecorderThread(QThread):
             command = [
                 FFMPEG_FILE,
                 '-y',
-                '-threads', '2',
-                '-thread_queue_size', '512',
                 '-f', 'rawvideo',
                 '-pix_fmt', 'bgr24',
                 '-s', f'{w}x{h}',
@@ -108,6 +106,7 @@ class ScreenRecorderThread(QThread):
             ]
 
             process = Popen(command, stdin=PIPE)
+            
 
             while self.recording:
                 try:
