@@ -125,6 +125,19 @@ os.makedirs(dist_lalc_log_dir, exist_ok=True)
 dist_lalc_video_dir = os.path.join(dist_dir, 'lalc/video')
 os.makedirs(dist_lalc_video_dir, exist_ok=True)
 
+
+additional_files = [
+    ('README.md', '.'),      # 复制到根目录
+    ('README_en.md', '.'),   # 复制到根目录
+    ('LICENSE', '.'),        # 复制到根目录
+]
+# 复制额外文件
+for src_file, dest_dir in additional_files:
+    src_path = os.path.join(current_dir, src_file)
+    dest_path = os.path.join(dist_lalc_dir, dest_dir, src_file)
+    shutil.copy2(src_path, dest_path)
+    
+
 # --------------------
 # 压缩 lalc 文件夹
 # --------------------
