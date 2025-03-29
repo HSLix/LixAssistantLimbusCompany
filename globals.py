@@ -23,7 +23,7 @@ GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.0.4"
+VERSION = "V3.0.5"
 
 
 # 支持网址
@@ -38,7 +38,7 @@ MOUSE_BASEPOINT = [0,0]
 MOUSE_HOME = [0,0]
 
 # 设定窗口的大小
-window_size = [1600, 1200]
+window_size = [1600, 900]
 
 # 人物选择对应坐标
 sinner_place = {

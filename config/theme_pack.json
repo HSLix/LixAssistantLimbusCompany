@@ -71,10 +71,6 @@
         "keyword":"tearfulthing",
         "weight":1
     },
-    "NocturnalSweeping":{
-        "keyword":"turnalsweeping",
-        "weight":1
-    },
     "RepressedWrath":{
         "keyword":"repressedwrath",
         "weight":100
