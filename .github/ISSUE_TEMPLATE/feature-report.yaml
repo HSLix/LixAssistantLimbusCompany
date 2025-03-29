@@ -5,7 +5,7 @@ body:
   - type: checkboxes
     id: checks
     attributes:
-      label: 应该被确定的
+      label: 应该被确定的 | Confirm
       options:
       - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等 | The title is clear rather than "A advice".
         required: true

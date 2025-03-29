@@ -15,53 +15,51 @@ body:
         required: true
       - label: 我使用的程序版本已为最新版 | The programme is the latest version.
         required: true
-      - label: 我已完整查看过项目 README，尤其是常见问题部分 | I have reviewed the project README in its entirety, especially the FAQ section
+      - label: 我已完整查看过项目 README, 尤其是常见问题部分 | I have reviewed the project README in its entirety, especially the FAQ section
         required: true
-      - label: 我理解并愿意跟进此 issue，协助测试和提供反馈 | I understand and am willing to follow up on this issue, assist with testing and provide feedback.
+      - label: 我理解并愿意跟进此 issue, 协助测试和提供反馈 | I understand and am willing to follow up on this issue, assist with testing and provide feedback.
         required: true
       - label: 我理解并认可上述内容，并理解项目维护者精力有限，不遵循规则的 issue 可能会被无视或直接关闭 | I understand and agree with the above, and understand that project maintainers have limited energy, and that issues that don't follow the rules may be ignored or simply shut down
         required: true
   - type: textarea
     id: describe
     attributes:
-      label: 问题描述
-      description: 尽可能详细描述你的问题
+      label: 问题描述 | Bug Description
+      description: 尽可能详细描述你的问题 | Describe the Bug as more details as you can
     validations:
       required: true
   - type: textarea
     id: rebug
     attributes:
-      label: 重现问题
-      description: 描述一个可重复的步骤，复现你的问题
-    validations:
+      label: 重现问题 | Reproduct the Bug
+      description: 描述一个可重复的步骤，复现你的问题 | Provide the steps of reproducing the Bug.
+    validation:
       required: true
   - type: textarea
     id: log
     attributes:
-      label: 日志文件
-      description: 上传log文件夹下所有.log文件
+      label: 日志文件 | Log Files
+      description: 上传 log 文件夹下当日的所有 log 文件(debug, info, warning) | Upload all the log files at that day, including debug, info, warning.
     validations:
       required: true
   - type: textarea
     id: screenshots
     attributes:
-      label: 视频/截图
-      description: 上传你发生此问题时的视频/截图
+      label: 视频/截图 | Video/Screenshot
+      description: 上传你发生此问题时的视频/截图 | Upload the Video/Screenshot when meeting up this Bug.
     validations:
       required: false
   - type: textarea
     id: shouldbe
     attributes:
-      label: 应该是？
-      description: 描述你认为应为的实际效果
+      label: 应该是？ | Expect Effect
+      description: 描述你认为应为的实际效果 | The correct action it should be.
     validations:
       required: false
   - type: textarea
     id: others
     attributes:
-      label: 其他信息
-      description: |
-        你最好提供以下内容：
-        操作系统、语言及版本号；屏幕分辨率；软件版本号等。
+      label: 其他信息 | Other Information
+      description: 操作系统、语言及版本号；屏幕分辨率等。| OS, language, Version of LALC, Screen Resolution……
     validations:
       required: false
