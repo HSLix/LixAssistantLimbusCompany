@@ -757,11 +757,15 @@ def initCustomAction():
                 if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
                     for gift in target_pic:
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
-                            mk.moveClick([945, 660], rest_time=2)
+                            mk.moveClick([945, 660], rest_time=1)
                             # mk.pressKey("enter", rest_time=1)
                             purchased_count += 1
                             break
-                mk.pressKey("enter", rest_time=1)
+                    mk.pressKey("enter", press_count=2, rest_time=1)
+                else:
+                    mk.pressKey("enter", press_count=2, rest_time=0.4)
+                    continue
+                
                 eye.captureScreenShot()
                 if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
                     lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
@@ -769,7 +773,7 @@ def initCustomAction():
 
             eye.screenshotOcr(recognize_area=[665, 190, 160, 55])
             rest_cost = eye.ocrGetFirstNum()
-            if (rest_cost < 800 or purchased_count>2):
+            if (rest_cost < 700 or purchased_count>2):
                 break
 
             mk.moveClick([1260, 200], rest_time=3)
@@ -894,6 +898,7 @@ def initCustomAction():
             mk.moveClick([1370, 100])
             sleep(4)
 
+            eye.captureScreenShot()
             eye.screenshotOcr(recognize_area=[210, 580, 1200, 80])
             if find_choose_simple_theme_pack(simple_keyword):
                 sleep(4)
@@ -903,6 +908,7 @@ def initCustomAction():
 
     
     def find_choose_simple_theme_pack(simple_keyword:list):
+        lalc_logger.log_task("DEBUG", "find_choose_simple_theme_pack", "STARTED", "")
         for keyword in simple_keyword:
             center = eye.queryOcrDict(keyword)
             if center != None:
@@ -912,6 +918,7 @@ def initCustomAction():
         return False
 
     def find_hard_theme_pack(hard_keyword:list):
+        lalc_logger.log_task("DEBUG", "find_hard_theme_pack", "STARTED", "")
         for keyword in hard_keyword:
             center = eye.queryOcrDict(keyword)
             if center != None:

@@ -1,14 +1,36 @@
 # -*- mode: python ; coding: utf-8 -*-
-
 import os
 import shutil
+from pathlib import Path
 from PIL import Image
 import subprocess
+import rapidocr_onnxruntime
 
 # 获取当前工作目录
 current_dir = os.getcwd()
 dist_dir = os.path.join(current_dir, 'dist')
 
+# --------------------
+# 动态收集 rapidocr_onnxruntime 数据文件
+# --------------------
+package_name = 'rapidocr_onnxruntime'
+install_dir = Path(rapidocr_onnxruntime.__file__).resolve().parent
+
+onnx_paths = list(install_dir.rglob('*.onnx'))
+yaml_paths = list(install_dir.rglob('*.yaml'))
+
+onnx_add_data = [(str(v.parent), f'{package_name}/{v.parent.name}')
+                for v in onnx_paths]
+
+yaml_add_data = []
+for v in yaml_paths:
+    if package_name == v.parent.name:
+        yaml_add_data.append((str(v.parent / '*.yaml'), package_name))
+    else:
+        yaml_add_data.append(
+            (str(v.parent / '*.yaml'), f'{package_name}/{v.parent.name}'))
+
+add_data = list(set(yaml_add_data + onnx_add_data))
 
 # --------------------
 # 清空 dist 目录
@@ -20,14 +42,32 @@ if os.path.exists(dist_dir):
         for dir in dirs:
             shutil.rmtree(os.path.join(root, dir))
 
-
 # --------------------
 # 资源处理
 # --------------------
 folders_to_copy = ['resource', 'log', 'i18n', 'video', 'doc', 'config']
 folders_to_empty = ['log', 'video']
 
+# --------------------
+# 打包配置
+# --------------------
+block_cipher = None
 
+a = Analysis(
+    ['main.py'],
+    pathex=[],
+    binaries=[],
+    datas=add_data,
+    hiddenimports=['PyQt5.sip'],
+    hookspath=[],
+    hooksconfig={},
+    runtime_hooks=[],
+    excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
+    noarchive=False,
+)
 
 # --------------------
 # 计算 splash 文字位置（含中英文）
@@ -45,21 +85,6 @@ try:
 except Exception as e:
     print(f"读取图片 {splash_image_path} 时出错: {e}")
     text_pos = (10, 50)  # 默认位置
-
-
-# --------------------
-# 打包配置
-# --------------------
-a = Analysis(
-    ['main.py'],
-    pathex=[],
-    binaries=[],
-    datas=[],
-    hiddenimports=['PyQt5.sip'],
-    runtime_hooks=[],
-    excludes=[],
-    noarchive=False,
-)
 
 splash = Splash(
     splash_image_path,
@@ -139,22 +164,8 @@ for src_file, dest_dir in additional_files:
     
 
 # --------------------
-# 压缩 lalc 文件夹
-# --------------------
-#archive_name = os.path.join(dist_dir, 'lalc')
-#shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')
-
-# --------------------
-# 压缩 lalc 文件夹为 7z 格式
+# 压缩 lalc 文件夹为 zip
 # --------------------
 archive_name = os.path.join(dist_dir, 'lalc')
-lalc_folder = os.path.join(dist_dir, 'lalc')
-seven_zip_path = os.path.join(current_dir, 'resource', '7-Zip', '7z.exe')
+shutil.make_archive(archive_name, 'zip', dist_dir, 'lalc')
 
-try:
-    subprocess.run([seven_zip_path, 'a', f'{archive_name}.7z', lalc_folder], check=True)
-    print(f"成功将 {lalc_folder} 压缩为 {archive_name}.7z")
-except subprocess.CalledProcessError as e:
-    print(f"压缩过程中出错: {e}")
-except FileNotFoundError:
-    print(f"未找到 7z.exe 可执行文件，路径为: {seven_zip_path}")

@@ -116,13 +116,20 @@ class Window(FramelessWindow):
                     _('Update Check Successful'),
                     _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
-            else:
+            elif latest_release > VERSION:
                 # 当前版本落后
                 self.show_message(
                     'error',
                     _('Update Check Successful'),
                     _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
+            else:
+                self.show_message(
+                    'success',
+                    _('Update Check Successful'),
+                    _('Your version is 404 Not Found.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                )
+            lalc_logger.log_task("INFO", "check_for_updates", "FINISHED", "Current version: {0}, GitHub version: {1}".format(VERSION, latest_release))
         else:
             # 网络检测失败
             self.show_message(
