@@ -462,25 +462,8 @@
             "SemiAutoPassNormalCheck",
             "SemiAutoPassLowCheck",
             "SemiAutoPassVeryLowCheck",
-            "SemiAutoDealEventResult",
-            "SemiAutoEventMakeFirstChoice",
-            "SemiAutoClickEventRightBottom"
+            "SemiAutoEventMakeFirstChoice"
         ]
-    },
-    "SemiAutoDealEventResult": {
-        "recognition": "TemplateMatch",
-        "template": "event_result.png",
-        "threshold": 0.9,
-        "action": "Click",
-        "target": [
-            1400,
-            860
-        ],
-        "next": [
-            "SemiAutoSkipEvent",
-            "SemiAutoCircleCenter"
-        ],
-        "post_wait_freezes": 2
     },
     "SemiAutoEventMakeChoiceGetEgo": {
         "recognition": "TemplateMatch",
@@ -492,17 +475,23 @@
         ]
     },
     "SemiAutoEventMakeFirstChoice": {
-        "recognition": "TemplateMatch",
-        "template": "event_choices.png",
-        "threshold": 0.8,
         "action": "Click",
         "target": [
             1160,
             350
         ],
         "next": [
-            "SemiAutoSkipEvent",
-            "SemiAutoCircleCenter"
+            "SemiAutoEventMakeSecondChoice"
+        ]
+    },
+    "SemiAutoEventMakeSecondChoice": {
+        "action": "Click",
+        "target": [
+            1160,
+            510
+        ],
+        "next": [
+            "SemiAutoClickEventRightBottom"
         ]
     },
     "SemiAutoPassVeryHighCheck": {
@@ -964,25 +953,8 @@
             "FullAutoPassNormalCheck",
             "FullAutoPassLowCheck",
             "FullAutoPassVeryLowCheck",
-            "FullAutoEventMakeFirstChoice",
-            "FullAutoDealEventResult",
-            "FullAutoClickEventRightBottom"
+            "FullAutoEventMakeFirstChoice"
         ]
-    },
-    "FullAutoDealEventResult": {
-        "recognition": "TemplateMatch",
-        "template": "event_result.png",
-        "threshold": 0.9,
-        "action": "Click",
-        "target": [
-            1400,
-            860
-        ],
-        "next": [
-            "FullAutoSkipEvent",
-            "FullAutoMirrorCircleCenter"
-        ],
-        "post_wait_freezes": 2
     },
     "FullAutoEventMakeChoiceGetEgo": {
         "recognition": "TemplateMatch",
@@ -994,9 +966,6 @@
         ]
     },
     "FullAutoEventMakeFirstChoice": {
-        "recognition": "TemplateMatch",
-        "template": "event_choices.png",
-        "threshold": 0.9,
         "action": "Click",
         "target": [
             1160,
@@ -1013,8 +982,7 @@
             510
         ],
         "next": [
-            "FullAutoSkipEvent",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoClickEventRightBottom"
         ]
     },
     "FullAutoPassVeryHighCheck": {
@@ -1068,7 +1036,7 @@
             "FullAutoSkipEvent",
             "FullAutoMirrorCircleCenter"
         ],
-        "post_wait_freezes": 1
+        "post_delay": 1
     },
     "FullAutoReadyFindWay": {
         "recognition": "TemplateMatch",
