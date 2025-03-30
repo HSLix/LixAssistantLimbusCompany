@@ -3,9 +3,9 @@ description: 程序出现问题
 labels: ['bug']
 body:
   - type: checkboxes
-    id: shallcheck
+    id: checks
     attributes:
-      label: 应该确定的
+      label: 应该确定的 | Confirm
       options:
       - label: 已尝试使用搜索引擎，且不能解决我的问题 | I have google it and can hardly find any solution.
         required: true
