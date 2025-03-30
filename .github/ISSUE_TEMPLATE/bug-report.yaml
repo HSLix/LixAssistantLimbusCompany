@@ -15,7 +15,9 @@ body:
         required: true
       - label: 我使用的程序版本已为最新版 | The programme is the latest version.
         required: true
-      - label: 我已完整查看过项目 README, 尤其是常见问题部分 | I have reviewed the project README in its entirety, especially the FAQ section
+      - label: 我已遵循[指导手册](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/manual_cn.md)完成相应配置 | I have reviewed the [Manual](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/manual_en.md)
+        required: true
+      - label: 我已完整查看过[常见问题](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/FAQ_cn.md) 部分 | I have reviewed the [FAQ](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/FAQ_en.md) section
         required: true
       - label: 我理解并愿意跟进此 issue, 协助测试和提供反馈 | I understand and am willing to follow up on this issue, assist with testing and provide feedback.
         required: true
@@ -33,7 +35,7 @@ body:
     attributes:
       label: 重现问题 | Reproduct the Bug
       description: 描述一个可重复的步骤，复现你的问题 | Provide the steps of reproducing the Bug.
-    validation:
+    validations:
       required: true
   - type: textarea
     id: log
