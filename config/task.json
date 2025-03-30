@@ -626,7 +626,7 @@
         ]
     },
     "FullAutoMirrorCircleCenter": {
-        "pre_wait_freezes": 1,
+        "pre_delay": 0.5,
         "next": [
             "FullAutoMirrorDealDownload",
             "FullAutoMirrorTouchToStart",
@@ -790,6 +790,7 @@
     "FullAutoMirrorSelectThemePack": {
         "recognition": "TemplateMatch",
         "template": "theme_pack_info.png",
+        "pre_delay": 1, 
         "action": "Custom",
         "custom_name": "select_theme_pack",
         "next": ["FullAutoMirrorSelectRandomThemePack", "FullAutoMirrorCircleCenter"]
@@ -1174,7 +1175,7 @@
         "template": "mirror_victory.png",
         "action": "Key",
         "key": "enter",
-        "action_count": 6,
+        "action_count": 8,
         "action_rest": 1,
         "post_delay": 8,
         "next": "MirrorCheckpoint"
