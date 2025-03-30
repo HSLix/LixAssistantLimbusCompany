@@ -773,7 +773,7 @@ def initCustomAction():
 
             eye.screenshotOcr(recognize_area=[665, 190, 160, 55])
             rest_cost = eye.ocrGetFirstNum()
-            if (rest_cost < 700 or purchased_count>2):
+            if (rest_cost < (550 + 100*purchased_count) or purchased_count>2):
                 break
 
             mk.moveClick([1260, 200], rest_time=3)

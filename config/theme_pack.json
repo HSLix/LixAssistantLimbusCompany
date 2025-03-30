@@ -11,8 +11,12 @@
         "keyword":"forgotten",
         "weight":1
     },
-    "MiracleInDistrict20":{
+    "MiracleInDistrict20_word1":{
         "keyword":"miracle",
+        "weight":1
+    },
+    "MiracleInDistrict20_word2":{
+        "keyword":"district",
         "weight":1
     },
     "HellsChicken":{

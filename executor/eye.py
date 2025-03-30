@@ -338,7 +338,7 @@ class EYE:
 
         result, _ = self.ocr(screenshot)
         if not result:
-            lalc_logger.log_task("DEBUG", "screenshotocr", "FAILED", "未识别到文字。")
+            lalc_logger.log_task("WARNING", "screenshotocr", "FAILED", "未识别到文字。")
             self.ocr_dict = {}
             return
 
@@ -400,8 +400,8 @@ class EYE:
                 num = float(key)
                 lalc_logger.log_task("DEBUG", "ocrGetFirstNum", "SUCCESS", f"找到第一个数字: {num}")
                 return num
-        lalc_logger.log_task("DEBUG", "ocrGetFirstNum", "FAILED", "未找到全是数字的字符串。")
-        return None
+        lalc_logger.log_task("WARNING", "ocrGetFirstNum", "FAILED", "未找到全是数字的字符串。")
+        return 0
     
     def rgbDetection(self, coordinate: list, recognize_area=[0, 0, 0, 0], is_show_result=False):
         """
