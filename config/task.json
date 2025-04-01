@@ -626,7 +626,6 @@
         ]
     },
     "FullAutoMirrorCircleCenter": {
-        "pre_delay": 0.5,
         "next": [
             "FullAutoMirrorDealDownload",
             "FullAutoMirrorTouchToStart",

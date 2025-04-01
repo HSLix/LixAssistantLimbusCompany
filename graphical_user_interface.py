@@ -85,7 +85,16 @@ class Window(FramelessWindow):
 
         self.show()
 
-        
+        self.show_announcement_dialog()
+
+    def show_announcement_dialog(self):
+        """显示公告窗口"""
+        dialog = Dialog(
+            title="紧急通告！| Emergency Announcement！",
+            content="由于月亮计划已声明将在4月3日更新反作弊，暂时不知其是否会波及LALC。\n保险起见，4月3日更新后请勿轻易使用 LALC。\nAs the Project Moon has announced that it will update its anti cheating measures on April 3rd, it is currently unknown whether it will affect LALC. \nFor safety reasons, please do not use LALC easily after the April 3rd update. \n",
+            parent=self
+        )
+        dialog.exec_()
 
     def check_for_updates(self):
         """检测当前版本是否是最新版本"""
@@ -590,7 +599,6 @@ def main(*args, **kwargs):
     # 获取项目根目录
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     sys.path.append(project_root)
-        
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
