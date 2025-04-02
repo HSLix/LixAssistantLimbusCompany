@@ -111,7 +111,7 @@ class WorkingPage(QFrame):
             self.pending_pause = True
             self.PauseButton.setEnabled(False)
             self.StopButton.setEnabled(False)
-            self.window().show_message("info", "Pausing", _("正在暂停任务"))
+            self.window().show_message("INFO", "Pausing", _("正在暂停任务"))
             
             # 2. 触发暂停操作
             control_unit.pause_requested.emit()  # 新增信号
@@ -136,7 +136,7 @@ class WorkingPage(QFrame):
         self.pending_stop = True
         self.StopButton.setEnabled(False)
         self.PauseButton.setEnabled(False)
-        self.window().show_message("info", "Stopping", _("正在停止任务"))
+        self.window().show_message("INFO", "Stopping", _("正在停止任务"))
         
         # 2. 触发停止操作
         ControlUnit().stop_requested.emit()  # 新增信号
@@ -147,13 +147,13 @@ class WorkingPage(QFrame):
         self.PauseButton.setText(_("Resume"))
         self.PauseButton.setEnabled(True)
         self.StopButton.setEnabled(True)
-        self.window().show_message("info", "Paused", _("任务已暂停"))
+        self.window().show_message("INFO", "Paused", _("任务已暂停"))
 
     def on_stopped(self):
         """停止完成回调"""
         self.pending_stop = False
         self.PauseButton.setText(_("Pause"))
-        self.window().show_message("info", "Stoped", _("任务已停止"))
+        self.window().show_message("INFO", "Stoped", _("任务已停止"))
         # 恢复开始按钮
         self.window().homeInterface.enableStartButtons()
         self.window().homeInterface.stopRecording()

@@ -184,7 +184,7 @@ class TeamPreviewWidget(QWidget):
             self.window().show_message("success", "SaveSuccess", f"{self.team_name} 顺序保存成功！")
             self.update_order_labels()
         except Exception as e:
-            self.window().show_message("error", "SaveFailed", f"{self.team_name} 顺序保存失败！")
+            self.window().show_message("ERROR", "SaveFailed", f"{self.team_name} 顺序保存失败！")
             # QMessageBox.critical(self, "错误", f"保存失败：{e}")
 
     def update_order_labels(self):

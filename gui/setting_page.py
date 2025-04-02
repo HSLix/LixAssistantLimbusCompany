@@ -72,6 +72,8 @@ class SettingPage(ScrollArea):
 
         # 录屏设置组
         self.recordingGroup = SettingCardGroup(_("录屏设置"), self.scrollWidget)
+        
+        # 录屏开关
         self.recordingCard = SwitchSettingCard(
             FIF.VIDEO,
             _("是否录屏"),
@@ -84,6 +86,32 @@ class SettingPage(ScrollArea):
         self.recordingCard.checkedChanged.connect(self._save_recording_config)
         self.recordingCard.checkedChanged.connect(self._on_recording_changed)
         self.recordingGroup.addSettingCard(self.recordingCard)
+        
+        # 录屏保存数量设置卡
+        class VideoRetention(Enum):
+            """ Video retention count enumeration """
+            TWELVE = 12
+
+        class VideoRetentionSerializer(ConfigSerializer):
+            """ Video retention serializer """
+            def serialize(self, count):
+                return count.value
+
+            def deserialize(self, value: int):
+                return VideoRetention(value)
+
+        self.videoRetentionCard = OptionsSettingCard(
+            OptionsConfigItem(
+                "gui", "video_retention", VideoRetention.TWELVE,
+                OptionsValidator(VideoRetention), VideoRetentionSerializer()
+            ),
+            FIF.SAVE,
+            _("录屏保存数量"),
+            _("设置最大保存的录屏视频数量"),
+            texts=['12'],
+            parent=self.recordingGroup
+        )
+        self.recordingGroup.addSettingCard(self.videoRetentionCard)
 
         # 录屏文件夹
         self.recordingFolderCard = PrimaryPushSettingCard(
@@ -96,8 +124,36 @@ class SettingPage(ScrollArea):
         self.recordingFolderCard.clicked.connect(lambda: self._open_folder(VIDEO_DIR))
         self.recordingGroup.addSettingCard(self.recordingFolderCard)
 
-        # 日志文件夹组
-        self.logGroup = SettingCardGroup(_("日志文件夹"), self.scrollWidget)
+        # 日志设置组
+        self.logGroup = SettingCardGroup(_("日志设置"), self.scrollWidget)
+        
+        # 日志保存天数设置卡
+        class LogRetention(Enum):
+            """ Log retention days enumeration """
+            SEVEN = 7
+
+        class LogRetentionSerializer(ConfigSerializer):
+            """ Log retention serializer """
+            def serialize(self, days):
+                return days.value
+
+            def deserialize(self, value: int):
+                return LogRetention(value)
+
+        self.logRetentionCard = OptionsSettingCard(
+            OptionsConfigItem(
+                "gui", "log_retention", LogRetention.SEVEN,
+                OptionsValidator(LogRetention), LogRetentionSerializer()
+            ),
+            FIF.HISTORY,
+            _("日志保留天数"),
+            _("设置自动保留日志的天数"),
+            texts=['7'],
+            parent=self.logGroup
+        )
+        self.logGroup.addSettingCard(self.logRetentionCard)
+
+        # 日志文件夹
         self.logFolderCard = PrimaryPushSettingCard(
             _("打开日志文件夹"),
             FIF.FOLDER,
@@ -160,14 +216,14 @@ class SettingPage(ScrollArea):
 
         # 使用 QDesktopServices 打开文件夹
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(folder_path)):
-            self.window().show_message("error", "FileDirNotFound", _("无法打开文件夹：%s") % (folder_path))
+            self.window().show_message("ERROR", "FileDirNotFound", _("无法打开文件夹：%s") % (folder_path))
 
     def _save_language_config(self):
         """保存语言配置"""
         value = self.languageCard.configItem.value
         self.gui_config["language"] = value.value
         config_manager.save_config("gui", self.gui_config)
-        self.window().show_message("info", "语言切换通知", "设置将在重启后生效\nSettings will take effect after restarting the programme")
+        self.window().show_message("INFO", "语言切换通知", "设置将在重启后生效\nSettings will take effect after restarting the programme")
 
     def _save_recording_config(self, is_checked):
         self.gui_config["recording"] = is_checked

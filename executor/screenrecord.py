@@ -40,36 +40,7 @@ class ScreenRecorderThread(QThread):
         super().__init__()
         self.recording = False
         self.output_path = VIDEO_DIR
-        self.safe_encoder = self.get_safe_encoder()
 
-    def get_safe_encoder(self):
-        """自动选择可用的最佳 H.264 编码器"""
-        # 按优先级排序的编码器列表
-        encoder_priority = [
-            'h264_nvenc',    # NVIDIA 显卡（效率最高）
-            'h264_qsv',      # Intel 核显
-            'h264_amf',      # AMD 显卡
-            'libx264'        # 软件后备
-        ]
-        
-        try:
-            # 获取 FFmpeg 支持的编码器列表
-            result = run(
-                [FFMPEG_FILE, '-hide_banner', '-encoders'],
-                stdout=PIPE,
-                stderr=PIPE,
-                text=True
-            )
-            encoders_output = result.stderr
-
-            # 按优先级检查可用编码器
-            for encoder in encoder_priority:
-                if encoder in encoders_output:
-                    return encoder
-        except Exception as e:
-            print(f"检测编码器时出错: {e}")
-        
-        return 'libx264'  # 默认后备
 
     def set_recording_enabled(self, enabled):
         """设置录屏功能是否启用"""
@@ -77,7 +48,7 @@ class ScreenRecorderThread(QThread):
 
     def run(self):
         self.remove_exceeded_video()
-        lalc_logger.log_task("INFO", "record_fun", "STARTED", "Use Encoder [{0}]".format(self.safe_encoder))
+        lalc_logger.log_task("INFO", "record_fun", "STARTED", "Use Encoder [libx264]")
         if not self.recording:
             self.recording = True
 
@@ -97,13 +68,15 @@ class ScreenRecorderThread(QThread):
                 '-pix_fmt', 'bgr24',
                 '-s', f'{w}x{h}',
                 '-r', '8',
-                '-i', '-',
+                # '-i', '-',
+                '-i', 'pipe:',
                 '-an',
-                '-c:v', self.safe_encoder,
+                '-c:v', "libx264",
                 '-pix_fmt', 'yuv420p',
                 '-crf', '37',
                 output_file
             ]
+            
 
             process = Popen(command, stdin=PIPE)
             

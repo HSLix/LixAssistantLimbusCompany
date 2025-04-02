@@ -90,7 +90,8 @@ class GifPlayer(QLabel):
                     "shaking_hand",
                     "blow_kiss", 
                     # "black1",
-                    # "heart"
+                    # "heart",
+                    # "white_night"
                     ]
         self.push_gif_to_queue(random.choice(choices))
 
