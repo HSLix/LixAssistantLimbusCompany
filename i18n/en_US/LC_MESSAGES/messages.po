@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-03-19 22:49+0800\n"
+"POT-Creation-Date: 2025-04-02 20:49+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,51 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: graphical_user_interface.py:90
+#: graphical_user_interface.py:126 graphical_user_interface.py:133
+#: graphical_user_interface.py:139
+msgid "Update Check Successful"
+msgstr "Update Check Successful"
+
+#: graphical_user_interface.py:127
+#, python-brace-format
+msgid ""
+"You are using the latest version.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"You are using the latest version.\n"
+"Current version: {0}, GitHub version: {1}"
+
+#: graphical_user_interface.py:134
+#, python-brace-format
+msgid ""
+"Your version is outdated. Please update.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"Your version is outdated. Please update.\n"
+"Current version: {0}, GitHub version: {1}"
+
+#: graphical_user_interface.py:140
+#, python-brace-format
+msgid ""
+"Your version is 404 Not Found.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"Your version is 404 Not Found.\n"
+"Current version: {0}, GitHub version: {1}"
+
+#: graphical_user_interface.py:147
+msgid "Update Check Failed"
+msgstr "Update Check Failed"
+
+#: graphical_user_interface.py:148
+msgid ""
+"Failed to check for updates. \n"
+"Please check your internet connection."
+msgstr ""
+"Failed to check for updates. \n"
+"Please check your internet connection."
+
+#: graphical_user_interface.py:166
 msgid ""
 "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
@@ -25,7 +69,7 @@ msgstr ""
 "Would you mind giving LALC a star ✨ on GitHub?\n"
 "\n"
 
-#: graphical_user_interface.py:91
+#: graphical_user_interface.py:167
 msgid ""
 "这是对陆爻齐莫大的肯定，谢谢啦！\n"
 "\n"
@@ -33,7 +77,7 @@ msgstr ""
 "This would be a great encouragement to LuYaoqi, thank you!\n"
 "\n"
 
-#: graphical_user_interface.py:92
+#: graphical_user_interface.py:168
 msgid ""
 "PS：如果能打赏一点点就更好了哈哈\n"
 "\n"
@@ -41,7 +85,7 @@ msgstr ""
 "PS: A small donation would be even better, hehe\n"
 "\n"
 
-#: graphical_user_interface.py:93
+#: graphical_user_interface.py:169
 msgid ""
 "(不打赏也没关系，但一定要过好自己的生活哦)\n"
 "\n"
@@ -49,28 +93,28 @@ msgstr ""
 "(No pressure if not, just live your best life!)\n"
 "\n"
 
-#: graphical_user_interface.py:94
+#: graphical_user_interface.py:170
 msgid "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
 msgstr "PPS: LuYaoqi is closing this window soon, please don't hate me QAQ"
 
-#: graphical_user_interface.py:100
+#: graphical_user_interface.py:176
 msgid "还有<nobr><b>6</b></nobr>秒。"
 msgstr "There are <nobr><b>6</b></nobr> seconds left."
 
-#: graphical_user_interface.py:106
+#: graphical_user_interface.py:182
 msgid "现在就去"
 msgstr "Come now"
 
-#: graphical_user_interface.py:107 graphical_user_interface.py:395
+#: graphical_user_interface.py:183 graphical_user_interface.py:526
 msgid "下次一定"
 msgstr "Next time for sure"
 
-#: graphical_user_interface.py:140 graphical_user_interface.py:150
+#: graphical_user_interface.py:216 graphical_user_interface.py:226
 #, python-format
 msgid "还有<nobr><b>%d</b></nobr>秒。"
 msgstr "There are <nobr><b>%d</b></nobr> seconds left."
 
-#: graphical_user_interface.py:149
+#: graphical_user_interface.py:225
 msgid ""
 "谢谢 !祝你生活愉快！✨\n"
 "\n"
@@ -84,80 +128,124 @@ msgstr ""
 "\n"
 "Thanks for taking the time to know LALC"
 
-#: graphical_user_interface.py:161
+#: graphical_user_interface.py:237
 msgid "也祝你生活愉快！(^_−)☆"
 msgstr "Wish you a wonderful life too! (^_−)☆"
 
-#: graphical_user_interface.py:180
+#: graphical_user_interface.py:256
 msgid "NotRecommandAction"
 msgstr "NotRecommandAction"
 
-#: graphical_user_interface.py:181
+#: graphical_user_interface.py:257
 msgid "You had better keep one team enabled at least."
 msgstr "You had better keep one team enabled at least."
 
-#: graphical_user_interface.py:190
+#: graphical_user_interface.py:266
 msgid "TaskFinished"
 msgstr "TaskFinished"
 
-#: graphical_user_interface.py:191
+#: graphical_user_interface.py:267
 #, python-brace-format
 msgid "{0} have finished {1} time(s)"
 msgstr "{0} have finished {1} time(s)"
 
-#: graphical_user_interface.py:221
+#: graphical_user_interface.py:307
 msgid "所有任务顺利执行"
 msgstr "All tasks completed successfully"
 
-#: graphical_user_interface.py:225
+#: graphical_user_interface.py:311
 msgid "任务执行已暂停"
 msgstr "Task execution paused"
 
-#: graphical_user_interface.py:228
+#: graphical_user_interface.py:314
 msgid "任务执行已继续"
 msgstr "Task execution resumed"
 
-#: graphical_user_interface.py:283
+#: graphical_user_interface.py:331
+msgid "Too Much Video"
+msgstr "Too Much Video"
+
+#: graphical_user_interface.py:331
+msgid ""
+"The amount of Video is about to overcome 11.\n"
+"Next time the earlist one would be deleted."
+msgstr ""
+"The amount of Video is about to overcome 11.\n"
+"Next time the earlist one would be deleted."
+
+#: graphical_user_interface.py:337
+msgid "WhiteNight"
+msgstr "WhiteNight"
+
+#: graphical_user_interface.py:337
+msgid ""
+"Twelfth, why have I not chosen thee? Because there is among you a devil that "
+"hath betrayed his master."
+msgstr ""
+"Twelfth, why have I not chosen thee? Because there is among you a devil that "
+"hath betrayed his master."
+
+#: graphical_user_interface.py:343
+msgid "Delete Video"
+msgstr "Delete Video"
+
+#: graphical_user_interface.py:343
+msgid "The earliest Video has been deleted."
+msgstr "The earliest Video has been deleted."
+
+#: graphical_user_interface.py:351
+msgid "Delete outdated log from seven days ago successfully."
+msgstr "Delete outdated log from seven days ago successfully."
+
+#: graphical_user_interface.py:404
 msgid "Home"
 msgstr "Home"
 
-#: graphical_user_interface.py:284
+#: graphical_user_interface.py:405
 msgid "Working"
 msgstr "Working"
 
-#: graphical_user_interface.py:288
+#: graphical_user_interface.py:409
 msgid "Teams"
 msgstr "Teams"
 
-#: graphical_user_interface.py:289
+#: graphical_user_interface.py:410
 msgid "Team1"
 msgstr "Team1"
 
-#: graphical_user_interface.py:290
+#: graphical_user_interface.py:411
 msgid "Team2"
 msgstr "Team2"
 
-#: graphical_user_interface.py:291
+#: graphical_user_interface.py:412
 msgid "Team3"
 msgstr "Team3"
 
-#: graphical_user_interface.py:292
+#: graphical_user_interface.py:413
 msgid "Team4"
 msgstr "Team4"
 
-#: graphical_user_interface.py:298 graphical_user_interface.py:301
+#: graphical_user_interface.py:414
+msgid "Team5"
+msgstr "Team5"
+
+#: graphical_user_interface.py:419 graphical_user_interface.py:422
+msgid "Chat"
+msgstr "Chat"
+
+#: graphical_user_interface.py:429 graphical_user_interface.py:432
 msgid "Support"
 msgstr "Support"
 
-#: graphical_user_interface.py:314
+#: graphical_user_interface.py:445
 msgid "Settings"
 msgstr "Settings"
 
-#: graphical_user_interface.py:390
+#: graphical_user_interface.py:521
 msgid "支持作者🥰"
 msgstr "Support the Author 🥰"
 
-#: graphical_user_interface.py:391
+#: graphical_user_interface.py:522
 msgid ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
@@ -165,11 +253,11 @@ msgstr ""
 "Developing alone is tough. If this project helps you, consider starring it on GitHub ⭐. Your support"
 "is the motivation for the author to develop and maintain the project 🚀"
 
-#: graphical_user_interface.py:394
+#: graphical_user_interface.py:525
 msgid "来啦老弟"
 msgstr "Come now"
 
-#: graphical_user_interface.py:411
+#: graphical_user_interface.py:552
 #, python-format
 msgid ""
 "捕获到未知，是否打开日志查看？\n"
@@ -190,35 +278,39 @@ msgstr "Configuration Settings"
 msgid "游戏窗口大小"
 msgstr "Game Window Size"
 
-#: gui/full_auto_page.py:124
+#: gui/full_auto_page.py:94
+msgid "AssembleEnkephalinModules"
+msgstr "AssembleEnkephalinModules"
+
+#: gui/full_auto_page.py:138
 msgid "Init"
 msgstr "Init"
 
-#: gui/full_auto_page.py:126
+#: gui/full_auto_page.py:140
 msgid "EXP"
 msgstr "EXP"
 
-#: gui/full_auto_page.py:129
+#: gui/full_auto_page.py:143
 msgid "Thread"
 msgstr "Thread"
 
-#: gui/full_auto_page.py:132
+#: gui/full_auto_page.py:146
 msgid "Mirror"
 msgstr "Mirror"
 
-#: gui/full_auto_page.py:135
+#: gui/full_auto_page.py:149
 msgid "Reward"
 msgstr "Reward"
 
-#: gui/full_auto_page.py:137 gui/semi_auto_page.py:150
+#: gui/full_auto_page.py:151 gui/semi_auto_page.py:151
 msgid "Start"
 msgstr "Start"
 
-#: gui/full_auto_page.py:228
+#: gui/full_auto_page.py:243
 msgid "录屏完成"
 msgstr "Screen Recording Completed"
 
-#: gui/full_auto_page.py:228
+#: gui/full_auto_page.py:243
 #, python-format
 msgid "录屏已保存至:%s"
 msgstr "Screen recording saved to: %s"
@@ -231,31 +323,35 @@ msgstr "FullAuto"
 msgid "SemiAuto"
 msgstr "SemiAuto"
 
-#: gui/semi_auto_page.py:92
+#: gui/semi_auto_page.py:79
+msgid "Full(12/12) Team to Battle"
+msgstr "Full(12/12) Team to Battle"
+
+#: gui/semi_auto_page.py:93
 msgid "Select \"Ego\" Choice"
 msgstr "Select \"Ego\" Choice"
 
-#: gui/semi_auto_page.py:136
+#: gui/semi_auto_page.py:137
 msgid "Auto P Battle"
 msgstr "Auto P Battle"
 
-#: gui/semi_auto_page.py:138
+#: gui/semi_auto_page.py:139
 msgid "Skip Event"
 msgstr "Skip Event"
 
-#: gui/semi_auto_page.py:140
+#: gui/semi_auto_page.py:141
 msgid "Auto Click Next Stage"
 msgstr "Auto Click Next Stage"
 
-#: gui/semi_auto_page.py:142
+#: gui/semi_auto_page.py:143
 msgid "Auto Select Reward Card"
 msgstr "Auto Select Reward Card"
 
-#: gui/semi_auto_page.py:144
+#: gui/semi_auto_page.py:145
 msgid "Auto Skip EgoGiftGet"
 msgstr "Auto Skip EgoGiftGet"
 
-#: gui/semi_auto_page.py:146
+#: gui/semi_auto_page.py:147
 msgid "Auto Enter Mirror(Begin)"
 msgstr "Auto Enter Mirror(Begin)"
 
@@ -275,75 +371,95 @@ msgstr "Set your preferred UI language"
 msgid "录屏设置"
 msgstr "Screen Recording Settings"
 
-#: gui/setting_page.py:77
+#: gui/setting_page.py:79
 msgid "是否录屏"
 msgstr "Enable Screen Recording"
 
-#: gui/setting_page.py:78
+#: gui/setting_page.py:80
 msgid "开启或关闭录屏功能"
 msgstr "Toggle screen recording functionality"
 
-#: gui/setting_page.py:90
+#: gui/setting_page.py:109
+msgid "录屏保存数量"
+msgstr "Number of Screen Recordings to Save"
+
+#: gui/setting_page.py:110
+msgid "设置最大保存的录屏视频数量"
+msgstr "Set the maximum number of screen recordings to save"
+
+#: gui/setting_page.py:118
 msgid "打开录屏文件夹"
 msgstr "Open Screen Recording Folder"
 
-#: gui/setting_page.py:92
+#: gui/setting_page.py:120
 msgid "录屏文件夹"
 msgstr "Screen Recording Folder"
 
-#: gui/setting_page.py:93
+#: gui/setting_page.py:121
 msgid "点击打开录屏文件夹"
 msgstr "Click to open screen recording folder"
 
-#: gui/setting_page.py:100 gui/setting_page.py:104
-msgid "日志文件夹"
-msgstr "Log Folder"
+#: gui/setting_page.py:128
+msgid "日志设置"
+msgstr "Log Settings"
 
-#: gui/setting_page.py:102
+#: gui/setting_page.py:149
+msgid "日志保留天数"
+msgstr "Log Retention Days"
+
+#: gui/setting_page.py:150
+msgid "设置自动保留日志的天数"
+msgstr "Set the number of days to automatically retain logs"
+
+#: gui/setting_page.py:158
 msgid "打开日志文件夹"
 msgstr "Open Log Folder"
 
-#: gui/setting_page.py:105
+#: gui/setting_page.py:160
+msgid "日志文件夹"
+msgstr "Log Folder"
+
+#: gui/setting_page.py:161
 msgid "点击打开日志文件夹"
 msgstr "Click to open log folder"
 
-#: gui/setting_page.py:112
+#: gui/setting_page.py:168
 msgid "帮助与反馈"
 msgstr "Help & Feedback"
 
-#: gui/setting_page.py:115
+#: gui/setting_page.py:171
 msgid "打开帮助页面"
 msgstr "Open Help Page"
 
-#: gui/setting_page.py:117
+#: gui/setting_page.py:173
 msgid "帮助"
 msgstr "Help"
 
-#: gui/setting_page.py:118
+#: gui/setting_page.py:174
 msgid "发现新功能并学习有关本应用的有用提示"
 msgstr "Discover new features and learn useful tips about this app"
 
-#: gui/setting_page.py:123
+#: gui/setting_page.py:179
 msgid "前往反馈"
 msgstr "Go to Feedback"
 
-#: gui/setting_page.py:125
+#: gui/setting_page.py:181
 msgid "提供反馈"
 msgstr "Provide Feedback"
 
-#: gui/setting_page.py:126
+#: gui/setting_page.py:182
 msgid "通过提供反馈帮助改进本应用"
 msgstr "Help improve this app by providing feedback"
 
-#: gui/setting_page.py:133
+#: gui/setting_page.py:189
 msgid "关于"
 msgstr "About"
 
-#: gui/setting_page.py:136
+#: gui/setting_page.py:192
 msgid "点击前往更新应用"
 msgstr "Click to update the app"
 
-#: gui/setting_page.py:163
+#: gui/setting_page.py:219
 #, python-format
 msgid "无法打开文件夹：%s"
 msgstr "Cannot open folder: %s"
@@ -360,7 +476,7 @@ msgstr "Cancel All"
 msgid "保存队伍"
 msgstr "Save Team"
 
-#: gui/team_edit_page.py:235
+#: gui/team_edit_page.py:250
 #, python-format
 msgid "编辑队伍: %s"
 msgstr "Edit Team: %s"
@@ -409,7 +525,7 @@ msgstr "Team Style"
 msgid "首发队伍"
 msgstr "Starting Team"
 
-#: gui/working_page.py:24 gui/working_page.py:121 gui/working_page.py:151
+#: gui/working_page.py:24 gui/working_page.py:125 gui/working_page.py:155
 msgid "Pause"
 msgstr "Pause"
 
@@ -421,30 +537,30 @@ msgstr "Stop"
 msgid "Open Log Folder"
 msgstr "Open Log Folder"
 
-#: gui/working_page.py:36
+#: gui/working_page.py:40
 msgid "Current Team:"
 msgstr "Current Team:"
 
-#: gui/working_page.py:39
+#: gui/working_page.py:43
 msgid "Next Team:"
 msgstr "Next Team:"
 
-#: gui/working_page.py:110
+#: gui/working_page.py:114
 msgid "正在暂停任务"
 msgstr "Pausing task..."
 
-#: gui/working_page.py:135
+#: gui/working_page.py:139
 msgid "正在停止任务"
 msgstr "Stopping task..."
 
-#: gui/working_page.py:143
+#: gui/working_page.py:147
 msgid "Resume"
 msgstr "Resume"
 
-#: gui/working_page.py:146
+#: gui/working_page.py:150
 msgid "任务已暂停"
 msgstr "Task paused"
 
-#: gui/working_page.py:152
+#: gui/working_page.py:156
 msgid "任务已停止"
 msgstr "Task stopped"

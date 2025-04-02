@@ -240,7 +240,7 @@ class FullAutoPage(QFrame):
     def stop_recording(self):
         self.record_thread.stop_recording()
         if (config_manager.get_config("gui").get("recording", True)):
-            self.window().show_message("info", _("录屏完成"), _("录屏已保存至:%s") % (screen_record_thread.output_path))
+            self.window().show_message("INFO", _("录屏完成"), _("录屏已保存至:%s") % (screen_record_thread.output_path))
 
     def collect_save_params(self):
         """收集 FullAutoPage 要保存的配置参数"""

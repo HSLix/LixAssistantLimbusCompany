@@ -80,8 +80,9 @@ class Window(FramelessWindow):
 
         # 其余窗口初始化事项
         self.initWindow()
-        self.check_for_updates()  # 调用版本检测函数
+        self.checkForUpdates()  # 调用版本检测函数
         self.showSupportDialog()
+        lalc_logger.clean_old_logs()
 
         self.show()
 
@@ -91,12 +92,12 @@ class Window(FramelessWindow):
         """显示公告窗口"""
         dialog = Dialog(
             title="紧急通告！| Emergency Announcement！",
-            content="由于月亮计划已声明将在4月3日更新反作弊，暂时不知其是否会波及LALC。\n保险起见，4月3日更新后请勿轻易使用 LALC。\nAs the Project Moon has announced that it will update its anti cheating measures on April 3rd, it is currently unknown whether it will affect LALC. \nFor safety reasons, please do not use LALC easily after the April 3rd update. \n",
+            content="由于听说月亮计划将在4月3日更新反作弊，暂时不知其是否会波及LALC。\n保险起见，4月3日更新后请勿轻易使用 LALC。\n\nSomebody says Project Moon will update its anti cheating measures on April 3rd, it is currently unknown whether it will affect LALC. \nFor safety reasons, please do not use LALC easily after the April 3rd update.",
             parent=self
         )
         dialog.exec_()
 
-    def check_for_updates(self):
+    def checkForUpdates(self):
         """检测当前版本是否是最新版本"""
         def get_latest_release(repo):
             url = f"https://api.github.com/repos/{repo}/releases/latest"
@@ -107,11 +108,11 @@ class Window(FramelessWindow):
                     latest_release = release_info["tag_name"]
                     return latest_release
                 else:
-                    lalc_logger.log_task("WARNING", "check_for_updates", "FAILED", str(response))
+                    lalc_logger.log_task("WARNING", "checkForUpdates", "FAILED", str(response))
                     return None
             except Exception as e:
                 print(f"Failed to fetch release information: {e}")
-                lalc_logger.log_task("ERROR", "check_for_updates", "FAILED", str(e))
+                lalc_logger.log_task("ERROR", "checkForUpdates", "FAILED", str(e))
                 return None
 
         repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
@@ -121,28 +122,28 @@ class Window(FramelessWindow):
             if latest_release == VERSION:
                 # 当前版本是最新版本
                 self.show_message(
-                    'success',
+                    "SUCCESS",
                     _('Update Check Successful'),
                     _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
             elif latest_release > VERSION:
                 # 当前版本落后
                 self.show_message(
-                    'error',
+                    "ERROR",
                     _('Update Check Successful'),
                     _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
             else:
                 self.show_message(
-                    'success',
+                    "SUCCESS",
                     _('Update Check Successful'),
                     _('Your version is 404 Not Found.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
-            lalc_logger.log_task("INFO", "check_for_updates", "FINISHED", "Current version: {0}, GitHub version: {1}".format(VERSION, latest_release))
+            lalc_logger.log_task("INFO", "checkForUpdates", "FINISHED", "Current version: {0}, GitHub version: {1}".format(VERSION, latest_release))
         else:
             # 网络检测失败
             self.show_message(
-                'error',
+                "ERROR",
                 _('Update Check Failed'),
                 _('Failed to check for updates. \nPlease check your internet connection.')
             )
@@ -261,7 +262,7 @@ class Window(FramelessWindow):
         # 任务完成信号
         control_unit.task_finished.connect(
             lambda task_name, count: self.show_message(
-                'success', 
+                "SUCCESS", 
                 _('TaskFinished'), 
                 _('{0} have finished {1} time(s)').format(task_name, count)
             )
@@ -290,7 +291,7 @@ class Window(FramelessWindow):
         
         # 任务错误信号
         control_unit.task_error.connect(
-            lambda msg: self.show_message('error', 'Error', msg)
+            lambda msg: self.show_message("ERROR", 'Error', msg)
         )
         control_unit.task_error.connect(
             self.workingInterface.thread_self_stop
@@ -303,14 +304,14 @@ class Window(FramelessWindow):
             
         # 所有任务完成信号
         control_unit.task_completed.connect(
-            lambda : self.show_message('success', 'FinshAll', _("所有任务顺利执行"))
+            lambda : self.show_message("SUCCESS", 'FinshAll', _("所有任务顺利执行"))
         )
         # 任务暂停/继续信号
         control_unit.task_paused.connect(
-            lambda: self.show_message('info', 'Paused', _('任务执行已暂停'))
+            lambda: self.show_message("INFO", 'Paused', _('任务执行已暂停'))
         )
         control_unit.task_resumed.connect(
-            lambda: self.show_message('info', 'Resumed', _('任务执行已继续'))
+            lambda: self.show_message("INFO", 'Resumed', _('任务执行已继续'))
         )
 
         # 连接队伍信息更新信号
@@ -345,6 +346,11 @@ class Window(FramelessWindow):
             lambda : lalc_logger.log_task("WARNING", "record_thread_video_count_exceeded", "COMPLETED", "The earliest Video has been deleted.")
         )
 
+        global lalc_logger
+        lalc_logger.deleteOutdatedLogSignal.connect(
+            lambda : self.show_message("WARNING", "lalc_logger", _("Delete outdated log from seven days ago successfully."))
+        )
+
     def show_message(self, msg_type, title, content, default_gif_config = True):
         """
         统一显示消息条
@@ -353,17 +359,17 @@ class Window(FramelessWindow):
         # 创建新消息条
         self.info_bar = InfoBar(
             icon={
-                'info': InfoBarIcon.INFORMATION,
-                'success': InfoBarIcon.SUCCESS,
-                'warning': InfoBarIcon.WARNING,
-                'error': InfoBarIcon.ERROR
+                'INFO': InfoBarIcon.INFORMATION,
+                'SUCCESS': InfoBarIcon.SUCCESS,
+                'WARNING': InfoBarIcon.WARNING,
+                'ERROR': InfoBarIcon.ERROR
             }[msg_type],
             title=title,
             content=content,
             orient=Qt.Horizontal,
             isClosable=False if msg_type != "error" else True,
             position=InfoBarPosition.TOP,
-            duration=5000 if msg_type != 'error' else -1,
+            duration=30000 if msg_type == 'warning' else (5000 if msg_type != "ERROR" else -1),
             parent=self
         )
 
