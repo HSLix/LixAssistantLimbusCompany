@@ -137,7 +137,7 @@ class Window(FramelessWindow):
                 self.show_message(
                     "SUCCESS",
                     _('Update Check Successful'),
-                    _('Your version is 404 Not Found.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
+                    _('Welcome back! Coder :)\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
             lalc_logger.log_task("INFO", "checkForUpdates", "FINISHED", "Current version: {0}, GitHub version: {1}".format(VERSION, latest_release))
         else:
