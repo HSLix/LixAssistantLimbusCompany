@@ -1,5 +1,5 @@
 # coding: utf-8
-from logging import getLogger, DEBUG, Formatter, INFO, WARNING
+from logging import getLogger, DEBUG, Formatter, INFO, WARNING, ERROR
 from logging.handlers import TimedRotatingFileHandler
 from datetime import datetime, timedelta
 import os
@@ -68,9 +68,16 @@ class LALCLogger(QObject):
         self.warning_handler.setFormatter(log_format)
         self.warning_handler.setLevel(WARNING)
 
+        self.error_handler = DateOnlyRotatingFileHandler(
+            "task_error", when='midnight', backupCount=0, encoding="utf-8"
+        )
+        self.error_handler.setFormatter(log_format)
+        self.error_handler.setLevel(ERROR)
+
         self.logger.addHandler(self.debug_handler)
         self.logger.addHandler(self.info_handler)
         self.logger.addHandler(self.warning_handler)
+        self.logger.addHandler(self.error_handler)
 
         self.retain_days = retain_days
         # self._clean_old_logs()
@@ -81,7 +88,7 @@ class LALCLogger(QObject):
         """清理超过retain_days的旧日志"""
         cutoff_date = (datetime.now() - timedelta(days=self.retain_days)).strftime("%y-%m-%d")
         is_delete = False
-        for prefix in ["task_debug", "task_info", "task_warning"]:
+        for prefix in ["task_debug", "task_info", "task_warning", "task_error"]:
             for log_path in glob.glob(f"{LOG_DIR}/*_{prefix}.log"):
                 file_date = os.path.basename(log_path).split("_")[0]
                 if file_date < cutoff_date:

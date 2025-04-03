@@ -634,7 +634,7 @@
             "FullAutoInitMirrorInitStarBuff",
             "FullAutoInitMirrorInitStartEgoGift",
             "FullAutoMirrorCancelHardMode",
-            "FullAutoMirrorSelectThemePack",
+            "FullAutoMirrorSelectThemePackComfirmNormalMode",
             "FullAutoPassEgoGiftGet",
             "FullAutoReadySelectRewardCard",
             "FullAutoPEncounter",
@@ -654,6 +654,14 @@
             "FullAutoMirrorManagerLevelIncreased",
             "MirrorEntrance"
         ]
+    },
+    "FullAutoMirrorClaimPreviousReward":{
+        "recognition":"TemplateMatch",
+        "template":"previous_session_expired_claim_rewards.png",
+        "recognize_area":[550, 400, 500, 160],
+        "action":"Custom",
+        "custom_name":"claim_previous_reward",
+        "next":"FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorDealDownload": {
         "recognition": "TemplateMatch",
@@ -741,7 +749,7 @@
         "action_count": 2,
         "action_rest": 0.5,
         "post_delay": 0.5,
-        "next": "FullAutoInitMirrorStartOrResume"
+        "next": ["FullAutoMirrorClaimPreviousReward","FullAutoInitMirrorStartOrResume"]
     },
     "FullAutoInitMirrorStartOrResume": {
         "action": "Key",
@@ -786,6 +794,12 @@
         "post_delay": 10,
         "next": "FullAutoMirrorCircleCenter"
     },
+    "FullAutoMirrorSelectThemePackComfirmNormalMode": {
+        "recognition": "TemplateMatch",
+        "template": "mirror_normal_mode.png",
+        "recognize_area":[1015, 60, 240, 100],
+        "next": "FullAutoMirrorSelectThemePack"
+    },
     "FullAutoMirrorSelectThemePack": {
         "recognition": "TemplateMatch",
         "template": "theme_pack_info.png",
@@ -812,8 +826,9 @@
     "FullAutoMirrorCancelHardMode": {
         "recognition": "TemplateMatch",
         "template": "mirror_hard_mode.png",
+        "recognize_area":[1015, 60, 240, 100],
         "action": "Click",
-        "next": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoMirrorSelectThemePackComfirmNormalMode", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassEgoGiftGet": {
         "recognition": "TemplateMatch",

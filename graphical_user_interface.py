@@ -86,7 +86,7 @@ class Window(FramelessWindow):
 
         self.show()
 
-        self.show_announcement_dialog()
+        # self.show_announcement_dialog()
 
     def show_announcement_dialog(self):
         """显示公告窗口"""
@@ -252,7 +252,7 @@ class Window(FramelessWindow):
         control_unit = ControlUnit()
         self.teamManageInterface.last_enabled_team_disable_attempt.connect(
             lambda: self.show_message(
-                "warning",
+                "WARNING",
                 _("NotRecommandAction"),
                 _("You had better keep one team enabled at least.")
             )
@@ -277,7 +277,7 @@ class Window(FramelessWindow):
         # 屏幕缩放警告
         # control_unit.screen_scale_warning.connect(
         #     lambda: self.show_message(
-        #         'warning', 
+        #         "WARNING", 
         #         _('ScreenScaleWarning'), 
         #         _('检测到屏幕的缩放不是 150%，可能会导致运行不正常\nDetecting of screen scaling other than 150%\nwhich may result in malfunctioning.')
         #     )
@@ -297,7 +297,7 @@ class Window(FramelessWindow):
             self.workingInterface.thread_self_stop
         )
         control_unit.task_warning.connect(
-            lambda msg: self.show_message('warning', "Warning", msg)
+            lambda msg: self.show_message("WARNING", "Warning", msg)
         )
 
         
@@ -328,19 +328,19 @@ class Window(FramelessWindow):
         )
 
         screen_record_thread.video_count_warning.connect(
-            lambda: self.show_message("warning", _("Too Much Video"), _("The amount of Video is about to overcome 11.\nNext time the earlist one would be deleted."))
+            lambda: self.show_message("WARNING", _("Too Much Video"), _("The amount of Video is about to overcome 11.\nNext time the earlist one would be deleted."))
         )
         screen_record_thread.video_count_warning.connect(
             lambda : lalc_logger.log_task("WARNING", "record_thread_video_count_warning", "COMPLETED", "The amount of Video is about to overcome 12.")
         )
         screen_record_thread.video_count_exceeded.connect(
-            lambda : self.show_message("warning", _("WhiteNight"), _("Twelfth, why have I not chosen thee? Because there is among you a devil that hath betrayed his master."), default_gif_config=False)
+            lambda : self.show_message("WARNING", _("WhiteNight"), _("Twelfth, why have I not chosen thee? Because there is among you a devil that hath betrayed his master."), default_gif_config=False)
         )
         screen_record_thread.video_count_exceeded.connect(
             lambda : self.workingInterface.gif_player.push_gif_to_queue("white_night")
         )
         screen_record_thread.video_count_exceeded.connect(
-            lambda : self.show_message("warning", _("Delete Video"), _("The earliest Video has been deleted."), default_gif_config=False)
+            lambda : self.show_message("WARNING", _("Delete Video"), _("The earliest Video has been deleted."), default_gif_config=False)
         )
         screen_record_thread.video_count_exceeded.connect(
             lambda : lalc_logger.log_task("WARNING", "record_thread_video_count_exceeded", "COMPLETED", "The earliest Video has been deleted.")
@@ -367,9 +367,9 @@ class Window(FramelessWindow):
             title=title,
             content=content,
             orient=Qt.Horizontal,
-            isClosable=False if msg_type != "error" else True,
+            isClosable=False if msg_type != "ERROR" else True,
             position=InfoBarPosition.TOP,
-            duration=30000 if msg_type == 'warning' else (5000 if msg_type != "ERROR" else -1),
+            duration=30000 if msg_type == "WARNING" else (5000 if msg_type != "ERROR" else -1),
             parent=self
         )
 
@@ -384,7 +384,7 @@ class Window(FramelessWindow):
         # 根据消息类型触发 GIF 播放
         if msg_type == "success":
             self.workingInterface.gif_player.push_gif_to_queue("heart")
-        elif msg_type == "error" or msg_type == "warning":
+        elif msg_type == "ERROR" or msg_type == "WARNING":
             self.workingInterface.gif_player.push_gif_to_queue("black1")
 
         

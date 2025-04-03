@@ -2,6 +2,7 @@
 from pynput import mouse, keyboard
 from pynput.mouse import Button
 from time import sleep
+from random import uniform
 
 from .game_window import initMouseBasePoint, initMouseHomePoint
 from globals import ignoreScaleAndDpi
@@ -15,6 +16,17 @@ def get_mouse_keyboard():
     if (mk is None):
         mk = MOUSE_KEYBOARD()
     return mk
+
+
+def random_offset(origin_val, left_offset=0.05, right_offset=0.1):
+    """
+    此函数用于生成一个随机数, 该随机数会在 origin_val + left_offset 和 origin_val + right_offset 之间
+
+    :param left_offset: 随机数向左偏移值
+    :param right_offset: 随机数向右偏移值
+    :return: 包含两个随机数的列表
+    """
+    return float(uniform(origin_val-left_offset, origin_val+right_offset))
 
 
 class MOUSE_KEYBOARD:
@@ -32,7 +44,7 @@ class MOUSE_KEYBOARD:
         self.mouse_basepoint = initMouseBasePoint()
     
     
-    def dragMouse(self, coordinate:list, drag_time:float = 0.3):
+    def dragMouse(self, coordinate:list, drag_time:float = 0.6):
         """
         从按住鼠标起点坐标到终点坐标移动
         """
@@ -42,10 +54,11 @@ class MOUSE_KEYBOARD:
         # 按下鼠标左键
         self.ms.press(Button.left)
 
+        drag_time = random_offset(drag_time, 0.2, 0.5)
         # 计算总步数
         steps = int(drag_time*100)
         # 计算每一步的时间间隔
-        interval = drag_time / steps
+        interval =  drag_time / steps
         # 计算每一步在 x 和 y 方向上的增量
         dx = (end_x - start_x) / steps
         dy = (end_y - start_y) / steps
@@ -60,7 +73,7 @@ class MOUSE_KEYBOARD:
             # 移动鼠标到下一个位置
             self.ms.position = (next_x, next_y)
             # 等待一段时间
-            sleep(interval)
+            sleep(random_offset(interval, 0.002, 0.002))
 
         # 移动鼠标到最终位置
         self.ms.position = (end_x, end_y)
@@ -77,9 +90,9 @@ class MOUSE_KEYBOARD:
         # print((coordinate[0],  coordinate[1]))
         for _ in range(click_count):
             self.ms.press(Button.left)
-            sleep(0.1)
+            sleep(random_offset(0.1))
             self.ms.release(Button.left)
-            sleep(rest_time)
+            sleep(random_offset(rest_time))
 
     def scroll(self, offset:list, scroll_count:int = 1, rest_time:float=0.1):
         """
@@ -90,18 +103,9 @@ class MOUSE_KEYBOARD:
         """
         for _ in range(scroll_count):
             self.ms.scroll(offset[0], offset[1])
-            sleep(rest_time)
+            sleep(random_offset(rest_time, right_offset=0.05))
 
-    def scroll(self, offset:list, scroll_count:int = 1, rest_time:float=0.1):
-        """
-        模拟鼠标滚动
-        offset: [0,-1]即下滚动一单位，也就是滚动一下滚轮的效果
-        scroll_count: 滚动次数，默认一次
-        rest_time: 滚动后的休息时间，默认 0.1 s，滚动次数为 0 时不生效
-        """
-        for _ in range(scroll_count):
-            self.ms.scroll(offset[0], offset[1])
-            sleep(rest_time)
+    
 
 
     def pressKey(self, key:str, press_count:int = 1, rest_time:float=0.1):
@@ -121,9 +125,9 @@ class MOUSE_KEYBOARD:
         
         for _ in range(press_count):
             self.kb.press(middle_key)
-            sleep(0.1)
+            sleep(random_offset(0.1))
             self.kb.release(middle_key)
-            sleep(rest_time)
+            sleep(random_offset(rest_time))
 
     def listenMouse(self):
         """
