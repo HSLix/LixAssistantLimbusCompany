@@ -86,7 +86,7 @@ class Window(FramelessWindow):
 
         self.show()
 
-        self.show_announcement_dialog()
+        # self.show_announcement_dialog()
 
     def show_announcement_dialog(self):
         """显示公告窗口"""
