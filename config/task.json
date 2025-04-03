@@ -634,7 +634,7 @@
             "FullAutoInitMirrorInitStarBuff",
             "FullAutoInitMirrorInitStartEgoGift",
             "FullAutoMirrorCancelHardMode",
-            "FullAutoMirrorSelectThemePack",
+            "FullAutoMirrorSelectThemePackComfirmNormalMode",
             "FullAutoPassEgoGiftGet",
             "FullAutoReadySelectRewardCard",
             "FullAutoPEncounter",
@@ -828,7 +828,7 @@
         "template": "mirror_hard_mode.png",
         "recognize_area":[1015, 60, 240, 100],
         "action": "Click",
-        "next": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoMirrorSelectThemePackComfirmNormalMode", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassEgoGiftGet": {
         "recognition": "TemplateMatch",

@@ -54,10 +54,11 @@ class MOUSE_KEYBOARD:
         # 按下鼠标左键
         self.ms.press(Button.left)
 
+        drag_time = random_offset(drag_time, 0.2, 0.5)
         # 计算总步数
         steps = int(drag_time*100)
         # 计算每一步的时间间隔
-        interval = random_offset(drag_time, 0.2, 0.5) / steps
+        interval =  drag_time / steps
         # 计算每一步在 x 和 y 方向上的增量
         dx = (end_x - start_x) / steps
         dy = (end_y - start_y) / steps
@@ -72,7 +73,7 @@ class MOUSE_KEYBOARD:
             # 移动鼠标到下一个位置
             self.ms.position = (next_x, next_y)
             # 等待一段时间
-            sleep(random_offset(interval, 0.02, 0.02))
+            sleep(random_offset(interval, 0.002, 0.002))
 
         # 移动鼠标到最终位置
         self.ms.position = (end_x, end_y)
