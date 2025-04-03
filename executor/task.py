@@ -630,27 +630,6 @@ def initCustomAction():
                 break
 
     
-    
-    def search_place_sell_gift(gift_places:list, target_pic:list):
-        for c in gift_places:
-            while True:
-                mk.moveClick(c, rest_time=0.2)
-                eye.captureScreenShot()
-                sellable = True
-                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
-                    sellable = True
-                else:
-                    for gift in target_pic:
-                        if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
-                            sellable = False
-                            break
-
-                if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
-                    mk.pressKey("enter", press_count=2, rest_time=1)
-                    sleep(2)
-                    continue
-                
-                break
 
 
     @custom_action_dict.register
@@ -752,16 +731,16 @@ def initCustomAction():
             for place in goods_places:
                 if goods_places.index(place) < purchased_count:
                     continue
-                mk.moveClick(place, rest_time=1.5)
+                mk.moveClick(place, rest_time=1)
                 eye.captureScreenShot()
                 if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
                     for gift in target_pic:
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
-                            # mk.pressKey("enter", rest_time=1)
+                            mk.pressKey("enter", press_count=2, rest_time=0.3)
                             purchased_count += 1
                             break
-                    mk.pressKey("enter", press_count=2, rest_time=1)
+                    mk.pressKey("enter", press_count=1, rest_time=0.4)
                 else:
                     mk.pressKey("enter", press_count=2, rest_time=0.4)
                     continue

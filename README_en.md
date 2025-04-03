@@ -64,7 +64,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 - **Fully automatic** EXP/Thread/Mirror farming support  
 - **Team rotation** and team strategy selection  
 - Built-in **screen recording** and logging  
-- Support **custom tasks**, please refer to the [Guidance Notes] (./doc/json-guide_cn. md) for details
+- Support **custom tasks**, please refer to the [Guidance Notes](./doc/json_guide_cn.md) for details
 - Support **custom theme card package selection**, simply edit theme_packjson in 'config'
 - ~~Actually not many features~~  
 - **Extract & use** - no environment setup required  

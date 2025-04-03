@@ -712,7 +712,7 @@
     },
     "FullAutoAssembleEnkephalinModules": {
         "recognition": "ColorMatch",
-        "color_point": [575, 885],
+        "color_point": [555, 885],
         "lower":100, 
         "upper":170,
         "next": ["FullAutoAssembleEnkephalinModulesEnter", "FullAutoMirrorCircleCenter"]
@@ -839,7 +839,7 @@
             "FullAutoPassEgoGiftGetConfirm",
             "FullAutoMirrorCircleCenter"
         ],
-        "post_delay": 2
+        "post_delay": 0.5
     },
     "FullAutoPassEgoGiftGetConfirm": {
         "recognition": "TemplateMatch",
@@ -968,7 +968,7 @@
             "FullAutoPassNormalCheck",
             "FullAutoPassLowCheck",
             "FullAutoPassVeryLowCheck",
-            "FullAutoEventMakeFirstChoice"
+            "FullAutoEventMakeSecondChoice"
         ]
     },
     "FullAutoEventMakeChoiceGetEgo": {
@@ -987,7 +987,7 @@
             350
         ],
         "next": [
-            "FullAutoEventMakeSecondChoice"
+            "FullAutoClickEventRightBottom"
         ]
     },
     "FullAutoEventMakeSecondChoice": {
@@ -997,7 +997,7 @@
             510
         ],
         "next": [
-            "FullAutoClickEventRightBottom"
+            "FullAutoEventMakeFirstChoice"
         ]
     },
     "FullAutoPassVeryHighCheck": {

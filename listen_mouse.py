@@ -9,8 +9,7 @@ if __name__ == "__main__":
     # sleep(3)
     # print("滚")
     # mk.scroll([0,-1], 5)
-#     mk.moveClick([1400,
-#             860])
+    # mk.moveClick([555, 885])
     mk.listenMouse()  
     # gift_places = []
     # x = 860
