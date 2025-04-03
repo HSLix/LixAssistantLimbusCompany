@@ -927,6 +927,10 @@ def initCustomAction():
             
         return False
 
+    @custom_action_dict.register
+    def claim_previous_reward(**kwargs):
+        raise ValueError("请自行确认之前的收益。 | Please claim your reward.")
+
 
     
 task_dict = initJsonTask()
