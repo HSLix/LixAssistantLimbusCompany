@@ -287,6 +287,7 @@ class ControlUnit(QThread):
 
                 if self.cur_task.name == "End":
                     self.complete()
+                    break
 
                 # 执行当前任务
                 self.cur_task.execute_task(executed_time=self.task_executed_count, target_task_count=temp_target_task_count)
@@ -307,25 +308,20 @@ class ControlUnit(QThread):
                     self.set_next_task(self.pop_from_stack())
 
             except Exception as e:
+                # 获取详细的错误信息
+                from traceback import format_exc
+                error_info = format_exc()
                 # 记录任务异常
                 if self.cur_task:
                     lalc_logger.log_task(
                         'ERROR',
                         self.cur_task.name if self.cur_task else 'Unknown',
                         'FAILED',
-                        f"Error: {str(e)}"
+                        f"Error: {error_info}"
                     )
-                self.task_error.emit(f"任务执行失败: {str(e)}")
+                self.task_error.emit(f"任务执行失败: {error_info}")
                 break
-            finally:
-                if self.cur_task:
-                    duration = time() - start_time
-                    lalc_logger.log_task(
-                        self.cur_task.log_level,
-                        self.cur_task.name,
-                        'COMPLETED',
-                        f"Duration: {duration:.2f}s"
-                    )
+            
 
         # 清理资源
         with self.condition:

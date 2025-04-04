@@ -643,7 +643,8 @@
             "FullAutoReadyFindWay",
             "FullAutoReadyBattle",
             "FullAutoMirrorShopStart",
-            "FullAutoMirrorSelectAcquireEgo",
+            "FullAutoMirrorSelectAcquireEgoNew",
+            "FullAutoMirrorSelectAcquireEgoOwned",
             "FullAutoMirrorFinishVictory",
             "FullAutoMirrorFinishDefeat",
             "FullAutoContinueEncounter",
@@ -962,6 +963,7 @@
         "action_count": 5,
         "target": true,
         "next": [
+            "FullAutoEventMakeChoiceGetEgoByCheck",
             "FullAutoEventMakeChoiceGetEgo",
             "FullAutoPassVeryHighCheck",
             "FullAutoPassHighCheck",
@@ -971,9 +973,20 @@
             "FullAutoEventMakeSecondChoice"
         ]
     },
+    "FullAutoEventMakeChoiceGetEgoByCheck": {
+        "recognition": "TemplateMatch",
+        "template": "choices_check.png",
+        "recognize_area":[815, 140, 720, 700],
+        "action": "Click",
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
     "FullAutoEventMakeChoiceGetEgo": {
         "recognition": "TemplateMatch",
         "template": "choices_ego.png",
+        "recognize_area":[815, 140, 720, 700],
         "action": "Click",
         "next": [
             "FullAutoSkipEvent",
@@ -1172,10 +1185,18 @@
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
-    "FullAutoMirrorSelectAcquireEgo": {
+    "FullAutoMirrorSelectAcquireEgoNew": {
         "recognition": "TemplateMatch",
-        "template": "acquire_ego_gift.png",
+        "template": "acquire_ego_new.png",
         "action": "Click",
+        "target_offset":[0, 100],
+        "next": "FullAutoMirrorSelectAcquireEgoConfirm"
+    }
+    ,"FullAutoMirrorSelectAcquireEgoOwned": {
+        "recognition": "TemplateMatch",
+        "template": "acquire_ego_owned.png",
+        "action": "Click",
+        "target_offset":[0, 100],
         "next": "FullAutoMirrorSelectAcquireEgoConfirm"
     },
     "FullAutoMirrorSelectAcquireEgoConfirm": {

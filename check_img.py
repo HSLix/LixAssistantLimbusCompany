@@ -4,7 +4,8 @@ eye = get_eye()
 
 eye.captureScreenShot()
 
-c = eye.templateMatch("shop_purchase_keywordless.png", recognize_area=[575, 405, 60, 60], threshold=0, is_show_result=False)
+# c = eye.templateMatch("acquire_ego_owned.png", recognize_area=[160, 190, 1350, 100], threshold=0, is_show_result=True)
+c = eye.templateMatch("acquire_ego_new.png", recognize_area=[160, 190, 1350, 100], threshold=0, is_show_result=True)
 
 print(c)
 

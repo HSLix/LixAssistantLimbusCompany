@@ -544,10 +544,6 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
         # 忽略特定错误
         pass
 
-    print(exc_type)
-    if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
-        # 忽略特定错误
-        pass
 
     msg_box = Dialog("Unexpected Error", _("捕获到未知，是否打开日志查看？\n%s") % (error_msg))
 
