@@ -107,10 +107,11 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 
 
 ## Video_Tutorials
-<h3>Version 2.1.1-2.1.13</h3>
-<a href="https://youtu.be/ZKsNTLM-IT4">
-    <img src="./resource/github/video1Pic.png" width="300">
-</a>
+| Platform | Bilibili | Youtube |
+| - | - | - |
+| Tech Share | <a href="https://www.bilibili.com/video/BV1yPZoYSEiq/"> <img src="./resource/github/mako_speech_video.png" width="300"></a> | <a href="https://youtu.be/xbi2gapJZMA"> <img src="./resource/github/mako_speech_video.png" width="300"></a> |
+| Simple Show | <a href="https://www.bilibili.com/video/BV1MTR9YgE3p/"> <img src="./resource/github/lalc_show_video.png" width="300"></a> | <a href="https://youtu.be/Hwtjz8WAQc4"> <img src="./resource/github/lalc_show_video.png" width="300"></a> |
+| Version 2.1.1-2.1.13 | <a href="https://www.bilibili.com/video/BV12w41117so/"> <img src="./resource/github/video1Pic.png" width="300"></a> | <a href="https://youtu.be/ZKsNTLM-IT4"> <img src="./resource/github/video1Pic.png" width="300"></a> |
 
 
 ## Contribute
@@ -139,7 +140,9 @@ Translated with DeepL.com (free version)
 ### Sponsors
 | Sponsor | Date | Message |
 | - | - | - |
-| **锋** | 2024-10-12 | None |
+| **锋 | 2024-10-12 | None |
+| * | 2025-04-05 | 大佬加油！ |
+| [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
 
 ### Contributors:
 <!-- readme: collaborators,contributors -start -->

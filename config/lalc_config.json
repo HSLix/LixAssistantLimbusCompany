@@ -15,12 +15,12 @@
     },
     "semi_auto": {
         "AutoPBattle": true,
-        "SkipEvent": true,
-        "AutoClickNextStage": true,
-        "AutoSelectRewardCard": true,
+        "SkipEvent": false,
+        "AutoClickNextStage": false,
+        "AutoSelectRewardCard": false,
         "AutoSkipEgoGiftGet": false,
         "AutoEnterMirror": false,
-        "SemiAutoFullTeamToBattle": true,
+        "SemiAutoFullTeamToBattle": false,
         "SemiAutoEventMakeChoiceGetEgo": false
     }
 }

@@ -779,13 +779,14 @@ def initCustomAction():
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
                     mk.pressKey("esc")
                     continue
+                mk.pressKey("enter", press_count=1, rest_time=2)
+                
                 mk.pressKey("enter", press_count=1, rest_time=1)
                 eye.captureScreenShot()
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
                     mk.pressKey("esc")
                     continue
-                mk.pressKey("enter", press_count=2, rest_time=1)
-                sleep(2)
+                mk.pressKey("enter", press_count=1, rest_time=2)
             
             eye.captureScreenShot()
             if (not eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):

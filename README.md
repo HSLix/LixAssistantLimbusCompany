@@ -118,10 +118,13 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 | <img src="./resource/github/setting_page_cn.png" width="300"> | <img src="./resource/github/setting_page_en.png" width="300"> |
 ---
 ## 视频教程
-<h3>Version 2.1.1-2.1.13</h3>
-<a href="https://youtu.be/ZKsNTLM-IT4">    
-    <img src="./resource/github/video1Pic.png" width="300">
-</a>
+
+| 平台 | Bilibili | Youtube |
+| - | - | - |
+| 技术分享 | <a href="https://www.bilibili.com/video/BV1yPZoYSEiq/"> <img src="./resource/github/mako_speech_video.png" width="300"></a> | <a href="https://youtu.be/xbi2gapJZMA"> <img src="./resource/github/mako_speech_video.png" width="300"></a> |
+| 操作演示 | <a href="https://www.bilibili.com/video/BV1MTR9YgE3p/"> <img src="./resource/github/lalc_show_video.png" width="300"></a> | <a href="https://youtu.be/Hwtjz8WAQc4"> <img src="./resource/github/lalc_show_video.png" width="300"></a> |
+| Version 2.1.1-2.1.13 | <a href="https://www.bilibili.com/video/BV12w41117so/"> <img src="./resource/github/video1Pic.png" width="300"></a> | <a href="https://youtu.be/ZKsNTLM-IT4"> <img src="./resource/github/video1Pic.png" width="300"></a> |
+
 
 ---
 
@@ -155,6 +158,8 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 | 打赏者 | 打赏时间 | 留言 | 
 | - | - | - |
 | **锋 | 2024-10-12 | 无 | 
+| * | 2025-04-05 | 大佬加油！ |
+| [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
 
 ### 贡献者
 
