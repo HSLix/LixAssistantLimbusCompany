@@ -1,7 +1,7 @@
 
 <div align="center">
 
-![image](/resource/gui/MagicGirl.png)
+![image](/resource/github/MagicGirl.png)
 
 <br>
 
@@ -214,19 +214,11 @@ Translated with DeepL.com (free version)
   3. Consider better uses for your money (food, gifts, game passes)  
 
 - **If you still want to donate**:  
-<div align="center">
-  
-  <img src="./resource/github/wechat.png" width="300">  
-
-  WeChat  
-  <br>
---- 
-  <img src="./resource/github/alipay.png" width="300">  
-  
-  Alipay  
----
-  <br>
-</div>
+| Platform | QR Code |
+| - | - |
+| wechat | <img src="./resource/github/wechat.png" width="300"> |
+| aifadian | <img src="./resource/github/afdian.png" width="300"> |
+| alipay | <img src="./resource/github/alipay.png" width="300"> |
 
 
 ## Final_Words

@@ -1,6 +1,6 @@
 <div align="center">
 
-![image](/resource/gui/MagicGirl.png)
+![image](/resource/github/MagicGirl.png)
 
 <br>
 
@@ -217,7 +217,7 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 
 除我以外，还有其它开发者也致力于 limbus 脚本的开发，可以的话，也希望大家多多支持！！
 
-(虽然有项目没有放我的链接，但我还是放了他们的，QWQ。特别“表扬”LCAA，连我应援的评论都删了，亏我还发动态支持LCAA的视频，QWQ）
+虽然有项目没有放我的链接，但我还是放了他们的，QWQ。特别“表扬”LCAA，连我应援的评论都删了，亏我还发动态支持LCAA的视频，QWQ
 
 
 | 项目名称 | 简介  | 功能特点   | 支持平台       | 链接  |
@@ -243,23 +243,16 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 3. 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
 - 如果您仍有打赏的想法，那我再拒绝就不礼貌啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
-<div align="center">
-  
-  <img src="./resource/github/wechat.png" width="300">
-  
-  wechat
-  <br>
---- 
-  <img src="./resource/github/alipay.png" width="300">
-  
-  alipay
----
-  <br>
-</div>
+
+| 方式 | 二维码 |
+| - | - |
+| 微信 | <img src="./resource/github/wechat.png" width="300"> |
+| 爱发电 | <img src="./resource/github/afdian.png" width="300"> |
+| 支付宝 | <img src="./resource/github/alipay.png" width="300"> |
+
 
 
 ## 最后
-Last
 
 - 如果你觉得该软件对你有帮助，请帮忙点个 Star 吧，这个网页右上角小星星对我们是最好的支持！
 
