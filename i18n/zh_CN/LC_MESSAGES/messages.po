@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-04-02 20:59+0800\n"
+"POT-Creation-Date: 2025-04-06 15:56+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,94 +17,100 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: graphical_user_interface.py:126 graphical_user_interface.py:133
-#: graphical_user_interface.py:139
+#: graphical_user_interface.py:127 graphical_user_interface.py:137
+#: graphical_user_interface.py:141
 msgid "Update Check Successful"
 msgstr "更新检查成功"
 
-#: graphical_user_interface.py:127
+#: graphical_user_interface.py:128
 #, python-brace-format
 msgid ""
 "You are using the latest version.\n"
 "Current version: {0}, GitHub version: {1}"
-msgstr "当前版本就是最新版本。\n"
+msgstr ""
+"当前版本就是最新版本。\n"
 "当前版本: {0}，GitHub 版本: {1}"
 
-#: graphical_user_interface.py:134
+#: graphical_user_interface.py:133
 #, python-brace-format
 msgid ""
 "Your version is outdated. Please update.\n"
-"Current version: {0}, GitHub version: {1}"
-msgstr "当前版本已过时，请及时更新。\n"
-"当前版本: {0}，GitHub 版本: {1}"
+"Current version: {0}, GitHub version: {1}\n"
+"\n"
+"Release Notes:\n"
+"{2}"
+msgstr ""
+"当前版本已过时，请及时更新。\n"
+"当前版本: {0}，GitHub 版本: {1}\n"
+"\n"
+"更新公告：\n"
+"{2}"
 
-#: graphical_user_interface.py:140
+#: graphical_user_interface.py:142
 #, python-brace-format
 msgid ""
 "Welcome back! Coder :)\n"
 "Current version: {0}, GitHub version: {1}"
-msgstr "欢迎回来！开发者 :)\n"
+msgstr ""
+"欢迎回来！开发者 :)\n"
 "当前版本: {0}，GitHub 版本: {1}"
 
-#: graphical_user_interface.py:147
+#: graphical_user_interface.py:149
 msgid "Update Check Failed"
 msgstr "更新检查失败"
 
-#: graphical_user_interface.py:148
+#: graphical_user_interface.py:150
 msgid ""
 "Failed to check for updates. \n"
 "Please check your internet connection."
-msgstr "检查更新失败。\n"
+msgstr ""
+"检查更新失败。\n"
 "请检查你的网络连接。"
 
 #: graphical_user_interface.py:166
 msgid ""
 "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
 "\n"
-msgstr "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
-"\n"
+msgstr ""
 
 #: graphical_user_interface.py:167
 msgid ""
 "这是对陆爻齐莫大的肯定，谢谢啦！\n"
 "\n"
-msgstr "这是对陆爻齐莫大的肯定，谢谢啦！\n"
-"\n"
+msgstr ""
 
 #: graphical_user_interface.py:168
 msgid ""
 "PS：如果能打赏一点点就更好了哈哈\n"
 "\n"
-msgstr "PS：如果能打赏一点点就更好了哈哈\n"
-"\n"
+msgstr ""
 
 #: graphical_user_interface.py:169
 msgid ""
 "(不打赏也没关系，但一定要过好自己的生活哦)\n"
 "\n"
-msgstr "(不打赏也没关系，但一定要过好自己的生活哦)\n"
-"\n"
+msgstr ""
 
 #: graphical_user_interface.py:170
 msgid "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
-msgstr "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ"
+msgstr ""
 
 #: graphical_user_interface.py:176
 msgid "还有<nobr><b>6</b></nobr>秒。"
-msgstr "还有<nobr><b>6</b></nobr>秒。"
+msgstr ""
 
 #: graphical_user_interface.py:182
 msgid "现在就去"
-msgstr "现在就去"
+msgstr ""
 
 #: graphical_user_interface.py:183 graphical_user_interface.py:526
 msgid "下次一定"
-msgstr "下次一定"
+msgstr ""
 
 #: graphical_user_interface.py:216 graphical_user_interface.py:226
 #, python-format
 msgid "还有<nobr><b>%d</b></nobr>秒。"
-msgstr "还有<nobr><b>%d</b></nobr>秒。"
+msgstr ""
 
 #: graphical_user_interface.py:225
 msgid ""
@@ -113,15 +119,11 @@ msgid ""
 "不管你到底有没有给 Star\n"
 "\n"
 "谢谢你愿意多了解一点 LALC"
-msgstr "谢谢 !祝你生活愉快！✨\n"
-"\n"
-"不管你到底有没有给 Star\n"
-"\n"
-"谢谢你愿意多了解一点 LALC"
+msgstr ""
 
 #: graphical_user_interface.py:237
 msgid "也祝你生活愉快！(^_−)☆"
-msgstr "也祝你生活愉快！(^_−)☆"
+msgstr ""
 
 #: graphical_user_interface.py:256
 msgid "NotRecommandAction"
@@ -142,15 +144,15 @@ msgstr "{0} 已完成 {1} 次"
 
 #: graphical_user_interface.py:307
 msgid "所有任务顺利执行"
-msgstr "所有任务顺利执行"
+msgstr ""
 
 #: graphical_user_interface.py:311
 msgid "任务执行已暂停"
-msgstr "任务执行已暂停"
+msgstr ""
 
 #: graphical_user_interface.py:314
 msgid "任务执行已继续"
-msgstr "任务执行已继续"
+msgstr ""
 
 #: graphical_user_interface.py:331
 msgid "Too Much Video"
@@ -160,7 +162,8 @@ msgstr "视频数量过多"
 msgid ""
 "The amount of Video is about to overcome 11.\n"
 "Next time the earlist one would be deleted."
-msgstr "视频数量即将超过 11 个。\n"
+msgstr ""
+"视频数量即将超过 11 个。\n"
 "下次最早的那个视频将会被删除。"
 
 #: graphical_user_interface.py:337
@@ -171,7 +174,8 @@ msgstr "白夜"
 msgid ""
 "Twelfth, why have I not chosen thee? Because there is among you a devil that "
 "hath betrayed his master."
-msgstr "第十二个，吾为什么没有选你呢？因为你们之中，有一个卖主的魔鬼。"
+msgstr ""
+"第十二个，吾为什么没有选你呢？因为你们之中，有一个卖主的魔鬼。"
 
 #: graphical_user_interface.py:343
 msgid "Delete Video"
@@ -231,40 +235,36 @@ msgstr "设置"
 
 #: graphical_user_interface.py:521
 msgid "支持作者🥰"
-msgstr "支持作者🥰"
+msgstr ""
 
 #: graphical_user_interface.py:522
 msgid ""
 "个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
 "就是作者开发和维护项目的动力🚀"
 msgstr ""
-"个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持"
-"就是作者开发和维护项目的动力🚀"
 
 #: graphical_user_interface.py:525
 msgid "来啦老弟"
-msgstr "来啦老弟"
+msgstr ""
 
-#: graphical_user_interface.py:552
+#: graphical_user_interface.py:548
 #, python-format
 msgid ""
 "捕获到未知，是否打开日志查看？\n"
 "%s"
 msgstr ""
-"捕获到未知，是否打开日志查看？\n"
-"%s"
 
 #: gui/full_auto_page.py:22 gui/semi_auto_page.py:21
 msgid "任务设置"
-msgstr "任务设置"
+msgstr ""
 
 #: gui/full_auto_page.py:27 gui/semi_auto_page.py:26
 msgid "配置设置"
-msgstr "配置设置"
+msgstr ""
 
 #: gui/full_auto_page.py:81
 msgid "游戏窗口大小"
-msgstr "游戏窗口大小"
+msgstr ""
 
 #: gui/full_auto_page.py:94
 msgid "AssembleEnkephalinModules"
@@ -296,12 +296,12 @@ msgstr "开始"
 
 #: gui/full_auto_page.py:243
 msgid "录屏完成"
-msgstr "录屏完成"
+msgstr ""
 
 #: gui/full_auto_page.py:243
 #, python-format
 msgid "录屏已保存至:%s"
-msgstr "录屏已保存至:%s"
+msgstr ""
 
 #: gui/home_page.py:25
 msgid "FullAuto"
@@ -345,7 +345,7 @@ msgstr "自动进入镜牢（开始）"
 
 #: gui/setting_page.py:42
 msgid "语言设置"
-msgstr "语言设置"
+msgstr ""
 
 #: gui/setting_page.py:49
 msgid "Language"
@@ -353,121 +353,121 @@ msgstr "语言"
 
 #: gui/setting_page.py:50
 msgid "设置你偏好的 UI 语言"
-msgstr "设置你偏好的 UI 语言"
+msgstr ""
 
 #: gui/setting_page.py:74
 msgid "录屏设置"
-msgstr "录屏设置"
+msgstr ""
 
 #: gui/setting_page.py:79
 msgid "是否录屏"
-msgstr "是否录屏"
+msgstr ""
 
 #: gui/setting_page.py:80
 msgid "开启或关闭录屏功能"
-msgstr "开启或关闭录屏功能"
+msgstr ""
 
 #: gui/setting_page.py:109
 msgid "录屏保存数量"
-msgstr "录屏保存数量"
+msgstr ""
 
 #: gui/setting_page.py:110
 msgid "设置最大保存的录屏视频数量"
-msgstr "设置最大保存的录屏视频数量"
+msgstr ""
 
 #: gui/setting_page.py:118
 msgid "打开录屏文件夹"
-msgstr "打开录屏文件夹"
+msgstr ""
 
 #: gui/setting_page.py:120
 msgid "录屏文件夹"
-msgstr "录屏文件夹"
+msgstr ""
 
 #: gui/setting_page.py:121
 msgid "点击打开录屏文件夹"
-msgstr "点击打开录屏文件夹"
+msgstr ""
 
 #: gui/setting_page.py:128
 msgid "日志设置"
-msgstr "日志设置"
+msgstr ""
 
 #: gui/setting_page.py:149
 msgid "日志保留天数"
-msgstr "日志保留天数"
+msgstr ""
 
 #: gui/setting_page.py:150
 msgid "设置自动保留日志的天数"
-msgstr "设置自动保留日志的天数"
+msgstr ""
 
 #: gui/setting_page.py:158
 msgid "打开日志文件夹"
-msgstr "打开日志文件夹"
+msgstr ""
 
 #: gui/setting_page.py:160
 msgid "日志文件夹"
-msgstr "日志文件夹"
+msgstr ""
 
 #: gui/setting_page.py:161
 msgid "点击打开日志文件夹"
-msgstr "点击打开日志文件夹"
+msgstr ""
 
 #: gui/setting_page.py:168
 msgid "帮助与反馈"
-msgstr "帮助与反馈"
+msgstr ""
 
 #: gui/setting_page.py:171
 msgid "打开帮助页面"
-msgstr "打开帮助页面"
+msgstr ""
 
 #: gui/setting_page.py:173
 msgid "帮助"
-msgstr "帮助"
+msgstr ""
 
 #: gui/setting_page.py:174
 msgid "发现新功能并学习有关本应用的有用提示"
-msgstr "发现新功能并学习有关本应用的有用提示"
+msgstr ""
 
 #: gui/setting_page.py:179
 msgid "前往反馈"
-msgstr "前往反馈"
+msgstr ""
 
 #: gui/setting_page.py:181
 msgid "提供反馈"
-msgstr "提供反馈"
+msgstr ""
 
 #: gui/setting_page.py:182
 msgid "通过提供反馈帮助改进本应用"
-msgstr "通过提供反馈帮助改进本应用"
+msgstr ""
 
 #: gui/setting_page.py:189
 msgid "关于"
-msgstr "关于"
+msgstr ""
 
 #: gui/setting_page.py:192
 msgid "点击前往更新应用"
-msgstr "点击前往更新应用"
+msgstr ""
 
 #: gui/setting_page.py:219
 #, python-format
 msgid "无法打开文件夹：%s"
-msgstr "无法打开文件夹：%s"
+msgstr ""
 
 #: gui/team_edit_page.py:37
 msgid "恢复顺序"
-msgstr "恢复顺序"
+msgstr ""
 
 #: gui/team_edit_page.py:41
 msgid "全部取消"
-msgstr "全部取消"
+msgstr ""
 
 #: gui/team_edit_page.py:45
 msgid "保存队伍"
-msgstr "保存队伍"
+msgstr ""
 
 #: gui/team_edit_page.py:250
 #, python-format
 msgid "编辑队伍: %s"
-msgstr "编辑队伍: %s"
+msgstr ""
 
 #: gui/team_manage_page.py:23
 msgid "Burn"
@@ -499,19 +499,19 @@ msgstr "充能"
 
 #: gui/team_manage_page.py:37
 msgid "队伍名"
-msgstr "队伍名"
+msgstr ""
 
 #: gui/team_manage_page.py:37
 msgid "是否启用"
-msgstr "是否启用"
+msgstr ""
 
 #: gui/team_manage_page.py:37
 msgid "队伍流派"
-msgstr "队伍流派"
+msgstr ""
 
 #: gui/team_manage_page.py:37
 msgid "首发队伍"
-msgstr "首发队伍"
+msgstr ""
 
 #: gui/working_page.py:24 gui/working_page.py:125 gui/working_page.py:155
 msgid "Pause"
@@ -535,11 +535,11 @@ msgstr "下一个队伍:"
 
 #: gui/working_page.py:114
 msgid "正在暂停任务"
-msgstr "正在暂停任务"
+msgstr ""
 
 #: gui/working_page.py:139
 msgid "正在停止任务"
-msgstr "正在停止任务"
+msgstr ""
 
 #: gui/working_page.py:147
 msgid "Resume"
@@ -547,8 +547,8 @@ msgstr "继续"
 
 #: gui/working_page.py:150
 msgid "任务已暂停"
-msgstr "任务已暂停"
+msgstr ""
 
 #: gui/working_page.py:156
 msgid "任务已停止"
-msgstr "任务已停止"
+msgstr ""

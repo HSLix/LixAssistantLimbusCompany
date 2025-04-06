@@ -31,7 +31,7 @@ ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0
 EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
 
 # Discord
-DISCORD_LINK = "https://discord.gg/7UwBbjUGS3"
+DISCORD_LINK = "https://discord.gg/bVzCuBU4bC"
 
 MOUSE_BASEPOINT = [0,0]
 

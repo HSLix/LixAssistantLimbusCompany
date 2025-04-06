@@ -9,7 +9,7 @@
 
 <br>
 <div>
-    <a href="https://discord.gg/7UwBbjUGS3">
+    <a href="https://discord.gg/bVzCuBU4bC">
         <img src="https://cdn.simpleicons.org/discord" alt="Discord" width="24" height="24">
     </a>
 </div>
@@ -140,6 +140,9 @@ Translated with DeepL.com (free version)
 ### Sponsors
 | Sponsor | Date | Message |
 | - | - | - |
+| 世有万象 | 2023-11-20 | 6 |
+| 灵清__ | 2023-11-24 | 加油！ |
+| 灵清__ | 2023-11-24 | 无 |
 | **锋 | 2024-10-12 | None |
 | * | 2025-04-05 | 大佬加油！ |
 | [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
