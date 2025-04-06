@@ -1229,7 +1229,7 @@
         "action": "Click",
         "target": [
             500,
-            660
+            720
         ],
         "post_delay": 2,
         "next": "FullAutoMirrorGiveUpRewardsConfirm"
