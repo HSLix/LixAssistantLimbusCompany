@@ -22,6 +22,7 @@ from requests import get
 from requests import get
 
 
+
 from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
@@ -131,8 +132,7 @@ class Window(FramelessWindow):
                 # 当前版本落后
                 message = _(
                     'Your version is outdated. Please update.\n'
-                    'Current version: {0}, GitHub version: {1}\n\n'
-                    'Release Notes:\n{2}'
+                    'Current version: {0}, GitHub version: {1}'
                 ).format(VERSION, latest_release, release_body)  # 增加公告内容
                 self.show_message("ERROR", _('Update Check Successful'), message)
             else:

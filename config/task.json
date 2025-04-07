@@ -847,7 +847,7 @@
         "template": "ego_gift_get_confirm.png",
         "action": "Click",
         "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 2
+        "post_delay": 0.5
     },
     "FullAutoReadySelectRewardCard": {
         "pre_delay": 1,
@@ -889,7 +889,7 @@
         "action": "Key",
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 3
+        "post_delay": 2
     },
     "FullAutoContinueEncounter": {
         "recognition": "TemplateMatch",
@@ -938,8 +938,7 @@
         "next": [
             "FullAutoWaitFinishBattle",
             "FullAutoMirrorCircleCenter"
-        ],
-        "post_delay": 1
+        ]
     },
     "FullAutoWaitFinishBattle": {
         "recognition": "TemplateMatch",
@@ -963,6 +962,7 @@
         "action_count": 5,
         "target": true,
         "next": [
+            "FullAutoEventMakeChoiceGetEgoBySelectToGain",
             "FullAutoEventMakeChoiceGetEgoByCheck",
             "FullAutoEventMakeChoiceGetEgo",
             "FullAutoPassVeryHighCheck",
@@ -971,6 +971,16 @@
             "FullAutoPassLowCheck",
             "FullAutoPassVeryLowCheck",
             "FullAutoEventMakeSecondChoice"
+        ]
+    },
+    "FullAutoEventMakeChoiceGetEgoBySelectToGain": {
+        "recognition": "TemplateMatch",
+        "template": "choices_select_to_gain.png",
+        "recognize_area":[815, 140, 720, 700],
+        "action": "Click",
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
         ]
     },
     "FullAutoEventMakeChoiceGetEgoByCheck": {

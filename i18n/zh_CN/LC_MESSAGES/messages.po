@@ -35,16 +35,10 @@ msgstr ""
 #, python-brace-format
 msgid ""
 "Your version is outdated. Please update.\n"
-"Current version: {0}, GitHub version: {1}\n"
-"\n"
-"Release Notes:\n"
-"{2}"
+"Current version: {0}, GitHub version: {1}"
 msgstr ""
 "当前版本已过时，请及时更新。\n"
-"当前版本: {0}，GitHub 版本: {1}\n"
-"\n"
-"更新公告：\n"
-"{2}"
+"当前版本: {0}，GitHub 版本: {1}"
 
 #: graphical_user_interface.py:142
 #, python-brace-format
