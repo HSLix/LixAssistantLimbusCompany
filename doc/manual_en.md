@@ -6,11 +6,14 @@
 - In-game language requirement is English
 - The screen of your device are required to over the 1600x900, or with the virtual mechime, which can make the screen big enough to suit the requirement.LALC will automatically adjust the resolution of the game window to 1600x900 (set display value), without the need for manual adjustment.
 - Set the Render Scaling "High" in the Graphics of Settings if possible, which can absolutly help lalc recognize the image correctly.
+- Set "windowed" in the Setting of Limbus.
 ## Tutorial
 - In the main screen, click the button below to start the software.
 - In the working interface, click on the pause and stop buttons below to pause and stop running respectively.
 - To ensure stability, the pause and stop buttons do not take effect immediately.
 - Team Edit is a sub-button of Team Rotation, you need to click to save the order of the teams, otherwise, it will only be according to the last saved result.
+- Support **custom tasks**, please refer to the [Guidance Notes](./json_guide_cn.md) for details
+- Support **custom theme card package selection**, simply edit theme_packjson in 'config'
 ## Exception Handling Tutorial
 - After changing the language setting in the game, you need to restart the game for the setting to take effect.
 - If there are any clicking anomalies, please try to fix them by ‘running in administrator mode’.

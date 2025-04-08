@@ -8,7 +8,7 @@ cn | [EnglishVersion](FAQ_en.md)
 - A:该 LALC 最适配的缩放为 **150%**，虽然其他相近分辨率不是不可以使用，但效果可能没那么稳定。
 ---
 - Q:LALC 运行异常，点击错误/长时间不动/弹出错误窗口，怎么办？
-- A:1. 保存 LALC 安装文件夹中 log 文件夹下当天的log文件；2. 保存运行时产生的录像；3. 然后按照 Issue 模板中 Report Bug 的要求提 Issue，并提供所有日志文件夹（debug、info、warning）以及对应的视频文件（可以在 [dicord 群](https://discord.gg/7UwBbjUGS3) 提供）。
+- A:1. 保存 LALC 安装文件夹中 log 文件夹下当天的log文件；2. 保存运行时产生的录像；3. 然后按照 Issue 模板中 Report Bug 的要求提 Issue，并提供所有日志文件夹（debug、info、warning）以及对应的视频文件（可以在 [dicord 群](https://discord.gg/bVzCuBU4bC) 提供）。
 ---
 - Q:打开LALC时出现的错误中有“UnicodeEncodeError: 'charmap' codec can't encode characters……”之类的，怎么办？
 - A:可以参考该[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues/26)中，陆爻齐提供的解决方案

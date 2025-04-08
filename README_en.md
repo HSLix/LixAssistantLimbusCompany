@@ -1,7 +1,7 @@
 
 <div align="center">
 
-![image](/resource/gui/MagicGirl.png)
+![image](/resource/github/MagicGirl.png)
 
 <br>
 
@@ -9,7 +9,7 @@
 
 <br>
 <div>
-    <a href="https://discord.gg/7UwBbjUGS3">
+    <a href="https://discord.gg/bVzCuBU4bC">
         <img src="https://cdn.simpleicons.org/discord" alt="Discord" width="24" height="24">
     </a>
 </div>
@@ -64,7 +64,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 - **Fully automatic** EXP/Thread/Mirror farming support  
 - **Team rotation** and team strategy selection  
 - Built-in **screen recording** and logging  
-- Support **custom tasks**, please refer to the [Guidance Notes] (./doc/json-guide_cn. md) for details
+- Support **custom tasks**, please refer to the [Guidance Notes](./doc/json_guide_cn.md) for details
 - Support **custom theme card package selection**, simply edit theme_packjson in 'config'
 - ~~Actually not many features~~  
 - **Extract & use** - no environment setup required  
@@ -107,10 +107,11 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 
 
 ## Video_Tutorials
-<h3>Version 2.1.1-2.1.13</h3>
-<a href="https://youtu.be/ZKsNTLM-IT4">
-    <img src="./resource/github/video1Pic.png" width="300">
-</a>
+| Platform | Bilibili | Youtube |
+| - | - | - |
+| Tech Share | <a href="https://www.bilibili.com/video/BV1yPZoYSEiq/"> <img src="./resource/github/mako_speech_video.png" width="300"></a> | <a href="https://youtu.be/xbi2gapJZMA"> <img src="./resource/github/mako_speech_video.png" width="300"></a> |
+| Simple Show | <a href="https://www.bilibili.com/video/BV1MTR9YgE3p/"> <img src="./resource/github/lalc_show_video.png" width="300"></a> | <a href="https://youtu.be/Hwtjz8WAQc4"> <img src="./resource/github/lalc_show_video.png" width="300"></a> |
+| Version 2.1.1-2.1.13 | <a href="https://www.bilibili.com/video/BV12w41117so/"> <img src="./resource/github/video1Pic.png" width="300"></a> | <a href="https://youtu.be/ZKsNTLM-IT4"> <img src="./resource/github/video1Pic.png" width="300"></a> |
 
 
 ## Contribute
@@ -139,7 +140,12 @@ Translated with DeepL.com (free version)
 ### Sponsors
 | Sponsor | Date | Message |
 | - | - | - |
-| **锋** | 2024-10-12 | None |
+| 世有万象 | 2023-11-20 | 6 |
+| 灵清__ | 2023-11-24 | 加油！ |
+| 灵清__ | 2023-11-24 | 无 |
+| **锋 | 2024-10-12 | None |
+| * | 2025-04-05 | 大佬加油！ |
+| [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
 
 ### Contributors:
 <!-- readme: collaborators,contributors -start -->
@@ -211,19 +217,11 @@ Translated with DeepL.com (free version)
   3. Consider better uses for your money (food, gifts, game passes)  
 
 - **If you still want to donate**:  
-<div align="center">
-  
-  <img src="./resource/github/wechat.png" width="300">  
-
-  WeChat  
-  <br>
---- 
-  <img src="./resource/github/alipay.png" width="300">  
-  
-  Alipay  
----
-  <br>
-</div>
+| Platform | QR Code |
+| - | - |
+| wechat | <img src="./resource/github/wechat.png" width="300"> |
+| aifadian | <img src="./resource/github/afdian.png" width="300"> |
+| alipay | <img src="./resource/github/alipay.png" width="300"> |
 
 
 ## Final_Words

@@ -1,6 +1,6 @@
 <div align="center">
 
-![image](/resource/gui/MagicGirl.png)
+![image](/resource/github/MagicGirl.png)
 
 <br>
 
@@ -8,7 +8,7 @@
 
 <br>
 <div>
-    <a href="https://discord.gg/7UwBbjUGS3">
+    <a href="https://discord.gg/bVzCuBU4bC">
         <img src="https://cdn.simpleicons.org/discord" alt="Discord" width="24" height="24">
     </a>
 </div>
@@ -118,10 +118,13 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 | <img src="./resource/github/setting_page_cn.png" width="300"> | <img src="./resource/github/setting_page_en.png" width="300"> |
 ---
 ## 视频教程
-<h3>Version 2.1.1-2.1.13</h3>
-<a href="https://youtu.be/ZKsNTLM-IT4">    
-    <img src="./resource/github/video1Pic.png" width="300">
-</a>
+
+| 平台 | Bilibili | Youtube |
+| - | - | - |
+| 技术分享 | <a href="https://www.bilibili.com/video/BV1yPZoYSEiq/"> <img src="./resource/github/mako_speech_video.png" width="300"></a> | <a href="https://youtu.be/xbi2gapJZMA"> <img src="./resource/github/mako_speech_video.png" width="300"></a> |
+| 操作演示 | <a href="https://www.bilibili.com/video/BV1MTR9YgE3p/"> <img src="./resource/github/lalc_show_video.png" width="300"></a> | <a href="https://youtu.be/Hwtjz8WAQc4"> <img src="./resource/github/lalc_show_video.png" width="300"></a> |
+| Version 2.1.1-2.1.13 | <a href="https://www.bilibili.com/video/BV12w41117so/"> <img src="./resource/github/video1Pic.png" width="300"></a> | <a href="https://youtu.be/ZKsNTLM-IT4"> <img src="./resource/github/video1Pic.png" width="300"></a> |
+
 
 ---
 
@@ -153,8 +156,13 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 
 ### 打赏者
 | 打赏者 | 打赏时间 | 留言 | 
-| - | - | - |
+| - | - | - |=
+| 世有万象 | 2023-11-20 | 6 |
+| 灵清__ | 2023-11-24 | 加油！ |
+| 灵清__ | 2023-11-24 | 无 |
 | **锋 | 2024-10-12 | 无 | 
+| * | 2025-04-05 | 大佬加油！ |
+| [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
 
 ### 贡献者
 
@@ -212,7 +220,7 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 
 除我以外，还有其它开发者也致力于 limbus 脚本的开发，可以的话，也希望大家多多支持！！
 
-(虽然有项目没有放我的链接，但我还是放了他们的，QWQ。特别“表扬”LCAA，连我应援的评论都删了，亏我还发动态支持LCAA的视频，QWQ）
+虽然有项目没有放我的链接，但我还是放了他们的，QWQ。特别“表扬”LCAA，连我应援的评论都删了，亏我还发动态支持LCAA的视频，QWQ
 
 
 | 项目名称 | 简介  | 功能特点   | 支持平台       | 链接  |
@@ -238,23 +246,16 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
 3. 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 
 - 如果您仍有打赏的想法，那我再拒绝就不礼貌啦o(￣┰￣*)ゞ（蠢蠢欲动地伸手
-<div align="center">
-  
-  <img src="./resource/github/wechat.png" width="300">
-  
-  wechat
-  <br>
---- 
-  <img src="./resource/github/alipay.png" width="300">
-  
-  alipay
----
-  <br>
-</div>
+
+| 方式 | 二维码 |
+| - | - |
+| 微信 | <img src="./resource/github/wechat.png" width="300"> |
+| 爱发电 | <img src="./resource/github/afdian.png" width="300"> |
+| 支付宝 | <img src="./resource/github/alipay.png" width="300"> |
+
 
 
 ## 最后
-Last
 
 - 如果你觉得该软件对你有帮助，请帮忙点个 Star 吧，这个网页右上角小星星对我们是最好的支持！
 

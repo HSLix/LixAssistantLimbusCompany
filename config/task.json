@@ -643,7 +643,8 @@
             "FullAutoReadyFindWay",
             "FullAutoReadyBattle",
             "FullAutoMirrorShopStart",
-            "FullAutoMirrorSelectAcquireEgo",
+            "FullAutoMirrorSelectAcquireEgoNew",
+            "FullAutoMirrorSelectAcquireEgoOwned",
             "FullAutoMirrorFinishVictory",
             "FullAutoMirrorFinishDefeat",
             "FullAutoContinueEncounter",
@@ -712,7 +713,7 @@
     },
     "FullAutoAssembleEnkephalinModules": {
         "recognition": "ColorMatch",
-        "color_point": [575, 885],
+        "color_point": [555, 885],
         "lower":100, 
         "upper":170,
         "next": ["FullAutoAssembleEnkephalinModulesEnter", "FullAutoMirrorCircleCenter"]
@@ -839,14 +840,14 @@
             "FullAutoPassEgoGiftGetConfirm",
             "FullAutoMirrorCircleCenter"
         ],
-        "post_delay": 2
+        "post_delay": 0.5
     },
     "FullAutoPassEgoGiftGetConfirm": {
         "recognition": "TemplateMatch",
         "template": "ego_gift_get_confirm.png",
         "action": "Click",
         "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 2
+        "post_delay": 0.5
     },
     "FullAutoReadySelectRewardCard": {
         "pre_delay": 1,
@@ -888,7 +889,7 @@
         "action": "Key",
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 3
+        "post_delay": 2
     },
     "FullAutoContinueEncounter": {
         "recognition": "TemplateMatch",
@@ -937,8 +938,7 @@
         "next": [
             "FullAutoWaitFinishBattle",
             "FullAutoMirrorCircleCenter"
-        ],
-        "post_delay": 1
+        ]
     },
     "FullAutoWaitFinishBattle": {
         "recognition": "TemplateMatch",
@@ -962,18 +962,41 @@
         "action_count": 5,
         "target": true,
         "next": [
+            "FullAutoEventMakeChoiceGetEgoBySelectToGain",
+            "FullAutoEventMakeChoiceGetEgoByCheck",
             "FullAutoEventMakeChoiceGetEgo",
             "FullAutoPassVeryHighCheck",
             "FullAutoPassHighCheck",
             "FullAutoPassNormalCheck",
             "FullAutoPassLowCheck",
             "FullAutoPassVeryLowCheck",
-            "FullAutoEventMakeFirstChoice"
+            "FullAutoEventMakeSecondChoice"
+        ]
+    },
+    "FullAutoEventMakeChoiceGetEgoBySelectToGain": {
+        "recognition": "TemplateMatch",
+        "template": "choices_select_to_gain.png",
+        "recognize_area":[815, 140, 720, 700],
+        "action": "Click",
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoEventMakeChoiceGetEgoByCheck": {
+        "recognition": "TemplateMatch",
+        "template": "choices_check.png",
+        "recognize_area":[815, 140, 720, 700],
+        "action": "Click",
+        "next": [
+            "FullAutoSkipEvent",
+            "FullAutoMirrorCircleCenter"
         ]
     },
     "FullAutoEventMakeChoiceGetEgo": {
         "recognition": "TemplateMatch",
         "template": "choices_ego.png",
+        "recognize_area":[815, 140, 720, 700],
         "action": "Click",
         "next": [
             "FullAutoSkipEvent",
@@ -987,17 +1010,17 @@
             350
         ],
         "next": [
-            "FullAutoEventMakeSecondChoice"
+            "FullAutoClickEventRightBottom"
         ]
     },
     "FullAutoEventMakeSecondChoice": {
         "action": "Click",
         "target": [
             1160,
-            510
+            500
         ],
         "next": [
-            "FullAutoClickEventRightBottom"
+            "FullAutoEventMakeFirstChoice"
         ]
     },
     "FullAutoPassVeryHighCheck": {
@@ -1172,10 +1195,18 @@
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
-    "FullAutoMirrorSelectAcquireEgo": {
+    "FullAutoMirrorSelectAcquireEgoNew": {
         "recognition": "TemplateMatch",
-        "template": "acquire_ego_gift.png",
+        "template": "acquire_ego_new.png",
         "action": "Click",
+        "target_offset":[0, 100],
+        "next": "FullAutoMirrorSelectAcquireEgoConfirm"
+    }
+    ,"FullAutoMirrorSelectAcquireEgoOwned": {
+        "recognition": "TemplateMatch",
+        "template": "acquire_ego_owned.png",
+        "action": "Click",
+        "target_offset":[0, 100],
         "next": "FullAutoMirrorSelectAcquireEgoConfirm"
     },
     "FullAutoMirrorSelectAcquireEgoConfirm": {
@@ -1208,7 +1239,7 @@
         "action": "Click",
         "target": [
             500,
-            660
+            720
         ],
         "post_delay": 2,
         "next": "FullAutoMirrorGiveUpRewardsConfirm"

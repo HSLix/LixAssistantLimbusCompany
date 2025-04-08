@@ -22,6 +22,7 @@ from requests import get
 from requests import get
 
 
+
 from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
@@ -102,21 +103,22 @@ class Window(FramelessWindow):
         def get_latest_release(repo):
             url = f"https://api.github.com/repos/{repo}/releases/latest"
             try:
-                response = get(url)
+                response = get(url, timeout=3)
                 if response.status_code == 200:
                     release_info = response.json()
                     latest_release = release_info["tag_name"]
-                    return latest_release
+                    release_body = release_info.get("body", "")  # 获取 release 公告内容
+                    return latest_release, release_body
                 else:
                     lalc_logger.log_task("WARNING", "checkForUpdates", "FAILED", str(response))
-                    return None
+                    return None, None
             except Exception as e:
                 print(f"Failed to fetch release information: {e}")
                 lalc_logger.log_task("ERROR", "checkForUpdates", "FAILED", str(e))
-                return None
+                return None, None
 
         repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
-        latest_release = get_latest_release(repo)
+        latest_release, release_body = get_latest_release(repo)
 
         if latest_release:
             if latest_release == VERSION:
@@ -128,11 +130,11 @@ class Window(FramelessWindow):
                 )
             elif latest_release > VERSION:
                 # 当前版本落后
-                self.show_message(
-                    "ERROR",
-                    _('Update Check Successful'),
-                    _('Your version is outdated. Please update.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
-                )
+                message = _(
+                    'Your version is outdated. Please update.\n'
+                    'Current version: {0}, GitHub version: {1}'
+                ).format(VERSION, latest_release, release_body)  # 增加公告内容
+                self.show_message("ERROR", _('Update Check Successful'), message)
             else:
                 self.show_message(
                     "SUCCESS",
@@ -147,8 +149,6 @@ class Window(FramelessWindow):
                 _('Update Check Failed'),
                 _('Failed to check for updates. \nPlease check your internet connection.')
             )
-
-
 
 
 
@@ -544,10 +544,6 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
         # 忽略特定错误
         pass
 
-    print(exc_type)
-    if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
-        # 忽略特定错误
-        pass
 
     msg_box = Dialog("Unexpected Error", _("捕获到未知，是否打开日志查看？\n%s") % (error_msg))
 

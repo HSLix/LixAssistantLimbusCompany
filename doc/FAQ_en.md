@@ -12,7 +12,7 @@ en | [中文版](FAQ_cn.md)
 - A:
 1. Save the log files from the log folder in LALC's installation directory (for the current day).
 2. Save the recordings generated during runtime.
-3. Submit an Issue following the Report Bug template requirements with your log file, including debug, info, warning, and the video, which could be shown conveniently on [dicord](https://discord.gg/7UwBbjUGS3).
+3. Submit an Issue following the Report Bug template requirements with your log file, including debug, info, warning, and the video, which could be shown conveniently on [dicord](https://discord.gg/bVzCuBU4bC).
 ---
 - Q: I get an error like "UnicodeEncodeError: 'charmap' codec can't encode characters……" when opening LALC. What should I do?
 - A: Refer to the [solution](https://github.com/HSLix/LixAssistantLimbusCompany/issues/26) provided by 陆爻齐 (Lu Yaoqi) in this Issue.
