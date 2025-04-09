@@ -759,14 +759,19 @@ def initCustomAction():
 
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
+        fake_enhance_count = 3 # reduce the waste of time for the last ego gift can not be enhanced
+
         for c in gift_places:
+            if (fake_enhance_count <= 0):
+                lalc_logger.log_task("DEBUG", "search_place_enhance_ego", "INTERRUPTED", "Due to too many fake enhanceable.")
+                break
+
             mk.moveClick(c, rest_time=0.2)
             eye.captureScreenShot()
             enhance_able = False
 
             if (not eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                 continue
-            
 
             for gift in target_pic:
                 if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200])):
@@ -775,14 +780,20 @@ def initCustomAction():
             
             if (enhance_able):
                 mk.pressKey("enter", press_count=1, rest_time=1)
+                fake_enhance_count -= 1
                 eye.captureScreenShot()
+                if (eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
+                    continue
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
                     mk.pressKey("esc")
                     continue
                 mk.pressKey("enter", press_count=1, rest_time=2)
+                fake_enhance_count = 3
                 
                 mk.pressKey("enter", press_count=1, rest_time=1)
                 eye.captureScreenShot()
+                if (eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
+                    continue
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
                     mk.pressKey("esc")
                     continue

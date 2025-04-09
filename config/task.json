@@ -1017,7 +1017,7 @@
         "action": "Click",
         "target": [
             1160,
-            500
+            480
         ],
         "next": [
             "FullAutoEventMakeFirstChoice"

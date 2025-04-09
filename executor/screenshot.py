@@ -16,11 +16,8 @@ def captureLimbusCompanyWindow(is_save_pic: bool = False, is_pic_gray: bool = Tr
     """
     查找名为 "LimbusCompany" 的窗口，根据缩放比例调整窗口数据，并截屏。
     """
-    try:
-        window = getWindow()
-    except IndexError:
-        return None
-
+    window = getWindow()
+    
     left, top, width, height = window.left, window.top, window.width, window.height
 
     monitor = {"left": left, "top": top, "width": width, "height": height}

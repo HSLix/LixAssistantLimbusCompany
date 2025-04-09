@@ -135,7 +135,6 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 | [pyinstaller](https://pypi.org/project/pyinstaller/) | Classic packaging repository, easy to use even though the packages are big |
 | ...... | ...... | ......
 
-Translated with DeepL.com (free version)
 
 ### Sponsors
 | Sponsor | Date | Message |

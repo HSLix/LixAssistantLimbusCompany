@@ -40,8 +40,8 @@ body:
   - type: textarea
     id: log
     attributes:
-      label: 日志文件 | Log Files
-      description: 上传 log 文件夹下当日的所有 log 文件(debug, info, warning) | Upload all the log files at that day, including debug, info, warning.
+      label: 日志文件 | Log Files (Debug Info Warning Error)
+      description: 上传 log 文件夹下当日的所有 log 文件(debug, info, warning, error) | Upload all the log files at that day, including debug, info, warning and error.
     validations:
       required: true
   - type: textarea

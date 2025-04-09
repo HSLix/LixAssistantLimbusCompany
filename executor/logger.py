@@ -92,13 +92,9 @@ class LALCLogger(QObject):
             for log_path in glob.glob(f"{LOG_DIR}/*_{prefix}.log"):
                 file_date = os.path.basename(log_path).split("_")[0]
                 if file_date < cutoff_date:
-                    try:
-                        is_delete = True
-                        self.logger.debug("Delete the old log {log_path} Successfully.")
-                        os.remove(log_path)
-                    except Exception as e:
-                        self.logger.error(f"Failed to delete old log {log_path}: {str(e)}")
-                        raise RuntimeError(f"Failed to delete old log {log_path}: {str(e)}")
+                    is_delete = True
+                    self.logger.debug("Delete the old log {log_path} Successfully.")
+                    os.remove(log_path)
         if (is_delete):
             self.deleteOutdatedLogSignal.emit()
 
