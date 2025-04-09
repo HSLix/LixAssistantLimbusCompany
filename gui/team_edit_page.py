@@ -181,7 +181,7 @@ class TeamPreviewWidget(QWidget):
             with open(os.path.join(CONFIG_DIR, "team.json"), "w", encoding="utf-8") as f:
                 json.dump(self.teams, f, indent=4, ensure_ascii=False)
             # QMessageBox.information(self, "成功", f"{self.team_name} 顺序已保存！")
-            self.window().show_message("success", "SaveSuccess", f"{self.team_name} 顺序保存成功！")
+            self.window().show_message("SUCCESS", "SaveSuccess", f"{self.team_name} 顺序保存成功！")
             self.update_order_labels()
         except Exception as e:
             self.window().show_message("ERROR", "SaveFailed", f"{self.team_name} 顺序保存失败！")

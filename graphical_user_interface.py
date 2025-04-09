@@ -49,7 +49,6 @@ class Window(FramelessWindow):
 
         # self.show()
 
-
         self.hBoxLayout = QHBoxLayout(self)
         self.navigationInterface = NavigationInterface(self, showMenuButton=True)
         self.stackWidget = QStackedWidget(self)
@@ -68,25 +67,22 @@ class Window(FramelessWindow):
 
         # initialize layout
         self.initLayout()
-
+        
         # add items to navigation interface
         self.initNavigation()
 
         # 添加消息条管理
         self.info_bar = None
-
         
         # 连接信号
         self.connect_signals()
 
-        # 其余窗口初始化事项
         self.initWindow()
-        self.checkForUpdates()  # 调用版本检测函数
-        self.showSupportDialog()
-        lalc_logger.clean_old_logs()
 
         self.show()
-
+        self.showSupportDialog()
+        self.checkForUpdates()  # 调用版本检测函数
+        lalc_logger.clean_old_logs()
         # self.show_announcement_dialog()
 
     def show_announcement_dialog(self):
@@ -154,78 +150,39 @@ class Window(FramelessWindow):
 
     def showSupportDialog(self):
         """显示支持对话框"""
-        self.supportDialog = QDialog(self)
-        # 去除QDialog右上角的问号
-        self.supportDialog.setWindowFlags(self.supportDialog.windowFlags() & ~Qt.WindowContextHelpButtonHint & ~Qt.WindowCloseButtonHint)
-        self.supportDialog.setWindowTitle("QAQ")
-        self.supportDialog.setMinimumSize(400, 200)
-        layout = QVBoxLayout(self.supportDialog)
-
-        # 主文本改为类属性，并美化文字和排版，用_()包裹文字串
-        self.main_text = BodyLabel(
-            _("请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n\n") +
-            _("这是对陆爻齐莫大的肯定，谢谢啦！\n\n") +
-            _("PS：如果能打赏一点点就更好了哈哈\n\n") +
-            _("(不打赏也没关系，但一定要过好自己的生活哦)\n\n") +
-            _("PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ")
+        # 使用 fluentwidgets 的 Dialog 替代 QDialog
+        self.supportDialog = Dialog(
+            title="QAQ",
+            content=_(
+                "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
+                "这是对陆爻齐莫大的肯定，谢谢啦！\n"
+                "PS：如果能打赏一点点就更好了哈哈\n"
+                "(不打赏也没关系，但一定要过好自己的生活哦)\n"
+                "PPS：陆爻齐马上就关闭这个窗口，请不要讨厌陆爻齐QAQ\n"
+                "\n3秒后自动关闭。"
+            ),
+            parent=self
         )
-        self.main_text.setWordWrap(True)
-        self.main_text.setAlignment(Qt.AlignCenter)
-
-        # 倒计时标签
-        self.countdown_label = BodyLabel(_("还有<nobr><b>6</b></nobr>秒。"))
-        self.countdown_label.setAlignment(Qt.AlignCenter)
-        self.countdown_label.setTextFormat(Qt.RichText)
-
-        # 按钮
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self.supportDialog)
-        button_box.button(QDialogButtonBox.Ok).setText(_("现在就去"))
-        button_box.button(QDialogButtonBox.Cancel).setText(_("下次一定"))
         
-        # 创建一个新的水平布局用于居中按钮
-        button_layout = QHBoxLayout()
-        button_layout.addStretch(1)
-        button_layout.addWidget(button_box)
-        button_layout.addStretch(1)
+        # 设置按钮
+        self.supportDialog.yesButton.setText(_("现在就去"))
+        self.supportDialog.cancelButton.setText(_("下次一定"))
 
-        # 布局
-        layout.addWidget(self.main_text)
-        layout.addSpacing(10)
-        layout.addWidget(self.countdown_label)
-        layout.addSpacing(20)
-        layout.addLayout(button_layout)
+        # 连接信号
+        self.supportDialog.yesSignal.connect(self.onStarClicked)  # 确认按钮
+        self.supportDialog.cancelSignal.connect(self.onCancelClicked)  # 取消按钮
 
-        # 倒计时定时器
+        # 自动关闭定时器
         self.timer = QTimer(self.supportDialog)
-        self.timer.timeout.connect(self.updateCountdown)
-        self.remaining_seconds = 4
-        self.timer.start(1000)
-        self.updateCountdown()  # 初始显示
+        self.timer.timeout.connect(self.supportDialog.accept)
+        self.timer.start(3000)  # 3秒后关闭
 
-
-        # **新增信号连接**
-        button_box.accepted.connect(self.onStarClicked)  # 确认按钮
-        button_box.rejected.connect(self.onCancelClicked)  # 取消按钮
-
+        # 显示对话框
         self.supportDialog.exec_()
-
-
-    def updateCountdown(self):
-        """更新倒计时显示"""
-        self.remaining_seconds -= 1
-        self.countdown_label.setText(_("还有<nobr><b>%d</b></nobr>秒。") % (self.remaining_seconds))
-        if self.remaining_seconds <= 0:
-            self.timer.stop()
-            self.supportDialog.accept()  # 自动关闭
-
 
     def onStarClicked(self):
         """处理确认按钮点击"""
-        # 修改文本
-        self.main_text.setText(_("谢谢 !祝你生活愉快！✨\n\n不管你到底有没有给 Star\n\n谢谢你愿意多了解一点 LALC"))
-        self.countdown_label.setText(_("还有<nobr><b>%d</b></nobr>秒。") % (self.remaining_seconds))
-        # 延长一点时间
-        self.remaining_seconds += 1
+        self.show_message("INFO", "Thanks", _("谢谢 !祝你生活愉快！✨不管你到底有没有给 Star\n谢谢你愿意多了解一点 LALC"))
         # 打开链接
         QDesktopServices.openUrl(QUrl("https://github.com/HSLix/LixAssistantLimbusCompany"))
         # self.supportDialog.accept()
@@ -233,11 +190,7 @@ class Window(FramelessWindow):
 
     def onCancelClicked(self):
         """处理取消按钮点击"""
-        # 修改文本
-        self.main_text.setText(_("也祝你生活愉快！(^_−)☆"))
-        # self.countdown_label.setText("")
-        # 停止倒计时
-        # self.timer.stop()
+        self.show_message("INFO", "", _("也祝你生活愉快！(^_−)☆"))
         # self.supportDialog.reject()
 
 
@@ -382,7 +335,7 @@ class Window(FramelessWindow):
             return
 
         # 根据消息类型触发 GIF 播放
-        if msg_type == "success":
+        if msg_type == "SUCCESS":
             self.workingInterface.gif_player.push_gif_to_queue("heart")
         elif msg_type == "ERROR" or msg_type == "WARNING":
             self.workingInterface.gif_player.push_gif_to_queue("black1")
@@ -531,21 +484,28 @@ class Window(FramelessWindow):
 
 
 def my_excepthook(exc_type, exc_value, exc_traceback):
+    # 格式化异常信息
     error_msg = ''.join(format_exception(exc_type, exc_value, exc_traceback))
     print(f"全局异常捕获:\n{error_msg}")
+    
+    # 记录错误日志
     lalc_logger.log_task(
-            "ERROR",
-            "Graphical User Interface",
-            "UNEXPECTED ERROR",
-            f"{error_msg}"
-        )
-    print(exc_type)
+        "ERROR",
+        "Graphical User Interface",
+        "UNEXPECTED ERROR",
+        f"{error_msg}"
+    )
+    
+    # 判断是否为特定错误
     if exc_type == RuntimeError and "TopInfoBarManager" in error_msg:
-        # 忽略特定错误
-        pass
+        print("忽略特定错误：RuntimeError with TopInfoBarManager")
+        sys.exit(1)
 
-
-    msg_box = Dialog("Unexpected Error", _("捕获到未知，是否打开日志查看？\n%s") % (error_msg))
+    # 弹出错误提示对话框
+    msg_box = Dialog(
+        "Unexpected Error",
+        _("捕获到未知错误，是否打开日志查看？\n%s") % (error_msg)
+    )
 
     if msg_box.exec_():
         log_dir = LOG_DIR  
@@ -557,6 +517,7 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
         else:
             print(f"Log directory does not exist: {log_dir}")
 
+    # 退出程序
     sys.exit(1)
 
 def shutdown_splash():
@@ -586,10 +547,9 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    if not windll.shell32.IsUserAnAdmin():
-        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-        # shutdown_splash()
-        sys.exit(0)
+    # if not windll.shell32.IsUserAnAdmin():
+    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+    #     sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",
@@ -609,6 +569,7 @@ def main(*args, **kwargs):
     sys.excepthook = my_excepthook
     # shutdown_splash()
     w = Window()
+    
     sys.exit(app.exec_())
 
 if __name__ == '__main__':

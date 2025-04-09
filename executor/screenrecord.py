@@ -82,38 +82,35 @@ class ScreenRecorderThread(QThread):
             
 
             while self.recording:
-                try:
-                    with mss.mss() as sct:
-                        sct_img = sct.grab(monitor)
-                    frame = cv2.cvtColor(np.array(sct_img), cv2.COLOR_BGRA2BGR)
+                with mss.mss() as sct:
+                    sct_img = sct.grab(monitor)
+                frame = cv2.cvtColor(np.array(sct_img), cv2.COLOR_BGRA2BGR)
 
-                    # 添加水印
-                    text = "LixAssistantLimbusCompany"
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 4
-                    font_color = (128, 128, 128)
-                    thickness = 5
-                    text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-                    text_x = (frame.shape[1] - text_size[0]) // 2
-                    text_y = (frame.shape[0] + text_size[1]) // 2
-                    cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
+                # 添加水印
+                text = "LixAssistantLimbusCompany"
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 4
+                font_color = (128, 128, 128)
+                thickness = 5
+                text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+                text_x = (frame.shape[1] - text_size[0]) // 2
+                text_y = (frame.shape[0] + text_size[1]) // 2
+                cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
 
-                    # 添加时间水印
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    time_font = cv2.FONT_HERSHEY_SIMPLEX
-                    time_font_scale = 2
-                    time_font_color = (128, 128, 128)
-                    time_thickness = 5
-                    time_x = 10
-                    time_y = frame.shape[0] - 10
-                    cv2.putText(frame, current_time, (time_x, time_y), time_font, time_font_scale,
-                                time_font_color, time_thickness, cv2.LINE_AA)
+                # 添加时间水印
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                time_font = cv2.FONT_HERSHEY_SIMPLEX
+                time_font_scale = 2
+                time_font_color = (128, 128, 128)
+                time_thickness = 5
+                time_x = 10
+                time_y = frame.shape[0] - 10
+                cv2.putText(frame, current_time, (time_x, time_y), time_font, time_font_scale,
+                            time_font_color, time_thickness, cv2.LINE_AA)
 
-                    process.stdin.write(frame.tobytes())
-                    QApplication.processEvents()
-                except Exception as e:
-                    print(f"录制出错: {e}")
-                    continue
+                process.stdin.write(frame.tobytes())
+                QApplication.processEvents()
+
 
             if process:
                 process.stdin.close()
