@@ -858,8 +858,8 @@ def initCustomAction():
             else:
                 break
         
-
-        mk.pressKey("esc", rest_time=1)
+        mk.moveClick([1400, 860], rest_time=1)
+        # mk.pressKey("esc", rest_time=1)
 
     @custom_action_dict.register
     def heal_all_sinner(**kwargs):
@@ -921,6 +921,11 @@ def initCustomAction():
     @custom_action_dict.register
     def claim_previous_reward(**kwargs):
         raise ValueError("请自行确认之前的收益。 | Please claim your reward.")
+
+
+    @custom_action_dict.register
+    def network_unstable_stop(**kwargs):
+        raise ValueError("网络不稳定，请自行重启。 | Please restart due to the unstable network.")
 
 
     

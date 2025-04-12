@@ -22,3 +22,6 @@ en | [中文版](FAQ_cn.md)
 ---
 - Q:Why is it that I've been using LALC to fully automate the Mirror for a long time, but in the end I find that it doesn't clear?
 - A:It's most likely because every time when you entry the Mirror, it fails, and then LALC will choose to give up the rewarding. Please check the screen recording and logs to make sure. If this is not the case, please refer to the FAQ for bug feedback.
+---
+- Q:LALC can not run with the error report like the [Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues/155).
+- A:Make sure that the path of LALC is all English.

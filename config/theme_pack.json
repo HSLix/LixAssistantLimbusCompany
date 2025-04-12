@@ -1,14 +1,6 @@
 {
-    "AutomatedFactory":{
-        "keyword":"factory",
-        "weight":1
-    },
-    "TheOutcast":{
-        "keyword":"outcast",
-        "weight":1
-    },
-    "TheForgotten":{
-        "keyword":"forgotten",
+    "HellsChicken":{
+        "keyword":"chicken",
         "weight":1
     },
     "MiracleInDistrict20_word1":{
@@ -19,8 +11,16 @@
         "keyword":"district",
         "weight":1
     },
-    "HellsChicken":{
-        "keyword":"chicken",
+    "TheOutcast":{
+        "keyword":"outcast",
+        "weight":1
+    },
+    "TheForgotten":{
+        "keyword":"forgotten",
+        "weight":1
+    },
+    "AutomatedFactory":{
+        "keyword":"factory",
         "weight":1
     },
     "TheUnloving":{

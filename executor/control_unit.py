@@ -193,6 +193,7 @@ class ControlUnit(QThread):
 
     def run(self):
         """主执行循环（修改任务获取逻辑）"""
+        
         self.is_running = True
         self.preprocess_tasks()
         self.task_executed_count = 0
