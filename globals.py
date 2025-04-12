@@ -18,8 +18,6 @@ FFMPEG_FILE = path.join(RESOURCE_DIR, "ffmpeg/ffmpeg.exe")
 # 仓库
 GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 
-
-
 # 事件名称
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
@@ -91,8 +89,9 @@ def isPathAllEnglish(path):
     return bool(fullmatch(pattern, path))
 
 def checkWorkDirAllEnglish():
-    if (isPathAllEnglish(WORK_DIR)):
-        raise ValueError("请把 LALC 放在路径全英文的目录下！ | Make sure that the path of LALC is all English!")
+    print(WORK_DIR)
+    if (not isPathAllEnglish(WORK_DIR)):
+        raise ValueError("请把 LALC 放在路径全英文的目录下！ | Make sure that the path of LALC is all English!\n" + WORK_DIR)
 
 if __name__ == "__main__":
     getScreenScale()

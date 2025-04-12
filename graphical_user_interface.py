@@ -23,7 +23,7 @@ from requests import get
 
 
 
-from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK
+from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK, checkWorkDirAllEnglish
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
@@ -37,6 +37,7 @@ from executor import ControlUnit, lalc_logger, screen_record_thread
 class Window(FramelessWindow):
 
     def __init__(self):
+        checkWorkDirAllEnglish()
         super().__init__()
         self.setTitleBar(StandardTitleBar(self))
         self.setWindowTitle("LixAssistantLimbusCompany")
