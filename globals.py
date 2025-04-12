@@ -1,6 +1,7 @@
 # coding: utf-8
 from os import path
 from ctypes import windll
+from re import fullmatch
 
 
  
@@ -17,13 +18,11 @@ FFMPEG_FILE = path.join(RESOURCE_DIR, "ffmpeg/ffmpeg.exe")
 # 仓库
 GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 
-
-
 # 事件名称
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.1.1"
+VERSION = "V3.1.3"
 
 
 # 支持网址
@@ -72,12 +71,35 @@ def getScreenScale():
     if(not(scale > 1.49 and scale < 1.51)):
         print(scale)
 
+
+def isPathAllEnglish(path):
+    """
+    检查给定路径是否全部由英文字符组成。
+    
+    参数:
+        path (str): 要检查的路径字符串。
+        
+    返回:
+        bool: 如果路径中全是英文字符（包括字母、数字、标点符号和路径分隔符），返回 True；否则返回 False。
+    """
+    # 定义正则表达式模式：允许英文字符、数字、常见标点符号和路径分隔符
+    pattern = r'^[a-zA-Z0-9\/\\.\\-_~!@#$%^&*()+=\[\]{}|;:",<>? ]+$'
+    
+    # 使用 re.fullmatch 检查整个字符串是否匹配模式
+    return bool(fullmatch(pattern, path))
+
+def checkWorkDirAllEnglish():
+    print(WORK_DIR)
+    if (not isPathAllEnglish(WORK_DIR)):
+        raise ValueError("请把 LALC 放在路径全英文的目录下！ | Make sure that the path of LALC is all English!\n" + WORK_DIR)
+
 if __name__ == "__main__":
     getScreenScale()
     # ignoreScaleAndDpi()
-    resetDpiAwareness()
+    # resetDpiAwareness()
     getScreenScale()
     print(WORK_DIR)
+    # print(isPathAllEnglish(WORK_DIR))
     # ignoreScaleAndDpi()
     # activateWindow()
     # initMouseBasePoint()

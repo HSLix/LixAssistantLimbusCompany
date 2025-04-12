@@ -18,3 +18,6 @@ cn | [EnglishVersion](FAQ_en.md)
 ---
 - Q:为什么我用 LALC 全自动刷了很久镜牢，最后发现都没有结算？
 - A:很可能是因为每次刷取镜牢时都失败了，然后 LALC 会选择放弃花费体力来结算。请自行查看录屏和日志确认，如果不是上述情况，请参考 FAQ 来反馈 Bug。
+---
+- Q:无法启动，并且发生了与 [Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues/155) 类似的报错
+- A:把 LALC 放到全英文的路径下即可

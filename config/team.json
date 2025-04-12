@@ -1,5 +1,5 @@
 {
-    "TeamOffset": 0,
+    "TeamOffset": 1,
     "Team1": {
         "enabled": true,
         "style": "Bleed",
