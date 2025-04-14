@@ -628,6 +628,7 @@
     "FullAutoMirrorCircleCenter": {
         "next": [
             "FullAutoMirrorDealDownload",
+            "FullAutoMirrorErrorRetry",
             "FullAutoMirrorOccurUnstableNetwork",
             "FullAutoMirrorTouchToStart",
             "FullAutoMirrorStart",
@@ -650,7 +651,6 @@
             "FullAutoContinueEncounter",
             "FullAutoMirrorWaitConnecting",
             "FullAutoMirrorWaitCombatTips",
-            "FullAutoMirrorErrorRetry",
             "FullAutoMirrorTopLeftArrow",
             "FullAutoMirrorManagerLevelIncreased",
             "MirrorEntrance"
@@ -1072,10 +1072,8 @@
             860
         ],
         "next": [
-            "FullAutoSkipEvent",
             "FullAutoMirrorCircleCenter"
-        ],
-        "post_delay": 0.5
+        ]
     },
     "FullAutoReadyFindWay": {
         "recognition": "TemplateMatch",

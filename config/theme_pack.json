@@ -19,13 +19,37 @@
         "keyword":"forgotten",
         "weight":1
     },
+    "FlatbrokeGamblers":{
+        "keyword":"gambler",
+        "weight":1
+    },
+    "NagelAndHammer": {
+        "keyword":"hammer",
+        "weight":1
+    },
+    "TheUnconfronting": {
+        "keyword":"unconfronting",
+        "weight":1
+    },
+    "NestWorkshopAndTechnology": {
+        "keyword":"workshop",
+        "weight":1
+    },
+    "LakeWorld": {
+        "keyword":"lake",
+        "weight":1
+    },
+    "ACertainWorld":{
+        "keyword":"certain",
+        "weight":1
+    },
     "AutomatedFactory":{
         "keyword":"factory",
-        "weight":1
+        "weight":100
     },
     "TheUnloving":{
         "keyword":"unloving",
-        "weight":1
+        "weight":100
     },
     "ToBeCleaved":{
         "keyword":"cleaved",
@@ -73,7 +97,7 @@
     },
     "TearfulThings":{
         "keyword":"tearfulthing",
-        "weight":1
+        "weight":100
     },
     "RepressedWrath":{
         "keyword":"repressedwrath",

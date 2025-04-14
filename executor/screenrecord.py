@@ -8,7 +8,7 @@ import os
 import mss
 from datetime import datetime
 from PyQt5.QtCore import QThread, pyqtSignal
-from subprocess import Popen, PIPE, run
+from subprocess import Popen, PIPE, run, STARTF_USESHOWWINDOW, STARTUPINFO, STDOUT, SW_HIDE
 
 from globals import ignoreScaleAndDpi, FFMPEG_FILE
 from .logger import lalc_logger
@@ -61,6 +61,10 @@ class ScreenRecorderThread(QThread):
             now = datetime.now()
             output_file = os.path.join(self.output_path, now.strftime("%Y-%m-%d-%H-%M-%S") + '.mp4')
 
+            startup = STARTUPINFO()
+            startup.dwFlags = STARTF_USESHOWWINDOW
+            startup.wShowWindow = SW_HIDE
+
             command = [
                 FFMPEG_FILE,
                 '-y',
@@ -78,7 +82,7 @@ class ScreenRecorderThread(QThread):
             ]
             
 
-            process = Popen(command, stdin=PIPE)
+            process = Popen(command, stdin=PIPE, startupinfo=startup)
             
 
             while self.recording:
@@ -97,8 +101,9 @@ class ScreenRecorderThread(QThread):
                 text_y = (frame.shape[0] + text_size[1]) // 2
                 cv2.putText(frame, text, (text_x, text_y), font, font_scale, font_color, thickness, cv2.LINE_AA)
 
+                
                 # 添加时间水印
-                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]  # 包含毫秒部分
                 time_font = cv2.FONT_HERSHEY_SIMPLEX
                 time_font_scale = 2
                 time_font_color = (128, 128, 128)
