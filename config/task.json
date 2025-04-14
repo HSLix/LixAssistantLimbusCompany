@@ -628,6 +628,7 @@
     "FullAutoMirrorCircleCenter": {
         "next": [
             "FullAutoMirrorDealDownload",
+            "FullAutoMirrorErrorRetry",
             "FullAutoMirrorOccurUnstableNetwork",
             "FullAutoMirrorTouchToStart",
             "FullAutoMirrorStart",
@@ -650,7 +651,6 @@
             "FullAutoContinueEncounter",
             "FullAutoMirrorWaitConnecting",
             "FullAutoMirrorWaitCombatTips",
-            "FullAutoMirrorErrorRetry",
             "FullAutoMirrorTopLeftArrow",
             "FullAutoMirrorManagerLevelIncreased",
             "MirrorEntrance"
@@ -864,9 +864,9 @@
             "FullAutoSelectRewardCardCoin",
             "FullAutoSelectRewardCardCoinEgo",
             "FullAutoSelectRewardCardEgoGift",
-            "FullAutoSelectRewardCardEgoResource"
-        ],
-        "interrupt": "FullAutoMirrorCircleCenter"
+            "FullAutoSelectRewardCardEgoResource",
+            "FullAutoMirrorCircleCenter"
+        ]
     },
     "FullAutoSelectRewardCardCoin": {
         "recognition": "TemplateMatch",
@@ -1029,40 +1029,35 @@
         "template": "very_high.png",
         "action": "Click",
         "target": true,
-        "next": "FullAutoClickEventRightBottom",
-        "interrupt": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoClickEventRightBottom", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassHighCheck": {
         "recognition": "TemplateMatch",
         "template": "high.png",
         "action": "Click",
         "target": true,
-        "next": "FullAutoClickEventRightBottom",
-        "interrupt": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoClickEventRightBottom", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassNormalCheck": {
         "recognition": "TemplateMatch",
         "template": "normal.png",
         "action": "Click",
         "target": true,
-        "next": "FullAutoClickEventRightBottom",
-        "interrupt": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoClickEventRightBottom", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassLowCheck": {
         "recognition": "TemplateMatch",
         "template": "low.png",
         "action": "Click",
         "target": true,
-        "next": "FullAutoClickEventRightBottom",
-        "interrupt": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoClickEventRightBottom", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoPassVeryLowCheck": {
         "recognition": "TemplateMatch",
         "template": "very_low.png",
         "action": "Click",
         "target": true,
-        "next": "FullAutoClickEventRightBottom",
-        "interrupt": "FullAutoMirrorCircleCenter"
+        "next": ["FullAutoClickEventRightBottom", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoClickEventRightBottom": {
         "recognition": "DirectHit",
@@ -1072,10 +1067,8 @@
             860
         ],
         "next": [
-            "FullAutoSkipEvent",
             "FullAutoMirrorCircleCenter"
-        ],
-        "post_delay": 0.5
+        ]
     },
     "FullAutoReadyFindWay": {
         "recognition": "TemplateMatch",

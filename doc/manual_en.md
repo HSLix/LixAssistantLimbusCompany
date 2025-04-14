@@ -4,10 +4,10 @@
 - Please run the software under 64-bit Windows system.
 - The screen zoom should be set to 150%, otherwise the software may run abnormally.
 - In-game language requirement is English
-- The screen of your device are required to over the 1600x900, or with the virtual mechime, which can make the screen big enough to suit the requirement.LALC will automatically adjust the resolution of the game window to 1600x900 (set display value), without the need for manual adjustment.
+- The screen of your device are required to over the 1600x900, or with the virtual mechime, which can make the screen big enough to suit the requirement. If your screen can not reach the standard, you can refer to this [comment](https://github.com/HSLix/LixAssistantLimbusCompany/issues/126#issuecomment-2799048129). 
 - Set the Render Scaling "High" in the Graphics of Settings if possible, which can absolutly help lalc recognize the image correctly.
 - Make sure that the path of LALC is all English, or LALC will report error to remind you of this.
-- Set "windowed" in the Setting of Limbus.
+- Set "windowed" in the Setting of Limbus.LALC will automatically adjust the resolution of the game window to 1600x900 (set display value), without the need for manual adjustment.
 ## Tutorial
 - In the main screen, click the button below to start the software.
 - In the working interface, click on the pause and stop buttons below to pause and stop running respectively.

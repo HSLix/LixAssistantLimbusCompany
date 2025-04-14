@@ -376,6 +376,14 @@ def initCustomAction():
     @custom_action_dict.register
     def choose_team(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
+        mk.moveClick([150, 630])
+        mk.scroll([0,1], 30, 0.01)
+        sleep(0.5)
+        if (team_index > 4):
+            scroll_count = team_index // 4 * 7
+            mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
+        while(team_index > 4):
+            team_index -= 4
         if (team_index == 1):
             mk.moveClick([150, 555])
         elif (team_index == 2):
@@ -384,10 +392,6 @@ def initCustomAction():
             mk.moveClick([150, 650])
         elif (team_index == 4):
             mk.moveClick([150, 700])
-        elif (team_index == 5):
-            mk.moveClick([150, 725])
-        elif (team_index == 5):
-            mk.moveClick([150, 725])
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)
@@ -544,17 +548,16 @@ def initCustomAction():
     def clear_and_edit_team_member_selections(**kwargs):
         # skip selection
         eye.captureScreenShot()
-        center, score = eye.templateMatch("team_selection_1212.png")
-        if (score != None):
+        if (eye.templateMactchExist("team_selection_1212.png", recognize_area=[1410, 665, 150, 80])):
             mk.pressKey("enter")
             return
         
         # clear selection
-        mk.moveClick([1440, 650], rest_time=1)
+        mk.moveClick([1440, 650], rest_time=1.5)
         eye.captureScreenShot()
-        center, score = eye.templateMatch("reset_deployment_order.png")
-        if (score != None):
-            mk.pressKey("enter", rest_time=2)
+        if (eye.templateMactchExist("reset_deployment_order.png", recognize_area=[555, 395, 500, 160])):
+            mk.pressKey("enter", rest_time=1)
+
 
 
         # select
@@ -752,7 +755,7 @@ def initCustomAction():
 
             eye.screenshotOcr(recognize_area=[665, 190, 160, 55])
             rest_cost = eye.ocrGetFirstNum()
-            if (rest_cost < (450 + 100*purchased_count) or purchased_count>2):
+            if (purchased_count>2 or rest_cost < (450 + 100*purchased_count)):
                 break
 
             mk.moveClick([1260, 200], rest_time=3)

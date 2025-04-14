@@ -105,7 +105,7 @@ class MOUSE_KEYBOARD:
         """
         for _ in range(scroll_count):
             self.ms.scroll(offset[0], offset[1])
-            sleep(random_offset(rest_time, right_offset=0.05))
+            sleep(random_offset(rest_time, right_offset=0.05, left_offset=rest_time-0.005))
 
     
 

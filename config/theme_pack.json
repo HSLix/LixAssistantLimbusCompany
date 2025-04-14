@@ -13,19 +13,55 @@
     },
     "TheOutcast":{
         "keyword":"outcast",
+        "weight":100
+    },
+    "FaithErosion": {
+        "keyword":"faith",
+        "weight":1
+    },
+    "GregsOfTheManor": {
+        "keyword":"gregs",
         "weight":1
     },
     "TheForgotten":{
         "keyword":"forgotten",
         "weight":1
     },
+    "FlatbrokeGamblers":{
+        "keyword":"gambler",
+        "weight":1
+    },
+    "NagelAndHammer": {
+        "keyword":"hammer",
+        "weight":1
+    },
+    "TheUnconfronting": {
+        "keyword":"unconfronting",
+        "weight":1
+    },
+    "NestWorkshopAndTechnology": {
+        "keyword":"workshop",
+        "weight":1
+    },
+    "LakeWorld": {
+        "keyword":"lake",
+        "weight":1
+    },
+    "ACertainWorld":{
+        "keyword":"certain",
+        "weight":1
+    },
+    "EmotionalSubservience":{
+        "keyword":"subservience",
+        "weight":1
+    },
     "AutomatedFactory":{
         "keyword":"factory",
-        "weight":1
+        "weight":100
     },
     "TheUnloving":{
         "keyword":"unloving",
-        "weight":1
+        "weight":100
     },
     "ToBeCleaved":{
         "keyword":"cleaved",
@@ -35,16 +71,24 @@
         "keyword":"pierced",
         "weight":1
     },
+    "EmotionalRepression":{
+        "keyword":"repression",
+        "weight":1
+    },
+    "PiercersPenetrators":{
+        "keyword":"penetrators",
+        "weight":1
+    },
     "ToBeCrushed":{
         "keyword":"crushed",
         "weight":1
     },
     "InsignificantEnvy":{
-        "keyword":"insignificanten",
+        "keyword":"insignificant",
         "weight":1
     },
     "EmotionalJudgment":{
-        "keyword":"emotionaljudgment",
+        "keyword":"judgment",
         "weight":1
     },
     "VainPride":{
@@ -56,24 +100,40 @@
         "weight":1
     },
     "EmotionalCraving":{
-        "keyword":"emotionalcraving",
+        "keyword":"craving",
         "weight":1
     },
     "DevouredGluttony":{
-        "keyword":"devouredgluttony",
+        "keyword":"gluttony",
         "weight":1
     },
     "EmotionalIndolence":{
-        "keyword":"emotionalindolence",
+        "keyword":"indolence",
         "weight":1
     },
     "EmotionalSeduction":{
-        "keyword":"emotionalseduction",
+        "keyword":"seduction",
+        "weight":1
+    },
+    "FullStoppedByABullet":{
+        "keyword":"bullet",
+        "weight":1
+    },
+    "AddictingLust":{
+        "keyword":"addicting",
         "weight":1
     },
     "TearfulThings":{
         "keyword":"tearfulthing",
-        "weight":1
+        "weight":100
+    },
+    "TimekillingTime":{
+        "keyword":"timekilling",
+        "weight":100
+    },
+    "TheMoonOfViolet":{
+        "keyword":"violet",
+        "weight":100
     },
     "RepressedWrath":{
         "keyword":"repressedwrath",
@@ -108,7 +168,7 @@
         "weight":100
     },
     "SlicersDicers":{
-        "keyword":"slicersdicers",
+        "keyword":"dicers",
         "weight":100
     }
 }
