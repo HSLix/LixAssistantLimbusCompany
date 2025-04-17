@@ -63,6 +63,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 - **Semi-automatic** Mirror dungeon farming support  
 - **Fully automatic** EXP/Thread/Mirror farming support  
 - **Team rotation** and team strategy selection  
+- **Assemble enkephalin modules** when it is almost full.
 - Built-in **screen recording** and logging  
 - Support **custom tasks**, please refer to the [Guidance Notes](./doc/json_guide_cn.md) for details
 - Support **custom theme card package selection**, simply edit theme_packjson in 'config'
@@ -141,10 +142,11 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 | - | - | - |
 | 世有万象 | 2023-11-20 | 6 |
 | 灵清__ | 2023-11-24 | 加油！ |
-| 灵清__ | 2023-11-24 | 无 |
+| 灵清__ | 2023-11-24 | None |
 | **锋 | 2024-10-12 | None |
 | * | 2025-04-05 | 大佬加油！ |
 | [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
+| **语 | 2025-04-13 | None |
 
 ### Contributors:
 <!-- readme: collaborators,contributors -start -->

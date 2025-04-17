@@ -47,8 +47,8 @@
         "keyword":"lake",
         "weight":1
     },
-    "ACertainWorld":{
-        "keyword":"certain",
+    "EmotionalCraving":{
+        "keyword":"craving",
         "weight":1
     },
     "EmotionalSubservience":{
@@ -83,6 +83,10 @@
         "keyword":"crushed",
         "weight":1
     },
+    "ACertainWorld":{
+        "keyword":"certain",
+        "weight":1
+    },
     "InsignificantEnvy":{
         "keyword":"insignificant",
         "weight":1
@@ -97,10 +101,6 @@
     },
     "DegradedGloom":{
         "keyword":"degradedgloom",
-        "weight":1
-    },
-    "EmotionalCraving":{
-        "keyword":"craving",
         "weight":1
     },
     "DevouredGluttony":{

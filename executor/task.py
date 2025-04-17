@@ -614,10 +614,10 @@ def initCustomAction():
             while True:
                 mk.moveClick(c)
                 eye.captureScreenShot()
-
                 sellable = True
-
                 if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
+                    sellable = True
+                elif (eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
                     sellable = True
                 else:
                     for gift in target_pic:
@@ -690,8 +690,19 @@ def initCustomAction():
         mk.pressKey("esc", rest_time=2)
 
 
-
-
+    style_refresh = {
+                    "Burn":[420, 415],
+                    "Bleed":[610, 415],
+                    "Tremor":[800, 415],
+                    "Rupture":[990, 415],
+                    "Sinking":[1180, 415],
+                    "Poise":[420, 590],
+                    "Charge":[610, 590],
+                     }
+    def refresh_according_to_team_style(team_style:str):
+        mk.moveClick([1435, 200], rest_time=0.5)
+        mk.moveClick(style_refresh[team_style])
+        mk.moveClick([990, 745], rest_time=3)   
 
 
     
@@ -729,6 +740,7 @@ def initCustomAction():
         target_pic.append("shop_purchase_keywordless.png")
 
         purchased_count = 0
+        round_count = 0
 
         while(True):
             for place in goods_places:
@@ -736,7 +748,7 @@ def initCustomAction():
                     continue
                 mk.moveClick(place, rest_time=1)
                 eye.captureScreenShot()
-                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
+                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60]) and (not eye.templateMactchExist("shop_purchase_ego_resource.png", recognize_area=[655, 305, 520, 300]))):
                     for gift in target_pic:
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
@@ -755,10 +767,16 @@ def initCustomAction():
 
             eye.screenshotOcr(recognize_area=[665, 190, 160, 55])
             rest_cost = eye.ocrGetFirstNum()
-            if (purchased_count>2 or rest_cost < (450 + 100*purchased_count)):
+            if (purchased_count>2 or rest_cost < (450 + 75*purchased_count)):
                 break
+            
+            if (rest_cost >= (540 + round_count*300)):
+                refresh_according_to_team_style(team_style=team_style)
+            else:
+                mk.moveClick([1260, 200], rest_time=3)
+            
+            round_count += 1
 
-            mk.moveClick([1260, 200], rest_time=3)
 
     
     def search_place_enhance_ego(gift_places:list, target_pic:list):
@@ -788,7 +806,7 @@ def initCustomAction():
                 if (eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
                     continue
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
-                    mk.pressKey("esc")
+                    mk.pressKey("esc", rest_time=0.5)
                     continue
                 mk.pressKey("enter", press_count=1, rest_time=2)
                 fake_enhance_count = 3
@@ -798,7 +816,7 @@ def initCustomAction():
                 if (eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
                     continue
                 if (eye.templateMactchExist("shop_you_need.png", recognize_area=[365, 655, 300, 80])):
-                    mk.pressKey("esc")
+                    mk.pressKey("esc", rest_time=0.5)
                     continue
                 mk.pressKey("enter", press_count=1, rest_time=2)
             
