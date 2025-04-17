@@ -162,7 +162,6 @@ class WorkingPage(QFrame):
         """线程自己停止后处理"""
         self.PauseButton.setEnabled(False)
         self.StopButton.setEnabled(False)
-        self.update_team_info(None, None)  # 清空队伍信息
         homepage = self.window().homeInterface
         homepage.enableStartButtons()
         homepage.stopRecording()

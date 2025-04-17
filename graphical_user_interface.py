@@ -81,7 +81,8 @@ class Window(FramelessWindow):
         self.initWindow()
 
         self.show()
-        self.showSupportDialog()
+        QTimer.singleShot(100, self.showSupportDialog)
+        # self.showSupportDialog()
         self.checkForUpdates()  # 调用版本检测函数
         lalc_logger.clean_old_logs()
         # self.show_announcement_dialog()
@@ -148,11 +149,9 @@ class Window(FramelessWindow):
             )
 
 
-
     def showSupportDialog(self):
         """显示支持对话框"""
-        # 使用 fluentwidgets 的 Dialog 替代 QDialog
-        self.supportDialog = Dialog(
+        supportDialog = Dialog(
             title="QAQ",
             content=_(
                 "请问可以在 GitHub 上给 LALC 点颗 Star✨吗？\n"
@@ -164,36 +163,60 @@ class Window(FramelessWindow):
             ),
             parent=self
         )
-        
-        # 设置按钮
-        self.supportDialog.yesButton.setText(_("现在就去"))
-        self.supportDialog.cancelButton.setText(_("下次一定"))
+        supportDialog.titleLabel.setAlignment(Qt.AlignCenter)
+        supportDialog.contentLabel.setAlignment(Qt.AlignCenter)
 
-        # 连接信号
-        self.supportDialog.yesSignal.connect(self.onStarClicked)  # 确认按钮
-        self.supportDialog.cancelSignal.connect(self.onCancelClicked)  # 取消按钮
+        
+        supportDialog.yesButton.setText(_("现在就去"))
+        supportDialog.cancelButton.setText(_("下次一定"))
+
+        # 修改为非模态对话框
+        supportDialog.setModal(False)
+        supportDialog.show()
 
         # 自动关闭定时器
-        self.timer = QTimer(self.supportDialog)
-        self.timer.timeout.connect(self.supportDialog.accept)
-        self.timer.start(3000)  # 3秒后关闭
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(supportDialog.close)  # 使用close而不是accept
+        self.timer.start(3000)
 
-        # 显示对话框
-        self.supportDialog.exec_()
+        # 连接按钮信号
+        supportDialog.yesButton.clicked.connect(
+            lambda: [
+                self.timer.stop(),
+                supportDialog.close(),
+                self.show_message("INFO", "Thanks", _("谢谢 !祝你生活愉快！✨不管你到底有没有给 Star\n谢谢你愿意多了解一点 LALC")),
+                QDesktopServices.openUrl(QUrl("https://github.com/HSLix/LixAssistantLimbusCompany"))
+            ]
+        )
+        supportDialog.cancelButton.clicked.connect(
+            lambda: [
+                self.timer.stop(),
+                supportDialog.close(),
+                self.show_message("INFO", "", _("也祝你生活愉快！(^_−)☆"))
+            ]
+        )
 
-    def onStarClicked(self):
-        """处理确认按钮点击"""
-        self.show_message("INFO", "Thanks", _("谢谢 !祝你生活愉快！✨不管你到底有没有给 Star\n谢谢你愿意多了解一点 LALC"))
-        # 打开链接
-        QDesktopServices.openUrl(QUrl("https://github.com/HSLix/LixAssistantLimbusCompany"))
-        # self.supportDialog.accept()
+    def showMessageBox(self):
+        w = MessageBox(
+            _('支持作者🥰'),
+            _('个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持就是作者开发和维护项目的动力🚀'),
+            self
+        )
+        w.yesButton.setText(_('来啦老弟'))
+        w.cancelButton.setText(_('下次一定'))
+        
+        # 修改为非模态对话框
+        w.setModal(False)
+        w.show()
 
-
-    def onCancelClicked(self):
-        """处理取消按钮点击"""
-        self.show_message("INFO", "", _("也祝你生活愉快！(^_−)☆"))
-        # self.supportDialog.reject()
-
+        # 连接按钮信号
+        w.yesButton.clicked.connect(
+            lambda: [
+                w.close(),
+                QDesktopServices.openUrl(QUrl("https://github.com/HSLix/LixAssistantLimbusCompany"))
+            ]
+        )
+        w.cancelButton.clicked.connect(w.close)
 
     # 保存语言配置
     def _save_language_config(self, value):
@@ -308,7 +331,7 @@ class Window(FramelessWindow):
     def show_message(self, msg_type, title, content, default_gif_config = True):
         """
         统一显示消息条
-        msg_type:info,success,warning,error
+        msg_type:INFO,SUCCESS,WARNING,ERROR
         """
         # 创建新消息条
         self.info_bar = InfoBar(
@@ -470,17 +493,7 @@ class Window(FramelessWindow):
         #!IMPORTANT: This line of code needs to be uncommented if the return button is enabled
         # qrouter.push(self.stackWidget, widget.objectName())
 
-    def showMessageBox(self):
-        w = MessageBox(
-            _('支持作者🥰'),
-            _('个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持就是作者开发和维护项目的动力🚀'),
-            self
-        )
-        w.yesButton.setText(_('来啦老弟'))
-        w.cancelButton.setText(_('下次一定'))
 
-        if w.exec():
-            QDesktopServices.openUrl(QUrl("https://github.com/HSLix/LixAssistantLimbusCompany"))
 
 
 
@@ -548,9 +561,9 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    if not windll.shell32.IsUserAnAdmin():
-        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-        sys.exit(0)
+    # if not windll.shell32.IsUserAnAdmin():
+    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+    #     sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",

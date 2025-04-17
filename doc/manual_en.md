@@ -8,6 +8,7 @@
 - Set the Render Scaling "High" in the Graphics of Settings if possible, which can absolutly help lalc recognize the image correctly.
 - Make sure that the path of LALC is all English, or LALC will report error to remind you of this.
 - Set "windowed" in the Setting of Limbus.LALC will automatically adjust the resolution of the game window to 1600x900 (set display value), without the need for manual adjustment.
+- In order to avoid being accidentally killed by Windows Firewall, please turn off Windows Firewall (Defender) yourself, otherwise the program may be automatically deleted.
 ## Tutorial
 - In the main screen, click the button below to start the software.
 - In the working interface, click on the pause and stop buttons below to pause and stop running respectively.

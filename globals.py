@@ -22,7 +22,7 @@ GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.1.4"
+VERSION = "V3.1.5"
 
 
 # 支持网址

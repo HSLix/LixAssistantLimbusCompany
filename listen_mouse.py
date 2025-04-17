@@ -14,12 +14,24 @@ if __name__ == "__main__":
     # mk.moveClick([150,555])
     # mk.moveClick([555, 885])
     mk.listenMouse()  
-    # gift_places = []
-    # x = 860
-    # y = 370
-    # x_step = 115
-    # y_step = 120
-    # for i in range(3):
-    #     for j in range(5):
-    #         gift_places.append([x + j*x_step, y + i*y_step])
-    #         mk.moveClick([x + j*x_step, y + i*y_step])
+    
+    # x = 420
+    # y = 415
+    # x_step = 190
+    # y_step = 175
+    # for i in range(5):
+    #     for j in range(2):
+    #         mk.moveClick([x + i*x_step, y + j*y_step])
+    #         print("%d, %d".format(x + i*x_step, y + j*y_step))
+
+    # style_refresh = {
+    #                 "Burn":[420, 415],
+    #                 "Bleed":[610, 415],
+    #                 "Tremor":[800, 415],
+    #                 "Rupture":[990, 415],
+    #                 "Sinking":[1180, 415],
+    #                 "Poise":[420, 590],
+    #                 "Charge":[610, 590],
+    #                  }
+    # for place in style_refresh.values():
+    #     mk.moveClick(place)
