@@ -656,6 +656,13 @@
             "MirrorEntrance"
         ]
     },
+    "FullAutoMirrorDoNotHaveEnoughEnkephalinModules":{
+        "recognition":"TemplateMatch",
+        "template":"do_not_have_enough_enkephalin_modules.png",
+        "action":"Custom",
+        "custom_name":"remind_assemble_enkephalin_modules",
+        "next":"FullAutoMirrorCircleCenter"
+    },
     "FullAutoMirrorOccurUnstableNetwork": {
         "recognition":"TemplateMatch",
         "template": "network_unstable_check_connection.png",
@@ -799,7 +806,7 @@
         "template": "mirror_init_selected_ego_gift.png",
         "action": "Custom",
         "custom_name": "choose_start_ego_gift",
-        "post_delay": 3,
+        "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorSelectThemePackComfirmNormalMode": {
@@ -915,7 +922,7 @@
         "threshold": 0.85,
         "action": "Key",
         "key": "p",
-        "action_rest": 0.5,
+        "action_rest": 0.3,
         "next": [
             "FullAutoClickEncounter",
             "FullAutoEnterEncounter"
@@ -926,8 +933,6 @@
         "template": "win_rate.png",
         "threshold": 0.85,
         "action": "Click",
-        "action_count": 2,
-        "action_rest": 0.5,
         "target": true,
         "next": [
             "FullAutoEnterEncounter"
@@ -1180,7 +1185,6 @@
             1400,
             860
         ],
-        "action_rest": 1,
         "next": "FullAutoMirrorShopLeaveConfirm"
     },
     "FullAutoMirrorShopLeaveConfirm": {
@@ -1191,6 +1195,7 @@
     "FullAutoMirrorSelectAcquireEgoNew": {
         "recognition": "TemplateMatch",
         "template": "acquire_ego_new.png",
+        "threshold":0.7,
         "action": "Click",
         "target_offset":[0, 100],
         "next": "FullAutoMirrorSelectAcquireEgoConfirm"

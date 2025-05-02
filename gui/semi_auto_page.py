@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt
 import json
 
 
-from executor import ControlUnit, screen_record_thread
+from executor import lalc_cu, screen_record_thread
 from json_manager import config_manager  
 from i18n import _
 
@@ -212,7 +212,7 @@ class SemiAutoPage(QFrame):
 
     def start_thread(self):
         # 获取全局的 ControlUnit 实例
-        control_unit = ControlUnit()
+        control_unit = lalc_cu
         if not control_unit.isRunning():
             # 收集并保存参数
             global config_manager

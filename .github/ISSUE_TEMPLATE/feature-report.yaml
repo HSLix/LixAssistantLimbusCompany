@@ -1,6 +1,7 @@
 name: 需求建议 Feature request
-description: 提出你需要的新功能 | 
+description: 提出你需要的新功能 | Suggest a new feature or improvement to an existing feature."
 labels: ['enhancement']
+title: "[Feature] Title"
 body:
   - type: checkboxes
     id: checks
@@ -9,7 +10,7 @@ body:
       options:
       - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”等 | The title is clear rather than "A advice".
         required: true
-      - label:  我已确认目前没有类似 issue | I have confirmed that there is no similar issue at this time. 
+      - label:  我已确认在[Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues)目前没有类似 issue | I have confirmed that there is no similar issue in [Issue](https://github.com/HSLix/LixAssistantLimbusCompany/issues) at this time. 
         required: true
       - label: 我确定这是一个建议，而不是遇到了问题 | I'm sure it was a suggestion, not a problem encountered
         required: true
@@ -20,6 +21,7 @@ body:
   - type: textarea
     id: feature
     attributes:
-      label: 建议
+      label: 建议 | Suggestion
+      description: "请尽可能详细地描述你希望添加的功能或是你希望改进的地方。 Please describe the feature you'd like to see, or the enhancement of other features as detailed as possible."
     validations:
       required: false

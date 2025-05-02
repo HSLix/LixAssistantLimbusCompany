@@ -1,6 +1,6 @@
 {
     "gui": {
-        "language": "en_US",
+        "language": "zh_CN",
         "recording": true
     },
     "full_auto": {
@@ -10,7 +10,7 @@
         "ThreadEnable": false,
         "Thread": 1,
         "MirrorEnable": true,
-        "Mirror": 99,
+        "Mirror": 3,
         "reward": false
     },
     "semi_auto": {

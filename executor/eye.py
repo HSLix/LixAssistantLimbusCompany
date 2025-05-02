@@ -222,13 +222,14 @@ class EYE:
     def templateMultiMatch(self, pic_path, threshold=0.8, recognize_area=[0, 0, 0, 0], merge_distance=10, is_show_result=False):
         # 加载目标图像
         pic_path = os.path.join(TEMPLATE_DIR, pic_path)
-        target = EYE.getGreyNormalizedPic(pic_path=pic_path)
+        target = imread(pic_path, IMREAD_GRAYSCALE)
+        target = EYE.getGreyNormalizedPic(target)
         if target is None:
             raise FileNotFoundError(pic_path)
 
         
         template = self.getScreenShot()
-        template = EYE.getGreyNormalizedPic(image=template)
+        template = EYE.getGreyNormalizedPic(template)
 
         
         # 裁剪到指定区域
@@ -294,13 +295,16 @@ class EYE:
         
         # 转换为全局坐标
         global_points = []
-        for (x, y, score) in selected:
-            global_x = x + recognize_area[0]
-            global_y = y + recognize_area[1]
-            global_points.append([int(global_x), int(global_y), float(score)])
+        
         
         # 显示匹配结果
         if is_show_result:
+            
+            for (x, y, score) in selected:
+                global_x = x + recognize_area[0]
+                global_y = y + recognize_area[1]
+                global_points.append([int(global_x), int(global_y), float(score)])
+
             template_color = cvtColor(template, COLOR_GRAY2BGR)
             target_color = cvtColor(target, COLOR_GRAY2BGR)
             
@@ -316,6 +320,11 @@ class EYE:
             imshow("Matched Areas (Red Boxes)", template_color)
             waitKey(0)
             destroyAllWindows()
+        else:
+            for (x, y, score) in selected:
+                global_x = x + recognize_area[0]
+                global_y = y + recognize_area[1]
+                global_points.append([int(global_x), int(global_y)])
         
         return global_points
 

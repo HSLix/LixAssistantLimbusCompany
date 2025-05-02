@@ -29,7 +29,7 @@ def initMouseHomePoint():
     with mss.mss() as sct:
         monitor = sct.monitors[0]
         w = monitor['width']
-    return (w-10, 10)
+    return (w-100, 100)
 
 
 
