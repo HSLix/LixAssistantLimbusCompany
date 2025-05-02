@@ -1,6 +1,7 @@
 name: 问题反馈 Bug report
-description: 程序出现问题
+description: 程序出现问题 | Report the error to help lalc improve.
 labels: ['bug']
+title: "[Bug] Title"
 body:
   - type: checkboxes
     id: checks
@@ -34,7 +35,7 @@ body:
     id: rebug
     attributes:
       label: 重现问题 | Reproduct the Bug
-      description: 描述一个可重复的步骤，复现你的问题 | Provide the steps of reproducing the Bug.
+      description: 在（什么时候），做（什么行为），LALC 出现（什么问题） | 
     validations:
       required: true
   - type: textarea
@@ -47,10 +48,10 @@ body:
   - type: textarea
     id: screenshots
     attributes:
-      label: 视频/截图 | Video/Screenshot
-      description: 上传你发生此问题时的视频/截图 | Upload the Video/Screenshot when meeting up this Bug.
+      label: 录屏/截图 | Record Video/Screenshot
+      description: 上传你发生此问题时的录屏/截图 | Upload the Video/Screenshot when meeting up this Bug.
     validations:
-      required: false
+      required: true
   - type: textarea
     id: shouldbe
     attributes:
@@ -62,6 +63,6 @@ body:
     id: others
     attributes:
       label: 其他信息 | Other Information
-      description: 操作系统、语言及版本号；屏幕分辨率等。| OS, language, Version of LALC, Screen Resolution……
+      description: 操作系统、语言及 LALC 版本号；屏幕分辨率等。| OS, language, Version of LALC, Screen Resolution……
     validations:
       required: false

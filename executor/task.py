@@ -439,7 +439,7 @@ def initCustomAction():
         mk.moveClick([1045, 380], rest_time=0.5)
         mk.moveClick([1045, 510], rest_time=0.5)
         mk.moveClick([1045, 650], rest_time=0.5)
-        mk.pressKey("enter", press_count=4, rest_time=1)
+        mk.pressKey("enter", press_count=2, rest_time=1)
 
 
         
@@ -617,10 +617,11 @@ def initCustomAction():
                 sellable = True
                 if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
                     sellable = True
-                elif (eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
-                    sellable = True
                 else:
                     for gift in target_pic:
+                        if (gift == "shop_enhance_keywordless.png" and eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
+                            sellable = True
+                            break
                         if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
                             sellable = False
                             break
@@ -688,7 +689,7 @@ def initCustomAction():
          
             
         mk.pressKey("esc", rest_time=2)
-
+        mk.mouseBackHome()
 
     style_refresh = {
                     "Burn":[420, 415],
@@ -703,6 +704,7 @@ def initCustomAction():
         mk.moveClick([1435, 200], rest_time=0.5)
         mk.moveClick(style_refresh[team_style])
         mk.moveClick([990, 745], rest_time=3)   
+        mk.mouseBackHome()
 
 
     
@@ -748,8 +750,10 @@ def initCustomAction():
                     continue
                 mk.moveClick(place, rest_time=1)
                 eye.captureScreenShot()
-                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60]) and (not eye.templateMactchExist("shop_purchase_ego_resource.png", recognize_area=[655, 305, 520, 300]))):
+                if (eye.templateMactchExist("purchase_ego_gift.png", recognize_area=[500, 230, 400, 60])):
                     for gift in target_pic:
+                        if (gift == "shop_purchase_keywordless.png" and eye.templateMactchExist("shop_purchase_ego_resource.png", recognize_area=[655, 305, 520, 300])):
+                            continue
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
                             mk.pressKey("enter", press_count=2, rest_time=0.3)
@@ -778,15 +782,18 @@ def initCustomAction():
             round_count += 1
 
 
+
     
-    def search_place_enhance_ego(gift_places:list, target_pic:list):
+    def search_place_enhance_ego(gift_places:list, target_pic:list, gift_recognize_area:list):
         fake_enhance_count = 3 # reduce the waste of time for the last ego gift can not be enhanced
+        eye.captureScreenShot()
+        gift_places += eye.templateMultiMatch("shop_enhance_left_bottom_corner.png", threshold=0.7, recognize_area=gift_recognize_area)
 
         for c in gift_places:
             if (fake_enhance_count <= 0):
                 lalc_logger.log_task("DEBUG", "search_place_enhance_ego", "INTERRUPTED", "Due to too many fake enhanceable.")
                 break
-
+            c[0] += 20
             mk.moveClick(c, rest_time=0.2)
             eye.captureScreenShot()
             enhance_able = False
@@ -825,6 +832,7 @@ def initCustomAction():
                 mk.pressKey("esc", rest_time=1)
 
 
+
     @custom_action_dict.register
     def enhance_wanted_ego_gift(**kwargs):
         eye.captureScreenShot()
@@ -859,28 +867,31 @@ def initCustomAction():
         gift_places = []
         x = 860
         y = 370
-        y = 370
-        x_step = 115
-        y_step = 120
-        for i in range(3):
-            for j in range(5):
-                gift_places.append([x + j*x_step, y + i*y_step])
+        gift_places.append([x, y]) # first place
+        # x_step = 115
+        # y_step = 120
+        # for i in range(3):
+        #     for j in range(5):
+        #         gift_places.append([x + j*x_step, y + i*y_step])
 
-        
+        gift_recognize_area = [0, 0, 0, 0]
         while True:
-            search_place_enhance_ego(gift_places, target_pic)
+            search_place_enhance_ego(gift_places, target_pic, gift_recognize_area=gift_recognize_area)
             eye.captureScreenShot()
             if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 310, 55, 370])):
                 break
-            if (len(gift_places) != 10):
-                gift_places = gift_places[5:]
+            gift_places.clear()
+            # if (len(gift_places) != 10):
+            #     gift_places = gift_places[5:]
             if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
                 mk.scroll([0,-1], 5, rest_time=0.2)
+                gift_recognize_area = [790, 425, 640, 290]
             else:
                 break
         
-        mk.moveClick([1400, 860], rest_time=1)
+        mk.moveClick([1450, 860], rest_time=1)
         # mk.pressKey("esc", rest_time=1)
+        mk.mouseBackHome()
 
     @custom_action_dict.register
     def heal_all_sinner(**kwargs):
@@ -893,6 +904,8 @@ def initCustomAction():
         if eye.templateMactchExist("heal_sinners.png", recognize_area=[125, 60, 325, 110]):
             mk.moveClick([1280, 460], rest_time=2)
             mk.moveClick([1415, 860], rest_time=2)
+        
+        mk.mouseBackHome()
 
     @custom_action_dict.register
     def select_theme_pack(**kwargs):
@@ -915,6 +928,8 @@ def initCustomAction():
             if find_choose_simple_theme_pack(simple_keyword):
                 sleep(4)
                 return
+            
+        mk.mouseBackHome()
 
         
 
@@ -947,6 +962,10 @@ def initCustomAction():
     @custom_action_dict.register
     def network_unstable_stop(**kwargs):
         raise ValueError("网络不稳定，请自行重启。 | Please restart due to the unstable network.")
+
+    @custom_action_dict.register
+    def remind_assemble_enkephalin_modules(**kwargs):
+        raise ValueError("脑啡肽模组不足，请自行合成并确认奖励。 | Do not have enough enkephalin modules, assemble it and claim the rewards plz.")
 
 
     

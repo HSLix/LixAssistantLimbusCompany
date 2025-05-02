@@ -214,6 +214,7 @@ class ControlUnit(QThread):
             self.team_info_updated.emit(current_team_name, next_team_name)
         elif self.mode == "SemiAuto":
             self.team_info_updated.emit("-", "-")
+
         while self.is_running:
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
@@ -366,12 +367,6 @@ class ControlUnit(QThread):
                 'SUCCESS',
                 "cu stop with final task[{0}]".format(self.cur_task.name)
             )
-            lalc_logger.log_task(
-                "INFO",
-                "ContainUnitStop",
-                'SUCCESS',
-                "cu stop with final task[{0}]".format(self.cur_task.name)
-            )
             self.next_task = None
             self.pending_task_stack.clear()
             self.is_running = False
@@ -387,12 +382,6 @@ class ControlUnit(QThread):
                 'SUCCESS',
                 "cu complete with final task[{0}]".format(self.cur_task.name)
             )
-            lalc_logger.log_task(
-                "INFO",
-                "ContainUnitComplete",
-                'SUCCESS',
-                "cu complete with final task[{0}]".format(self.cur_task.name)
-            )
             self.stop()
             self.task_completed.emit()
             
@@ -401,6 +390,7 @@ class ControlUnit(QThread):
 
 
 
+lalc_cu = ControlUnit()
 
 
 

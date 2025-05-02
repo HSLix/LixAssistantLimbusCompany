@@ -23,11 +23,12 @@ from requests import get
 
 
 
+
 from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK, checkWorkDirAllEnglish
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
-from executor import ControlUnit, lalc_logger, screen_record_thread
+from executor import lalc_cu, lalc_logger, screen_record_thread
 
 
 
@@ -226,7 +227,6 @@ class Window(FramelessWindow):
 
     def connect_signals(self):
         """连接信号到消息显示"""
-        control_unit = ControlUnit()
         self.teamManageInterface.last_enabled_team_disable_attempt.connect(
             lambda: self.show_message(
                 "WARNING",
@@ -237,22 +237,22 @@ class Window(FramelessWindow):
         
         
         # 任务完成信号
-        control_unit.task_finished.connect(
+        lalc_cu.task_finished.connect(
             lambda task_name, count: self.show_message(
                 "SUCCESS", 
                 _('TaskFinished'), 
                 _('{0} have finished {1} time(s)').format(task_name, count)
             )
         )
-        control_unit.pause_completed.connect(
+        lalc_cu.pause_completed.connect(
             self.workingInterface.on_paused
         )
-        control_unit.stop_completed.connect(
+        lalc_cu.stop_completed.connect(
             self.workingInterface.on_stopped
         )
 
         # 屏幕缩放警告
-        # control_unit.screen_scale_warning.connect(
+        # lalc_cu.screen_scale_warning.connect(
         #     lambda: self.show_message(
         #         "WARNING", 
         #         _('ScreenScaleWarning'), 
@@ -261,41 +261,41 @@ class Window(FramelessWindow):
         # )
             
         # 任务停止信号
-        control_unit.task_stopped.connect(
+        lalc_cu.task_stopped.connect(
             self.workingInterface.thread_self_stop
         )
 
         
         # 任务错误信号
-        control_unit.task_error.connect(
+        lalc_cu.task_error.connect(
             lambda msg: self.show_message("ERROR", 'Error', msg)
         )
-        control_unit.task_error.connect(
+        lalc_cu.task_error.connect(
             self.workingInterface.thread_self_stop
         )
-        control_unit.task_warning.connect(
+        lalc_cu.task_warning.connect(
             lambda msg: self.show_message("WARNING", "Warning", msg)
         )
 
         
             
         # 所有任务完成信号
-        control_unit.task_completed.connect(
+        lalc_cu.task_completed.connect(
             lambda : self.show_message("SUCCESS", 'FinshAll', _("所有任务顺利执行"))
         )
         # 任务暂停/继续信号
-        control_unit.task_paused.connect(
+        lalc_cu.task_paused.connect(
             lambda: self.show_message("INFO", 'Paused', _('任务执行已暂停'))
         )
-        control_unit.task_resumed.connect(
+        lalc_cu.task_resumed.connect(
             lambda: self.show_message("INFO", 'Resumed', _('任务执行已继续'))
         )
 
         # 连接队伍信息更新信号
-        control_unit.team_info_updated.connect(
+        lalc_cu.team_info_updated.connect(
             lambda current_team_name, next_team_name: self.workingInterface.update_team_info(current_team_name, next_team_name)
         )
-        control_unit.team_info_updated.connect(
+        lalc_cu.team_info_updated.connect(
             lambda current_team_name, next_team_name: lalc_logger.log_task(
                 "INFO",
                 "UpdateTeamRotate",
@@ -506,7 +506,7 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
     lalc_logger.log_task(
         "ERROR",
         "Graphical User Interface",
-        "UNEXPECTED ERROR",
+        "ERROR",
         f"{error_msg}"
     )
     
@@ -524,10 +524,7 @@ def my_excepthook(exc_type, exc_value, exc_traceback):
     if msg_box.exec_():
         log_dir = LOG_DIR  
         if os.path.exists(log_dir):
-            if os.name == 'nt':  # Windows
-                os.startfile(log_dir)
-            elif os.name == 'posix':  # macOS and Linux
-                os.system(f'open "{log_dir}"' if sys.platform == 'darwin' else f'xdg-open "{log_dir}"')
+            os.startfile(log_dir)
         else:
             print(f"Log directory does not exist: {log_dir}")
 
@@ -561,9 +558,9 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    # if not windll.shell32.IsUserAnAdmin():
-    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-    #     sys.exit(0)
+    if not windll.shell32.IsUserAnAdmin():
+        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+        sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",

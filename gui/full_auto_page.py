@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt
 import json
 
 
-from executor import ControlUnit, screen_record_thread
+from executor import lalc_cu, screen_record_thread
 from json_manager import config_manager  
 from i18n import _
 
@@ -217,7 +217,7 @@ class FullAutoPage(QFrame):
         global config_manager
         config_manager.save_config('full_auto', save_params)
         # 传递参数到 ControlUnit
-        control_unit = ControlUnit()
+        control_unit = lalc_cu
         control_unit.set_task_params(params)
         # 启动任务
         control_unit.set_start_task("FullAutoEntrance")

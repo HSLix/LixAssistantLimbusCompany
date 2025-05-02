@@ -5,7 +5,7 @@ import os
 from PyQt5.QtCore import Qt
 
 from .gif_player import GifPlayer  
-from executor import ControlUnit
+from executor import lalc_cu
 from globals import LOG_DIR
 from i18n import _
 
@@ -100,7 +100,7 @@ class WorkingPage(QFrame):
         """暂停线程（新增中间状态处理）"""
         if self.pending_pause:  # 防止重复点击
             return
-        control_unit = ControlUnit()
+        control_unit = lalc_cu
         if self.is_pausing:
             control_unit.task_resumed.emit()
             self.resume_thread()
@@ -118,7 +118,7 @@ class WorkingPage(QFrame):
 
     def resume_thread(self):
         """恢复线程"""
-        control_unit = ControlUnit()
+        control_unit = lalc_cu
         if control_unit.isRunning():
             control_unit.resume()
         # 直接更新状态（恢复操作是即时的）
@@ -139,7 +139,7 @@ class WorkingPage(QFrame):
         self.window().show_message("INFO", "Stopping", _("正在停止任务"))
         
         # 2. 触发停止操作
-        ControlUnit().stop_requested.emit()  # 新增信号
+        lalc_cu.stop_requested.emit()  # 新增信号
 
     def on_paused(self):
         """暂停完成回调"""

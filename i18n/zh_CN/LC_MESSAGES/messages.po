@@ -30,6 +30,14 @@ msgstr "更新检查成功"
 
 #, python-brace-format
 msgid ""
+"You are using the latest version.\n"
+"Current version: {0}, GitHub version: {1}"
+msgstr ""
+"当前版本为最新的正式版本\n"
+"当前版本: {0}, GitHub 版本: {1}"
+
+#, python-brace-format
+msgid ""
 "Welcome back! Coder :)\n"
 "Current version: {0}, GitHub version: {1}"
 msgstr ""
