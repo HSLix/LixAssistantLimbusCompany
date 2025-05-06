@@ -1,0 +1,126 @@
+name: Build and Release Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'  
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller
+        if (Test-Path requirements.txt) { pip install -r requirements.txt }
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller lalc.spec
+        if (-not (Test-Path "dist\lalc.zip")) {
+          Write-Error "lalc.zip not found in dist directory!"
+          exit 1
+        }
+
+    - name: Generate Release Notes
+      id: release-notes
+      run: |
+        # 获取当前版本号
+        $currentVersion = $env:GITHUB_REF -replace 'refs/tags/v', ''
+
+        # 获取当前tag的标注信息
+        $currentNotes = git tag -l --format='%(contents)' "v$currentVersion"
+
+        # 去掉开头的中括号及版本号（如 [3.1.23]）
+        $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\d+\]\s*', ''
+
+        # 将分号替换为分号加换行符
+        $currentNotes = $currentNotes -replace ';', ";`n"
+
+        # 固定提示语
+        $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
+      
+        # 使用普通字符串拼接代替 here-string
+        $currentReleaseSection = "## v$currentVersion`n$currentNotes"
+
+        # 使用GitHub API获取上一个Release的body内容
+        $headers = @{
+          "Authorization" = "token ${{ secrets.LALC_TOKEN }}"
+          "Accept" = "application/vnd.github.v3+json"
+        }
+
+        try {
+          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" -Headers $headers
+
+          if ($releases) {
+            $previousReleaseBody = $releases[0].body
+
+            # 提取旧的 <details> 内容（如果存在）
+            $oldHistory = ""
+            if ($previousReleaseBody -match '(?s)<details>.*?</details>') {
+              $oldHistory = $matches[0] -replace '<details>\s*<summary>.*?</summary>\s*', '' -replace '</details>', ''
+            }
+
+            # 提取上一版本的主要内容（非 <details> 部分），并去掉第一行
+            $previousMainContent = if ($previousReleaseBody -match '(?s)^[\s\S]*?(?=<details>)') {
+              # 分割内容为行数组并跳过第一行
+              $lines = $matches[0] -split "`n"
+              if ($lines.Count -gt 1) {
+                $lines[1..($lines.Count-1)] -join "`n"
+              } else {
+                ""
+              }
+            } else {
+              # 同样处理没有<details>的情况
+              $lines = $previousReleaseBody -split "`n"
+              if ($lines.Count -gt 1) {
+                $lines[1..($lines.Count-1)] -join "`n"
+              } else {
+                ""
+              }
+            }
+
+            # 使用普通字符串拼接
+            $newHistoryContent = "$previousMainContent`n`n$oldHistory"
+
+            # 清理多余空白行
+            $newHistoryContent = $newHistoryContent -replace '\r?\n\s*\r?\n\s*\r?\n', "`n`n"
+
+            # 构建完整的发布说明
+            $fullReleaseNotes = "$quarkLink`n$currentReleaseSection`n<details>`n<summary>历史更新 | History</summary>`n`n$newHistoryContent`n</details>"
+          } else {
+            # 没有历史版本时只显示当前内容
+            $fullReleaseNotes = "$quarkLink`n`n$currentReleaseSection"
+          }
+        } catch {
+          Write-Output "无法获取历史发布: $_"
+          $fullReleaseNotes = "$quarkLink`n`n$currentReleaseSection"
+        }
+
+        echo "notes<<EOF" >> $env:GITHUB_OUTPUT
+        echo "$fullReleaseNotes" >> $env:GITHUB_OUTPUT
+        echo "EOF" >> $env:GITHUB_OUTPUT
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.LALC_TOKEN }}
+      with:
+        files: dist/lalc.zip
+        body: |
+          ${{ steps.release-notes.outputs.notes }}
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}

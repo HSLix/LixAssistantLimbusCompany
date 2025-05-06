@@ -145,7 +145,7 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 | 灵清__ | 2023-11-24 | None |
 | **锋 | 2024-10-12 | None |
 | * | 2025-04-05 | 大佬加油！ |
-| [Celly](https://github.com/Cefly) | 2025-04-05 | 我这人话不多 |
+| [Celly](https://github.com/Ceres233) | 2025-04-05 | 我这人话不多 |
 | **语 | 2025-04-13 | None |
 
 ### Contributors:

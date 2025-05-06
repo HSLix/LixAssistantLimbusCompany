@@ -72,7 +72,7 @@ a = Analysis(
 # --------------------
 # 计算 splash 文字位置（含中英文）
 # --------------------
-splash_image_path = 'C:\\Users\\Li\\Documents\\Code\\LixAssistantLimbusCompany\\resource\\gui\\MagicGirl_White.png'
+splash_image_path = '.\\resource\\gui\\MagicGirl_White.png'
 splash_text = "正在初始化（少女祈祷中）  Initializing"  # 中英文换行
 text_size = 20  # 增大文字大小
 text_color = 'black'  # 建议浅色文字适配深色背景
@@ -103,7 +103,7 @@ exe = EXE(
     a.scripts,
     name='LixAssistantLimbusCompany',
     console=False,
-    icon="C:\\Users\\Li\\Documents\\Code\\LixAssistantLimbusCompany\\MagicAndWonder.ico",
+    icon="MagicAndWonder.ico",
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -112,7 +112,7 @@ exe = EXE(
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
+    upx=False,
     exclude_binaries=True,
 )
 
@@ -123,7 +123,7 @@ coll = COLLECT(
     a.zipfiles,
     a.datas,
     strip=False,
-    upx=True,
+    upx=False,
     upx_exclude=[],
     name='lalc',
 )

@@ -913,6 +913,7 @@
             100,
             100
         ],
+        "threshold":0.85,
         "action": "Click",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -934,7 +935,9 @@
         "threshold": 0.85,
         "action": "Click",
         "target": true,
+        "action_rest":0.3,
         "next": [
+            "FullAutoClickEncounter",
             "FullAutoEnterEncounter"
         ]
     },
@@ -1195,7 +1198,6 @@
     "FullAutoMirrorSelectAcquireEgoNew": {
         "recognition": "TemplateMatch",
         "template": "acquire_ego_new.png",
-        "threshold":0.7,
         "action": "Click",
         "target_offset":[0, 100],
         "next": "FullAutoMirrorSelectAcquireEgoConfirm"
