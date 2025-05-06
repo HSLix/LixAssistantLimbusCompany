@@ -3,7 +3,7 @@ name: Build and Release Windows Executable
 on:
   push:
     tags:
-      - 'v*'  
+      - 'V*'  
 
 jobs:
   build-and-release:
@@ -38,10 +38,10 @@ jobs:
       id: release-notes
       run: |
         # 获取当前版本号
-        $currentVersion = $env:GITHUB_REF -replace 'refs/tags/v', ''
+        $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
 
         # 获取当前tag的标注信息
-        $currentNotes = git tag -l --format='%(contents)' "v$currentVersion"
+        $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
 
         # 去掉开头的中括号及版本号（如 [3.1.23]）
         $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\d+\]\s*', ''
@@ -53,7 +53,7 @@ jobs:
         $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
       
         # 使用普通字符串拼接代替 here-string
-        $currentReleaseSection = "## v$currentVersion`n$currentNotes"
+        $currentReleaseSection = "## V$currentVersion`n$currentNotes"
 
         # 使用GitHub API获取上一个Release的body内容
         $headers = @{
