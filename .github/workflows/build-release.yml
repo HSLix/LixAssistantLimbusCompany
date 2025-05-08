@@ -44,7 +44,7 @@ jobs:
         $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
 
         # 去掉开头的中括号及版本号（如 [3.1.23]）
-        $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\d+\]\s*', ''
+        $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\*\]\s*', ''
 
         # 将分号替换为分号加换行符
         $currentNotes = $currentNotes -replace ';', ";`n"
