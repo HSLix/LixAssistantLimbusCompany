@@ -364,6 +364,15 @@ msgstr "呼吸法"
 msgid "Charge"
 msgstr "充能"
 
+msgid "Slash"
+msgstr "斩击"
+
+msgid "Pierce"
+msgstr "突刺"
+
+msgid "Blunt"
+msgstr "打击"
+
 msgid "队伍名"
 msgstr "队伍名"
 

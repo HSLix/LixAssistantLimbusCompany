@@ -367,6 +367,15 @@ msgstr "Poise"
 msgid "Charge"
 msgstr "Charge"
 
+msgid "Slash"
+msgstr "Slash"
+
+msgid "Pierce"
+msgstr "Pierce"
+
+msgid "Blunt"
+msgstr "Blunt"
+
 msgid "队伍名"
 msgstr "Team Name"
 

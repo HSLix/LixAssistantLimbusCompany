@@ -433,6 +433,16 @@ def initCustomAction():
             mk.moveClick([450, 630])
         elif (team_style == "Charge"):
             mk.moveClick([650, 630])
+        elif (team_style == "Slash"):
+            mk.moveClick([830, 630])
+        elif (team_style == "Pierce"):
+            mk.moveClick([260, 630])
+            mk.scroll([0, -1], 15)
+            mk.moveClick([260, 630])
+        elif (team_style == "Blunt"):
+            mk.moveClick([450, 630])
+            mk.scroll([0, -1], 15)
+            mk.moveClick([450, 630])
         else:
             raise ValueError("Over Team Style in choose_start_ego_gift")
         
@@ -657,6 +667,12 @@ def initCustomAction():
             target_pic.append("shop_enhance_sinking.png")
         elif(team_style == "Tremor"):
             target_pic.append("shop_enhance_tremor.png")
+        elif(team_style == "Slash"):
+            target_pic.append("shop_enhance_slash.png")
+        elif(team_style == "Pierce"):
+            target_pic.append("shop_enhance_pierce.png")
+        elif(team_style == "Blunt"):
+            target_pic.append("shop_enhance_blunt.png")
         else:
             raise ValueError("Unknown Style: %s", team_style)
 
@@ -699,6 +715,9 @@ def initCustomAction():
                     "Sinking":[1180, 415],
                     "Poise":[420, 590],
                     "Charge":[610, 590],
+                    "Slash":[800, 590],
+                    "Pierce":[990, 590],
+                    "Blunt":[1180, 590],
                      }
     def refresh_according_to_team_style(team_style:str):
         mk.moveClick([1435, 200], rest_time=0.5)
@@ -736,6 +755,12 @@ def initCustomAction():
             target_pic.append("shop_purchase_sinking.png")
         elif(team_style == "Tremor"):
             target_pic.append("shop_purchase_tremor.png")
+        elif(team_style == "Slash"):
+            target_pic.append("shop_purchase_slash.png")
+        elif(team_style == "Pierce"):
+            target_pic.append("shop_purchase_pierce.png")
+        elif(team_style == "Blunt"):
+            target_pic.append("shop_purchase_blunt.png")
         else:
             raise ValueError("Unknown team style: %s" % (team_style))
         
@@ -859,6 +884,12 @@ def initCustomAction():
             target_pic.append("shop_enhance_sinking.png")
         elif(team_style == "Tremor"):
             target_pic.append("shop_enhance_tremor.png")
+        elif(team_style == "Slash"):
+            target_pic.append("shop_enhance_slash.png")
+        elif(team_style == "Pierce"):
+            target_pic.append("shop_enhance_pierce.png")
+        elif(team_style == "Blunt"):
+            target_pic.append("shop_enhance_blunt.png")
         else:
             raise ValueError("Unknown Style: %s", team_style)
 
