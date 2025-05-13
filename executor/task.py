@@ -781,7 +781,11 @@ def initCustomAction():
                             continue
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
-                            mk.pressKey("enter", press_count=2, rest_time=0.3)
+
+                            # Press Confirm
+                            # mk.pressKey("enter", press_count=2, rest_time=0.3)
+                            mk.moveClick([800, 700], rest_time=1)
+                            
                             purchased_count += 1
                             break
                     mk.pressKey("enter", press_count=1, rest_time=0.4)
