@@ -26,7 +26,10 @@ class TeamManagePage(QFrame):
             "Rupture": _("Rupture"),
             "Sinking": _("Sinking"),
             "Poise": _("Poise"),
-            "Charge": _("Charge")
+            "Charge": _("Charge"),
+            "Slash": _("Slash"),
+            "Pierce": _("Pierce"),
+            "Blunt": _("Blunt"),
         }
         self.initUI()
 
