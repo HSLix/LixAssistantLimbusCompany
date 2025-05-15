@@ -2,10 +2,11 @@
 from PyQt5.QtWidgets import QWidget
 from qfluentwidgets import (
     ScrollArea, SettingCardGroup, OptionsSettingCard, SwitchSettingCard, PrimaryPushSettingCard, HyperlinkCard,
-    ExpandLayout, OptionsConfigItem, OptionsValidator, ConfigSerializer, FluentIcon as FIF
+    ExpandLayout, OptionsConfigItem, OptionsValidator, ConfigSerializer, FluentIcon as FIF,InfoBar,InfoBarIcon,
+    InfoBarPosition
 )
 from PyQt5.QtGui import QDesktopServices
-from PyQt5.QtCore import QUrl
+from PyQt5.QtCore import QUrl,Qt
 from enum import Enum
 import os
 
@@ -13,6 +14,9 @@ from executor import screen_record_thread
 from json_manager import config_manager  
 from globals import LOG_DIR, VIDEO_DIR, VERSION
 from i18n import _
+from git import Repo
+import shutil
+import stat
 
 
 class SettingPage(ScrollArea):
@@ -195,6 +199,17 @@ class SettingPage(ScrollArea):
             VERSION + "; 陆爻齐-LuYaoQi",
             self.updateGroup
         )
+
+        self.tryHotUpdate = PrimaryPushSettingCard(
+            _("尝试拉取更新"),
+            FIF.FOLDER,
+            _("拉取更新"),
+            _("请稍等一段时间，等待从仓库拉取成功后，退出程序后手动把./temp目录下的文件复制到软件根目录"),
+            self.logGroup
+        )
+        self.tryHotUpdate.clicked.connect(lambda: self.clone_repo_git())
+
+        self.updateGroup.addSettingCard(self.tryHotUpdate)
         self.updateGroup.addSettingCard(self.updateCard)
 
         # 初始化布局
@@ -236,3 +251,60 @@ class SettingPage(ScrollArea):
 
         # 更新录屏线程状态
         screen_record_thread.set_recording_enabled(is_checked)
+    
+    # 这里没有做一个异步或是线程什么的，拉的时候会卡一下
+    def clone_repo_git(self):
+        """
+        使用GitPython浅克隆仓库
+        """
+        github_url = "https://github.com/HSLix/LixAssistantLimbusCompany.git"
+        target_dir = "temp"
+        
+        import shutil, stat
+        def force_remove_readonly(func, path, _):
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+        try:
+            if os.path.exists(target_dir):
+                shutil.rmtree(target_dir, onerror=force_remove_readonly)
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
+            Repo.clone_from(github_url, target_dir, depth=1)
+            # print(f"仓库已克隆到: {os.path.abspath(target_dir)}")
+            # 避免后续删除失败
+            git_dir = os.path.join(target_dir, ".git")
+            if os.path.exists(git_dir):
+                import shutil, stat
+                shutil.rmtree(git_dir, onerror=force_remove_readonly)
+                # print(".git 目录已删除")
+            self.clean_temp_directory()
+        except Exception as e:
+            self.window().show_message("INFO", "出错", _(f"拉取失败: {e}"))
+        
+    def clean_temp_directory(self, temp_dir='./temp'):
+        # 添加要保留的目录
+        keep_dirs = ['executor', 'gui', 'i18n','resource']  
+        temp_dir = os.path.abspath(temp_dir)
+
+        try:
+            if not os.path.isdir(temp_dir):
+                self.window().show_message("INFO", "出错", _(f"{temp_dir} 目录不存在"))
+                return
+            for entry in os.listdir(temp_dir):
+                full_path = os.path.join(temp_dir, entry)
+                # 保留指定目录和.py文件
+                if os.path.isfile(full_path) and entry.endswith('.py'):
+                    continue
+                if os.path.isdir(full_path) and entry in keep_dirs:
+                    continue
+                # 其他删除
+                if os.path.isdir(full_path):
+                    shutil.rmtree(full_path)
+                else:
+                    os.remove(full_path)
+            self.window().show_message("INFO", "成功", _("拉取仓库成功"))
+        except Exception as e:
+            self.window().show_message("INFO", "出错", _(f"清理过程中出错{e}"))
+            
+        
