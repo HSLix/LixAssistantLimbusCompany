@@ -13,6 +13,7 @@ from .custom_action_dict import CustomActionDict
 from .mouse_keyboard import get_mouse_keyboard
 from .logger import lalc_logger
 from json_manager import theme_pack_manager
+from typing import List
 
     
 
@@ -570,8 +571,8 @@ def initCustomAction():
         mk.pressKey("enter")
         
 
-
-    def get_sorted_members_by_team(team_number: int, json_path = "team.json") -> list[str]:
+    # 兼容py3.8.10
+    def get_sorted_members_by_team(team_number: int, json_path = "team.json") -> List[str]:
         """
         根据队伍编号获取按序号升序排列的字符串列表（人物名称）。
 

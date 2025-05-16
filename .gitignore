@@ -5,3 +5,6 @@
 /dist/
 /build/
 __pycache__/
+.venv/
+.vscode/
+temp/
