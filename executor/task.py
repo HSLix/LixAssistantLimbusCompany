@@ -150,6 +150,8 @@ class Task:
             self.color_point: List[int] = config.get('color_point')
             self.lower : int = config.get("lower", 0)
             self.upper : int = config.get("upper", 255)
+        
+        self.recognize_center, self.recognize_score = None,None
 
 
 
@@ -302,7 +304,7 @@ class Task:
                     self.name,
                     f"[{self.recognition}] FINISH, recognize_center:[{self.recognize_center}]; recognize_score:[{self.recognize_score}]"
                     )
-            if(self.recognize_center == None):
+            if(self.recognize_score < self.threshold):
                 return
             print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
         elif self.recognition == "ColorMatch":

@@ -104,7 +104,7 @@ class ControlUnit(QThread):
     def _is_task_recognized(self, task):
         """判断任务是否识别成功"""
         if task.recognition == "TemplateMatch":
-            return task.recognize_score is not None
+            return task.recognize_score > task.threshold
         elif task.recognition == "ColorMatch":
             return task.recognize_score > 0
         elif task.recognition == "DirectHit":
@@ -116,15 +116,29 @@ class ControlUnit(QThread):
         activateWindow()
         sleep(0.1)
         task.update_screenshot()
+        max_recoginize_score = -1  # 初始化最大识别分数
+        max_recoginize_score_task = None  # 初始化最大识别分数任务
         if task.next:
             with self.condition:
                 for next_task_name in task.next:
                     next_task = self.get_task_from_dict(next_task_name)
                     if next_task and next_task.enabled:
                         next_task.execute_recognize()
+                        if next_task.recognize_score is not None and max_recoginize_score < next_task.recognize_score:
+                            max_recoginize_score = next_task.recognize_score
+                            max_recoginize_score_task = next_task
                         if self._is_task_recognized(next_task):
                             self.next_task = next_task  # 直接设置下一个任务
                             break  # 找到第一个有效任务即终止循环
+                # 如果没有找到有效的下一个任务，则使用最大识别分数的任务
+                if self.next_task is None and max_recoginize_score > 0:
+                    self.next_task = max_recoginize_score_task
+                    lalc_logger.log_task(
+                        "WARNING",
+                        self.next_task.name,
+                        'FAILED',
+                        f"Next task not recognized, score: {self.next_task.recognize_score}"
+                    )
                 self.condition.notify()
 
     def _add_interrupt(self, task):
