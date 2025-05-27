@@ -621,11 +621,11 @@
     },
     "MirrorEntrance": {
         "next": [
-            "FullAutoMirrorCircleCenter",
+            "FullAutoInitMirrorCircleCenter",
             "MirrorCheckpoint"
         ]
     },
-    "FullAutoMirrorCircleCenter": {
+    "FullAutoInitMirrorCircleCenter": {
         "next": [
             "FullAutoMirrorDealDownload",
             "FullAutoMirrorErrorRetry",
@@ -635,6 +635,14 @@
             "FullAutoInitMirrorInitTeam",
             "FullAutoInitMirrorInitStarBuff",
             "FullAutoInitMirrorInitStartEgoGift",
+            "FullAutoInitMirrorWaitConnecting",
+            "FullAutoInitMirrorWaitCombatTips",
+            "FullAutoInitMirrorTopLeftArrow",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoMirrorCircleCenter":{
+        "next":[
             "FullAutoMirrorCancelHardMode",
             "FullAutoMirrorSelectThemePackComfirmNormalMode",
             "FullAutoPassEgoGiftGet",
@@ -651,7 +659,6 @@
             "FullAutoContinueEncounter",
             "FullAutoMirrorWaitConnecting",
             "FullAutoMirrorWaitCombatTips",
-            "FullAutoMirrorTopLeftArrow",
             "FullAutoMirrorManagerLevelIncreased"
         ]
     },
@@ -675,7 +682,7 @@
         "recognize_area":[550, 400, 500, 160],
         "action":"Custom",
         "custom_name":"claim_previous_reward",
-        "next":"FullAutoMirrorCircleCenter"
+        "next":"FullAutoInitMirrorCircleCenter"
     },
     "FullAutoMirrorDealDownload": {
         "recognition": "TemplateMatch",
@@ -688,7 +695,7 @@
         "action_rest": 3,
         "next": [
             "FullAutoMirrorWaitDownload",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoInitMirrorCircleCenter"
         ]
     },
     "FullAutoMirrorWaitDownload": {
@@ -697,7 +704,7 @@
         "post_delay": 3,
         "next": [
             "FullAutoMirrorWaitDownload",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoInitMirrorCircleCenter"
         ]
     },
     "FullAutoMirrorTouchToStart": {
@@ -708,7 +715,7 @@
             300,
             -500
         ],
-        "next": "FullAutoMirrorCircleCenter",
+        "next": "FullAutoInitMirrorCircleCenter",
         "post_delay": 5
     },
     "FullAutoMirrorStart": {
@@ -722,14 +729,20 @@
         "template": "menu_drive.png",
         "action": "Click",
         "post_delay": 2,
-        "next": ["FullAutoAssembleEnkephalinModules", "FullAutoEnterMirror"]
+        "next": [
+            "FullAutoAssembleEnkephalinModules",
+            "FullAutoEnterMirror"
+        ]
     },
     "FullAutoAssembleEnkephalinModules": {
         "recognition": "ColorMatch",
         "color_point": [555, 885],
         "lower":100, 
         "upper":170,
-        "next": ["FullAutoAssembleEnkephalinModulesEnter", "FullAutoMirrorCircleCenter"]
+        "next": [
+            "FullAutoAssembleEnkephalinModulesEnter",
+            "FullAutoInitMirrorCircleCenter"
+        ]
     },
     "FullAutoAssembleEnkephalinModulesEnter":{
         "recognition": "TemplateMatch",
@@ -763,12 +776,15 @@
         "action_count": 2,
         "action_rest": 0.5,
         "post_delay": 0.5,
-        "next": ["FullAutoMirrorClaimPreviousReward","FullAutoInitMirrorStartOrResume"]
+        "next": [
+            "FullAutoMirrorClaimPreviousReward",
+            "FullAutoInitMirrorStartOrResume"
+        ]
     },
     "FullAutoInitMirrorStartOrResume": {
         "action": "Key",
         "key": "enter",
-        "next": "FullAutoMirrorCircleCenter",
+        "next": "FullAutoInitMirrorCircleCenter",
         "post_wait_freezes": 1,
         "post_delay": 1
     },
@@ -785,7 +801,7 @@
         "custom_name": "choose_team",
         "next": [
             "FullAutoInitMirrorInitStarBuff",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoInitMirrorCircleCenter"
         ],
         "post_delay": 2
     },
@@ -797,7 +813,7 @@
         "post_delay": 2,
         "next": [
             "FullAutoInitMirrorInitStartEgoGift",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoInitMirrorCircleCenter"
         ]
     },
     "FullAutoInitMirrorInitStartEgoGift": {
@@ -806,7 +822,7 @@
         "action": "Custom",
         "custom_name": "choose_start_ego_gift",
         "post_delay": 1,
-        "next": "FullAutoMirrorCircleCenter"
+        "next": "FullAutoInitMirrorCircleCenter"
     },
     "FullAutoMirrorSelectThemePackComfirmNormalMode": {
         "recognition": "TemplateMatch",
@@ -1019,7 +1035,8 @@
         ],
         "next": [
             "FullAutoClickEventRightBottom"
-        ]
+        ],
+        "post_delay":1
     },
     "FullAutoEventMakeSecondChoice": {
         "action": "Click",
@@ -1029,7 +1046,8 @@
         ],
         "next": [
             "FullAutoEventMakeFirstChoice"
-        ]
+        ],
+        "post_delay":1
     },
     "FullAutoPassVeryHighCheck": {
         "recognition": "TemplateMatch",
@@ -1187,6 +1205,7 @@
             1400,
             860
         ],
+        "post_delay":1,
         "next": "FullAutoMirrorShopLeaveConfirm"
     },
     "FullAutoMirrorShopLeaveConfirm": {
@@ -1255,12 +1274,30 @@
         "next_task_name": "End",
         "log_level": "INFO"
     },
+    "FullAutoInitMirrorWaitConnecting": {
+        "recognition": "TemplateMatch",
+        "template": "connecting.png",
+        "post_delay": 1,
+        "next": [
+            "FullAutoInitMirrorWaitConnecting",
+            "FullAutoInitMirrorCircleCenter"
+        ]
+    },
     "FullAutoMirrorWaitConnecting": {
         "recognition": "TemplateMatch",
         "template": "connecting.png",
         "post_delay": 1,
         "next": [
             "FullAutoMirrorWaitConnecting",
+            "FullAutoMirrorCircleCenter"
+        ]
+    },
+    "FullAutoInitMirrorWaitCombatTips": {
+        "recognition": "TemplateMatch",
+        "template": "combat_tips.png",
+        "post_delay": 1,
+        "next": [
+            "FullAutoInitMirrorWaitCombatTips",
             "FullAutoMirrorCircleCenter"
         ]
     },
@@ -1279,13 +1316,13 @@
         "threshold": 0.85,
         "action": "Click",
         "post_delay": 5,
-        "next": "FullAutoMirrorCircleCenter"
+        "next": "FullAutoInitMirrorCircleCenter"
     },
-    "FullAutoMirrorTopLeftArrow": {
+    "FullAutoInitMirrorTopLeftArrow": {
         "recognition": "TemplateMatch",
         "template": "top_left_arrow.png",
         "action": "Click",
-        "next": "FullAutoMirrorCircleCenter"
+        "next": "FullAutoInitMirrorCircleCenter"
     },
     "FullAutoMirrorManagerLevelIncreased": {
         "recognition": "TemplateMatch",

@@ -441,7 +441,7 @@ def initCustomAction():
         mk.moveClick([1045, 380], rest_time=0.5)
         mk.moveClick([1045, 510], rest_time=0.5)
         mk.moveClick([1045, 650], rest_time=0.5)
-        mk.pressKey("enter", press_count=2, rest_time=1)
+        mk.pressKey("enter", press_count=4, rest_time=1)
 
 
         
@@ -613,27 +613,23 @@ def initCustomAction():
     
     def search_place_sell_gift(gift_places:list, target_pic:list):
         for c in gift_places:
-            while True:
-                mk.moveClick(c)
-                eye.captureScreenShot()
+            mk.moveClick(c)
+            eye.captureScreenShot()
+            sellable = True
+            if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
                 sellable = True
-                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
-                    sellable = True
-                else:
-                    for gift in target_pic:
-                        if (gift == "shop_enhance_keywordless.png" and eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
-                            sellable = True
-                            break
-                        if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
-                            sellable = False
-                            break
+            else:
+                for gift in target_pic:
+                    if (gift == "shop_enhance_keywordless.png" and eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
+                        sellable = True
+                        break
+                    if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
+                        sellable = False
+                        break
 
-                if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
-                    mk.pressKey("enter", press_count=2, rest_time=1)
-                    sleep(2)
-                    continue
-                
-                break
+            if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
+                mk.pressKey("enter", press_count=2, rest_time=1)
+                sleep(2)
 
     
 
@@ -758,13 +754,13 @@ def initCustomAction():
                             continue
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
-                            mk.pressKey("enter", press_count=2, rest_time=0.3)
+                            mk.pressKey("enter", press_count=2, rest_time=0.5)
                             purchased_count += 1
                             break
-                    mk.pressKey("enter", press_count=1, rest_time=0.4)
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
                 else:
-                    mk.pressKey("enter", press_count=2, rest_time=0.4)
-                    continue
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
+                    break
                 
                 eye.captureScreenShot()
                 if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
