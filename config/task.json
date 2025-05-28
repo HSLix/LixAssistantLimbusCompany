@@ -783,6 +783,7 @@
     },
     "FullAutoInitMirrorStartOrResume": {
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoInitMirrorCircleCenter",
         "post_wait_freezes": 1,
@@ -886,8 +887,7 @@
             "FullAutoSelectRewardCardCoin",
             "FullAutoSelectRewardCardCoinEgo",
             "FullAutoSelectRewardCardEgoGift",
-            "FullAutoSelectRewardCardEgoResource",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoSelectRewardCardEgoResource"
         ]
     },
     "FullAutoSelectRewardCardCoin": {
@@ -916,6 +916,7 @@
     },
     "FullAutoSelectRewardCardConfirm": {
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -958,6 +959,7 @@
     },
     "FullAutoEnterEncounter": {
         "action": "Key",
+        "pre_delay":1,
         "key": "enter",
         "next": [
             "FullAutoWaitFinishBattle",
@@ -1163,6 +1165,7 @@
         "recognition": "TemplateMatch",
         "template": "enter_mirror_stage.png",
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -1205,11 +1208,11 @@
             1400,
             860
         ],
-        "post_delay":1,
         "next": "FullAutoMirrorShopLeaveConfirm"
     },
     "FullAutoMirrorShopLeaveConfirm": {
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -1229,6 +1232,7 @@
     },
     "FullAutoMirrorSelectAcquireEgoConfirm": {
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -1236,6 +1240,7 @@
         "recognition": "TemplateMatch",
         "template": "mirror_victory.png",
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "action_count": 8,
         "action_rest": 1,
@@ -1246,6 +1251,7 @@
         "recognition": "TemplateMatch",
         "template": "mirror_defeat.png",
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "action_count": 2,
         "action_rest": 1,
@@ -1262,6 +1268,7 @@
     },
     "FullAutoMirrorGiveUpRewardsConfirm": {
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "post_delay": 3,
         "next": "MirrorEntrance"
@@ -1328,6 +1335,7 @@
         "recognition": "TemplateMatch",
         "template": "manager_level_increased.png",
         "action": "Key",
+        "pre_delay": 1,
         "key": "enter",
         "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"

@@ -613,23 +613,28 @@ def initCustomAction():
     
     def search_place_sell_gift(gift_places:list, target_pic:list):
         for c in gift_places:
-            mk.moveClick(c)
-            eye.captureScreenShot()
-            sellable = True
-            if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
+            while True:
+                mk.moveClick(c)
+                eye.captureScreenShot()
                 sellable = True
-            else:
-                for gift in target_pic:
-                    if (gift == "shop_enhance_keywordless.png" and eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
-                        sellable = True
-                        break
-                    if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
-                        sellable = False
-                        break
+                if (eye.templateMactchExist("shop_vestige.png", recognize_area=[290, 240, 400, 200])):
+                    sellable = True
+                else:
+                    for gift in target_pic:
+                        if (gift == "shop_enhance_keywordless.png" and eye.templateMactchExist("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260])):
+                            sellable = True
+                            break
+                        if (eye.templateMactchExist(gift, recognize_area=[290, 240, 310, 200], threshold=0.7)):
+                            sellable = False
+                            break
 
-            if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
-                mk.pressKey("enter", press_count=2, rest_time=1)
-                sleep(2)
+                if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
+                    mk.pressKey("enter", press_count=2, rest_time=1)
+                    sleep(2)
+                    # 如果售卖物品，重复检测该位置
+                    continue
+                # 否则跳出循环，检测下一个位置
+                break
 
     
 
@@ -760,7 +765,7 @@ def initCustomAction():
                     mk.pressKey("enter", press_count=2, rest_time=0.5)
                 else:
                     mk.pressKey("enter", press_count=2, rest_time=0.5)
-                    break
+                    continue
                 
                 eye.captureScreenShot()
                 if eye.templateMactchExist("shop_heal_sinner_not_enough_cost.png", recognize_area=[180, 600, 160, 90]):
