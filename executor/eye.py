@@ -135,12 +135,13 @@ class EYE:
         match = matchTemplate(template, target, TM_CCOEFF_NORMED)
         _, max_val, _, max_loc = minMaxLoc(match)
         
-        result = (None, None)
+        # result = (None, None)
+        x_center = max_loc[0] + w_target // 2 + recognize_area[0]
+        y_center = max_loc[1] + h_target // 2 + recognize_area[1]
+        center = [x_center, y_center]
+        result = (center, max_val)
         if max_val >= threshold:
-            x_center = max_loc[0] + w_target // 2 + recognize_area[0]
-            y_center = max_loc[1] + h_target // 2 + recognize_area[1]
-            center = [x_center, y_center]
-            result = (center, max_val)
+            # result = (center, max_val)
             lalc_logger.log_task("DEBUG", "templateMatch", "SUCCESS", 
                             f"模板匹配成功: 目标图片: {pic_path}, 匹配中心坐标: {center}, 匹配值: {max_val:.4f}, 目标匹配值: {threshold}, 裁剪区域: {recognize_area}")
             # 在模板图像绘制红框
@@ -331,7 +332,7 @@ class EYE:
 
     def templateMactchExist(self, pic_path, threshold:int=0.7, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
         center, score = self.templateMatch(pic_path, threshold, recognize_area, is_show_result)
-        if (score == None):
+        if (score < threshold):
             return False
         else:
             return True
