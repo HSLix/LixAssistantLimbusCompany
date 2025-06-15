@@ -131,4 +131,4 @@ jobs:
         gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-uploading
         gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-release-note
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.LALC_TOKEN }}

@@ -22,5 +22,6 @@
         "AutoEnterMirror": false,
         "SemiAutoFullTeamToBattle": false,
         "SemiAutoEventMakeChoiceGetEgo": false
-    }
+    },
+    "mirror_chyan": ""
 }
