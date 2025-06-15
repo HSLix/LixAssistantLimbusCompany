@@ -10,7 +10,7 @@
         "ThreadEnable": false,
         "Thread": 1,
         "MirrorEnable": true,
-        "Mirror": 3,
+        "Mirror": 99,
         "reward": false
     },
     "semi_auto": {

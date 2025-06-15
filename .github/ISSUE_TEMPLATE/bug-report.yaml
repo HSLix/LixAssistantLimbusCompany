@@ -8,8 +8,6 @@ body:
     attributes:
       label: 应该确定的 | Confirm
       options:
-      - label: 已尝试使用搜索引擎，且不能解决我的问题 | I have google it and can hardly find any solution.
-        required: true
       - label: 我填写的标题意义明确，而不是“一个建议”、“卡住了”,"LALC无法运行"等 | The title is clear rather than "A advice", "LALC stuck!".
         required: true
       - label:  我已确认目前没有类似 issue | I have confirmed that there is no similar issue at this time. 

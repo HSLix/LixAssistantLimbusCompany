@@ -2,10 +2,7 @@
 import sys
 import os
 from PyQt5.QtCore import Qt,  QUrl, QTimer
-from PyQt5.QtCore import Qt,  QUrl, QTimer
 from PyQt5.QtGui import QIcon, QDesktopServices
-from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
-from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon)
 from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
                             InfoBarPosition, isDarkTheme, setTheme, Theme, NavigationAvatarWidget, Dialog, BodyLabel)
@@ -18,7 +15,6 @@ from ctypes import windll
 from win32api import GetLastError
 from winerror import ERROR_ALREADY_EXISTS
 from win32event import CreateEvent
-from requests import get
 from requests import get
 
 

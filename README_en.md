@@ -93,7 +93,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 - No liability for commercial use (e.g., paid power-leveling)  
 - Administrator privileges required for smooth operation  
 - Offline version - manual updates from GitHub only  
-- Icon素材 from public domain - non-GPL, contact for removal if infringed  
+- Icon from public domain - non-GPL, contact for removal if infringed  
 
 
 ## Screenshots
@@ -218,11 +218,12 @@ All direct/indirect contributors, tutorial creators, and open-source code sharer
 ## Sponsorship
 
 - **Before donating**:  
-  1. LALC is completely free  
-  2. Stars ⭐ are the best support  
-  3. Consider better uses for your money (food, gifts, game passes)  
+  1. LALC is completely free 
+  2. Stars ⭐ are the best support for this repository 
+  3. Consider better uses for your money (food, gifts for families and friends, Limbus Pass)  
 
-- **If you still want to donate**:  
+- **If you still want to donate**: 
+
 | Platform | QR Code |
 | - | - |
 | wechat | <img src="./resource/github/wechat.png" width="300"> |

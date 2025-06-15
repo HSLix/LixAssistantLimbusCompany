@@ -22,12 +22,12 @@ GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.1.7"
+VERSION = "V3.1.8"
 
 
 # 支持网址
-ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/tree/V3.0.0?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
-EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/V3.0.0/README_en.md#Sponsorship"
+ZH_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany?tab=readme-ov-file#%E6%89%93%E8%B5%8F"
+EN_SUPPORT_URL = "https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/README_en.md#Sponsorship"
 
 # Discord
 DISCORD_LINK = "https://discord.gg/bVzCuBU4bC"
