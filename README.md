@@ -193,7 +193,7 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
         <a href="https://github.com/lhopitou">
             <img src="https://avatars.githubusercontent.com/u/88592614?v=4" width="100;" alt="lhopitou"/>
             <br />
-            <sub><b>lhopitou</b></sub>
+            <sub><b>Lhopitou</b></sub>
         </a>
     </td>
     <td align="center">
