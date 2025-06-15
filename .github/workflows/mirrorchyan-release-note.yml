@@ -15,5 +15,5 @@ jobs:
         with:
           mirrorchyan_rid: LALC
 
-          upload_token: ${{ secrets.MirrorChyanUploadToken }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_token: ${{ secrets.LALC_Token }}
+          github_token: ${{ secrets.LALC_TOKEN }}
