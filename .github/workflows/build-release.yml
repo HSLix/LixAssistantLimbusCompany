@@ -124,3 +124,11 @@ jobs:
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
         prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
+
+    - name: Trigger MirrorChyanUploading
+      shell: bash
+      run: |
+        gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-uploading
+        gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-release-note
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

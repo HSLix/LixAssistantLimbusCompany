@@ -1,0 +1,20 @@
+name: mirrorchyan-uploading
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  mirrorchyan:
+    runs-on: macos-latest
+    steps:
+      - uses: MirrorChyan/uploading-action@v1
+        with:
+          filetype: latest-release
+          filename: "lalc.zip"
+          mirrorchyan_rid: LALC
+
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          owner: HSLix
+          repo: LixAssistantLimbusCompany
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
