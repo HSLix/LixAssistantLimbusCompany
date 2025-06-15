@@ -17,4 +17,4 @@ jobs:
           github_token: ${{ secrets.LALC_TOKEN }}
           owner: HSLix
           repo: LixAssistantLimbusCompany
-          upload_token: ${{ secrets.LALC_TOKEN }}
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
