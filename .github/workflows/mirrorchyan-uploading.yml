@@ -14,7 +14,7 @@ jobs:
           filename: "lalc.zip"
           mirrorchyan_rid: LALC
 
-          github_token: ${{ secrets.LALC_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           owner: HSLix
           repo: LixAssistantLimbusCompany
-          upload_token: ${{ secrets.MirrorChyanUploadToken }}
+          upload_token: ${{ secrets.MIRRORCHYANUPLOADTOKEN }}
