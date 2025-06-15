@@ -183,6 +183,20 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
         </a>
     </td>
     <td align="center">
+        <a href="https://github.com/MistEO">
+            <img src="https://avatars.githubusercontent.com/u/18511905?v=4" width="100;" alt="MistEO"/>
+            <br />
+            <sub><b>MistEO</b></sub>
+        </a>
+    </td>
+    <td align="center">
+        <a href="https://github.com/lhopitou">
+            <img src="https://avatars.githubusercontent.com/u/88592614?v=4" width="100;" alt="lhopitou"/>
+            <br />
+            <sub><b>lhopitou</b></sub>
+        </a>
+    </td>
+    <td align="center">
         <a href="https://github.com/ZengXiaoPi">
             <img src="https://avatars.githubusercontent.com/u/102937102?v=4" width="100;" alt="ZengXiaoPi"/>
             <br />
@@ -202,7 +216,8 @@ LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.
             <br />
             <sub><b>PasathornP</b></sub>
         </a>
-    </td>
+    </td></tr>
+<tr>
     <td align="center">
         <a href="https://github.com/1353587086">
             <img src="https://avatars.githubusercontent.com/u/24757168?v=4" width="100;" alt="1353587086"/>
