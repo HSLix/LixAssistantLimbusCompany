@@ -131,7 +131,7 @@ GitHub现存**维护时间最长**的 Limbus 长草项目（之一）
 
 ## 加入开发
 
-LALC的开发欢迎所有开发者加入，可参考 [该文章](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75) 开始，也可参考这个专门面向开发者的 [WikiPage](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)。
+LALC的开发欢迎所有开发者加入，可参考[贡献文档](./doc/CONTRIBUTING_cn.md)。 
 
 ---
 ## 致谢

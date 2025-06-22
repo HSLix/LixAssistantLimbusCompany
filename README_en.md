@@ -117,7 +117,7 @@ Inherits ideological inspiration from [MaaFramework](https://github.com/MaaXYZ/M
 
 ## Contribute
 
-Development contributions welcome! Start with [this guide](https://github.com/HSLix/LixAssistantLimbusCompany/issues/75) or [Developer Wiki](https://github.com/HSLix/LixAssistantLimbusCompany/wiki/%E5%BC%80%E5%8F%91%E6%89%8B%E5%86%8C)
+Development contributions welcome! Start with [CONTRIBUTING](./doc/CONTRIBUTING.md).
 
 
 ## Acknowledgments

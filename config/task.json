@@ -1204,7 +1204,7 @@
     }
     ,"FullAutoMirrorSelectAcquireEgoOwned": {
         "recognition": "TemplateMatch",
-        "template": "acquire_ego_owned.png",
+        "template": "acquire_ego_gift.png",
         "action": "Click",
         "target_offset":[0, 100],
         "next": "FullAutoMirrorSelectAcquireEgoConfirm"

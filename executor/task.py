@@ -143,7 +143,7 @@ class Task:
         if self.recognition == "TemplateMatch":
             self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  
             self.template: str = config.get('template', '')
-            self.threshold: Union[float, List[float]] = config.get('threshold', 0.7)
+            self.threshold: Union[float, List[float]] = config.get('threshold', 0.8)
         # 颜色匹配
         elif self.recognition == "ColorMatch":
             self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  

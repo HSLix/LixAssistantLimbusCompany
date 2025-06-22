@@ -30,7 +30,6 @@ from executor import lalc_cu, lalc_logger, screen_record_thread
 
 
 
-
 class Window(FramelessWindow):
 
     def __init__(self):

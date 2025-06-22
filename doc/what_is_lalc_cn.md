@@ -15,4 +15,4 @@
 - 一次数据交互流程：Gui->Config->Task->ControlUnit->Gui。
 
 ## 打包
-- 调用那个 spec 文件就行，记得改下绝对路径。
+- 调用那个 spec 文件就行。
