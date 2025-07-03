@@ -390,15 +390,15 @@ def initCustomAction():
         if (team_index == 1):
             mk.moveClick([150, 430])
         elif (team_index == 2):
-            mk.moveClick([150, 470])
+            mk.moveClick([150, 480])
         elif (team_index == 3):
-            mk.moveClick([150, 510])
+            mk.moveClick([150, 530])
         elif (team_index == 4):
-            mk.moveClick([150, 555])
+            mk.moveClick([150, 570])
         elif (team_index == 5):
-            mk.moveClick([150, 590])
+            mk.moveClick([150, 620])
         elif (team_index == 6):
-            mk.moveClick([150, 630])
+            mk.moveClick([150, 660])
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)

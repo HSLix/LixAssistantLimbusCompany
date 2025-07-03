@@ -9,7 +9,18 @@ if __name__ == "__main__":
     # sleep(1)
     # mk.moveClick([150, 555])
     # mk.scroll([0,-1], 7)
-    mk.listenMouse()  
+    # mk.listenMouse()  
+
+    mk.moveClick([150, 430])
+    mk.moveClick([150, 480])
+
+    mk.moveClick([150, 530])
+
+    # mk.moveClick([150, 570])
+
+    # mk.moveClick([150, 620])
+
+    # mk.moveClick([150, 660])
 
     # x = 420
     # y = 415

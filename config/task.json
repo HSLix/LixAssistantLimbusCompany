@@ -885,6 +885,7 @@
             "FullAutoSelectRewardCardCoin",
             "FullAutoSelectRewardCardCoinEgo",
             "FullAutoSelectRewardCardEgoGift",
+            "FullAutoSelectRewardCardStarLight",
             "FullAutoSelectRewardCardEgoResource",
             "FullAutoMirrorCircleCenter"
         ]
@@ -904,6 +905,12 @@
     "FullAutoSelectRewardCardEgoGift": {
         "recognition": "TemplateMatch",
         "template": "reward_card_ego_gift.png",
+        "action": "Click",
+        "next": "FullAutoSelectRewardCardConfirm"
+    },
+    "FullAutoSelectRewardCardStarLight": {
+        "recognition": "TemplateMatch",
+        "template": "reward_card_star_light.png",
         "action": "Click",
         "next": "FullAutoSelectRewardCardConfirm"
     },
