@@ -537,18 +537,27 @@ def shutdown_splash():
         pass
 
 
-def set_process_name(new_name):  
-    # 获取当前进程ID  
-    pid = os.getpid()  
-  
-    # 设置进程名为新名称  
-    os.prctl(os.PR_SET_NAME, new_name)  
-  
-    # 输出已修改的进程名称  
-    print(f"Process name changed to '{new_name}' (PID: {pid})")
+def set_process_name(name):  
+    try:
+        # 获取当前进程的窗口句柄
+        GetConsoleWindow = windll.kernel32.GetConsoleWindow
+        # 设置窗口标题
+        SetConsoleTitleW = windll.kernel32.SetConsoleTitleW
+        
+        hwnd = GetConsoleWindow()
+        if hwnd:
+            SetConsoleTitleW(name)
+            # print(f"已将进程名设置为: {name}")
+        else:
+            print("无法获取控制台窗口句柄")
+    except Exception as e:
+        print(f"设置进程名失败: {e}")
 
 
 def main(*args, **kwargs):
+    
+    set_process_name("LixAssistantLimbusCompany")
+
     shutdown_splash()
     event = CreateEvent(None, 0, 0, EVENT_NAME)
 
@@ -567,7 +576,6 @@ def main(*args, **kwargs):
         windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
         sys.exit(0)
 
-    set_process_name("LixAssistantLimbusCompany")
 
     lalc_logger.log_task(
         "INFO",

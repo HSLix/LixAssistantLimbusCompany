@@ -885,7 +885,8 @@
             "FullAutoSelectRewardCardCoin",
             "FullAutoSelectRewardCardCoinEgo",
             "FullAutoSelectRewardCardEgoGift",
-            "FullAutoSelectRewardCardEgoResource"
+            "FullAutoSelectRewardCardEgoResource",
+            "FullAutoMirrorCircleCenter"
         ]
     },
     "FullAutoSelectRewardCardCoin": {
@@ -916,7 +917,8 @@
         "action": "Key",
         "pre_delay": 1,
         "key": "enter",
-        "next": "FullAutoMirrorCircleCenter"
+        "next": "FullAutoMirrorCircleCenter",
+        "post_delay": 0.5
     },
     "FullAutoContinueEncounter": {
         "recognition": "TemplateMatch",
