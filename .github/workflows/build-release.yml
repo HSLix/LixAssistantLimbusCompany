@@ -42,7 +42,7 @@ jobs:
         $tagName = "V$currentVersion"
 
         # 获取当前tag的标注信息（使用git show获取annotated tag信息）
-        $currentNotes = git show $tagName --quiet --format='%(contents)'
+        $currentNotes = git tag -l $tagName --format='%(contents)'
 
         # 如果为空（可能是轻量标签），尝试获取commit信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {
