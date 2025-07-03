@@ -15,13 +15,13 @@
     },
     "semi_auto": {
         "AutoPBattle": true,
-        "SkipEvent": false,
-        "AutoClickNextStage": false,
-        "AutoSelectRewardCard": false,
-        "AutoSkipEgoGiftGet": false,
-        "AutoEnterMirror": false,
-        "SemiAutoFullTeamToBattle": false,
-        "SemiAutoEventMakeChoiceGetEgo": false
+        "SkipEvent": true,
+        "AutoClickNextStage": true,
+        "AutoSelectRewardCard": true,
+        "AutoSkipEgoGiftGet": true,
+        "AutoEnterMirror": true,
+        "SemiAutoFullTeamToBattle": true,
+        "SemiAutoEventMakeChoiceGetEgo": true
     },
     "mirror_chyan": ""
 }
