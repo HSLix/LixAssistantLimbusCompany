@@ -184,6 +184,13 @@ LALC的开发欢迎所有开发者加入，可参考[贡献文档](./doc/CONTRIB
         </a>
     </td>
     <td align="center">
+        <a href="https://github.com/Sacamore">
+            <img src="https://avatars.githubusercontent.com/u/45283967?v=4" width="100;" alt="Sacamore"/>
+            <br />
+            <sub><b>Boyan Zhao</b></sub>
+        </a>
+    </td>
+    <td align="center">
         <a href="https://github.com/ZengXiaoPi">
             <img src="https://avatars.githubusercontent.com/u/102937102?v=4" width="100;" alt="ZengXiaoPi"/>
             <br />
@@ -196,15 +203,15 @@ LALC的开发欢迎所有开发者加入，可参考[贡献文档](./doc/CONTRIB
             <br />
             <sub><b>PasathornpGStudio</b></sub>
         </a>
-    </td>
+    </td></tr>
+<tr>
     <td align="center">
         <a href="https://github.com/PasathornP">
             <img src="https://avatars.githubusercontent.com/u/113973351?v=4" width="100;" alt="PasathornP"/>
             <br />
             <sub><b>PasathornP</b></sub>
         </a>
-    </td></tr>
-<tr>
+    </td>
     <td align="center">
         <a href="https://github.com/1353587086">
             <img src="https://avatars.githubusercontent.com/u/24757168?v=4" width="100;" alt="1353587086"/>
