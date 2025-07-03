@@ -104,7 +104,7 @@ class ControlUnit(QThread):
     def _is_task_recognized(self, task):
         """判断任务是否识别成功"""
         if task.recognition == "TemplateMatch":
-            return task.recognize_score is not None
+            return task.recognize_score > task.threshold
         elif task.recognition == "ColorMatch":
             return task.recognize_score > 0
         elif task.recognition == "DirectHit":
@@ -219,7 +219,6 @@ class ControlUnit(QThread):
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
                 initWindowSize([1600, 900])
-                initWindowSize([1600, 900])
                 with self.condition:
                     # 暂停
                     if self.is_paused:
@@ -228,13 +227,7 @@ class ControlUnit(QThread):
                             "INFO",
                             "ContainUnitRun",
                             'SUCCESS',
-                            "cu pause  with task[{0}]".format(self.cur_task.name)
-                        )
-                        lalc_logger.log_task(
-                            "INFO",
-                            "ContainUnitRun",
-                            'SUCCESS',
-                            "cu pause  with task[{0}]".format(self.cur_task.name)
+                            "cu pause with task[{0}]".format(self.cur_task.name)
                         )
                         while self.is_running and self.is_paused:
                             self.condition.wait()

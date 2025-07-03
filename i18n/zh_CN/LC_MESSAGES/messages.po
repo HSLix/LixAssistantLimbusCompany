@@ -164,6 +164,9 @@ msgstr "队伍4"
 msgid "Team5"
 msgstr "队伍5"
 
+msgid "Team6"
+msgstr "队伍6"
+
 msgid "Chat"
 msgstr "聊天"
 

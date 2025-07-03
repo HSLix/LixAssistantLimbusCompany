@@ -30,7 +30,6 @@ from executor import lalc_cu, lalc_logger, screen_record_thread
 
 
 
-
 class Window(FramelessWindow):
 
     def __init__(self):
@@ -61,7 +60,7 @@ class Window(FramelessWindow):
         self.team3EditInterface = TeamEditPage("Team3EditInterface", "Team3")
         self.team4EditInterface = TeamEditPage("Team4EditInterface", "Team4")
         self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
-        self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
+        self.team6EditInterface = TeamEditPage("Team6EditInterface", "Team6")
 
         # initialize layout
         self.initLayout()
@@ -340,7 +339,7 @@ class Window(FramelessWindow):
             title=title,
             content=content,
             orient=Qt.Horizontal,
-            isClosable=False if msg_type != "ERROR" else True,
+            isClosable=False if (msg_type != "ERROR") and (msg_type != "WARNING") else True,
             position=InfoBarPosition.TOP,
             duration=30000 if msg_type == "WARNING" else (5000 if msg_type != "ERROR" else -1),
             parent=self
@@ -385,6 +384,7 @@ class Window(FramelessWindow):
         self.addSubInterface(self.team3EditInterface, FIF.BUS, _('Team3'), parent=self.teamManageInterface)
         self.addSubInterface(self.team4EditInterface, FIF.BUS, _('Team4'), parent=self.teamManageInterface)
         self.addSubInterface(self.team5EditInterface, FIF.BUS, _('Team5'), parent=self.teamManageInterface)
+        self.addSubInterface(self.team6EditInterface, FIF.BUS, _('Team6'), parent=self.teamManageInterface)
 
         self.navigationInterface.addItem(
             routeKey='discord',
@@ -537,9 +537,27 @@ def shutdown_splash():
         pass
 
 
+def set_process_name(name):  
+    try:
+        # 获取当前进程的窗口句柄
+        GetConsoleWindow = windll.kernel32.GetConsoleWindow
+        # 设置窗口标题
+        SetConsoleTitleW = windll.kernel32.SetConsoleTitleW
+        
+        hwnd = GetConsoleWindow()
+        if hwnd:
+            SetConsoleTitleW(name)
+            # print(f"已将进程名设置为: {name}")
+        else:
+            print("无法获取控制台窗口句柄")
+    except Exception as e:
+        print(f"设置进程名失败: {e}")
 
 
 def main(*args, **kwargs):
+    
+    set_process_name("LixAssistantLimbusCompany")
+
     shutdown_splash()
     event = CreateEvent(None, 0, 0, EVENT_NAME)
 
@@ -557,6 +575,7 @@ def main(*args, **kwargs):
     if not windll.shell32.IsUserAnAdmin():
         windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
         sys.exit(0)
+
 
     lalc_logger.log_task(
         "INFO",

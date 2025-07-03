@@ -39,9 +39,15 @@ jobs:
       run: |
         # 获取当前版本号
         $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
+        $tagName = "V$currentVersion"
 
-        # 获取当前tag的标注信息
-        $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
+        # 获取当前tag的标注信息（使用git show获取annotated tag信息）
+        $currentNotes = git show $tagName --quiet --format='%(contents)'
+
+        # 如果为空（可能是轻量标签），尝试获取commit信息
+        if ([string]::IsNullOrWhiteSpace($currentNotes)) {
+          $currentNotes = git log -1 --pretty=%B
+        }
 
         # 去掉开头的中括号及版本号（如 [3.1.23]）
         $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\*\]\s*', ''
@@ -50,10 +56,11 @@ jobs:
         $currentNotes = $currentNotes -replace ';', ";`n"
 
         # 固定提示语
+        $mirrorChyanLink = "- [已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)"
         $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
       
         # 使用普通字符串拼接代替 here-string
-        $currentReleaseSection = "## V$currentVersion`n$currentNotes"
+        $currentReleaseSection = "## $tagName`n$currentNotes"
 
         # 使用GitHub API获取上一个Release的body内容
         $headers = @{
@@ -99,10 +106,10 @@ jobs:
             $newHistoryContent = $newHistoryContent -replace '\r?\n\s*\r?\n\s*\r?\n', "`n`n"
 
             # 构建完整的发布说明
-            $fullReleaseNotes = "$quarkLink`n$currentReleaseSection`n<details>`n<summary>历史更新 | History</summary>`n`n$newHistoryContent`n</details>"
+            $fullReleaseNotes = "$mirrorChyanLink`n$quarkLink`n$currentReleaseSection`n<details>`n<summary>历史更新 | History</summary>`n`n$newHistoryContent`n</details>"
           } else {
             # 没有历史版本时只显示当前内容
-            $fullReleaseNotes = "$quarkLink`n`n$currentReleaseSection"
+            $fullReleaseNotes = "$mirrorChyanLink`n$quarkLink`n`n$currentReleaseSection"
           }
         } catch {
           Write-Output "无法获取历史发布: $_"

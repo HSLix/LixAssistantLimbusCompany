@@ -214,9 +214,9 @@
             "SemiAutoEnterEncounter",
             "SemiAutoFullTeamToBattle",
             "SemiAutoSkipEvent",
-            "SemiAutoReadyFindWay",
-            "SemiAutoReadySelectRewardCard",
             "SemiAutoPassEgoGiftGet",
+            "SemiAutoReadySelectRewardCard",
+            "SemiAutoReadyFindWay",
             "SemiAutoRechargeEnkephalin",
             "SemiAutoAssembleEnkephalinModules",
             "SemiWaitConnecting",
@@ -630,20 +630,12 @@
             "FullAutoMirrorDealDownload",
             "FullAutoMirrorErrorRetry",
             "FullAutoMirrorOccurUnstableNetwork",
-            "FullAutoMirrorWaitConnecting",
-            "FullAutoMirrorWaitCombatTips",
-            "FullAutoMirrorManagerLevelIncreased",
-
             "FullAutoMirrorTouchToStart",
             "FullAutoMirrorStart",
             "FullAutoInitMirrorInitTeam",
             "FullAutoInitMirrorInitStarBuff",
             "FullAutoInitMirrorInitStartEgoGift",
-            "FullAutoInitMirrorWaitConnecting",
-            "FullAutoInitMirrorWaitCombatTips",
-            
-            "FullAutoMirrorCancelHardMode",
-            "FullAutoMirrorSelectThemePackComfirmNormalMode",
+            "FullAutoMirrorSelectThemePack",
             "FullAutoPassEgoGiftGet",
             "FullAutoReadySelectRewardCard",
             "FullAutoPEncounter",
@@ -651,14 +643,17 @@
             "FullAutoReadyFindWay",
             "FullAutoReadyBattle",
             "FullAutoMirrorShopStart",
+            "FullAutoMirrorSuperShopStart",
             "FullAutoMirrorSelectAcquireEgoNew",
             "FullAutoMirrorSelectAcquireEgoOwned",
             "FullAutoMirrorFinishVictory",
             "FullAutoMirrorFinishDefeat",
             "FullAutoContinueEncounter",
-            
-            "FullAutoInitMirrorTopLeftArrow",
-            "FullAutoMirrorCircleCenter"
+            "FullAutoMirrorWaitConnecting",
+            "FullAutoMirrorWaitCombatTips",
+            "FullAutoMirrorTopLeftArrow",
+            "FullAutoMirrorManagerLevelIncreased",
+            "MirrorEntrance"
         ]
     },
     "FullAutoMirrorDoNotHaveEnoughEnkephalinModules":{
@@ -728,20 +723,14 @@
         "template": "menu_drive.png",
         "action": "Click",
         "post_delay": 2,
-        "next": [
-            "FullAutoAssembleEnkephalinModules",
-            "FullAutoEnterMirror"
-        ]
+        "next": ["FullAutoAssembleEnkephalinModules", "FullAutoEnterMirror"]
     },
     "FullAutoAssembleEnkephalinModules": {
         "recognition": "ColorMatch",
         "color_point": [555, 885],
         "lower":100, 
         "upper":170,
-        "next": [
-            "FullAutoAssembleEnkephalinModulesEnter",
-            "FullAutoMirrorCircleCenter"
-        ]
+        "next": ["FullAutoAssembleEnkephalinModulesEnter", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoAssembleEnkephalinModulesEnter":{
         "recognition": "TemplateMatch",
@@ -775,16 +764,13 @@
         "action_count": 2,
         "action_rest": 0.5,
         "post_delay": 0.5,
-        "next": [
-            "FullAutoMirrorClaimPreviousReward",
-            "FullAutoInitMirrorStartOrResume"
-        ]
+        "next": ["FullAutoMirrorClaimPreviousReward","FullAutoInitMirrorStartOrResume"]
     },
     "FullAutoInitMirrorStartOrResume": {
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter",
+        "post_wait_freezes": 1,
         "post_delay": 1
     },
     "FullAutoInitMirrorInitTeam": {
@@ -792,9 +778,9 @@
         "template": "mirror_init_teams.png",
         "recognize_area": [
             70,
-            360,
+            460,
             180,
-            80
+            85
         ],
         "action": "Custom",
         "custom_name": "choose_team",
@@ -885,7 +871,6 @@
             "FullAutoSelectRewardCardCoin",
             "FullAutoSelectRewardCardCoinEgo",
             "FullAutoSelectRewardCardEgoGift",
-            "FullAutoSelectRewardCardStarLight",
             "FullAutoSelectRewardCardEgoResource",
             "FullAutoMirrorCircleCenter"
         ]
@@ -908,12 +893,6 @@
         "action": "Click",
         "next": "FullAutoSelectRewardCardConfirm"
     },
-    "FullAutoSelectRewardCardStarLight": {
-        "recognition": "TemplateMatch",
-        "template": "reward_card_star_light.png",
-        "action": "Click",
-        "next": "FullAutoSelectRewardCardConfirm"
-    },
     "FullAutoSelectRewardCardEgoResource": {
         "recognition": "TemplateMatch",
         "template": "reward_card_ego_resource.png",
@@ -922,10 +901,8 @@
     },
     "FullAutoSelectRewardCardConfirm": {
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
-        "next": "FullAutoMirrorCircleCenter",
-        "post_delay": 0.5
+        "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoContinueEncounter": {
         "recognition": "TemplateMatch",
@@ -966,7 +943,6 @@
     },
     "FullAutoEnterEncounter": {
         "action": "Key",
-        "pre_delay":1,
         "key": "enter",
         "next": [
             "FullAutoWaitFinishBattle",
@@ -1044,8 +1020,7 @@
         ],
         "next": [
             "FullAutoClickEventRightBottom"
-        ],
-        "post_delay":1
+        ]
     },
     "FullAutoEventMakeSecondChoice": {
         "action": "Click",
@@ -1055,8 +1030,7 @@
         ],
         "next": [
             "FullAutoEventMakeFirstChoice"
-        ],
-        "post_delay":1
+        ]
     },
     "FullAutoPassVeryHighCheck": {
         "recognition": "TemplateMatch",
@@ -1172,13 +1146,12 @@
         "recognition": "TemplateMatch",
         "template": "enter_mirror_stage.png",
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoReadyBattle": {
         "recognition": "TemplateMatch",
-        "template": "team_announcer.png",
+        "template": "total_participants.png",
         "action": "Custom",
         "custom_name": "clear_and_edit_team_member_selections",
         "next": "FullAutoMirrorCircleCenter",
@@ -1187,6 +1160,11 @@
     "FullAutoMirrorShopStart": {
         "recognition": "TemplateMatch",
         "template": "mirror_shop.png",
+        "next": "FullAutoMirrorShopSellEgoGift"
+    },
+    "FullAutoMirrorSuperShopStart": {
+        "recognition": "TemplateMatch",
+        "template": "mirror_super_shop.png",
         "next": "FullAutoMirrorShopSellEgoGift"
     },
     "FullAutoMirrorShopSellEgoGift": {
@@ -1219,7 +1197,6 @@
     },
     "FullAutoMirrorShopLeaveConfirm": {
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "next": "FullAutoMirrorCircleCenter"
     },
@@ -1239,15 +1216,15 @@
     },
     "FullAutoMirrorSelectAcquireEgoConfirm": {
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
+        "action_count": 2,
+        "action_rest": 0.5,
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoMirrorFinishVictory": {
         "recognition": "TemplateMatch",
         "template": "mirror_victory.png",
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "action_count": 8,
         "action_rest": 1,
@@ -1258,7 +1235,6 @@
         "recognition": "TemplateMatch",
         "template": "mirror_defeat.png",
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "action_count": 2,
         "action_rest": 1,
@@ -1275,7 +1251,6 @@
     },
     "FullAutoMirrorGiveUpRewardsConfirm": {
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "post_delay": 3,
         "next": "MirrorEntrance"
@@ -1288,30 +1263,12 @@
         "next_task_name": "End",
         "log_level": "INFO"
     },
-    "FullAutoInitMirrorWaitConnecting": {
-        "recognition": "TemplateMatch",
-        "template": "connecting.png",
-        "post_delay": 1,
-        "next": [
-            "FullAutoInitMirrorWaitConnecting",
-            "FullAutoMirrorCircleCenter"
-        ]
-    },
     "FullAutoMirrorWaitConnecting": {
         "recognition": "TemplateMatch",
         "template": "connecting.png",
         "post_delay": 1,
         "next": [
             "FullAutoMirrorWaitConnecting",
-            "FullAutoMirrorCircleCenter"
-        ]
-    },
-    "FullAutoInitMirrorWaitCombatTips": {
-        "recognition": "TemplateMatch",
-        "template": "combat_tips.png",
-        "post_delay": 1,
-        "next": [
-            "FullAutoInitMirrorWaitCombatTips",
             "FullAutoMirrorCircleCenter"
         ]
     },
@@ -1332,7 +1289,7 @@
         "post_delay": 5,
         "next": "FullAutoMirrorCircleCenter"
     },
-    "FullAutoInitMirrorTopLeftArrow": {
+    "FullAutoMirrorTopLeftArrow": {
         "recognition": "TemplateMatch",
         "template": "top_left_arrow.png",
         "action": "Click",
@@ -1342,7 +1299,6 @@
         "recognition": "TemplateMatch",
         "template": "manager_level_increased.png",
         "action": "Key",
-        "pre_delay": 1,
         "key": "enter",
         "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"

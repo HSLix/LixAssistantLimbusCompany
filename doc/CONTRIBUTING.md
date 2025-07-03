@@ -125,8 +125,3 @@ Strongly recommand to read [Official Document](https://docs.github.com/en/pull-r
 - Next, change the code or the document, and merge dev and your topic branch.
 - Finally, git add, commit and push to your repository, and open a pr, which base on dev and compare your new branch in your repository.
 After that, somebody would review the pr and 
-
-
-## Styleguides
-### Commit Messages
-Make sure add the version like **[3.0.1]**, and simply describe the changes of the code or document.

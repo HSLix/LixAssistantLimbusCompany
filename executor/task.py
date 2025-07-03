@@ -143,13 +143,15 @@ class Task:
         if self.recognition == "TemplateMatch":
             self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  
             self.template: str = config.get('template', '')
-            self.threshold: Union[float, List[float]] = config.get('threshold', 0.7)
+            self.threshold: Union[float, List[float]] = config.get('threshold', 0.8)
         # 颜色匹配
         elif self.recognition == "ColorMatch":
             self.recognize_area: List[int] = config.get('recognize_area', [0, 0, 0, 0])  
             self.color_point: List[int] = config.get('color_point')
             self.lower : int = config.get("lower", 0)
             self.upper : int = config.get("upper", 255)
+        
+        self.recognize_center, self.recognize_score = None,None
 
 
 
@@ -302,7 +304,7 @@ class Task:
                     self.name,
                     f"[{self.recognition}] FINISH, recognize_center:[{self.recognize_center}]; recognize_score:[{self.recognize_score}]"
                     )
-            if(self.recognize_center == None):
+            if(self.recognize_score < self.threshold):
                 return
             print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
         elif self.recognition == "ColorMatch":
@@ -377,21 +379,26 @@ def initCustomAction():
     def choose_team(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
         mk.moveClick([150, 630])
-        mk.scroll([0,1], 30, 0.01)
+        mk.scroll([0,1], 20, 0.01)
         sleep(0.5)
-        if (team_index > 4):
-            scroll_count = team_index // 4 * 7
-            mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
-        while(team_index > 4):
-            team_index -= 4
+        # 这是用于需要滚动的情况，20250703开始，新UI能包含6支队伍，够了：）
+        # if (team_index > 4):
+        #     scroll_count = team_index // 4 * 7
+        #     mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
+        # while(team_index > 4):
+        #     team_index -= 4
         if (team_index == 1):
-            mk.moveClick([150, 555])
+            mk.moveClick([150, 430])
         elif (team_index == 2):
-            mk.moveClick([150, 600])
+            mk.moveClick([150, 480])
         elif (team_index == 3):
-            mk.moveClick([150, 650])
+            mk.moveClick([150, 530])
         elif (team_index == 4):
-            mk.moveClick([150, 700])
+            mk.moveClick([150, 570])
+        elif (team_index == 5):
+            mk.moveClick([150, 620])
+        elif (team_index == 6):
+            mk.moveClick([150, 660])
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)
@@ -402,11 +409,12 @@ def initCustomAction():
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
-        mk.moveClick([1040, 400])
-        mk.moveClick([810, 665])
-        mk.moveClick([585, 665])
-        mk.moveClick([1280, 400])
-        mk.moveClick([350, 400])
+        mk.moveClick([1040, 400]) # 4
+        mk.moveClick([810, 665]) # 8
+        mk.moveClick([585, 665]) # 7
+        mk.moveClick([1280, 400]) # 5
+        mk.moveClick([350, 400]) # 1
+        mk.moveClick([585, 400]) # 2
         # 下面是结算
         mk.moveClick([1440, 900], rest_time=2)
         mk.moveClick([945, 720])
@@ -449,7 +457,7 @@ def initCustomAction():
         mk.moveClick([1045, 380], rest_time=0.5)
         mk.moveClick([1045, 510], rest_time=0.5)
         mk.moveClick([1045, 650], rest_time=0.5)
-        mk.pressKey("enter", press_count=2, rest_time=1)
+        mk.pressKey("enter", press_count=4, rest_time=1)
 
 
         
@@ -639,8 +647,9 @@ def initCustomAction():
                 if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                     mk.pressKey("enter", press_count=2, rest_time=1)
                     sleep(2)
+                    # 如果售卖物品，重复检测该位置
                     continue
-                
+                # 否则跳出循环，检测下一个位置
                 break
 
     
@@ -788,9 +797,9 @@ def initCustomAction():
                             
                             purchased_count += 1
                             break
-                    mk.pressKey("enter", press_count=1, rest_time=0.4)
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
                 else:
-                    mk.pressKey("enter", press_count=2, rest_time=0.4)
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
                     continue
                 
                 eye.captureScreenShot()
