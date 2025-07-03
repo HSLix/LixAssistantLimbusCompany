@@ -196,7 +196,7 @@ class EYE:
         # 计算差异
         grey_diff = absdiff(pic1, pic2)
         diff = average(grey_diff)
-        print(f"pic diff: {diff}")
+        # print(f"pic diff: {diff}")
         lalc_logger.log_task("DEBUG", "idPicDif", "DOING", "pic diff: %f" % (diff))
         
         # 判断差异是否小于阈值

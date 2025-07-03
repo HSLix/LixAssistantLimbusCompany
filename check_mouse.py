@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # sleep(1)
     # mk.moveClick([150, 555])
     # mk.scroll([0,-1], 7)
-    # mk.listenMouse()  
+    mk.listenMouse()  
 
     # x = 420
     # y = 415
