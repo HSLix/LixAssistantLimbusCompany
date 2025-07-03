@@ -60,7 +60,7 @@ class Window(FramelessWindow):
         self.team3EditInterface = TeamEditPage("Team3EditInterface", "Team3")
         self.team4EditInterface = TeamEditPage("Team4EditInterface", "Team4")
         self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
-        self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
+        self.team6EditInterface = TeamEditPage("Team6EditInterface", "Team6")
 
         # initialize layout
         self.initLayout()
@@ -384,6 +384,7 @@ class Window(FramelessWindow):
         self.addSubInterface(self.team3EditInterface, FIF.BUS, _('Team3'), parent=self.teamManageInterface)
         self.addSubInterface(self.team4EditInterface, FIF.BUS, _('Team4'), parent=self.teamManageInterface)
         self.addSubInterface(self.team5EditInterface, FIF.BUS, _('Team5'), parent=self.teamManageInterface)
+        self.addSubInterface(self.team6EditInterface, FIF.BUS, _('Team6'), parent=self.teamManageInterface)
 
         self.navigationInterface.addItem(
             routeKey='discord',
@@ -553,9 +554,9 @@ def main(*args, **kwargs):
         # shutdown_splash()
         sys.exit(1)
         
-    if not windll.shell32.IsUserAnAdmin():
-        windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
-        sys.exit(0)
+    # if not windll.shell32.IsUserAnAdmin():
+    #     windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
+    #     sys.exit(0)
 
     lalc_logger.log_task(
         "INFO",

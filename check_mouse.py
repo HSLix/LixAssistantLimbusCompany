@@ -6,15 +6,11 @@ from time import sleep
 if __name__ == "__main__":
     ignoreScaleAndDpi()  
     mk.updateMouseBasepoint()
-    sleep(1)
-    # mk.moveClick([150, 630])
-    # mk.scroll([0,1], 30, 0.01)
-    # sleep(0.5)
+    # sleep(1)
+    # mk.moveClick([150, 555])
     # mk.scroll([0,-1], 7)
-    # mk.moveClick([150,555])
-    # mk.moveClick([555, 885])
-    mk.listenMouse()  
-    
+    # mk.listenMouse()  
+
     # x = 420
     # y = 415
     # x_step = 190

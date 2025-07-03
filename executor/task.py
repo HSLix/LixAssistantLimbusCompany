@@ -379,21 +379,26 @@ def initCustomAction():
     def choose_team(**kwargs):
         team_index = get_team_by_index(kwargs.get("executed_time"))
         mk.moveClick([150, 630])
-        mk.scroll([0,1], 30, 0.01)
+        mk.scroll([0,1], 20, 0.01)
         sleep(0.5)
-        if (team_index > 4):
-            scroll_count = team_index // 4 * 7
-            mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
-        while(team_index > 4):
-            team_index -= 4
+        # 这是用于需要滚动的情况，20250703开始，新UI能包含6支队伍，够了：）
+        # if (team_index > 4):
+        #     scroll_count = team_index // 4 * 7
+        #     mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
+        # while(team_index > 4):
+        #     team_index -= 4
         if (team_index == 1):
-            mk.moveClick([150, 555])
+            mk.moveClick([150, 430])
         elif (team_index == 2):
-            mk.moveClick([150, 600])
+            mk.moveClick([150, 470])
         elif (team_index == 3):
-            mk.moveClick([150, 650])
+            mk.moveClick([150, 510])
         elif (team_index == 4):
-            mk.moveClick([150, 700])
+            mk.moveClick([150, 555])
+        elif (team_index == 5):
+            mk.moveClick([150, 590])
+        elif (team_index == 6):
+            mk.moveClick([150, 630])
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)
@@ -404,11 +409,12 @@ def initCustomAction():
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
-        mk.moveClick([1040, 400])
-        mk.moveClick([810, 665])
-        mk.moveClick([585, 665])
-        mk.moveClick([1280, 400])
-        mk.moveClick([350, 400])
+        mk.moveClick([1040, 400]) # 4
+        mk.moveClick([810, 665]) # 8
+        mk.moveClick([585, 665]) # 7
+        mk.moveClick([1280, 400]) # 5
+        mk.moveClick([350, 400]) # 1
+        mk.moveClick([585, 400]) # 2
         # 下面是结算
         mk.moveClick([1440, 900], rest_time=2)
         mk.moveClick([945, 720])
