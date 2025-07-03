@@ -104,7 +104,7 @@ class ControlUnit(QThread):
     def _is_task_recognized(self, task):
         """判断任务是否识别成功"""
         if task.recognition == "TemplateMatch":
-            return task.recognize_score is not None
+            return task.recognize_score > task.threshold
         elif task.recognition == "ColorMatch":
             return task.recognize_score > 0
         elif task.recognition == "DirectHit":
@@ -116,15 +116,38 @@ class ControlUnit(QThread):
         activateWindow()
         sleep(0.1)
         task.update_screenshot()
+        recognize_count = 3  # 识别次数
+        max_recognize_score = -1  # 初始化最大识别分数
+        max_recognize_score_task = None  # 初始化最大识别分数任务
         if task.next:
             with self.condition:
-                for next_task_name in task.next:
-                    next_task = self.get_task_from_dict(next_task_name)
-                    if next_task and next_task.enabled:
-                        next_task.execute_recognize()
-                        if self._is_task_recognized(next_task):
-                            self.next_task = next_task  # 直接设置下一个任务
-                            break  # 找到第一个有效任务即终止循环
+                for _ in range(recognize_count):
+                    for next_task_name in task.next:
+                        next_task = self.get_task_from_dict(next_task_name)
+                        if next_task and next_task.enabled:
+                            next_task.execute_recognize()
+                            if next_task.recognize_score is not None and max_recognize_score < next_task.recognize_score:
+                                max_recognize_score = next_task.recognize_score
+                                max_recognize_score_task = next_task
+                            if self._is_task_recognized(next_task):
+                                self.next_task = next_task  # 直接设置下一个任务
+                                break  # 找到第一个有效任务即终止循环
+                    if self.next_task is not None:
+                        break
+                    # 等待一段时间再进行下一次识别
+                    sleep(3)
+                    activateWindow()
+                    sleep(0.1)
+                    task.update_screenshot()
+                # 如果没有找到有效的下一个任务，则使用最大识别分数的任务
+                if self.next_task is None and max_recognize_score > 0:
+                    self.next_task = max_recognize_score_task
+                    lalc_logger.log_task(
+                        "WARNING",
+                        self.next_task.name,
+                        'FAILED',
+                        f"Next task not recognized, score: {self.next_task.recognize_score}"
+                    )
                 self.condition.notify()
 
     def _add_interrupt(self, task):
@@ -219,7 +242,6 @@ class ControlUnit(QThread):
             try:  # 将整个循环体包裹在try块中
                 activateWindow()
                 initWindowSize([1600, 900])
-                initWindowSize([1600, 900])
                 with self.condition:
                     # 暂停
                     if self.is_paused:
@@ -228,13 +250,7 @@ class ControlUnit(QThread):
                             "INFO",
                             "ContainUnitRun",
                             'SUCCESS',
-                            "cu pause  with task[{0}]".format(self.cur_task.name)
-                        )
-                        lalc_logger.log_task(
-                            "INFO",
-                            "ContainUnitRun",
-                            'SUCCESS',
-                            "cu pause  with task[{0}]".format(self.cur_task.name)
+                            "cu pause with task[{0}]".format(self.cur_task.name)
                         )
                         while self.is_running and self.is_paused:
                             self.condition.wait()

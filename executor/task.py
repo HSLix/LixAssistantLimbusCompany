@@ -150,6 +150,8 @@ class Task:
             self.color_point: List[int] = config.get('color_point')
             self.lower : int = config.get("lower", 0)
             self.upper : int = config.get("upper", 255)
+        
+        self.recognize_center, self.recognize_score = None,None
 
 
 
@@ -302,7 +304,7 @@ class Task:
                     self.name,
                     f"[{self.recognition}] FINISH, recognize_center:[{self.recognize_center}]; recognize_score:[{self.recognize_score}]"
                     )
-            if(self.recognize_center == None):
+            if(self.recognize_score < self.threshold):
                 return
             print(f"[{self.name}] 识别中心点坐标：[{self.recognize_center}];识别分数：[{self.recognize_score}]")
         elif self.recognition == "ColorMatch":
@@ -449,7 +451,7 @@ def initCustomAction():
         mk.moveClick([1045, 380], rest_time=0.5)
         mk.moveClick([1045, 510], rest_time=0.5)
         mk.moveClick([1045, 650], rest_time=0.5)
-        mk.pressKey("enter", press_count=2, rest_time=1)
+        mk.pressKey("enter", press_count=4, rest_time=1)
 
 
         
@@ -639,8 +641,9 @@ def initCustomAction():
                 if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                     mk.pressKey("enter", press_count=2, rest_time=1)
                     sleep(2)
+                    # 如果售卖物品，重复检测该位置
                     continue
-                
+                # 否则跳出循环，检测下一个位置
                 break
 
     
@@ -788,9 +791,9 @@ def initCustomAction():
                             
                             purchased_count += 1
                             break
-                    mk.pressKey("enter", press_count=1, rest_time=0.4)
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
                 else:
-                    mk.pressKey("enter", press_count=2, rest_time=0.4)
+                    mk.pressKey("enter", press_count=2, rest_time=0.5)
                     continue
                 
                 eye.captureScreenShot()
