@@ -537,6 +537,15 @@ def shutdown_splash():
         pass
 
 
+def set_process_name(new_name):  
+    # 获取当前进程ID  
+    pid = os.getpid()  
+  
+    # 设置进程名为新名称  
+    os.prctl(os.PR_SET_NAME, new_name)  
+  
+    # 输出已修改的进程名称  
+    print(f"Process name changed to '{new_name}' (PID: {pid})")
 
 
 def main(*args, **kwargs):
@@ -557,6 +566,8 @@ def main(*args, **kwargs):
     if not windll.shell32.IsUserAnAdmin():
         windll.shell32.ShellExecuteW(None,"runas", sys.executable, __file__, None, 1)
         sys.exit(0)
+
+    set_process_name("LixAssistantLimbusCompany")
 
     lalc_logger.log_task(
         "INFO",

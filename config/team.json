@@ -1,5 +1,5 @@
 {
-    "TeamOffset": 1,
+    "TeamOffset": 3,
     "Team1": {
         "enabled": true,
         "style": "Bleed",
@@ -67,18 +67,18 @@
     "Team5": {
         "enabled": true,
         "style": "Sinking",
-        "YiSang": 7,
+        "YiSang": 2,
         "Faust": 6,
         "DonQuixote": 11,
-        "Ryoshu": 1,
-        "Meursault": 3,
-        "HongLu": 10,
-        "Heathcliff": 8,
-        "Ishmael": 12,
+        "Ryoshu": 7,
+        "Meursault": 12,
+        "HongLu": 5,
+        "Heathcliff": 1,
+        "Ishmael": 3,
         "Rodion": 4,
-        "Sinclair": 5,
-        "Outis": 2,
-        "Gregor": 9
+        "Sinclair": 9,
+        "Outis": 10,
+        "Gregor": 8
     },
     "Team6": {
         "enabled": true,
