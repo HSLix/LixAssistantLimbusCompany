@@ -566,7 +566,7 @@ def initCustomAction():
     def clear_and_edit_team_member_selections(**kwargs):
         # skip selection
         eye.captureScreenShot()
-        if (eye.templateMactchExist("team_selection_1212.png", recognize_area=[1410, 665, 150, 80])):
+        if (eye.templateMactchExist("team_selection_1212.png", recognize_area=[1410, 670, 70, 60], threshold=0.85)):
             mk.pressKey("enter")
             return
         
