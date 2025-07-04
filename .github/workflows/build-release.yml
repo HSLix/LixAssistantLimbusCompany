@@ -39,10 +39,9 @@ jobs:
       run: |
         # 获取当前版本号
         $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
-        $tagName = "V$currentVersion"
 
-        # 获取当前tag的标注信息（使用git show获取annotated tag信息）
-        $currentNotes = git tag -l $tagName --format='%(contents)'
+        # 获取当前tag的标注信息
+        $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
 
         # 如果为空（可能是轻量标签），尝试获取commit信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {

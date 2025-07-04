@@ -791,9 +791,9 @@
         "recognition": "TemplateMatch",
         "template": "mirror_init_teams.png",
         "recognize_area": [
-            70,
-            360,
-            180,
+            1210,
+            160,
+            100,
             80
         ],
         "action": "Custom",
