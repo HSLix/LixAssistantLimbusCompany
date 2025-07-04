@@ -827,7 +827,7 @@
         "recognition": "TemplateMatch",
         "template": "mirror_normal_mode.png",
         "recognize_area":[1015, 60, 240, 100],
-        "next": "FullAutoMirrorSelectThemePack"
+        "next": ["FullAutoMirrorSelectThemePack", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoMirrorSelectThemePack": {
         "recognition": "TemplateMatch",

@@ -79,20 +79,20 @@ jobs:
               $oldHistory = $matches[0] -replace '<details>\s*<summary>.*?</summary>\s*', '' -replace '</details>', ''
             }
 
-            # 提取上一版本的主要内容（非 <details> 部分），并去掉第一行
+            # 提取上一版本的主要内容（非 <details> 部分），并去掉前两行
             $previousMainContent = if ($previousReleaseBody -match '(?s)^[\s\S]*?(?=<details>)') {
-              # 分割内容为行数组并跳过第一行
+              # 分割内容为行数组并跳过前两行
               $lines = $matches[0] -split "`n"
-              if ($lines.Count -gt 1) {
-                $lines[1..($lines.Count-1)] -join "`n"
+              if ($lines.Count -gt 2) {
+                $lines[2..($lines.Count-1)] -join "`n"
               } else {
                 ""
               }
             } else {
               # 同样处理没有<details>的情况
               $lines = $previousReleaseBody -split "`n"
-              if ($lines.Count -gt 1) {
-                $lines[1..($lines.Count-1)] -join "`n"
+              if ($lines.Count -gt 2) {
+                $lines[2..($lines.Count-1)] -join "`n"
               } else {
                 ""
               }

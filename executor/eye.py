@@ -103,7 +103,7 @@ class EYE:
 
 
 
-    def templateMatch(self, pic_path, threshold:int=0.7, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
+    def templateMatch(self, pic_path, threshold:int=0.8, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
         # 默认导向设置
         pic_path = os.path.join(TEMPLATE_DIR, pic_path)
         target = imread(pic_path, IMREAD_GRAYSCALE)
@@ -330,7 +330,7 @@ class EYE:
         return global_points
 
 
-    def templateMactchExist(self, pic_path, threshold:int=0.7, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
+    def templateMactchExist(self, pic_path, threshold:int=0.8, recognize_area=[0, 0, 0, 0], is_show_result:bool=False):
         center, score = self.templateMatch(pic_path, threshold, recognize_area, is_show_result)
         if (score < threshold):
             return False

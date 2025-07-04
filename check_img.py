@@ -6,7 +6,7 @@ eye = get_eye()
 
 # while True:
 eye.captureScreenShot()
-c = eye.templateMatch("team_selection_1212.png", recognize_area=[1410, 670, 70, 60], threshold=0, is_show_result=True)
+c = eye.templateMatch("shop_sell_ego_resource.png", recognize_area=[0, 0, 0, 0], threshold=0, is_show_result=True)
 #c = eye.templateMatch("acquire_ego_new.png", recognize_area=[660, 190, 350, 100], threshold=0, is_show_result=True)
 #c = eye.templateMatch("shop_sell_ego_resource.png", recognize_area=[0, 0, 0, 0], threshold=0, is_show_result=True)
 #c = eye.templateMatch("shop_sell_ego_resource.png", recognize_area=[180, 450, 540, 260], threshold=0, is_show_result=True)
