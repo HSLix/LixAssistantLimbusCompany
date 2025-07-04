@@ -1003,8 +1003,18 @@
             "FullAutoPassNormalCheck",
             "FullAutoPassLowCheck",
             "FullAutoPassVeryLowCheck",
+            "FullAutoEventNextStep",
             "FullAutoEventMakeSecondChoice"
         ]
+    },
+    "FullAutoEventNextStep": {
+        "recognition": "ColorMatch",
+        "color_point": [1330, 840],
+        "upper": 88,
+        "lower": 82,
+        "action":"Click",
+        "target": [1330, 840],
+        "next": ["FullAutoSkipEvent", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoEventMakeChoiceGetEgoBySelectToGain": {
         "recognition": "TemplateMatch",
