@@ -327,7 +327,6 @@ class Task:
     # 执行任务逻辑 
     def execute_task(self, **kwargs):
         """执行任务"""
-        
         self.eye.waitFreeze(self.pre_wait_freezes)
         sleep(self.pre_delay)
         self.mk.updateMouseBasepoint()
@@ -414,7 +413,6 @@ def initCustomAction():
         mk.moveClick([585, 665]) # 7
         mk.moveClick([1280, 400]) # 5
         mk.moveClick([350, 400]) # 1
-        mk.moveClick([585, 400]) # 2
         # 下面是结算
         mk.moveClick([1440, 900], rest_time=2)
         mk.moveClick([945, 720])
