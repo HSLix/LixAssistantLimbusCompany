@@ -1189,7 +1189,7 @@
     },
     "FullAutoReadyBattle": {
         "recognition": "TemplateMatch",
-        "template": "team_announcer.png",
+        "template": "team_details.png",
         "action": "Custom",
         "custom_name": "clear_and_edit_team_member_selections",
         "next": "FullAutoMirrorCircleCenter",
