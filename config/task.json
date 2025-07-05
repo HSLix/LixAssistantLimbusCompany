@@ -1014,6 +1014,7 @@
         "lower": 82,
         "action":"Click",
         "target": [1330, 840],
+        "post_delay": 1,
         "next": ["FullAutoSkipEvent", "FullAutoMirrorCircleCenter"]
     },
     "FullAutoEventMakeChoiceGetEgoBySelectToGain": {

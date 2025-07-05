@@ -6,6 +6,8 @@ from random import uniform
 from copy import deepcopy
 from os.path import join
 
+
+
 from executor.eye import get_eye
 from globals import sinner_place, sinner_name, CONFIG_DIR
 from .game_window import activateWindow
@@ -13,9 +15,7 @@ from .custom_action_dict import CustomActionDict
 from .mouse_keyboard import get_mouse_keyboard
 from .logger import lalc_logger
 from json_manager import theme_pack_manager
-
     
-
 
 def initJsonTask(json_path: str = join(CONFIG_DIR, "task.json")):
     """
@@ -47,14 +47,15 @@ def initJsonTask(json_path: str = join(CONFIG_DIR, "task.json")):
                 task_config['next'] = [next_tasks]
         else:
             task_config['next'] = []
-
+        
         if 'interrupt' in task_config:
             interrupt_tasks = task_config['interrupt']
             if isinstance(interrupt_tasks, str):
                 task_config['interrupt'] = [interrupt_tasks]
         else:
             task_config['interrupt'] = []
-
+        # from globals import getScreenScale
+        # getScreenScale()
         # 创建任务实例并存入字典
         task_dict[task_name] = Task(
             name=task_name,
@@ -356,7 +357,6 @@ def initCustomAction():
         return custom_action_dict
     
     custom_action_dict = CustomActionDict()
-
     mk = get_mouse_keyboard()
     eye = get_eye()
 
@@ -1010,5 +1010,4 @@ def initCustomAction():
         raise ValueError("脑啡肽模组不足，请自行合成并确认奖励。 | Do not have enough enkephalin modules, assemble it and claim the rewards plz.")
 
 
-    
 task_dict = initJsonTask()

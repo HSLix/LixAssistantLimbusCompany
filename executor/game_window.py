@@ -25,6 +25,7 @@ def initMouseBasePoint():
 def initMouseHomePoint():
     """
     初始化鼠标的归宿
+    不知为何，这部分执行后会忽略缩放
     """
     with mss.mss() as sct:
         monitor = sct.monitors[0]

@@ -9,6 +9,8 @@ from globals import ignoreScaleAndDpi
 
 
 
+
+
 mk = None
 
 def get_mouse_keyboard():
@@ -33,11 +35,13 @@ class MOUSE_KEYBOARD:
     def __init__(self):
         self.kb = keyboard.Controller()
         self.ms = mouse.Controller()
+        
         self.mouse_basepoint = [0, 0]
-        self.mouse_homepoint = initMouseHomePoint()
+        
         # ignoreScaleAndDpi()
 
     def mouseBackHome(self):
+        self.mouse_homepoint = initMouseHomePoint()
         self.ms.position = (self.mouse_homepoint[0], self.mouse_homepoint[1])
 
         

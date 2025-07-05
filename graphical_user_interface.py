@@ -20,7 +20,8 @@ from requests import get
 
 
 
-from globals import LOG_DIR, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK, checkWorkDirAllEnglish
+
+from globals import LOG_DIR, getScreenScale, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK, checkWorkDirAllEnglish
 from json_manager import config_manager
 from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
 from i18n import _, getLang
@@ -554,6 +555,10 @@ def set_process_name(name):
         print(f"设置进程名失败: {e}")
 
 
+    
+    
+
+
 def main(*args, **kwargs):
     
     set_process_name("LixAssistantLimbusCompany")
@@ -590,9 +595,12 @@ def main(*args, **kwargs):
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
-    ignoreScaleAndDpi()
+    scale = getScreenScale()
     app = QApplication(sys.argv)
     sys.excepthook = my_excepthook
+    if not 1.49 <= scale <= 1.51:
+        raise ValueError(f"请把屏幕的缩放调整为 150% | Make sure that the scale of your Screen is 150%\n当前缩放：{scale}")
+    ignoreScaleAndDpi()
     # shutdown_splash()
     w = Window()
     

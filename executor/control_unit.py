@@ -6,6 +6,8 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from copy import deepcopy
 from ctypes import windll
 
+
+
 from .task import task_dict, custom_action_dict
 from .game_window import activateWindow, initWindowSize
 from .logger import lalc_logger

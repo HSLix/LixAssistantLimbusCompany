@@ -22,7 +22,7 @@ GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.2.2"
+VERSION = "V3.2.3"
 
 
 # 支持网址
@@ -68,8 +68,11 @@ def getScreenScale():
 
     print("Screen(not scaled):{0}*{1}; Scale:{2}%".format(width, height, scale*100))
     
-    if(not(scale > 1.49 and scale < 1.51)):
+    if(not(scale >= 1.49 and scale <= 1.51)):
         print(scale)
+
+    return scale 
+
 
 
 def isPathAllEnglish(path):
