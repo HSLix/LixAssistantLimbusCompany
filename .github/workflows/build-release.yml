@@ -42,18 +42,19 @@ jobs:
 
         # 获取当前tag的标注信息
         $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
+        echo "1"
+        echo $currentNotes
 
         # 如果为空（可能是轻量标签），尝试获取commit信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {
           $currentNotes = git log -1 --pretty=%B
         }
-
-        # 去掉开头的中括号及版本号（如 [3.1.23]）
-        $currentNotes = $currentNotes -replace '^\[\d+\.\d+\.\*\]\s*', ''
-
+        echo "2"
+        echo $currentNotes
         # 将分号替换为分号加换行符
         $currentNotes = $currentNotes -replace ';', ";`n"
-
+        echo "3"
+        echo $currentNotes
         # 固定提示语
         $mirrorChyanLink = "- [已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)"
         $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
