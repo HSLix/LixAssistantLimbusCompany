@@ -83,7 +83,7 @@ def isPathAllEnglish(path):
         bool: 如果路径中全是英文字符（包括字母、数字、标点符号和路径分隔符），返回 True；否则返回 False。
     """
     # 定义正则表达式模式：允许英文字符、数字、常见标点符号和路径分隔符
-    pattern = r'^[a-zA-Z0-9\/\\.\\-_~!@#$%^&*()+=\[\]{}|;:",<>? ]+$'
+    pattern = r'^[a-zA-Z0-9\/\\.\\_~!@#$%^&*()+=\[\]{}|;:",<>? -]+$'
     
     # 使用 re.fullmatch 检查整个字符串是否匹配模式
     return bool(fullmatch(pattern, path))

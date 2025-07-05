@@ -1,7 +1,7 @@
 {
     "gui": {
         "language": "zh_CN",
-        "recording": false
+        "recording": true
     },
     "full_auto": {
         "init": true,
