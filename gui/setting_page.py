@@ -18,6 +18,7 @@ from i18n import _
 class SettingPage(ScrollArea):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
+        self.setObjectName("SettingPage")
         self.scrollWidget = QWidget()
         self.setWidget(self.scrollWidget)
         self.setWidgetResizable(True)

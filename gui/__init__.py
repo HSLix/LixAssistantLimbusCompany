@@ -3,7 +3,7 @@ from .team_manage_page import TeamManagePage
 from .home_page import HomePage
 from .working_page import WorkingPage
 from .setting_page import SettingPage
+from .starlight_page import StarlightPage
 
 
-
-__all__ = [TeamEditPage, TeamManagePage, HomePage, WorkingPage, SettingPage]
+__all__ = [TeamEditPage, TeamManagePage, HomePage, WorkingPage, SettingPage, StarlightPage]

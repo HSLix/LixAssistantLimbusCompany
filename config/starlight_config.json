@@ -1,0 +1,18 @@
+{
+  "starlight_0": {
+    "name": "mirror_favor_of_the_nebulae",
+    "order": 1
+  },
+  "starlight_1": {
+    "name": "mirror_star_shower",
+    "order": 2
+  },
+  "starlight_2": {
+    "name": "mirror_starlight_guidance",
+    "order": 3
+  },
+  "starlight_3": {
+    "name": "mirror_star_of_the_beginning",
+    "order": 4
+  }
+}

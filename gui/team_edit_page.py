@@ -40,15 +40,15 @@ class TeamPreviewWidget(QWidget):
         self.original_order = self.selected_order.copy()  # 保存初始顺序
         
         # 添加全部取消按钮
-        self.cancel_all_button = PushButton(_("全部取消"))
+        self.cancel_all_button = PushButton(_("Cancel All"))
         self.cancel_all_button.clicked.connect(self.cancel_all_selection)
         
         # 添加恢复按钮
-        self.restore_button = PushButton(_("恢复顺序"))
+        self.restore_button = PushButton(_("Restore"))
         self.restore_button.clicked.connect(self.load_saved_order)
 
         # 添加保存按钮
-        self.save_button = PushButton(_("保存队伍"))
+        self.save_button = PushButton(_("Save"))
         self.save_button.clicked.connect(self.save_order)
 
         button_layout = QHBoxLayout()

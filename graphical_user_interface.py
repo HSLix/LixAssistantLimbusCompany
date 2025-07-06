@@ -1,7 +1,8 @@
 # coding:utf-8
 import sys
 import os
-from PyQt5.QtCore import Qt,  QUrl, QTimer
+from PyQt5 import QtCore
+from PyQt5.QtCore import Qt, QUrl, QTimer
 from PyQt5.QtGui import QIcon, QDesktopServices
 from PyQt5.QtWidgets import (QApplication, QStackedWidget, QHBoxLayout, QVBoxLayout, QDialog, QDialogButtonBox)
 from qfluentwidgets import (NavigationInterface, NavigationItemPosition, MessageBox, InfoBar, InfoBarIcon,
@@ -17,13 +18,9 @@ from winerror import ERROR_ALREADY_EXISTS
 from win32event import CreateEvent
 from requests import get
 
-
-
-
-
 from globals import LOG_DIR, getScreenScale, ignoreScaleAndDpi, GUI_DIR, EVENT_NAME, ZH_SUPPORT_URL, EN_SUPPORT_URL, VERSION, GITHUB_REPOSITORY, DISCORD_LINK, checkWorkDirAllEnglish
 from json_manager import config_manager
-from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage
+from gui import TeamManagePage, TeamEditPage, HomePage, WorkingPage, SettingPage, StarlightPage
 from i18n import _, getLang
 from executor import lalc_cu, lalc_logger, screen_record_thread
 
@@ -62,6 +59,7 @@ class Window(FramelessWindow):
         self.team4EditInterface = TeamEditPage("Team4EditInterface", "Team4")
         self.team5EditInterface = TeamEditPage("Team5EditInterface", "Team5")
         self.team6EditInterface = TeamEditPage("Team6EditInterface", "Team6")
+        self.starlightInterface = StarlightPage()
 
         # initialize layout
         self.initLayout()
@@ -160,8 +158,8 @@ class Window(FramelessWindow):
             ),
             parent=self
         )
-        supportDialog.titleLabel.setAlignment(Qt.AlignCenter)
-        supportDialog.contentLabel.setAlignment(Qt.AlignCenter)
+        supportDialog.titleLabel.setAlignment(Qt.AlignCenter)  # type: ignore
+        supportDialog.contentLabel.setAlignment(Qt.AlignCenter)  # type: ignore
 
         
         supportDialog.yesButton.setText(_("现在就去"))
@@ -339,7 +337,7 @@ class Window(FramelessWindow):
             }[msg_type],
             title=title,
             content=content,
-            orient=Qt.Horizontal,
+            orient=Qt.Horizontal,  # type: ignore
             isClosable=False if (msg_type != "ERROR") and (msg_type != "WARNING") else True,
             position=InfoBarPosition.TOP,
             duration=30000 if msg_type == "WARNING" else (5000 if msg_type != "ERROR" else -1),
@@ -386,6 +384,8 @@ class Window(FramelessWindow):
         self.addSubInterface(self.team4EditInterface, FIF.BUS, _('Team4'), parent=self.teamManageInterface)
         self.addSubInterface(self.team5EditInterface, FIF.BUS, _('Team5'), parent=self.teamManageInterface)
         self.addSubInterface(self.team6EditInterface, FIF.BUS, _('Team6'), parent=self.teamManageInterface)
+
+        self.addSubInterface(self.starlightInterface, FIF.ASTERISK, _('Starlight'))
 
         self.navigationInterface.addItem(
             routeKey='discord',
@@ -436,7 +436,7 @@ class Window(FramelessWindow):
         # self.resize(900, 700)
         # self.setWindowIcon(QIcon('resource/gui/MagicGirl.png'))
         # self.setWindowTitle('LixAssistantLimbusCompany')
-        self.titleBar.setAttribute(Qt.WA_StyledBackground)
+        self.titleBar.setAttribute(Qt.WA_StyledBackground)  # type: ignore
 
         desktop = QApplication.desktop().availableGeometry()
         w, h = desktop.width(), desktop.height()
@@ -472,7 +472,7 @@ class Window(FramelessWindow):
             onClick=lambda: self.switchTo(interface),
             position=position,
             tooltip=text,
-            parentRouteKey=parent.objectName() if parent else None
+            parentRouteKey=parent.objectName() if parent else ""
         )
 
     def setQss(self):
@@ -485,7 +485,8 @@ class Window(FramelessWindow):
 
     def onCurrentInterfaceChanged(self, index):
         widget = self.stackWidget.widget(index)
-        self.navigationInterface.setCurrentItem(widget.objectName())
+        if widget and widget.objectName():
+            self.navigationInterface.setCurrentItem(widget.objectName())
 
         #!IMPORTANT: This line of code needs to be uncommented if the return button is enabled
         # qrouter.push(self.stackWidget, widget.objectName())
@@ -608,5 +609,3 @@ def main(*args, **kwargs):
 
 if __name__ == '__main__':
     main()
-
-   
