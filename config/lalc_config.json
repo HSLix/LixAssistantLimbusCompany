@@ -9,10 +9,10 @@
         "EXP": 1,
         "ThreadEnable": false,
         "Thread": 1,
-        "MirrorEnable": false,
+        "MirrorEnable": true,
         "Mirror": 99,
         "reward": false,
-        "EndAction": "\u5173\u95ed LALC \u548c Limbus"
+        "EndAction": "\u65e0"
     },
     "semi_auto": {
         "AutoPBattle": true,

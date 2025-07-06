@@ -112,10 +112,10 @@
     },
     "EXPCheckpoint": {
         "action": "Checkpoint",
-        "next": "",
-        "target_task_count_name": "EXP",
-        "current_task_name": "EXPEntrance",
-        "next_task_name": "ThreadEntrance",
+        "checkpoint_name": "EXP",
+        "max_count": 3,
+        "loop_task": "EXPEntrance",
+        "next_task": "ThreadEntrance",
         "log_level": "INFO"
     },
     "ThreadEntrance": {
@@ -193,10 +193,10 @@
     },
     "ThreadCheckpoint": {
         "action": "Checkpoint",
-        "next": "",
-        "target_task_count_name": "Thread",
-        "current_task_name": "ThreadEntrance",
-        "next_task_name": "MirrorEntrance",
+        "checkpoint_name": "Thread",
+        "max_count": 2,
+        "loop_task": "ThreadEntrance",
+        "next_task": "MirrorEntrance",
         "log_level": "INFO"
     },
     "test": {
@@ -1293,10 +1293,10 @@
     },
     "MirrorCheckpoint": {
         "action": "Checkpoint",
-        "next": "",
-        "target_task_count_name": "Mirror",
-        "current_task_name": "MirrorEntrance",
-        "next_task_name": "End",
+        "checkpoint_name": "Mirror",
+        "max_count": 5,
+        "loop_task": "MirrorEntrance",
+        "next_task": "End",
         "log_level": "INFO"
     },
     "FullAutoInitMirrorWaitConnecting": {

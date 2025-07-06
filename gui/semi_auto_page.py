@@ -73,10 +73,8 @@ class SemiAutoPage(QFrame):
         """)
         
         self.checkBox1 = CheckBox(_('Auto P Battle'), self)
-        self.full_team_to_battle_box = CheckBox(_("Full(12/12) Team to Battle"))
         
         battleLayout.addWidget(self.checkBox1)
-        battleLayout.addWidget(self.full_team_to_battle_box)
         leftLayout.addWidget(battleGroup)
         
         # 事件设置组
@@ -101,15 +99,10 @@ class SemiAutoPage(QFrame):
         
         self.checkBox2 = CheckBox(_('Skip Event'), self)
         self.event_select_ego_box = CheckBox(_("Select \"Ego\" Choice"))
-        self.checkBox3 = CheckBox(_('Auto Click Next Stage'), self)
-        self.checkBox4 = CheckBox(_('Auto Select Reward Card'), self)
-        self.checkBox5 = CheckBox(_('Auto Skip EgoGiftGet'), self)
+        
         
         eventLayout.addWidget(self.checkBox2)
         eventLayout.addWidget(self.event_select_ego_box)
-        eventLayout.addWidget(self.checkBox3)
-        eventLayout.addWidget(self.checkBox4)
-        eventLayout.addWidget(self.checkBox5)
         leftLayout.addWidget(eventGroup)
         
         # 右侧布局（镜牢设置）
@@ -135,9 +128,18 @@ class SemiAutoPage(QFrame):
             }
         """)
         
+        self.full_team_to_battle_box = CheckBox(_("Full(12/12) Team to Battle"))
+        self.checkBox3 = CheckBox(_('Auto Click Next Stage'), self)
+        self.checkBox4 = CheckBox(_('Auto Select Reward Card'), self)
+        self.checkBox5 = CheckBox(_('Auto Skip EgoGiftGet'), self)
         self.checkBox6 = CheckBox(_('Auto Enter Mirror(Begin)'), self)
         
+        mirrorLayout.addWidget(self.full_team_to_battle_box)
+        mirrorLayout.addWidget(self.checkBox3)
+        mirrorLayout.addWidget(self.checkBox4)
+        mirrorLayout.addWidget(self.checkBox5)
         mirrorLayout.addWidget(self.checkBox6)
+        
         rightLayout.addWidget(mirrorGroup)
         
         # 将左侧和右侧布局添加到主布局
