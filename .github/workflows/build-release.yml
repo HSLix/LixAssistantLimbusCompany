@@ -141,8 +141,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.LALC_TOKEN }}
       with:
         files: dist/lalc.zip
-        body: |
-          ${{ steps.release-notes.outputs.notes }}
+        body: ${{ steps.release-notes.outputs.notes }}
         tag_name: ${{ github.ref_name }}
         name: Release ${{ github.ref_name }}
         prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
