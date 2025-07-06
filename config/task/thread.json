@@ -1,0 +1,83 @@
+{
+    "ThreadEntrance": {
+        "next": [
+            "SkipThreadLuxcavationStart",
+            "MirrorEntrance"
+        ]
+    },
+    "SkipThreadLuxcavationStart": {
+        "action": "Click",
+        "target": [
+            1100,
+            860
+        ],
+        "next": "SkipThreadLuxcavationEnter",
+        "post_delay": 1
+    },
+    "SkipThreadLuxcavationEnter": {
+        "action": "Click",
+        "target": [
+            550,
+            285
+        ],
+        "next": "SkipThreadLuxcavationChooseThread",
+        "post_delay": 1
+    },
+    "SkipThreadLuxcavationChooseThread": {
+        "action": "Click",
+        "target": [
+            200,
+            450
+        ],
+        "next": "SkipThreadLuxcavationClickSkipBattle",
+        "post_delay": 1
+    },
+    "SkipThreadLuxcavationClickSkipBattle": {
+        "action": "Click",
+        "target": [
+            470,
+            685
+        ],
+        "next": "SkipThreadLuxcavationChooseHighestStage",
+        "post_delay": 1
+    },
+    "SkipThreadLuxcavationChooseHighestStage": {
+        "action": "Click",
+        "target": [
+            810,
+            620
+        ],
+        "next": "SkipThreadLuxcavationConfirmSkipBattle",
+        "post_delay": 1,
+        "interrupt": "ThreadEntrance"
+    },
+    "SkipThreadLuxcavationConfirmSkipBattle": {
+        "recognition": "TemplateMatch",
+        "template": "luxcavation_confirm_skip_battle.png",
+        "recognize_area": [
+            800,
+            560,
+            300,
+            150
+        ],
+        "action": "Key",
+        "key": "enter",
+        "action_count": 2,
+        "action_rest": 3,
+        "next": "SkipThreadLuxcavationExit"
+    },
+    "SkipThreadLuxcavationExit": {
+        "action": "Key",
+        "key": "esc",
+        "action_rest": 2,
+        "next": "ThreadCheckpoint"
+    },
+    "ThreadCheckpoint": {
+        "action": "Checkpoint",
+        "checkpoint_name": "Thread",
+        "max_count": 2,
+        "loop_task": "ThreadEntrance",
+        "next_task": "MirrorEntrance",
+        "log_level": "INFO"
+    }
+} 

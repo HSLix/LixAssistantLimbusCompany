@@ -17,51 +17,73 @@ from .logger import lalc_logger
 from json_manager import theme_pack_manager
     
 
-def initJsonTask(json_path: str = join(CONFIG_DIR, "task.json")):
+def initJsonTask(task_dir: str = join(CONFIG_DIR, "task")):
     """
-    从JSON文件加载任务配置到全局字典
+    从task文件夹中的多个JSON文件加载任务配置到全局字典
     
     参数：
-    json_path -- 任务配置文件的路径 (默认: "task.json")
+    task_dir -- 任务配置文件夹的路径 (默认: "config/task")
     
     异常：
-    FileNotFoundError -- 当配置文件不存在时抛出
+    FileNotFoundError -- 当配置文件夹不存在时抛出
     JSONDecodeError -- 当JSON格式错误时抛出
     """
-  
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            raw_data = json.load(f)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"任务配置文件 {json_path} 不存在")
-    except json.JSONDecodeError:
-        raise ValueError("JSON文件格式错误")
-
-
+    import os
+    from pathlib import Path
+    
     task_dict: Dict[str, Task] = dict()
-    for task_name, task_config in raw_data.items():
-        # 处理 next 字段的两种形式：字符串或列表
-        if 'next' in task_config:
-            next_tasks = task_config['next']
-            if isinstance(next_tasks, str):
-                task_config['next'] = [next_tasks]
-        else:
-            task_config['next'] = []
-        
-        if 'interrupt' in task_config:
-            interrupt_tasks = task_config['interrupt']
-            if isinstance(interrupt_tasks, str):
-                task_config['interrupt'] = [interrupt_tasks]
-        else:
-            task_config['interrupt'] = []
-        # from globals import getScreenScale
-        # getScreenScale()
-        # 创建任务实例并存入字典
-        task_dict[task_name] = Task(
-            name=task_name,
-            **task_config
-        )
-
+    
+    # 检查task文件夹是否存在
+    if not os.path.exists(task_dir):
+        raise FileNotFoundError(f"任务配置文件夹 {task_dir} 不存在")
+    
+    # 获取所有JSON文件
+    task_path = Path(task_dir)
+    json_files = list(task_path.glob("*.json"))
+    
+    if not json_files:
+        raise FileNotFoundError(f"在 {task_dir} 中没有找到任何JSON文件")
+    
+    # 按文件名排序，确保加载顺序一致
+    json_files.sort()
+    
+    # 加载所有JSON文件
+    for json_file in json_files:
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+            
+            # 处理每个任务配置
+            for task_name, task_config in raw_data.items():
+                # 处理 next 字段的两种形式：字符串或列表
+                if 'next' in task_config:
+                    next_tasks = task_config['next']
+                    if isinstance(next_tasks, str):
+                        task_config['next'] = [next_tasks]
+                else:
+                    task_config['next'] = []
+                
+                if 'interrupt' in task_config:
+                    interrupt_tasks = task_config['interrupt']
+                    if isinstance(interrupt_tasks, str):
+                        task_config['interrupt'] = [interrupt_tasks]
+                else:
+                    task_config['interrupt'] = []
+                
+                # 创建任务实例并存入字典
+                task_dict[task_name] = Task(
+                    name=task_name,
+                    **task_config
+                )
+            
+            print(f"✓ 已加载任务文件: {json_file.name}")
+            
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON文件 {json_file.name} 格式错误: {e}")
+        except Exception as e:
+            raise Exception(f"加载任务文件 {json_file.name} 时出错: {e}")
+    
+    print(f"✓ 总共加载了 {len(task_dict)} 个任务")
     return task_dict
 
 

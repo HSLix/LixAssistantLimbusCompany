@@ -30,13 +30,14 @@ from executor import lalc_cu, lalc_logger, screen_record_thread
 
 class Window(FramelessWindow):
 
-    def __init__(self):
+    def __init__(self, scale=None):
         checkWorkDirAllEnglish()
         super().__init__()
         self.setTitleBar(StandardTitleBar(self))
         self.setWindowTitle("LixAssistantLimbusCompany")
         self.setWindowIcon(QIcon(join(GUI_DIR, "MagicGirl.png")))
         setTheme(Theme.LIGHT)
+        self.scale = scale
         
         # self.splashScreen = SplashScreen(self.windowIcon(), self)
         # self.splashScreen.setIconSize(QSize(102, 102))
@@ -81,6 +82,9 @@ class Window(FramelessWindow):
         self.checkForUpdates()  # 调用版本检测函数
         lalc_logger.clean_old_logs()
         # self.show_announcement_dialog()
+        
+        # 检查屏幕缩放并显示警告
+        self.checkScreenScale()
 
     def show_announcement_dialog(self):
         """显示公告窗口"""
@@ -90,6 +94,17 @@ class Window(FramelessWindow):
             parent=self
         )
         dialog.exec_()
+
+    def checkScreenScale(self):
+        """检查屏幕缩放并显示警告"""
+        if self.scale is None:
+            self.scale = getScreenScale()
+        if not 1.49 <= self.scale <= 1.51:
+            self.show_message(
+                "WARNING",
+                'ScreenScaleWarning',
+                '检测到屏幕的缩放不是 150%，可能会导致运行不正常\nDetecting of screen scaling other than 150%\nwhich may result in malfunctioning.\n当前缩放：{0}%'.format(self.scale*100)
+            )
 
     def checkForUpdates(self):
         """检测当前版本是否是最新版本"""
@@ -293,14 +308,7 @@ class Window(FramelessWindow):
             self.workingInterface.on_stopped
         )
 
-        # 屏幕缩放警告
-        # lalc_cu.screen_scale_warning.connect(
-        #     lambda: self.show_message(
-        #         "WARNING", 
-        #         _('ScreenScaleWarning'), 
-        #         _('检测到屏幕的缩放不是 150%，可能会导致运行不正常\nDetecting of screen scaling other than 150%\nwhich may result in malfunctioning.')
-        #     )
-        # )
+
             
         # 任务停止信号
         lalc_cu.task_stopped.connect(
@@ -650,11 +658,9 @@ def main(*args, **kwargs):
     scale = getScreenScale()
     app = QApplication(sys.argv)
     sys.excepthook = my_excepthook
-    if not 1.49 <= scale <= 1.51:
-        raise ValueError(f"请把屏幕的缩放调整为 150% | Make sure that the scale of your Screen is 150%\n当前缩放：{scale}")
     ignoreScaleAndDpi()
     # shutdown_splash()
-    w = Window()
+    w = Window(scale)
     
     sys.exit(app.exec_())
 
