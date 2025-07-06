@@ -52,13 +52,13 @@ jobs:
         
         # 获取当前tag的标注信息
         $currentNotes = git show --no-patch --format='%B' "V$currentVersion" 2>$null
-        Write-Output "Tag message from V$currentVersion: '$currentNotes'"
+        Write-Output "Tag message from V$currentVersion`: '$currentNotes'"
         
         # 如果还是为空，尝试其他方法获取tag信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {
           # 尝试使用tag对象获取
           $currentNotes = git show --no-patch --format='%B' "refs/tags/V$currentVersion" 2>$null
-          Write-Output "Tag message from refs/tags/V$currentVersion: '$currentNotes'"
+          Write-Output "Tag message from refs/tags/V$currentVersion`: '$currentNotes'"
         }
         
         # 如果仍然为空，尝试获取commit信息
