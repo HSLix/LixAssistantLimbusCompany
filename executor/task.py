@@ -9,7 +9,7 @@ from os.path import join
 
 
 from executor.eye import get_eye
-from globals import sinner_place, sinner_name, CONFIG_DIR
+from globals import sinner_place, sinner_name, CONFIG_DIR, starlight_place
 from .game_window import activateWindow
 from .custom_action_dict import CustomActionDict
 from .mouse_keyboard import get_mouse_keyboard
@@ -408,11 +408,31 @@ def initCustomAction():
 
     @custom_action_dict.register
     def choose_star_buff(**kwargs):
-        mk.moveClick([1040, 400]) # 4
-        mk.moveClick([810, 665]) # 8
-        mk.moveClick([585, 665]) # 7
-        mk.moveClick([1280, 400]) # 5
-        mk.moveClick([350, 400]) # 1
+        # 读取星光配置
+        config_path = join(CONFIG_DIR, "starlight_config.json")
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                starlight_config = json.load(f)
+        except Exception as e:
+            print(f"无法加载星光配置：{e}")
+            return
+        
+        # 按order排序星光配置
+        sorted_starlights = []
+        for key, value in starlight_config.items():
+            if 'name' in value and 'order' in value:
+                sorted_starlights.append((value['name'], value['order']))
+        
+        # 按order升序排序
+        sorted_starlights.sort(key=lambda x: x[1])
+        
+        # 按顺序点击星光
+        for starlight_name, order in sorted_starlights:
+            if starlight_name in starlight_place:
+                coordinates = starlight_place[starlight_name]
+                mk.moveClick(coordinates)
+                sleep(0.2)  # 添加短暂延迟确保点击生效
+        
         # 下面是结算
         mk.moveClick([1440, 900], rest_time=2)
         mk.moveClick([945, 720])

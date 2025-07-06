@@ -40,11 +40,9 @@ jobs:
       run: |
         # 获取当前版本号
         $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
-        $tagName = "V$currentVersion"
-
+        
         # 获取当前tag的标注信息
-        $currentNotes = git tag -l --format='%(contents)' "V$currentVersion"
-
+        $currentNotes = git show --no-patch --format='%B' "V$currentVersion" 2>$null
 
         # 如果为空（可能是轻量标签），尝试获取commit信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {
@@ -59,7 +57,7 @@ jobs:
         $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
       
         # 使用普通字符串拼接代替 here-string
-        $currentReleaseSection = "## $tagName`n$currentNotes"
+        $currentReleaseSection = "## V$currentVersion`n$currentNotes"
 
         # 使用GitHub API获取上一个Release的body内容
         $headers = @{

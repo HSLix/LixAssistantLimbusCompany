@@ -9,7 +9,7 @@ if __name__ == "__main__":
     # sleep(1)
     # mk.moveClick([150, 555])
     # mk.scroll([0,-1], 7)
-    mk.listenMouse()  
+    # mk.listenMouse()  
 
     # mk.moveClick([150, 430])
     # mk.moveClick([150, 480])
@@ -22,15 +22,18 @@ if __name__ == "__main__":
 
     # mk.moveClick([150, 660])
 
-    # x = 420
-    # y = 415
-    # x_step = 190
-    # y_step = 175
-    # for i in range(5):
-    #     for j in range(2):
-    #         mk.moveClick([x + i*x_step, y + j*y_step])
-    #         print("%d, %d".format(x + i*x_step, y + j*y_step))
+    x = 350
+    y = 400
+    x_step = 250
+    y_step = 250
+    l = []
+    for j in range(2):
+        for i in range(5):
+            mk.moveClick([x + i*x_step, y + j*y_step])
+            l.append([x + i*x_step, y + j*y_step])
+            print("%d, %d".format(x + i*x_step, y + j*y_step))
 
+    print(l)
     # style_refresh = {
     #                 "Burn":[420, 415],
     #                 "Bleed":[610, 415],

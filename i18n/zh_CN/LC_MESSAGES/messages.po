@@ -227,6 +227,9 @@ msgstr "全自动"
 msgid "SemiAuto"
 msgstr "半自动"
 
+msgid "Edit Starlight"
+msgstr "编辑星光"
+
 msgid "Full(12/12) Team to Battle"
 msgstr "满员（12/12）队伍出战"
 
@@ -333,14 +336,14 @@ msgstr "点击前往更新应用"
 msgid "无法打开文件夹：%s"
 msgstr "无法打开文件夹：%s"
 
-msgid "恢复顺序"
+msgid "Restore"
 msgstr "恢复顺序"
 
-msgid "全部取消"
+msgid "Cancel All"
 msgstr "全部取消"
 
-msgid "保存队伍"
-msgstr "保存队伍"
+msgid "Save"
+msgstr "保存"
 
 #, python-format
 msgid "编辑队伍: %s"

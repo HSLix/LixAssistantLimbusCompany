@@ -22,7 +22,7 @@ GITHUB_REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 EVENT_NAME = "LixAssistantLimbusCompanyRunning"
 
 # 版本号
-VERSION = "V3.2.4"
+VERSION = "V3.2.5"
 
 
 # 支持网址
@@ -49,6 +49,32 @@ sinner_name = [  # 固定十二个人物列表
             "YiSang", "Faust", "DonQuixote", "Ryoshu", "Meursault", "HongLu",
             "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"
 ]
+
+starlight_name = [
+    "mirror_star_of_the_beginning",
+    "mirror_cumulating_starcloud",
+    "mirror_interstellar_travel",
+    "mirror_star_shower",
+    "mirror_binary_star_shop",
+    "mirror_moon_star_shop",
+    "mirror_favor_of_the_nebulae",
+    "mirror_starlight_guidance",
+    "mirror_chance_comet", 
+    "mirror_perfected_possibility"
+]
+
+starlight_place = {
+    "mirror_star_of_the_beginning": [350, 400],
+    "mirror_cumulating_starcloud": [600, 400],
+    "mirror_interstellar_travel": [850, 400],
+    "mirror_star_shower": [1100, 400],
+    "mirror_binary_star_shop": [1350, 400],
+    "mirror_moon_star_shop": [350, 650],
+    "mirror_favor_of_the_nebulae": [600, 650],
+    "mirror_starlight_guidance": [850, 650],
+    "mirror_chance_comet": [1100, 650],
+    "mirror_perfected_possibility": [1350, 650]
+}
 
 def ignoreScaleAndDpi():
     windll.shcore.SetProcessDpiAwareness(2)
