@@ -184,11 +184,7 @@ msgstr ""
 "捕获到未知错误，是否打开日志查看？\n"
 "%s"
 
-msgid "任务设置"
-msgstr "任务设置"
 
-msgid "配置设置"
-msgstr "配置设置"
 
 msgid "游戏窗口大小"
 msgstr "游戏窗口大小"
@@ -365,7 +361,7 @@ msgid "Sinking"
 msgstr "沉沦"
 
 msgid "Poise"
-msgstr "呼吸法"
+msgstr "呼吸"
 
 msgid "Charge"
 msgstr "充能"
@@ -420,3 +416,15 @@ msgstr "任务已暂停"
 
 msgid "任务已停止"
 msgstr "任务已停止"
+
+msgid "结束后动作:"
+msgstr "结束后动作:"
+
+msgid "无"
+msgstr "无"
+
+msgid "关闭 LALC 和 Limbus"
+msgstr "关闭 LALC 和 Limbus"
+
+msgid "关机"
+msgstr "关机"

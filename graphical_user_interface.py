@@ -217,6 +217,54 @@ class Window(FramelessWindow):
     def _save_language_config(self, value):
         self.gui_config["language"] = value
         config_manager.save_config("gui", self.gui_config)
+    
+    def execute_end_action(self):
+        """执行结束后的动作"""
+        # 获取当前模式
+        current_mode = lalc_cu.mode
+        
+        if current_mode == "FullAuto":
+            # 从全自动页面获取结束动作设置
+            end_action = self.homeInterface.fullAutoInterface.endActionComboBox.currentText()
+        elif current_mode == "SemiAuto":
+            # 半自动模式暂时没有结束动作设置，可以后续添加
+            return
+        else:
+            return
+        
+        # 执行对应的结束动作
+        if end_action == _("无"):
+            return
+        elif end_action == _("关闭 LALC 和 Limbus"):
+            self.close_lalc_and_limbus()
+        elif end_action == _("关机"):
+            self.shutdown_computer()
+    
+    def close_lalc_and_limbus(self):
+        """关闭 LALC 和 Limbus 游戏"""
+        try:
+            import subprocess
+            # 关闭 LALC 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LixAssistantLimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            # 关闭 Limbus Company 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            print("已关闭 LALC 和 Limbus Company")
+        except Exception as e:
+            print(f"关闭进程时出错: {e}")
+    
+    def shutdown_computer(self):
+        """关机"""
+        try:
+            import subprocess
+            # 使用 Windows 关机命令，30秒后关机
+            subprocess.run(['shutdown', '/s', '/t', '30'], check=True)
+            print("系统将在30秒后关机")
+        except Exception as e:
+            print(f"关机命令执行失败: {e}")
 
 
     def connect_signals(self):
@@ -276,6 +324,9 @@ class Window(FramelessWindow):
         # 所有任务完成信号
         lalc_cu.task_completed.connect(
             lambda : self.show_message("SUCCESS", 'FinshAll', _("所有任务顺利执行"))
+        )
+        lalc_cu.task_completed.connect(
+            self.execute_end_action
         )
         # 任务暂停/继续信号
         lalc_cu.task_paused.connect(
