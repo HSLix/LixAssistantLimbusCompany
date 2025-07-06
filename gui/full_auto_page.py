@@ -5,6 +5,8 @@ from qfluentwidgets import (
 )
 from PyQt5.QtCore import Qt
 import json
+import os
+import subprocess
 
 
 from executor import lalc_cu, screen_record_thread
@@ -19,23 +21,14 @@ class FullAutoPage(QFrame):
         self.fullAutoLayout = QHBoxLayout(self)
 
         # 创建任务设置组
-        self.taskGroupBox = QGroupBox(_("任务设置"))
+        self.taskGroupBox = QGroupBox()
         self.taskLayout = QVBoxLayout()
         self.taskGroupBox.setLayout(self.taskLayout)
 
         # 创建配置设置组
-        self.configGroupBox = QGroupBox(_("配置设置"))
-        self.scrollConfig = SingleDirectionScrollArea(orient=Qt.Vertical)
+        self.configGroupBox = QGroupBox()
         self.configLayout = QVBoxLayout()
-        self.scrollConfig.setWidgetResizable(True)
-        widget = QWidget()
-        widget.setLayout(self.configLayout)
-        self.scrollConfig.setWidget(widget)
-
-        # 将配置设置组添加到布局
-        group_box_layout = QVBoxLayout()
-        group_box_layout.addWidget(self.scrollConfig)
-        self.configGroupBox.setLayout(group_box_layout)
+        self.configGroupBox.setLayout(self.configLayout)
 
         # 设置 QGroupBox 标题的字号
         self.taskGroupBox.setStyleSheet("QGroupBox { font-size: 20px; }")
@@ -58,96 +51,83 @@ class FullAutoPage(QFrame):
         self.record_thread = screen_record_thread
 
     def initConfigLayout(self):
-        # 创建一个 QStackedWidget 来管理多个配置页面
-        self.config_pages = QStackedWidget()
-        self.configLayout.addWidget(self.config_pages)
-
-        # 为每个设置按钮创建对应的配置页面
-        pages = [
-            self.init_init_config_page(),
-            self.init_exp_config_page(),
-            self.init_thread_config_page(),
-            self.init_mirror_config_page(),
-            self.init_reward_config_page()
-        ]
-        for page in pages:
-            self.config_pages.addWidget(page)
-
-    def init_init_config_page(self):
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-
-        # 创建标签
-        game_window_size_label = StrongBodyLabel(_("游戏窗口大小"), page)
-        game_window_size = ComboBox()
-        game_window_size.addItems(['1600,900'])
-        game_window_size.setEnabled(False)
-
-        # 创建水平布局来放置标签和多选框
-        h_layout1 = QHBoxLayout()
-        h_layout1.addWidget(game_window_size_label)
-        h_layout1.addWidget(game_window_size)
-
-        page_layout.addLayout(h_layout1)
-
-        # 创建标签
-        assemble_enkephalin_label = StrongBodyLabel(_("AssembleEnkephalinModules"), page)
-        assemble_enkephalin = ComboBox()
-        assemble_enkephalin.addItems(["80%"])
-        assemble_enkephalin.setEnabled(False)
-
-        # 创建水平布局来放置标签和多选框
-        h_layout2 = QHBoxLayout()
-        h_layout2.addWidget(assemble_enkephalin_label)
-        h_layout2.addWidget(assemble_enkephalin)
-
-        page_layout.addLayout(h_layout2)
+        # 直接使用 configLayout，不创建额外的 widget
+        self.configLayout.setSpacing(15)
         
-        return page
+        # 添加基础设置
+        self.addConfigSection(_("基础设置"), [
+            (_("游戏窗口大小"), ComboBox(), ['1600,900']),
+            (_("脑啡肽模组阈值"), ComboBox(), ["80%"])
+        ])
+        
+        # 添加经验本设置
+        self.addConfigSection(_("经验本设置"), [
+            
+        ])
 
-    def init_exp_config_page(self):
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-        label = StrongBodyLabel("EXP Setting\n暂无自定义选项\nNo Custom Setting for now", page)
-        page_layout.addWidget(label)
-        return page
+        # 添加纽本设置
+        self.addConfigSection(_("纽本设置"), [
+            
+        ])
 
-    def init_thread_config_page(self):
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-        label = StrongBodyLabel("Thread Setting\n暂无自定义选项\nNo Custom Setting for now", page)
-        page_layout.addWidget(label)
-        return page
+        # 添加镜牢设置
+        self.addConfigSection(_("镜牢设置"), [
+            
+        ])
+    
+    def addConfigSection(self, title, items):
+        """添加配置区域"""
+        # 创建配置组
+        sectionGroup = QGroupBox(title)
+        sectionGroup.setStyleSheet("""
+            QGroupBox {
+                font-size: 14px;
+                font-weight: bold;
+                border: 1px solid #d0d0d0;
+                border-radius: 6px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 5px 0 5px;
+            }
+        """)
+        
+        sectionLayout = QVBoxLayout(sectionGroup)
+        sectionLayout.setSpacing(8)
+        
+        # 配置项
+        for item in items:
+            if isinstance(item, tuple):
+                label, widget, *args = item
+                if isinstance(widget, ComboBox) and args:
+                    widget.addItems(args[0])
+                    widget.setEnabled(False)
+                
+                itemLayout = QHBoxLayout()
+                itemLayout.addWidget(StrongBodyLabel(label))
+                itemLayout.addWidget(widget)
+                itemLayout.addStretch()
+                sectionLayout.addLayout(itemLayout)
+            else:
+                sectionLayout.addWidget(item)
+        
+        self.configLayout.addWidget(sectionGroup)
 
-    def init_mirror_config_page(self):
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-        label = StrongBodyLabel("Mirror Setting\n暂无自定义选项\nNo Custom Setting for now", page)
-        page_layout.addWidget(label)
-        return page
 
-    def init_reward_config_page(self):
-        page = QWidget()
-        page_layout = QVBoxLayout(page)
-        label = StrongBodyLabel("Reward Setting\n暂无自定义选项\nNo Custom Setting for now", page)
-        page_layout.addWidget(label)
-        return page
 
     def initTaskLayout(self):
-        # 添加四个复选框和对应的 SpinBox
+        # 添加复选框和对应的 SpinBox，去掉设置按钮
         self.checkBox0 = CheckBox(_("Init"), self)
-        self.toolButton0 = ToolButton(FIF.SETTING)
         self.checkBox1 = CheckBox(_("EXP"), self)
         self.spinBox1 = SpinBox(self)
-        self.toolButton1 = ToolButton(FIF.SETTING)
         self.checkBox2 = CheckBox(_("Thread"), self)
         self.spinBox2 = SpinBox(self)
-        self.toolButton2 = ToolButton(FIF.SETTING)
         self.checkBox3 = CheckBox(_("Mirror"), self)
         self.spinBox3 = SpinBox(self)
-        self.toolButton3 = ToolButton(FIF.SETTING)
         self.checkBox4 = CheckBox(_("Reward"), self)
-        self.toolButton4 = ToolButton(FIF.SETTING)
         self.StartButton = PushButton(_("Start"))
         self.StartButton.setToolTip("Ctrl+Enter+F")
         self.StartButton.setFixedSize(200, 50)
@@ -162,34 +142,45 @@ class FullAutoPage(QFrame):
             spinBox.setValue(1)
             spinBox.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Preferred)
 
-        for toolButton in [self.toolButton0, self.toolButton1, self.toolButton2, self.toolButton3, self.toolButton4]:
-            toolButton.setEnabled(True)
-            toolButton.setFixedSize(40, 40)
-
-        def addHBoxLayout(layout: QVBoxLayout, a, b, c, alignment=Qt.AlignBottom):
+        def addHBoxLayout(layout: QVBoxLayout, checkbox, spinbox=None, alignment=Qt.AlignBottom):
             hBoxLayout = QHBoxLayout()
             hBoxLayout.setAlignment(alignment)
-            hBoxLayout.addWidget(a)
+            hBoxLayout.addWidget(checkbox)
+            if spinbox:
+                hBoxLayout.addStretch(1)  # 在 SpinBox 左边添加弹簧
+                hBoxLayout.addWidget(spinbox)
             hBoxLayout.addStretch(1)
-            hBoxLayout.addWidget(b)
-            hBoxLayout.addStretch(1)
-            hBoxLayout.addWidget(c)
             layout.addLayout(hBoxLayout)
 
         # 将复选框和 SpinBox 添加到布局中
-        addHBoxLayout(self.taskLayout, self.checkBox0, QWidget(), self.toolButton0)
-        addHBoxLayout(self.taskLayout, self.checkBox1, self.spinBox1, self.toolButton1)
-        addHBoxLayout(self.taskLayout, self.checkBox2, self.spinBox2, self.toolButton2)
-        addHBoxLayout(self.taskLayout, self.checkBox3, self.spinBox3, self.toolButton3)
-        addHBoxLayout(self.taskLayout, self.checkBox4, QWidget(), self.toolButton4)
-        addHBoxLayout(self.taskLayout, QWidget(), self.StartButton, QWidget(), Qt.AlignCenter)
-
-        # 连接按钮点击信号到切换页面的槽函数
-        self.toolButton0.clicked.connect(lambda: self.config_pages.setCurrentIndex(0))
-        self.toolButton1.clicked.connect(lambda: self.config_pages.setCurrentIndex(1))
-        self.toolButton2.clicked.connect(lambda: self.config_pages.setCurrentIndex(2))
-        self.toolButton3.clicked.connect(lambda: self.config_pages.setCurrentIndex(3))
-        self.toolButton4.clicked.connect(lambda: self.config_pages.setCurrentIndex(4))
+        addHBoxLayout(self.taskLayout, self.checkBox0)
+        addHBoxLayout(self.taskLayout, self.checkBox1, self.spinBox1)
+        addHBoxLayout(self.taskLayout, self.checkBox2, self.spinBox2)
+        addHBoxLayout(self.taskLayout, self.checkBox3, self.spinBox3)
+        addHBoxLayout(self.taskLayout, self.checkBox4)
+        
+        # 添加结束动作选择
+        endActionLayout = QHBoxLayout()
+        endActionLayout.addStretch(1)
+        endActionLabel = StrongBodyLabel(_("结束后动作:"))
+        self.endActionComboBox = ComboBox()
+        self.endActionComboBox.addItems([_("无"), _("关闭 LALC 和 Limbus"), _("关机")])
+        self.endActionComboBox.setCurrentText(_("无"))
+        
+        endActionLayout.addWidget(endActionLabel)
+        endActionLayout.addWidget(self.endActionComboBox)
+        endActionLayout.addStretch(1)
+        self.taskLayout.addLayout(endActionLayout)
+        
+        # 添加间隔
+        self.taskLayout.addSpacing(20)
+        
+        # 添加开始按钮
+        startLayout = QHBoxLayout()
+        startLayout.addStretch(1)
+        startLayout.addWidget(self.StartButton)
+        startLayout.addStretch(1)
+        self.taskLayout.addLayout(startLayout)
 
         self.StartButton.clicked.connect(self.start_thread)
 
@@ -208,6 +199,45 @@ class FullAutoPage(QFrame):
             spinbox.setEnabled(False)
         else:
             spinbox.setEnabled(True)
+    
+    def execute_end_action(self):
+        """执行结束后的动作"""
+        end_action = self.endActionComboBox.currentText()
+        
+        if end_action == _("无"):
+            return
+        elif end_action == _("关闭 LALC 和 Limbus"):
+            self.close_lalc_and_limbus()
+        elif end_action == _("关机"):
+            self.shutdown_computer()
+    
+    def close_lalc_and_limbus(self):
+        """关闭 LALC 和 Limbus 游戏"""
+        try:
+            # 关闭 LALC 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LixAssistantLimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            # 关闭 Limbus Company 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            # 关闭 Steam 进程（如果游戏是通过 Steam 启动的）
+            subprocess.run(['taskkill', '/f', '/im', 'steam.exe'], 
+                         capture_output=True, check=False)
+            
+            print("已关闭 LALC 和 Limbus Company")
+        except Exception as e:
+            print(f"关闭进程时出错: {e}")
+    
+    def shutdown_computer(self):
+        """关机"""
+        try:
+            # 使用 Windows 关机命令，30秒后关机
+            subprocess.run(['shutdown', '/s', '/t', '30'], check=True)
+            print("系统将在30秒后关机")
+        except Exception as e:
+            print(f"关机命令执行失败: {e}")
 
     def start_thread(self):
         # 收集参数
@@ -252,7 +282,8 @@ class FullAutoPage(QFrame):
             'Thread': self.spinBox2.value(),  # Thread 任务执行次数
             "MirrorEnable": self.checkBox3.isChecked(),
             'Mirror': self.spinBox3.value(),  # Mirror 任务执行次数
-            'reward': self.checkBox4.isChecked()  # Reward 类型
+            'reward': self.checkBox4.isChecked(),  # Reward 类型
+            'EndAction': self.endActionComboBox.currentText()  # 结束动作
         }
 
     def collect_cu_params(self):
@@ -281,6 +312,13 @@ class FullAutoPage(QFrame):
             self.checkBox3.setChecked(full_auto_config.get('MirrorEnable', False))
             self.spinBox3.setValue(full_auto_config.get('Mirror', 0))
             self.checkBox4.setChecked(full_auto_config.get('reward', False))
+            
+            # 加载结束动作设置
+            end_action = full_auto_config.get('EndAction', _("无"))
+            if end_action in [_("无"), _("关闭 LALC 和 Limbus"), _("关机")]:
+                self.endActionComboBox.setCurrentText(end_action)
+            else:
+                self.endActionComboBox.setCurrentText(_("无"))
 
             # 根据复选框状态设置 SpinBox 可用性
             self.update_spinbox(self.checkBox1.checkState(), self.spinBox1)

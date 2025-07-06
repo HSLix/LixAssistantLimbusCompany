@@ -17,51 +17,73 @@ from .logger import lalc_logger
 from json_manager import theme_pack_manager
     
 
-def initJsonTask(json_path: str = join(CONFIG_DIR, "task.json")):
+def initJsonTask(task_dir: str = join(CONFIG_DIR, "task")):
     """
-    从JSON文件加载任务配置到全局字典
+    从task文件夹中的多个JSON文件加载任务配置到全局字典
     
     参数：
-    json_path -- 任务配置文件的路径 (默认: "task.json")
+    task_dir -- 任务配置文件夹的路径 (默认: "config/task")
     
     异常：
-    FileNotFoundError -- 当配置文件不存在时抛出
+    FileNotFoundError -- 当配置文件夹不存在时抛出
     JSONDecodeError -- 当JSON格式错误时抛出
     """
-  
-    try:
-        with open(json_path, 'r', encoding='utf-8') as f:
-            raw_data = json.load(f)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"任务配置文件 {json_path} 不存在")
-    except json.JSONDecodeError:
-        raise ValueError("JSON文件格式错误")
-
-
+    import os
+    from pathlib import Path
+    
     task_dict: Dict[str, Task] = dict()
-    for task_name, task_config in raw_data.items():
-        # 处理 next 字段的两种形式：字符串或列表
-        if 'next' in task_config:
-            next_tasks = task_config['next']
-            if isinstance(next_tasks, str):
-                task_config['next'] = [next_tasks]
-        else:
-            task_config['next'] = []
-        
-        if 'interrupt' in task_config:
-            interrupt_tasks = task_config['interrupt']
-            if isinstance(interrupt_tasks, str):
-                task_config['interrupt'] = [interrupt_tasks]
-        else:
-            task_config['interrupt'] = []
-        # from globals import getScreenScale
-        # getScreenScale()
-        # 创建任务实例并存入字典
-        task_dict[task_name] = Task(
-            name=task_name,
-            **task_config
-        )
-
+    
+    # 检查task文件夹是否存在
+    if not os.path.exists(task_dir):
+        raise FileNotFoundError(f"任务配置文件夹 {task_dir} 不存在")
+    
+    # 获取所有JSON文件
+    task_path = Path(task_dir)
+    json_files = list(task_path.glob("*.json"))
+    
+    if not json_files:
+        raise FileNotFoundError(f"在 {task_dir} 中没有找到任何JSON文件")
+    
+    # 按文件名排序，确保加载顺序一致
+    json_files.sort()
+    
+    # 加载所有JSON文件
+    for json_file in json_files:
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                raw_data = json.load(f)
+            
+            # 处理每个任务配置
+            for task_name, task_config in raw_data.items():
+                # 处理 next 字段的两种形式：字符串或列表
+                if 'next' in task_config:
+                    next_tasks = task_config['next']
+                    if isinstance(next_tasks, str):
+                        task_config['next'] = [next_tasks]
+                else:
+                    task_config['next'] = []
+                
+                if 'interrupt' in task_config:
+                    interrupt_tasks = task_config['interrupt']
+                    if isinstance(interrupt_tasks, str):
+                        task_config['interrupt'] = [interrupt_tasks]
+                else:
+                    task_config['interrupt'] = []
+                
+                # 创建任务实例并存入字典
+                task_dict[task_name] = Task(
+                    name=task_name,
+                    **task_config
+                )
+            
+            print(f"✓ 已加载任务文件: {json_file.name}")
+            
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON文件 {json_file.name} 格式错误: {e}")
+        except Exception as e:
+            raise Exception(f"加载任务文件 {json_file.name} 时出错: {e}")
+    
+    print(f"✓ 总共加载了 {len(task_dict)} 个任务")
     return task_dict
 
 
@@ -187,11 +209,12 @@ class Task:
                 print("Unknown Custom")
                 raise ValueError("Unknown Custom")
         
-        # 系列任务终止的检查点
+        # 检查点参数 - 简化设计
         elif self.action == "Checkpoint":
-            self.target_task_count_name = config.get("target_task_count_name","")
-            self.current_task_name = config.get("current_task_name","")
-            self.next_task_name = config.get("next_task_name","")
+            self.checkpoint_name = config.get("checkpoint_name", "")
+            self.max_count = config.get("max_count", 1)
+            self.loop_task = config.get("loop_task", "")
+            self.next_task = config.get("next_task", "")
 
     def click_action(self):
         click_list = None
@@ -233,16 +256,16 @@ class Task:
             self.mk.pressKey(single_key, press_count=self.action_count, rest_time=self.action_rest)
 
 
-    def end_action(self, **kwargs):
-        executed = kwargs.get("executed_time")
-        target_task_count_dict = kwargs.get("target_task_count", {})
-        target_count = target_task_count_dict.get(self.target_task_count_name, 0)
-
-        if executed >= target_count:
-            kwargs.get("target_task_count", {})["Pass"] = 1
-            self.next[0] = self.next_task_name
+    def checkpoint_action(self, **kwargs):
+        """简化的检查点动作，只负责返回下一步应该执行的任务名"""
+        executed = kwargs.get("executed_time", 0)
+        
+        if executed >= self.max_count:
+            # 达到最大次数，执行下一个任务
+            return self.next_task
         else:
-            self.next[0] = self.current_task_name
+            # 未达到最大次数，继续循环
+            return self.loop_task
 
 
     def _init_action_function(self):
@@ -258,7 +281,7 @@ class Task:
                 raise ValueError(f"正在尝试从自定义活动调用不存在的自定义活动[{self.custom_name}]")
             return custom_action_dict[self.custom_name]
         elif self.action == "Checkpoint":
-            return self.end_action
+            return self.checkpoint_action
         else:
             return None
         
@@ -340,7 +363,10 @@ class Task:
         if (self.action != "DoNothing"):
             activateWindow()
             if (self.action=="Custom" or self.action=="Checkpoint"):
-                self.action_function(**kwargs)
+                result = self.action_function(**kwargs)
+                if self.action == "Checkpoint":
+                    # 检查点返回下一步任务名，需要更新next列表
+                    self.next = [result] if result else []
             else:
                 self.action_function()
 

@@ -1,0 +1,415 @@
+{
+    "SemiAutoEntrance": {
+        "next": "SemiAutoCircleCenter"
+    },
+    "SemiAutoCircleCenter": {
+        "pre_delay": 1,
+        "next": [
+            "SemiAutoReadyEnterMirror",
+            "SemiAutoPEncounter",
+            "SemiAutoEnterEncounter",
+            "SemiAutoFullTeamToBattle",
+            "SemiAutoSkipEvent",
+            "SemiAutoReadyFindWay",
+            "SemiAutoReadySelectRewardCard",
+            "SemiAutoPassEgoGiftGet",
+            "SemiAutoRechargeEnkephalin",
+            "SemiAutoAssembleEnkephalinModules",
+            "SemiWaitConnecting",
+            "SemiWaitCombatTips",
+            "SemiErrorRetry",
+            "SemiAutoCircleCenter"
+        ],
+        "log_level": "INFO"
+    },
+    "SemiAutoFullTeamToBattle":{
+        "recognition":"TemplateMatch",
+        "template":"team_selection_1212.png",
+        "action":"Key",
+        "key":"enter",
+        "next":"SemiAutoCircleCenter"
+    },
+    "SemiWaitConnecting": {
+        "recognition": "TemplateMatch",
+        "template": "connecting.png",
+        "post_delay": 1,
+        "next": [
+            "SemiWaitConnecting",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiWaitCombatTips": {
+        "recognition": "TemplateMatch",
+        "template": "combat_tips.png",
+        "post_delay": 1,
+        "next": [
+            "SemiWaitCombatTips",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiErrorRetry": {
+        "recognition": "TemplateMatch",
+        "template": "retry.png",
+        "threshold": 0.85,
+        "action": "Click",
+        "post_delay": 5,
+        "next": "SemiAutoCircleCenter"
+    },
+    "SemiAutoReadyEnterMirror": {
+        "recognition": "TemplateMatch",
+        "recognize_area": [
+            1040,
+            825,
+            110,
+            100
+        ],
+        "template": "menu_drive.png",
+        "action": "Click",
+        "post_delay": 2,
+        "next": "SemiAutoEnterMirror"
+    },
+    "SemiAutoEnterMirror": {
+        "action": "Click",
+        "target": [
+            650,
+            440
+        ],
+        "action_count": 2,
+        "action_rest": 0.5,
+        "post_delay": 0.5,
+        "next": "SemiAutoEnterOrResumeMirror"
+    },
+    "SemiAutoEnterOrResumeMirror": {
+        "action": "Key",
+        "key": "enter",
+        "next": "SemiAutoCircleCenter"
+    },
+    "SemiAutoAssembleEnkephalinModules": {
+        "enabled": false,
+        "recognition": "TemplateMatch",
+        "template": "enkephalin_module.png",
+        "action": "Click",
+        "post_wait_freezes": 1,
+        "next": "SemiAutoSelectAllEnkephalin"
+    },
+    "SemiAutoSelectAllEnkephalin": {
+        "action": "Click",
+        "target": [
+            1010,
+            460
+        ],
+        "next": "SemiAutoConfirmAssembleEnkephalinModules"
+    },
+    "SemiAutoConfirmAssembleEnkephalinModules": {
+        "action": "Key",
+        "key": [
+            "enter",
+            "esc"
+        ],
+        "action_rest": 6,
+        "next": "SemiAutoCircleCenter",
+        "post_wait_freezes": 1
+    },
+    "SemiAutoRechargeEnkephalin": {
+        "enabled": false,
+        "recognition": "TemplateMatch",
+        "template": "enkephalin_module.png",
+        "action": "Click",
+        "post_wait_freezes": 1,
+        "next": "SemiAutoClickUseLunary"
+    },
+    "SemiAutoClickUseLunary": {
+        "recognition": "TemplateMatch",
+        "template": "use_lunary.png",
+        "action": "Click",
+        "post_wait_freezes": 1,
+        "next": "SemiAutoComsume26Lunary",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoComsume26Lunary": {
+        "recognition": "TemplateMatch",
+        "template": "lunary_26.png",
+        "action": "Key",
+        "key": [
+            "enter",
+            "esc"
+        ],
+        "action_rest": 2,
+        "next": "SemiAutoCircleCenter",
+        "post_wait_freezes": 1
+    },
+    "SemiAutoConfirmRewardCard": {
+        "action": "Key",
+        "key": "enter",
+        "next": "SemiAutoCircleCenter",
+        "post_wait_freezes": 1
+    },
+    "SemiAutoPassEgoGiftGet": {
+        "recognition": "TemplateMatch",
+        "template": "ego_gift_get.png",
+        "threshold": 0.85,
+        "action": "Key",
+        "key": "esc",
+        "next": [
+            "SemiAutoPassEgoGiftGetConfirm",
+            "SemiAutoCircleCenter"
+        ],
+        "post_delay": 1
+    },
+    "SemiAutoPassEgoGiftGetConfirm": {
+        "recognition": "TemplateMatch",
+        "template": "ego_gift_get_confirm.png",
+        "action": "Click",
+        "next": "SemiAutoCircleCenter",
+        "post_delay": 2
+    },
+    "SemiAutoReadySelectRewardCard": {
+        "recognition": "TemplateMatch",
+        "template": "select_encounter_reward_card.png",
+        "next": [
+            "SemiAutoSelectRewardCardCoin",
+            "SemiAutoSelectRewardCardCoinEgo",
+            "SemiAutoSelectRewardCardEgoGift",
+            "SemiAutoSelectRewardCardEgoResource"
+        ],
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoSelectRewardCardCoin": {
+        "recognition": "TemplateMatch",
+        "template": "reward_card_coin.png",
+        "action": "Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardCoinEgo": {
+        "recognition": "TemplateMatch",
+        "template": "reward_card_coin_ego.png",
+        "action": "Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardEgoGift": {
+        "recognition": "TemplateMatch",
+        "template": "reward_card_ego_gift.png",
+        "action": "Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoSelectRewardCardEgoResource": {
+        "recognition": "TemplateMatch",
+        "template": "reward_card_ego_resource.png",
+        "action": "Click",
+        "next": "SemiAutoConfirmRewardCard"
+    },
+    "SemiAutoPEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold": 0.85,
+        "action": "Key",
+        "key": "p",
+        "action_rest": 1,
+        "next": [
+            "SemiAutoEnterEncounter",
+            "SemiAutoClickEncounter",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoClickEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "win_rate.png",
+        "threshold": 0.85,
+        "action": "Click",
+        "action_count": 2,
+        "action_rest": 0.5,
+        "target": true,
+        "next": [
+            "SemiAutoEnterEncounter",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoEnterEncounter": {
+        "recognition": "TemplateMatch",
+        "template": "battle_start.png",
+        "threshold":0.7,
+        "action": "Key",
+        "key": "enter",
+        "next": [
+            "SemiAutoWaitFinishBattle",
+            "SemiAutoCircleCenter"
+        ],
+        "post_delay": 1
+    },
+    "SemiAutoWaitFinishBattle": {
+        "recognition": "TemplateMatch",
+        "template": "battle_pause.png",
+        "next": [
+            "SemiAutoWaitFinishBattle",
+            "SemiAutoCircleCenter"
+        ],
+        "post_wait_freezes": 1
+    },
+    "SemiAutoSkipEvent": {
+        "recognition": "TemplateMatch",
+        "template": "skip.png",
+        "action": "Click",
+        "action_count": 5,
+        "target": true,
+        "next": [
+            "SemiAutoEventMakeChoiceGetEgo",
+            "SemiAutoPassVeryHighCheck",
+            "SemiAutoPassHighCheck",
+            "SemiAutoPassNormalCheck",
+            "SemiAutoPassLowCheck",
+            "SemiAutoPassVeryLowCheck",
+            "SemiAutoEventMakeFirstChoice"
+        ]
+    },
+    "SemiAutoEventMakeChoiceGetEgo": {
+        "recognition": "TemplateMatch",
+        "template": "choices_ego.png",
+        "action": "Click",
+        "next": [
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ]
+    },
+    "SemiAutoEventMakeFirstChoice": {
+        "action": "Click",
+        "target": [
+            1160,
+            350
+        ],
+        "next": [
+            "SemiAutoEventMakeSecondChoice"
+        ]
+    },
+    "SemiAutoEventMakeSecondChoice": {
+        "action": "Click",
+        "target": [
+            1160,
+            510
+        ],
+        "next": [
+            "SemiAutoClickEventRightBottom"
+        ]
+    },
+    "SemiAutoPassVeryHighCheck": {
+        "recognition": "TemplateMatch",
+        "template": "very_high.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoPassHighCheck": {
+        "recognition": "TemplateMatch",
+        "template": "high.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoPassNormalCheck": {
+        "recognition": "TemplateMatch",
+        "template": "normal.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoPassLowCheck": {
+        "recognition": "TemplateMatch",
+        "template": "low.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoPassVeryLowCheck": {
+        "recognition": "TemplateMatch",
+        "template": "very_low.png",
+        "action": "Click",
+        "target": true,
+        "next": "SemiAutoClickEventRightBottom",
+        "interrupt": "SemiAutoCircleCenter"
+    },
+    "SemiAutoClickEventRightBottom": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            1400,
+            860
+        ],
+        "next": [
+            "SemiAutoSkipEvent",
+            "SemiAutoCircleCenter"
+        ],
+        "post_wait_freezes": 2
+    },
+    "SemiAutoReadyFindWay": {
+        "recognition": "TemplateMatch",
+        "template": "legend.png",
+        "recognize_area": [
+            1500,
+            0,
+            99,
+            300
+        ],
+        "action": "DoNothing",
+        "next": "SemiAutoFindMiddleWay"
+    },
+    "SemiAutoFindMiddleWay": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            910,
+            390
+        ],
+        "next": [
+            "SemiAutoEnterMirrorStage",
+            "SemiAutoFindTopWay"
+        ],
+        "post_wait_freezes": 0.5
+    },
+    "SemiAutoFindTopWay": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            910,
+            155
+        ],
+        "next": [
+            "SemiAutoEnterMirrorStage",
+            "SemiAutoFindBottomWay"
+        ],
+        "post_wait_freezes": 0.5
+    },
+    "SemiAutoFindBottomWay": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            910,
+            680
+        ],
+        "next": [
+            "SemiAutoEnterMirrorStage",
+            "SemiAutoFindSelfWay"
+        ],
+        "post_wait_freezes": 0.5
+    },
+    "SemiAutoFindSelfWay": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [
+            590,
+            390
+        ],
+        "next": "SemiAutoEnterMirrorStage",
+        "interrupt": "SemiAutoCircleCenter",
+        "post_wait_freezes": 0.5
+    },
+    "SemiAutoEnterMirrorStage": {
+        "recognition": "TemplateMatch",
+        "template": "enter_mirror_stage.png",
+        "action": "Key",
+        "key": "enter",
+        "next": "SemiAutoCircleCenter"
+    }
+} 

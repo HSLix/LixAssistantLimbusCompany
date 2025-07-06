@@ -184,11 +184,7 @@ msgstr ""
 "An unknown error was captured. Would you like to open the log to view it?\n"
 "%s"
 
-msgid "任务设置"
-msgstr "Task Settings"
 
-msgid "配置设置"
-msgstr "Configuration Settings"
 
 msgid "游戏窗口大小"
 msgstr "Game Window Size"
@@ -417,3 +413,15 @@ msgstr "Task paused"
 
 msgid "任务已停止"
 msgstr "Task stopped"
+
+msgid "结束后动作:"
+msgstr "End Action:"
+
+msgid "无"
+msgstr "None"
+
+msgid "关闭 LALC 和 Limbus"
+msgstr "Close LALC and Limbus"
+
+msgid "关机"
+msgstr "Shutdown"

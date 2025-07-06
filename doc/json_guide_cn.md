@@ -27,7 +27,7 @@ next 中全部未识别到时的候补节点列表，会执行类似中断操作
 若 next 中的节点全部未识别到，则会按序识别该中断列表中的每个节点，并执行第一个识别到的。在后续节点全部执行完成后，重新跳转到该节点来再次尝试识别。
 例如: A: { next: [B, C], interrupt: [D, E] }
 当 B, C 未识别到而识别到 D 时，会去完整的执行 D 及 D.next。但当 D 的流水线完全执行完毕后。会再次回到节点 A，继续尝试识别 B, C, D, E 。
-该字段多用于异常处理，例如 D 是识别 “网络断开提示框”，在点击确认并等待网络连接成功后，继续之前的节点流程。
+该字段多用于异常处理，例如 D 是识别 "网络断开提示框"，在点击确认并等待网络连接成功后，继续之前的节点流程。
 
 ~~on_error : string | list<string, >~~
 ~~当动作执行失败后，接下来会执行该列表中的节点。可选，默认空。~~
@@ -64,7 +64,7 @@ log_level: str
 直接命中，即不进行识别，直接执行动作。
 
 ### TemplateMatch
-模板匹配，即“找图”。
+模板匹配，即"找图"。
 
 该算法属性需额外部分字段：
 
@@ -79,7 +79,7 @@ threshold: double
 模板匹配阈值。可选，默认 0.8 。
 
 ### ColorMatch
-颜色匹配，也就是“找色”。
+颜色匹配，也就是"找色"。
 
 该算法属性需额外部分字段：
 
@@ -145,18 +145,35 @@ key: string | list<string>
 要按的键，仅支持 p, enter, esc。
 
 ### Checkpoint
-~~不太好用，后续再改~~
-本次任务结束检查点，会根据Control Unit传入的任务已执行次数。
+循环控制检查点，用于实现任务循环和计数。
 
-target_task_count_name: string 
-必要字段
-当前任务计数名字，用于task自己核对次数是否满足，没满足就把next的部分换成current_task_name,满足了就设置next为next_task_name
+该动作属性需额外部分字段：
 
-current_task_name: string
-必要字段
-当前任务名字，不满足检查要求时，就返回到该任务。
+checkpoint_name: string
+检查点名称，用于在ControlUnit中识别和计数。必选字段。
 
-next_task_name: string
-必要字段
-满足次数后，要执行的下一个任务名字。
+max_count: int
+最大循环次数。可选，默认 1。
+
+loop_task: string
+循环任务名称。当未达到最大次数时，执行该任务。必选字段。
+
+next_task: string
+下一个任务名称。当达到最大次数时，执行该任务。必选字段。
+
+示例：
+```json
+"EXPCheckpoint": {
+    "action": "Checkpoint",
+    "checkpoint_name": "EXP",
+    "max_count": 3,
+    "loop_task": "EXPEntrance",
+    "next_task": "ThreadEntrance",
+    "log_level": "INFO"
+}
+```
+这个检查点会：
+1. 将EXP的计数加1
+2. 如果计数 < 3，继续执行EXPEntrance任务
+3. 如果计数 >= 3，执行ThreadEntrance任务
 

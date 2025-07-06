@@ -30,13 +30,14 @@ from executor import lalc_cu, lalc_logger, screen_record_thread
 
 class Window(FramelessWindow):
 
-    def __init__(self):
+    def __init__(self, scale=None):
         checkWorkDirAllEnglish()
         super().__init__()
         self.setTitleBar(StandardTitleBar(self))
         self.setWindowTitle("LixAssistantLimbusCompany")
         self.setWindowIcon(QIcon(join(GUI_DIR, "MagicGirl.png")))
         setTheme(Theme.LIGHT)
+        self.scale = scale
         
         # self.splashScreen = SplashScreen(self.windowIcon(), self)
         # self.splashScreen.setIconSize(QSize(102, 102))
@@ -81,6 +82,9 @@ class Window(FramelessWindow):
         self.checkForUpdates()  # 调用版本检测函数
         lalc_logger.clean_old_logs()
         # self.show_announcement_dialog()
+        
+        # 检查屏幕缩放并显示警告
+        self.checkScreenScale()
 
     def show_announcement_dialog(self):
         """显示公告窗口"""
@@ -90,6 +94,17 @@ class Window(FramelessWindow):
             parent=self
         )
         dialog.exec_()
+
+    def checkScreenScale(self):
+        """检查屏幕缩放并显示警告"""
+        if self.scale is None:
+            self.scale = getScreenScale()
+        if not 1.49 <= self.scale <= 1.51:
+            self.show_message(
+                "WARNING",
+                'ScreenScaleWarning',
+                '检测到屏幕的缩放不是 150%，可能会导致运行不正常\nDetecting of screen scaling other than 150%\nwhich may result in malfunctioning.\n当前缩放：{0}%'.format(self.scale*100)
+            )
 
     def checkForUpdates(self):
         """检测当前版本是否是最新版本"""
@@ -217,6 +232,54 @@ class Window(FramelessWindow):
     def _save_language_config(self, value):
         self.gui_config["language"] = value
         config_manager.save_config("gui", self.gui_config)
+    
+    def execute_end_action(self):
+        """执行结束后的动作"""
+        # 获取当前模式
+        current_mode = lalc_cu.mode
+        
+        if current_mode == "FullAuto":
+            # 从全自动页面获取结束动作设置
+            end_action = self.homeInterface.fullAutoInterface.endActionComboBox.currentText()
+        elif current_mode == "SemiAuto":
+            # 半自动模式暂时没有结束动作设置，可以后续添加
+            return
+        else:
+            return
+        
+        # 执行对应的结束动作
+        if end_action == _("无"):
+            return
+        elif end_action == _("关闭 LALC 和 Limbus"):
+            self.close_lalc_and_limbus()
+        elif end_action == _("关机"):
+            self.shutdown_computer()
+    
+    def close_lalc_and_limbus(self):
+        """关闭 LALC 和 Limbus 游戏"""
+        try:
+            import subprocess
+            # 关闭 LALC 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LixAssistantLimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            # 关闭 Limbus Company 进程
+            subprocess.run(['taskkill', '/f', '/im', 'LimbusCompany.exe'], 
+                         capture_output=True, check=False)
+            
+            print("已关闭 LALC 和 Limbus Company")
+        except Exception as e:
+            print(f"关闭进程时出错: {e}")
+    
+    def shutdown_computer(self):
+        """关机"""
+        try:
+            import subprocess
+            # 使用 Windows 关机命令，30秒后关机
+            subprocess.run(['shutdown', '/s', '/t', '30'], check=True)
+            print("系统将在30秒后关机")
+        except Exception as e:
+            print(f"关机命令执行失败: {e}")
 
 
     def connect_signals(self):
@@ -245,14 +308,7 @@ class Window(FramelessWindow):
             self.workingInterface.on_stopped
         )
 
-        # 屏幕缩放警告
-        # lalc_cu.screen_scale_warning.connect(
-        #     lambda: self.show_message(
-        #         "WARNING", 
-        #         _('ScreenScaleWarning'), 
-        #         _('检测到屏幕的缩放不是 150%，可能会导致运行不正常\nDetecting of screen scaling other than 150%\nwhich may result in malfunctioning.')
-        #     )
-        # )
+
             
         # 任务停止信号
         lalc_cu.task_stopped.connect(
@@ -276,6 +332,9 @@ class Window(FramelessWindow):
         # 所有任务完成信号
         lalc_cu.task_completed.connect(
             lambda : self.show_message("SUCCESS", 'FinshAll', _("所有任务顺利执行"))
+        )
+        lalc_cu.task_completed.connect(
+            self.execute_end_action
         )
         # 任务暂停/继续信号
         lalc_cu.task_paused.connect(
@@ -599,11 +658,9 @@ def main(*args, **kwargs):
     scale = getScreenScale()
     app = QApplication(sys.argv)
     sys.excepthook = my_excepthook
-    if not 1.49 <= scale <= 1.51:
-        raise ValueError(f"请把屏幕的缩放调整为 150% | Make sure that the scale of your Screen is 150%\n当前缩放：{scale}")
     ignoreScaleAndDpi()
     # shutdown_splash()
-    w = Window()
+    w = Window(scale)
     
     sys.exit(app.exec_())
 

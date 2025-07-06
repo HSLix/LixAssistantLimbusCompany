@@ -11,7 +11,8 @@
         "Thread": 1,
         "MirrorEnable": true,
         "Mirror": 99,
-        "reward": false
+        "reward": false,
+        "EndAction": "\u65e0"
     },
     "semi_auto": {
         "AutoPBattle": true,

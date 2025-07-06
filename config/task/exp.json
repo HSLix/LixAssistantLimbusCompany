@@ -1,0 +1,65 @@
+{
+    "EXPEntrance": {
+        "next": [
+            "SkipEXPLuxcavationStart",
+            "ThreadEntrance"
+        ]
+    },
+    "SkipEXPLuxcavationStart": {
+        "action": "Click",
+        "target": [
+            1100,
+            860
+        ],
+        "next": "SkipEXPLuxcavationEnter",
+        "post_delay": 1
+    },
+    "SkipEXPLuxcavationEnter": {
+        "action": "Click",
+        "target": [
+            550,
+            285
+        ],
+        "next": "SkipEXPLuxcavationClickSkipBattle",
+        "post_delay": 1
+    },
+    "SkipEXPLuxcavationClickSkipBattle": {
+        "action": "Click",
+        "target": [
+            1400,
+            685
+        ],
+        "next": "SkipEXPLuxcavationConfirmSkipBattle",
+        "post_delay": 1,
+        "interrupt": "EXPEntrance"
+    },
+    "SkipEXPLuxcavationConfirmSkipBattle": {
+        "recognition": "TemplateMatch",
+        "template": "luxcavation_confirm_skip_battle.png",
+        "recognize_area": [
+            800,
+            560,
+            300,
+            150
+        ],
+        "action": "Key",
+        "key": "enter",
+        "action_count": 2,
+        "action_rest": 3,
+        "next": "SkipEXPLuxcavationExit"
+    },
+    "SkipEXPLuxcavationExit": {
+        "action": "Key",
+        "key": "esc",
+        "action_rest": 2,
+        "next": "EXPCheckpoint"
+    },
+    "EXPCheckpoint": {
+        "action": "Checkpoint",
+        "checkpoint_name": "EXP",
+        "max_count": 3,
+        "loop_task": "EXPEntrance",
+        "next_task": "ThreadEntrance",
+        "log_level": "INFO"
+    }
+} 

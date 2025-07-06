@@ -61,6 +61,8 @@ class ControlUnit(QThread):
         self.mode = ""
         self.pause_requested.connect(self._handle_pause)
         self.stop_requested.connect(self._handle_stop)
+        # 检查点计数器
+        self.checkpoint_counters = {}
 
     def set_task_params(self, params):
         self.task_params = params
@@ -182,15 +184,12 @@ class ControlUnit(QThread):
             if task:
                 task.enabled = enable
 
-    def init_target_task_count(self):
-        """预处理函数，根据task_params修改task_dict里相关任务的count设置"""
-        self.target_task_count = {}
+    def init_checkpoint_counters(self):
+        """初始化检查点计数器"""
+        self.checkpoint_counters = {}
         for task_name, target_count in self.task_params.items():
-            if (type(target_count) != int):
-                continue
-            self.target_task_count[task_name] = target_count
-
-        self.target_task_count["Pass"] = 0
+            if (type(target_count) == int):
+                self.checkpoint_counters[task_name] = 0
 
 
     def run(self):
@@ -199,7 +198,7 @@ class ControlUnit(QThread):
         self.is_running = True
         self.preprocess_tasks()
         self.task_executed_count = 0
-        self.init_target_task_count()
+        self.init_checkpoint_counters()
         self.cur_task = None
         self.is_stoped = False
         self.is_paused = False
@@ -254,8 +253,6 @@ class ControlUnit(QThread):
                         self.stop()
                         break
 
-                temp_target_task_count = deepcopy(self.target_task_count)
-
                 # 记录任务开始
                 lalc_logger.log_task(
                     self.cur_task.log_level,
@@ -264,34 +261,35 @@ class ControlUnit(QThread):
                 )
 
                 start_time = time()
+                
+                # 处理检查点计数
                 if self.cur_task.action == "Checkpoint":
-                    self.task_executed_count += 1
-                    self.task_finished.emit(self.cur_task.target_task_count_name, self.task_executed_count)
-                    lalc_logger.log_task(
-                        self.cur_task.log_level,
-                        self.cur_task.name,
-                        'FINISH',
-                        f"For {self.task_executed_count} Times"
-                    )
+                    checkpoint_name = self.cur_task.checkpoint_name
+                    if checkpoint_name in self.checkpoint_counters:
+                        self.checkpoint_counters[checkpoint_name] += 1
+                        current_count = self.checkpoint_counters[checkpoint_name]
+                        self.task_finished.emit(checkpoint_name, current_count)
+                        lalc_logger.log_task(
+                            self.cur_task.log_level,
+                            self.cur_task.name,
+                            'FINISH',
+                            f"For {current_count} Times"
+                        )
 
-                    if self.mode == "FullAuto":
-                        # 获取当前队伍和下一个队伍的信息
-                        current_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count)
-                        next_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count + 1)
-                        self.team_info_updated.emit(current_team_name, next_team_name)
-                    elif self.mode == "SemiAuto":
-                        self.team_info_updated.emit("-", "-")
+                        if self.mode == "FullAuto":
+                            # 获取当前队伍和下一个队伍的信息
+                            current_team_name = custom_action_dict["get_team_name_by_index"](current_count)
+                            next_team_name = custom_action_dict["get_team_name_by_index"](current_count + 1)
+                            self.team_info_updated.emit(current_team_name, next_team_name)
+                        elif self.mode == "SemiAuto":
+                            self.team_info_updated.emit("-", "-")
 
                 if self.cur_task.name == "End":
                     self.complete()
                     break
 
                 # 执行当前任务
-                self.cur_task.execute_task(executed_time=self.task_executed_count, target_task_count=temp_target_task_count)
-
-                # 满足结束检查点，重置任务已执行次数
-                if (temp_target_task_count["Pass"] == 1): 
-                    self.task_executed_count = 0
+                self.cur_task.execute_task(executed_time=self.checkpoint_counters.get(self.cur_task.checkpoint_name, 0) if self.cur_task.action == "Checkpoint" else 0)
 
                 # 处理正常任务链
                 self._add_next(self.cur_task)

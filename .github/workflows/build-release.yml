@@ -38,15 +38,33 @@ jobs:
     - name: Generate Release Notes
       id: release-notes
       run: |
+        # 确保获取所有tags
+        git fetch --tags
+        
         # 获取当前版本号
         $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
+        Write-Output "Current version: $currentVersion"
+        Write-Output "GITHUB_REF: $env:GITHUB_REF"
+        
+        # 列出所有可用的tags
+        Write-Output "Available tags:"
+        git tag -l | Write-Output
         
         # 获取当前tag的标注信息
         $currentNotes = git show --no-patch --format='%B' "V$currentVersion" 2>$null
-
-        # 如果为空（可能是轻量标签），尝试获取commit信息
+        Write-Output "Tag message from V$currentVersion: '$currentNotes'"
+        
+        # 如果还是为空，尝试其他方法获取tag信息
+        if ([string]::IsNullOrWhiteSpace($currentNotes)) {
+          # 尝试使用tag对象获取
+          $currentNotes = git show --no-patch --format='%B' "refs/tags/V$currentVersion" 2>$null
+          Write-Output "Tag message from refs/tags/V$currentVersion: '$currentNotes'"
+        }
+        
+        # 如果仍然为空，尝试获取commit信息
         if ([string]::IsNullOrWhiteSpace($currentNotes)) {
           $currentNotes = git log -1 --pretty=%B
+          Write-Output "Fallback to commit message: '$currentNotes'"
         }
 
         # 将分号替换为分号加换行符
