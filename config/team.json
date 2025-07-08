@@ -1,5 +1,9 @@
 {
+<<<<<<< Updated upstream
     "TeamOffset": 4,
+=======
+    "FirstTeam": "Team1",
+>>>>>>> Stashed changes
     "Team1": {
         "enabled": true,
         "style": "Bleed",
