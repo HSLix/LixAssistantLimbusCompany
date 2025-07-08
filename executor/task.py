@@ -258,7 +258,7 @@ class Task:
 
     def checkpoint_action(self, **kwargs):
         """简化的检查点动作，只负责返回下一步应该执行的任务名"""
-        executed = kwargs.get("executed_time", 0)
+        executed = kwargs.get("team_index", 0)
         
         if executed >= self.max_count:
             # 达到最大次数，执行下一个任务
@@ -394,42 +394,30 @@ def initCustomAction():
             sleep(0.6)
 
     @custom_action_dict.register
-    def test_task_executed_time(**kwargs):
-        t = kwargs.get("executed_time")
-        print(get_team_by_index(t))
-
-    
-
-    @custom_action_dict.register
     def choose_team(**kwargs):
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        logic_index = kwargs.get("team_index", 0)
+        team_number = get_team_by_index(logic_index)  # 1~6
         mk.moveClick([150, 630])
         mk.scroll([0,1], 20, 0.01)
         sleep(0.5)
-        # 这是用于需要滚动的情况，20250703开始，新UI能包含6支队伍，够了：）
-        # if (team_index > 4):
-        #     scroll_count = team_index // 4 * 7
-        #     mk.scroll([0, -1], scroll_count=scroll_count, rest_time=0.02)
-        # while(team_index > 4):
-        #     team_index -= 4
-        if (team_index == 1):
+        # team_number 1~6 分别对应6支队伍
+        # print(f"logic:{logic_index};team_number:{team_number}")
+        if team_number == 1:
             mk.moveClick([150, 430])
-        elif (team_index == 2):
+        elif team_number == 2:
             mk.moveClick([150, 480])
-        elif (team_index == 3):
+        elif team_number == 3:
             mk.moveClick([150, 530])
-        elif (team_index == 4):
+        elif team_number == 4:
             mk.moveClick([150, 570])
-        elif (team_index == 5):
+        elif team_number == 5:
             mk.moveClick([150, 620])
-        elif (team_index == 6):
+        elif team_number == 6:
             mk.moveClick([150, 660])
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)
-
         mk.pressKey("enter")
-
         mk.mouseBackHome()
 
     @custom_action_dict.register
@@ -467,7 +455,10 @@ def initCustomAction():
     
     @custom_action_dict.register
     def choose_start_ego_gift(**kwargs):
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        team_index = kwargs.get("team_index", 0)
+        if team_index is None:
+            team_index = 0
+        team_index = get_team_by_index(team_index)
         team_style = get_style_by_team(team_index)
 
 
@@ -532,78 +523,59 @@ def initCustomAction():
         return style
 
 
-    def get_team_by_index(index: int, json_path: str = "team.json") -> int:
+    def get_team_by_index(index: int = 0, json_path: str = "team.json") -> int:
         """
-        根据传入的数字返回要使用的队伍编号。
-
-        :param index: 传入的数字（从 0 开始）
-        :param json_path: team.json 文件的路径（默认: "team.json"）
-        :return: 队伍编号（1, 2, 3, 4 等）
+        根据传入的逻辑编号返回实际启用队伍编号，自动考虑FirstTeam为首发。
+        index: 逻辑编号（自动化流程用作第几个队伍）
+        json_path: team.json 文件路径
+        返回：实际启用队伍编号（如1,2,3...），如无有效队伍返回-1
         """
         json_path = join(CONFIG_DIR, json_path)
-        # 读取 team.json 文件
         with open(json_path, "r", encoding="utf-8") as f:
             teams = json.load(f)
 
-        offset = teams.get("TeamOffset")
-        
-        # 过滤出 enabled 为 true 的队伍
-        enabled_teams = [team_name for team_name, team_data in teams.items() if (type(team_data) != int and team_data.get("enabled", False))]
-        
-        # 计算有效队伍的数量
+        first_team = teams.get("FirstTeam", "Team1")
+        enabled_teams = sorted(
+            [team_name for team_name, team_data in teams.items() if isinstance(team_data, dict) and team_data.get("enabled", False)],
+            key=lambda x: int(x.replace("Team", ""))
+        )
         num_enabled_teams = len(enabled_teams)
-        
-        # 如果没有任何有效队伍，返回 -1
         if num_enabled_teams == 0:
-            return -1
-        
-        # 计算传入数字对应的队伍索引
-        team_index = (index + offset) % num_enabled_teams
-        
-        # 获取对应的队伍名称（如 "Team1", "Team2" 等）
+            raise ValueError("zero team")
+        # 以FirstTeam为首发，轮换队伍
+        if first_team in enabled_teams:
+            first_index = enabled_teams.index(first_team)
+        else:
+            first_index = 0
+        team_index = (int(index) + first_index) % num_enabled_teams
         team_name = enabled_teams[team_index]
-        
-        # 提取队伍编号（去掉 "Team" 前缀）
         team_number = int(team_name.replace("Team", ""))
-        
         return team_number
     
 
     @custom_action_dict.register
-    def get_team_name_by_index(index: int, json_path: str = "team.json") -> int:
+    def get_team_name_by_index(index: int, json_path: str = "team.json") -> str:
         """
-        根据传入的数字返回要使用的队伍名字。
-
-        :param index: 传入的数字（从 0 开始）
-        :param json_path: team.json 文件的路径（默认: "team.json"）
-        :return: 队伍编号（1, 2, 3, 4 等）
+        根据传入的数字返回要使用的队伍名字，首发队伍由FirstTeam字段决定。
         """
-        # 读取 team.json 文件
         json_path = join(CONFIG_DIR, json_path)
         with open(json_path, "r", encoding="utf-8") as f:
             teams = json.load(f)
-
-        offset = teams.get("TeamOffset")
-        
-        # 过滤出 enabled 为 true 的队伍
-        enabled_teams = [team_name for team_name, team_data in teams.items() if (type(team_data) != int and team_data.get("enabled", False))]
-        
-        # 计算有效队伍的数量
+        first_team = teams.get("FirstTeam", "Team1")
+        enabled_teams = sorted(
+            [team_name for team_name, team_data in teams.items() if isinstance(team_data, dict) and team_data.get("enabled", False)],
+            key=lambda x: int(x.replace("Team", ""))
+        )
+        # print(enabled_teams)
         num_enabled_teams = len(enabled_teams)
-        
-        # 如果没有任何有效队伍，返回 -1, 不应存在
         if num_enabled_teams == 0:
             raise IndexError("No Enabled Team")
-
-        
-        # 计算传入数字对应的队伍索引
-        team_index = (index + offset) % num_enabled_teams
-        
-        # 获取对应的队伍名称（如 "Team1", "Team2" 等）
-        team_name = enabled_teams[team_index]
-        
-        
-        return team_name
+        if first_team in enabled_teams:
+            first_index = enabled_teams.index(first_team)
+        else:
+            raise IndexError("No Enabled Team")
+        team_index = (int(index) + first_index) % num_enabled_teams
+        return enabled_teams[team_index]
 
     
     @custom_action_dict.register 
@@ -623,7 +595,7 @@ def initCustomAction():
 
 
         # select
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        team_index = get_team_by_index(kwargs.get("team_index"))
         members = get_sorted_members_by_team(team_index)
 
         for sinner in members:
@@ -702,7 +674,7 @@ def initCustomAction():
     @custom_action_dict.register
     def sell_unwanted_ego_gift(**kwargs):
         mk.moveClick([505, 540], rest_time=1)
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        team_index = get_team_by_index(kwargs.get("team_index"))
         team_style = get_style_by_team(team_index)
 
         target_pic = []
@@ -787,7 +759,7 @@ def initCustomAction():
             lalc_logger.log_task("DEBUG", "purchase_wanted_ego_gift", "FAILED", "Not Enough Cost")
             return
 
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        team_index = get_team_by_index(kwargs.get("team_index"))
         team_style = get_style_by_team(team_index)
 
         goods_places = [[985, 365], [1175, 365], [1365, 365], [785, 550], [985, 550], [1175, 550]]
@@ -923,7 +895,7 @@ def initCustomAction():
             return
         mk.moveClick([215,540], rest_time=1)
 
-        team_index = get_team_by_index(kwargs.get("executed_time"))
+        team_index = get_team_by_index(kwargs.get("team_index"))
         team_style = get_style_by_team(team_index)
 
         target_pic = []

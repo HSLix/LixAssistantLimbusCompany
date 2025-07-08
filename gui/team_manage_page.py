@@ -110,7 +110,7 @@ class TeamManagePage(QFrame):
             QTimer.singleShot(0, self.update_offset_after_switch_change)
 
     def update_offset_after_switch_change(self):
-        """在启用状态变化后更新offset"""
+        """在启用状态变化后更新首发队伍"""
         try:
             with open(os.path.join(CONFIG_DIR, "team.json"), "r+") as f:
                 teams = json.load(f)
@@ -124,23 +124,21 @@ class TeamManagePage(QFrame):
                         current_selected_team = f"Team{i + 1}"
                         break
 
-                # 计算当前选中队伍在启用队伍中的排名
+                # 设置FirstTeam为当前选中队伍
                 if current_selected_team in enabled_teams:
-                    new_offset = enabled_teams.index(current_selected_team)
-                    teams["TeamOffset"] = new_offset
+                    teams["FirstTeam"] = current_selected_team
                 elif enabled_teams:
                     # 如果当前选中队伍未启用，将第一个启用队伍设为首发
-                    new_offset = 0
-                    teams["TeamOffset"] = new_offset
-                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"].index(enabled_teams[new_offset])].setChecked(True)
+                    teams["FirstTeam"] = enabled_teams[0]
+                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"].index(enabled_teams[0])].setChecked(True)
                 else:
-                    teams["TeamOffset"] = 0
+                    teams["FirstTeam"] = "Team1"
 
                 f.seek(0)
                 json.dump(teams, f, indent=4)
                 f.truncate()
         except Exception as e:
-            QMessageBox.critical(self, "错误", f"更新offset失败: {str(e)}")
+            QMessageBox.critical(self, "错误", f"更新首发队伍失败: {str(e)}")
 
     def force_enable_last_team(self, index, team_name):
         """强制启用最后一个尝试禁用的队伍"""
@@ -158,7 +156,7 @@ class TeamManagePage(QFrame):
                 break
 
     def update_offset(self, team_name, checked):
-        """更新首发队伍offset"""
+        """更新首发队伍FirstTeam"""
         if checked:
             try:
                 with open(os.path.join(CONFIG_DIR, "team.json"), "r+") as f:
@@ -166,12 +164,12 @@ class TeamManagePage(QFrame):
                     enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"]
                                      if teams[t]["enabled"]]
                     if team_name in enabled_teams:
-                        teams["TeamOffset"] = enabled_teams.index(team_name)
+                        teams["FirstTeam"] = team_name
                         f.seek(0)
                         json.dump(teams, f, indent=4)
                         f.truncate()
             except Exception as e:
-                QMessageBox.critical(self, "错误", f"保存offset失败: {str(e)}")
+                QMessageBox.critical(self, "错误", f"保存首发队伍失败: {str(e)}")
 
     def load_all_states(self):
         """加载所有状态"""
@@ -188,27 +186,26 @@ class TeamManagePage(QFrame):
                         self.style_options.get(teams[team]["style"], "")
                     )
 
-                # 加载offset
+                # 加载首发队伍
                 enabled_teams = [t for t in ["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"]
                                  if teams[t]["enabled"]]
-                if enabled_teams:
-                    offset = teams["TeamOffset"]
-                    if offset < len(enabled_teams):
-                        self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"].index(
-                            enabled_teams[offset]
-                        )].setChecked(True)
+                first_team = teams.get("FirstTeam", "Team1")
+                if enabled_teams and first_team in enabled_teams:
+                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"].index(first_team)].setChecked(True)
+                elif enabled_teams:
+                    self.radio_buttons[["Team1", "Team2", "Team3", "Team4", "Team5", "Team6"].index(enabled_teams[0])].setChecked(True)
         except Exception as e:
             QMessageBox.critical(self, "错误", f"加载配置失败: {str(e)}")
 
     def load_offset_state(self):
-        """加载 TeamOffset 的状态"""
+        """加载首发队伍的状态"""
         try:
             with open(os.path.join(CONFIG_DIR, "team.json"), "r", encoding="utf-8") as f:
                 teams = json.load(f)
-                offset = teams.get("TeamOffset", 0)
+                first_team = teams.get("FirstTeam", "Team1")
                 enabled_teams = [i for i, switch in enumerate(self.switch_buttons) if switch.isChecked()]
-                if 0 <= offset < len(enabled_teams):
-                    index = enabled_teams[offset]
+                if first_team in [f"Team{i+1}" for i in enabled_teams]:
+                    index = int(first_team.replace("Team", "")) - 1
                     self.radio_buttons[index].setChecked(True)
         except Exception as e:
             raise AttributeError(f"无法加载队伍配置：{e}")

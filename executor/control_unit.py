@@ -63,6 +63,7 @@ class ControlUnit(QThread):
         self.stop_requested.connect(self._handle_stop)
         # 检查点计数器
         self.checkpoint_counters = {}
+        self.current_team_index = 0  # 新增：当前队伍编号
 
     def set_task_params(self, params):
         self.task_params = params
@@ -202,6 +203,7 @@ class ControlUnit(QThread):
         self.cur_task = None
         self.is_stoped = False
         self.is_paused = False
+        self.current_team_index = 0  # 新增：每次run重置队伍编号
         lalc_logger.log_task(
             "INFO",
             "ContainUnitRun",
@@ -210,8 +212,8 @@ class ControlUnit(QThread):
         )
         if self.mode == "FullAuto":
             # 获取当前队伍和下一个队伍的信息
-            current_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count)
-            next_team_name = custom_action_dict["get_team_name_by_index"](self.task_executed_count + 1)
+            current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
+            next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
             self.team_info_updated.emit(current_team_name, next_team_name)
         elif self.mode == "SemiAuto":
             self.team_info_updated.emit("-", "-")
@@ -268,6 +270,7 @@ class ControlUnit(QThread):
                     if checkpoint_name in self.checkpoint_counters:
                         self.checkpoint_counters[checkpoint_name] += 1
                         current_count = self.checkpoint_counters[checkpoint_name]
+                        self.current_team_index = current_count  # 新增：更新当前队伍编号
                         self.task_finished.emit(checkpoint_name, current_count)
                         lalc_logger.log_task(
                             self.cur_task.log_level,
@@ -278,8 +281,8 @@ class ControlUnit(QThread):
 
                         if self.mode == "FullAuto":
                             # 获取当前队伍和下一个队伍的信息
-                            current_team_name = custom_action_dict["get_team_name_by_index"](current_count)
-                            next_team_name = custom_action_dict["get_team_name_by_index"](current_count + 1)
+                            current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
+                            next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
                             self.team_info_updated.emit(current_team_name, next_team_name)
                         elif self.mode == "SemiAuto":
                             self.team_info_updated.emit("-", "-")
@@ -288,8 +291,8 @@ class ControlUnit(QThread):
                     self.complete()
                     break
 
-                # 执行当前任务
-                self.cur_task.execute_task(executed_time=self.checkpoint_counters.get(self.cur_task.checkpoint_name, 0) if self.cur_task.action == "Checkpoint" else 0)
+                # 执行当前任务，所有任务都传递team_index参数
+                self.cur_task.execute_task(team_index=self.current_team_index)
 
                 # 处理正常任务链
                 self._add_next(self.cur_task)

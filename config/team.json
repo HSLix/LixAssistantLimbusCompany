@@ -1,5 +1,5 @@
 {
-    "TeamOffset": 4,
+    "FirstTeam": "Team6",
     "Team1": {
         "enabled": true,
         "style": "Bleed",

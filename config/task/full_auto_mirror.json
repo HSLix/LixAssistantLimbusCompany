@@ -568,6 +568,7 @@
         "action": "Key",
         "pre_delay": 1,
         "key": "enter",
+        "post_delay": 1,
         "next": "FullAutoMirrorCircleCenter"
     },
     "FullAutoReadyBattle": {

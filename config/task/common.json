@@ -54,9 +54,5 @@
     "GetPassMissionCoinGainWeekly": {
         "action": "Custom",
         "custom_name": "click_all_pass_mission_coin"
-    },
-    "test": {
-        "action": "Custom",
-        "custom_name": "test_task_executed_time"
     }
 } 
