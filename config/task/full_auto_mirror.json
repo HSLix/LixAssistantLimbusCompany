@@ -678,7 +678,7 @@
     "MirrorCheckpoint": {
         "action": "Checkpoint",
         "checkpoint_name": "Mirror",
-        "max_count": 5,
+        "max_count": 0,
         "loop_task": "MirrorEntrance",
         "next": ["End"],
         "log_level": "INFO"
