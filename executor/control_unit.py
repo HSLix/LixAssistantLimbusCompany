@@ -177,13 +177,14 @@ class ControlUnit(QThread):
         
 
     def preprocess_tasks(self):
-        """预处理函数，根据task_params修改task_dict里相关任务的enable设置"""
-        for task_name, enable in self.task_params.items():
-            if (type(enable) != bool):
-                continue
+        """预处理函数，根据task_params修改task_dict里相关任务的enable和max_count设置"""
+        for task_name, value in self.task_params.items():
             task = self.task_dict.get(task_name)
             if task:
-                task.enabled = enable
+                if isinstance(value, bool):
+                    task.enabled = value
+                elif isinstance(value, int) and hasattr(task, "max_count"):
+                    task.max_count = value  # 新增：同步循环次数
 
     def init_checkpoint_counters(self):
         """初始化检查点计数器"""
@@ -286,6 +287,12 @@ class ControlUnit(QThread):
                             self.team_info_updated.emit(current_team_name, next_team_name)
                         elif self.mode == "SemiAuto":
                             self.team_info_updated.emit("-", "-")
+
+                    # 执行计数逻辑
+                    result = self.cur_task.action_function(executed_time=current_count)
+                    if result:  # 未达成，继续loop_task
+                        self.set_next_task(self.get_task_from_dict(result))
+                        continue
 
                 if self.cur_task.name == "End":
                     self.complete()

@@ -1,5 +1,5 @@
 {
-    "FirstTeam": "Team6",
+    "FirstTeam": "Team2",
     "Team1": {
         "enabled": true,
         "style": "Bleed",
@@ -95,5 +95,6 @@
         "Sinclair": 8,
         "Outis": 4,
         "Gregor": 9
-    }
+    },
+    "TeamOffset": 0
 }

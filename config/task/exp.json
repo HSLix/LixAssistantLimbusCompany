@@ -59,7 +59,7 @@
         "checkpoint_name": "EXP",
         "max_count": 3,
         "loop_task": "EXPEntrance",
-        "next_task": "ThreadEntrance",
+        "next": ["ThreadEntrance"],
         "log_level": "INFO"
     }
 } 

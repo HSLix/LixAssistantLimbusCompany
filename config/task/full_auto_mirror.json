@@ -680,7 +680,7 @@
         "checkpoint_name": "Mirror",
         "max_count": 5,
         "loop_task": "MirrorEntrance",
-        "next_task": "End",
+        "next": ["End"],
         "log_level": "INFO"
     },
     "FullAutoInitMirrorWaitConnecting": {

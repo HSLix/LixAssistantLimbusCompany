@@ -77,7 +77,7 @@
         "checkpoint_name": "Thread",
         "max_count": 2,
         "loop_task": "ThreadEntrance",
-        "next_task": "MirrorEntrance",
+        "next": ["MirrorEntrance"],
         "log_level": "INFO"
     }
 } 

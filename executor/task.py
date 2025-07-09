@@ -261,10 +261,8 @@ class Task:
         executed = kwargs.get("team_index", 0)
         
         if executed >= self.max_count:
-            # 达到最大次数，执行下一个任务
-            return self.next_task
+            return None  # 达成时不再返回任务名
         else:
-            # 未达到最大次数，继续循环
             return self.loop_task
 
 
