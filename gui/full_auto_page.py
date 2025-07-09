@@ -277,11 +277,11 @@ class FullAutoPage(QFrame):
         return {
             'init': self.checkBox0.isChecked(),  # Init
             'EXPEnable': self.checkBox1.isChecked(),
-            "EXP": self.spinBox1.value(),  # EXP 任务执行次数
+            "EXPCheckpoint": self.spinBox1.value(),  # EXP 任务执行次数
             "ThreadEnable": self.checkBox2.isChecked(),
-            'Thread': self.spinBox2.value(),  # Thread 任务执行次数
+            'ThreadCheckpoint': self.spinBox2.value(),  # Thread 任务执行次数
             "MirrorEnable": self.checkBox3.isChecked(),
-            'Mirror': self.spinBox3.value(),  # Mirror 任务执行次数
+            'MirrorCheckpoint': self.spinBox3.value(),  # Mirror 任务执行次数
             'reward': self.checkBox4.isChecked(),  # Reward 类型
             'EndAction': self.endActionComboBox.currentText()  # 结束动作
         }
