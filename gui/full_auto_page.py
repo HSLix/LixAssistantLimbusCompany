@@ -293,9 +293,9 @@ class FullAutoPage(QFrame):
         mirror_value = self.spinBox3.value() if self.checkBox3.isChecked() else 0
 
         return {
-            "EXP": exp_value,  # EXP 任务执行次数
-            'Thread': thread_value,  # Thread 任务执行次数
-            'Mirror': mirror_value,  # Mirror 任务执行次数
+            "EXPCheckpoint": exp_value,  # EXP 任务执行次数
+            'ThreadCheckpoint': thread_value,  # Thread 任务执行次数
+            'MirrorCheckpoint': mirror_value,  # Mirror 任务执行次数
             'SkipEXPLuxcavationStart': self.checkBox1.isChecked(),
             "SkipThreadLuxcavationStart": self.checkBox2.isChecked(),
             "FullAutoMirrorCircleCenter": self.checkBox3.isChecked(),
@@ -306,11 +306,11 @@ class FullAutoPage(QFrame):
             full_auto_config = config_manager.get_config("full_auto")
             self.checkBox0.setChecked(full_auto_config.get('init', True))
             self.checkBox1.setChecked(full_auto_config.get('EXPEnable', False))
-            self.spinBox1.setValue(full_auto_config.get('EXP', 0))
+            self.spinBox1.setValue(full_auto_config.get('EXPCheckpoint', 0))
             self.checkBox2.setChecked(full_auto_config.get('ThreadEnable', False))
-            self.spinBox2.setValue(full_auto_config.get('Thread', 0))
+            self.spinBox2.setValue(full_auto_config.get('ThreadCheckpoint', 0))
             self.checkBox3.setChecked(full_auto_config.get('MirrorEnable', False))
-            self.spinBox3.setValue(full_auto_config.get('Mirror', 0))
+            self.spinBox3.setValue(full_auto_config.get('MirrorCheckpoint', 0))
             self.checkBox4.setChecked(full_auto_config.get('reward', False))
             
             # 加载结束动作设置

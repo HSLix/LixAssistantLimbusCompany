@@ -214,6 +214,7 @@ class Task:
             self.checkpoint_name = config.get("checkpoint_name", "")
             self.max_count = config.get("max_count", 0)
             self.loop_task = config.get("loop_task", "")
+            self.next_task = config.get("next_task", "")
 
     def click_action(self):
         click_list = None
@@ -258,11 +259,12 @@ class Task:
     def checkpoint_action(self, **kwargs):
         """简化的检查点动作，只负责返回下一步应该执行的任务名"""
         executed = kwargs.get("team_index", 0)
+        print(f"executed:{executed}; max_count:{self.max_count};")
         
         if executed >= self.max_count:
-            return None  # 达成时不再返回任务名
+            self.next = [self.next_task] if self.next_task else []
         else:
-            return self.loop_task
+            self.next = [self.loop_task] if self.loop_task else []
 
 
     def _init_action_function(self):
@@ -361,9 +363,6 @@ class Task:
             activateWindow()
             if (self.action=="Custom" or self.action=="Checkpoint"):
                 result = self.action_function(**kwargs)
-                if self.action == "Checkpoint":
-                    # 检查点返回下一步任务名，需要更新next列表
-                    self.next = [result] if result else []
             else:
                 self.action_function()
 

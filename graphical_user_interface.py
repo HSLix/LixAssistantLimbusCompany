@@ -125,23 +125,35 @@ class Window(FramelessWindow):
                 lalc_logger.log_task("ERROR", "checkForUpdates", "FAILED", str(e))
                 return None, None
 
+        def parse_version(version_str):
+            """将版本号字符串（如V3.2.10或3.2.10）转为元组(3,2,10)用于比较"""
+            import re
+            version_str = version_str.lstrip('Vv')
+            version_str = re.match(r'[0-9.]+', version_str).group(0)
+            return tuple(int(x) for x in version_str.split('.'))
+
         repo = GITHUB_REPOSITORY  # 从 globals 中导入的仓库名称
         latest_release, release_body = get_latest_release(repo)
 
         if latest_release:
-            if latest_release == VERSION:
-                # 当前版本是最新版本
+            try:
+                latest_tuple = parse_version(latest_release)
+                current_tuple = parse_version(VERSION)
+            except Exception as e:
+                latest_tuple = latest_release
+                current_tuple = VERSION
+
+            if latest_tuple == current_tuple:
                 self.show_message(
                     "SUCCESS",
                     _('Update Check Successful'),
                     _('You are using the latest version.\nCurrent version: {0}, GitHub version: {1}').format(VERSION, latest_release)
                 )
-            elif latest_release > VERSION:
-                # 当前版本落后
+            elif latest_tuple > current_tuple:
                 message = _(
                     'Your version is outdated. Please update.\n'
                     'Current version: {0}, GitHub version: {1}'
-                ).format(VERSION, latest_release, release_body)  # 增加公告内容
+                ).format(VERSION, latest_release, release_body)
                 self.show_message("ERROR", _('Update Check Successful'), message)
             else:
                 self.show_message(
@@ -151,7 +163,6 @@ class Window(FramelessWindow):
                 )
             lalc_logger.log_task("INFO", "checkForUpdates", "FINISHED", "Current version: {0}, GitHub version: {1}".format(VERSION, latest_release))
         else:
-            # 网络检测失败
             self.show_message(
                 "ERROR",
                 _('Update Check Failed'),
