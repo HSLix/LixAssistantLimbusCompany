@@ -5,6 +5,7 @@ from time import sleep, time
 from PyQt5.QtCore import QThread, pyqtSignal
 from copy import deepcopy
 from ctypes import windll
+from collections import defaultdict
 
 
 
@@ -186,29 +187,40 @@ class ControlUnit(QThread):
             return not bool(self.pending_task_stack)
         
 
-    def preprocess_tasks(self):
-        """预处理函数，根据task_params修改task_dict里相关任务的enable和max_count设置"""
+    # def preprocess_tasks(self):
+    #     """预处理函数，根据task_params修改task_dict里相关任务的enable和max_count设置"""
+    #     for task_name, value in self.task_params.items():
+    #         task = self.task_dict.get(task_name)
+    #         if task:
+    #             if isinstance(value, bool):
+    #                 task.enabled = value
+    #             elif isinstance(value, int) and hasattr(task, "max_count"):
+    #                 task.max_count = value
+
+    def preprocess_tasks_debug(self):
+        """预处理函数（带调试信息），根据task_params修改task_dict里相关任务的enable和max_count设置，并输出调试信息"""
         for task_name, value in self.task_params.items():
+            lalc_logger.log_task("DEBUG", "preprocess_tasks", "PARAM", f"task_name={task_name}, value={value}")
             task = self.task_dict.get(task_name)
             if task:
                 if isinstance(value, bool):
+                    lalc_logger.log_task("DEBUG", "preprocess_tasks", "EDIT", f"Set {task_name}.enabled = {value}")
                     task.enabled = value
                 elif isinstance(value, int) and hasattr(task, "max_count"):
-                    task.max_count = value  # 新增：同步循环次数
+                    lalc_logger.log_task("DEBUG", "preprocess_tasks", "EDIT", f"Set {task_name}.max_count = {value}")
+                    task.max_count = value
+                lalc_logger.log_task("DEBUG", "preprocess_tasks", "RESULT", f"{task_name}: enabled={getattr(task, 'enabled', None)}, max_count={getattr(task, 'max_count', None)}")
 
     def init_checkpoint_counters(self):
         """初始化检查点计数器"""
-        self.checkpoint_counters = {}
-        for task_name, target_count in self.task_params.items():
-            if (type(target_count) == int):
-                self.checkpoint_counters[task_name] = 0
+        self.checkpoint_counters = defaultdict(int)
 
 
     def run(self):
         """主执行循环（修改任务获取逻辑）"""
         
         self.is_running = True
-        self.preprocess_tasks()
+        self.preprocess_tasks_debug()
         self.task_executed_count = 0
         self.init_checkpoint_counters()
         self.cur_task = None
@@ -273,49 +285,46 @@ class ControlUnit(QThread):
                     'STARTED'
                 )
 
-                start_time = time()
-                
-                # 处理检查点计数
-                if self.cur_task.action == "Checkpoint":
-                    checkpoint_name = self.cur_task.checkpoint_name
-                    if checkpoint_name in self.checkpoint_counters:
-                        self.checkpoint_counters[checkpoint_name] += 1
-                        current_count = self.checkpoint_counters[checkpoint_name]
-                        self.current_team_index = current_count  # 新增：更新当前队伍编号
-                        self.task_finished.emit(checkpoint_name, current_count)
-                        lalc_logger.log_task(
-                            self.cur_task.log_level,
-                            self.cur_task.name,
-                            'FINISH',
-                            f"For {current_count} Times"
-                        )
-
-                        if self.mode == "FullAuto":
-                            # 获取当前队伍和下一个队伍的信息
-                            current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
-                            next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
-                            self.team_info_updated.emit(current_team_name, next_team_name)
-                        elif self.mode == "SemiAuto":
-                            self.team_info_updated.emit("-", "-")
-
-                    # 执行计数逻辑
-                    result = self.cur_task.action_function(team_index=current_count)
-                    if result:  # 未达成，继续loop_task
-                        self.set_next_task(self.get_task_from_dict(result))    
-                    else:
-                        self.current_team_index = 0
-                        current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
-                        next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
-                        self.team_info_updated.emit(current_team_name, next_team_name)
-                        self._add_next(self.cur_task)
-                    continue
+                start_time = time()                
 
                 if self.cur_task.name == "End":
                     self.complete()
                     break
 
-                # 执行当前任务，所有任务都传递team_index参数
-                self.cur_task.execute_task(team_index=self.current_team_index)
+                
+
+                # 处理检查点计数
+                if self.cur_task.action == "Checkpoint":
+                    checkpoint_name = self.cur_task.checkpoint_name
+                    self.checkpoint_counters[checkpoint_name] += 1
+                    current_count = self.checkpoint_counters[checkpoint_name]
+                    self.current_team_index = current_count  # 新增：更新当前队伍编号
+
+                    # 执行当前任务，所有任务都传递team_index参数
+                    self.cur_task.execute_task(team_index=self.current_team_index)
+                    
+                    self.task_finished.emit(checkpoint_name, current_count)
+                    lalc_logger.log_task(
+                        self.cur_task.log_level,
+                        self.cur_task.checkpoint_name,
+                        'FINISH',
+                        f"For {current_count} Times"
+                    )
+                    print(f"next:{self.cur_task.next};next_task:{self.cur_task.next_task}")
+                    if self.cur_task.next[0] == self.cur_task.next_task:
+                        self.current_team_index = 0
+                    if self.mode == "FullAuto":
+                        # 获取当前队伍和下一个队伍的信息
+                        current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
+                        next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
+                        self.team_info_updated.emit(current_team_name, next_team_name)
+                    elif self.mode == "SemiAuto":
+                        self.team_info_updated.emit("-", "-")
+                else:
+                    # 执行当前任务，所有任务都传递team_index参数
+                    self.cur_task.execute_task(team_index=self.current_team_index)
+
+                    
 
                 # 处理正常任务链
                 self._add_next(self.cur_task)

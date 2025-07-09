@@ -158,7 +158,7 @@ max_count: int
 loop_task: string
 循环任务名称。当未达到最大次数时，执行该任务。必选字段。
 
-next_task: string
+next: string
 下一个任务名称。当达到最大次数时，执行该任务。必选字段。
 
 示例：
@@ -168,7 +168,7 @@ next_task: string
     "checkpoint_name": "EXP",
     "max_count": 3,
     "loop_task": "EXPEntrance",
-    "next_task": "ThreadEntrance",
+    "next": "ThreadEntrance",
     "log_level": "INFO"
 }
 ```
