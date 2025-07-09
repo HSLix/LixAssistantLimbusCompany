@@ -1,16 +1,16 @@
 {
     "gui": {
         "language": "zh_CN",
-        "recording": false
+        "recording": true
     },
     "full_auto": {
         "init": true,
         "EXPEnable": false,
-        "EXP": 1,
+        "EXPCheckpoint": 1,
         "ThreadEnable": false,
-        "Thread": 1,
+        "ThreadCheckpoint": 1,
         "MirrorEnable": true,
-        "Mirror": 99,
+        "MirrorCheckpoint": 99,
         "reward": false,
         "EndAction": "\u65e0"
     },
