@@ -10,7 +10,7 @@
         "ThreadEnable": false,
         "Thread": 1,
         "MirrorEnable": true,
-        "Mirror": 1,
+        "Mirror": 99,
         "reward": false,
         "EndAction": "\u65e0"
     },

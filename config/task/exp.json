@@ -57,7 +57,7 @@
     "EXPCheckpoint": {
         "action": "Checkpoint",
         "checkpoint_name": "EXP",
-        "max_count": 3,
+        "max_count": 0,
         "loop_task": "EXPEntrance",
         "next": ["ThreadEntrance"],
         "log_level": "INFO"

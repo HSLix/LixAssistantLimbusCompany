@@ -212,9 +212,8 @@ class Task:
         # 检查点参数 - 简化设计
         elif self.action == "Checkpoint":
             self.checkpoint_name = config.get("checkpoint_name", "")
-            self.max_count = config.get("max_count", 1)
+            self.max_count = config.get("max_count", 0)
             self.loop_task = config.get("loop_task", "")
-            self.next_task = config.get("next_task", "")
 
     def click_action(self):
         click_list = None

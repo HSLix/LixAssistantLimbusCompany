@@ -125,11 +125,21 @@ class ControlUnit(QThread):
             with self.condition:
                 for next_task_name in task.next:
                     next_task = self.get_task_from_dict(next_task_name)
-                    if next_task and next_task.enabled:
+                    debug_msg = f"[add_next] next_task_name={next_task_name} "
+                    if next_task:
+                        debug_msg += f"enabled={next_task.enabled} recognition={getattr(next_task, 'recognition', None)} "
+                        # 先执行识别
                         next_task.execute_recognize()
-                        if self._is_task_recognized(next_task):
+                        debug_msg += f"recognize_score={getattr(next_task, 'recognize_score', None)} "
+                        is_recognized = self._is_task_recognized(next_task)
+                        debug_msg += f"is_recognized={is_recognized}"
+                        lalc_logger.log_task("DEBUG", task.name, "add_next", debug_msg)
+                        if next_task.enabled and is_recognized:
                             self.next_task = next_task  # 直接设置下一个任务
                             break  # 找到第一个有效任务即终止循环
+                    else:
+                        debug_msg += "get_task_from_dict failed"
+                        lalc_logger.log_task("ERROR", task.name, "add_next", debug_msg)
                 self.condition.notify()
 
     def _add_interrupt(self, task):
@@ -289,10 +299,16 @@ class ControlUnit(QThread):
                             self.team_info_updated.emit("-", "-")
 
                     # 执行计数逻辑
-                    result = self.cur_task.action_function(executed_time=current_count)
+                    result = self.cur_task.action_function(team_index=current_count)
                     if result:  # 未达成，继续loop_task
-                        self.set_next_task(self.get_task_from_dict(result))
-                        continue
+                        self.set_next_task(self.get_task_from_dict(result))    
+                    else:
+                        self.current_team_index = 0
+                        current_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index)
+                        next_team_name = custom_action_dict["get_team_name_by_index"](self.current_team_index + 1)
+                        self.team_info_updated.emit(current_team_name, next_team_name)
+                        self._add_next(self.cur_task)
+                    continue
 
                 if self.cur_task.name == "End":
                     self.complete()

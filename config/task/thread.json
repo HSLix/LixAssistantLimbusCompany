@@ -75,7 +75,7 @@
     "ThreadCheckpoint": {
         "action": "Checkpoint",
         "checkpoint_name": "Thread",
-        "max_count": 2,
+        "max_count": 0,
         "loop_task": "ThreadEntrance",
         "next": ["MirrorEntrance"],
         "log_level": "INFO"
