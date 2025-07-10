@@ -413,7 +413,7 @@ def initCustomAction():
         else:
             raise ValueError("Over Index in choose_team")
         sleep(0.2)
-        mk.pressKey("enter")
+        mk.pressKey("enter", press_count=2, rest_time=0.5)
         mk.mouseBackHome()
 
     @custom_action_dict.register
@@ -444,8 +444,8 @@ def initCustomAction():
                 sleep(0.2)  # 添加短暂延迟确保点击生效
         
         # 下面是结算
-        mk.moveClick([1440, 900], rest_time=2)
-        mk.moveClick([945, 720])
+        mk.moveClick([1440, 900], rest_time=1)
+        mk.moveClick([945, 720], rest_time=1)
         mk.mouseBackHome()
 
     

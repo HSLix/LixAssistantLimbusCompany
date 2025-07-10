@@ -5,12 +5,12 @@
     },
     "full_auto": {
         "init": true,
-        "EXPEnable": true,
+        "EXPEnable": false,
         "EXPCheckpoint": 2,
-        "ThreadEnable": true,
+        "ThreadEnable": false,
         "ThreadCheckpoint": 1,
-        "MirrorEnable": false,
-        "MirrorCheckpoint": 1,
+        "MirrorEnable": true,
+        "MirrorCheckpoint": 99,
         "reward": false,
         "EndAction": "\u65e0"
     },
