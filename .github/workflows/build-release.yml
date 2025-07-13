@@ -71,7 +71,7 @@ jobs:
         $currentNotes = $currentNotes -replace ';', ";`n"
 
         # 固定提示语
-        $mirrorChyanLink = "- [已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)"
+        $mirrorChyanLink = "- [已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)PS:收益由 Mirror 酱官方与 LALC 共享"
         $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
       
         # 使用普通字符串拼接代替 here-string

@@ -444,7 +444,7 @@ def initCustomAction():
                 sleep(0.2)  # 添加短暂延迟确保点击生效
         
         # 下面是结算
-        mk.moveClick([1440, 900], rest_time=1)
+        mk.moveClick([1460, 900], rest_time=1)
         mk.moveClick([945, 720], rest_time=1)
         mk.mouseBackHome()
 
@@ -583,7 +583,7 @@ def initCustomAction():
             return
         
         # clear selection
-        mk.moveClick([1440, 650], rest_time=1.5)
+        mk.moveClick([1440, 650], rest_time=2)
         eye.captureScreenShot()
         if (eye.templateMactchExist("reset_deployment_order.png", recognize_area=[555, 395, 500, 160])):
             mk.pressKey("enter", rest_time=1)

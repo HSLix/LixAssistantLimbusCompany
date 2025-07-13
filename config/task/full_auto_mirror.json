@@ -172,13 +172,7 @@
     },
     "FullAutoInitMirrorInitTeam": {
         "recognition": "TemplateMatch",
-        "template": "mirror_init_teams.png",
-        "recognize_area": [
-            1210,
-            160,
-            100,
-            80
-        ],
+        "template": "mirror_init_starlight_bonus.png",
         "action": "Custom",
         "custom_name": "choose_team",
         "next": [
