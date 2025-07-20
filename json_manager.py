@@ -64,7 +64,22 @@ class ThemePackManager(JSONManager):
     def get_keywords_by_weight(self, weight: int) -> list:
         return self.weight_dict.get(weight, [])
 
+class SkillSwapConfigManager(JSONManager):
+    JSON_FILE = "skill_swap_config.json"
+
+    def get_team_config(self, team_name: str) -> Dict[str, Any]:
+        return self._config.get(team_name, {})
+
+    def save_team_config(self, team_name: str, config: Dict[str, Any]) -> None:
+        self._config[team_name] = config
+        try:
+            with open(self._config_path, 'w', encoding='utf-8') as f:
+                json.dump(self._config, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"保存技能替换配置文件失败: {e}")
+
 # 初始化单例实例
 config_manager = ConfigManager()
 team_manager = TeamManager()
 theme_pack_manager = ThemePackManager()
+skill_swap_config_manager = SkillSwapConfigManager()
