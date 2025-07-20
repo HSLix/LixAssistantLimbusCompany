@@ -76,14 +76,14 @@ def initJsonTask(task_dir: str = join(CONFIG_DIR, "task")):
                     **task_config
                 )
             
-            print(f"✓ 已加载任务文件: {json_file.name}")
+            # print(f"✓ 已加载任务文件: {json_file.name}")
             
         except json.JSONDecodeError as e:
             raise ValueError(f"JSON文件 {json_file.name} 格式错误: {e}")
         except Exception as e:
             raise Exception(f"加载任务文件 {json_file.name} 时出错: {e}")
     
-    print(f"✓ 总共加载了 {len(task_dict)} 个任务")
+    # print(f"✓ 总共加载了 {len(task_dict)} 个任务")
     return task_dict
 
 
@@ -638,6 +638,15 @@ def initCustomAction():
 
         return sorted_members
     
+
+    def wait_connecting():
+        print("custom check connect")
+        eye.captureScreenShot()
+        while(eye.templateMactchExist("connecting.png")):
+            print("custom wait connecting")
+            sleep(0.5)
+            eye.captureScreenShot()
+    
     
     def search_place_sell_gift(gift_places:list, target_pic:list):
         for c in gift_places:
@@ -659,8 +668,8 @@ def initCustomAction():
                 if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                     mk.pressKey("enter", press_count=2, rest_time=1)
                     sleep(2)
-                    # 如果售卖物品，重复检测该位置
-                    continue
+                    wait_connecting()
+                    continue # 如果售卖物品，重复检测该位置
                 # 否则跳出循环，检测下一个位置
                 break
 
@@ -740,10 +749,11 @@ def initCustomAction():
                     "Pierce":[990, 590],
                     "Blunt":[1180, 590],
                      }
+    
     def refresh_according_to_team_style(team_style:str):
         mk.moveClick([1435, 200], rest_time=0.5)
         mk.moveClick(style_refresh[team_style])
-        mk.moveClick([990, 745], rest_time=3)   
+        mk.moveClick([990, 745], rest_time=2)
         mk.mouseBackHome()
 
 
@@ -802,7 +812,7 @@ def initCustomAction():
                             continue
                         if (eye.templateMactchExist(gift, recognize_area=[575, 405, 60, 60])):
                             mk.moveClick([945, 660], rest_time=1)
-
+                            wait_connecting()
                             # Press Confirm
                             # mk.pressKey("enter", press_count=2, rest_time=0.3)
                             mk.moveClick([800, 700], rest_time=1)
@@ -829,6 +839,7 @@ def initCustomAction():
             else:
                 mk.moveClick([1260, 200], rest_time=3)
             
+            wait_connecting()
             round_count += 1
 
 
@@ -866,6 +877,7 @@ def initCustomAction():
                     mk.pressKey("esc", rest_time=0.5)
                     continue
                 mk.pressKey("enter", press_count=1, rest_time=2)
+                wait_connecting()
                 fake_enhance_count = 3
                 
                 mk.pressKey("enter", press_count=1, rest_time=1)
@@ -876,6 +888,7 @@ def initCustomAction():
                     mk.pressKey("esc", rest_time=0.5)
                     continue
                 mk.pressKey("enter", press_count=1, rest_time=2)
+                wait_connecting()
             
             eye.captureScreenShot()
             if (not eye.templateMactchExist("power_up.png", recognize_area=[820, 735, 330, 100])):
@@ -959,8 +972,9 @@ def initCustomAction():
         eye.captureScreenShot()
         if eye.templateMactchExist("heal_sinners.png", recognize_area=[125, 60, 325, 110]):
             mk.moveClick([1280, 460], rest_time=2)
+            wait_connecting()
             mk.moveClick([1415, 860], rest_time=2)
-        
+
         mk.mouseBackHome()
 
     @custom_action_dict.register
