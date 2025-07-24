@@ -9,7 +9,7 @@ ignoreScaleAndDpi()
 # while True:
 
 eye.captureScreenShot()
-c = eye.templateMatch("connecting.png", recognize_area=[0, 0, 0, 0], threshold=0, is_show_result=True)
+c = eye.templateMatch("mirror_init_activate_gift_search_on.png", recognize_area=[0, 0, 0, 0], threshold=0, is_show_result=True)
 
 # c = []
 # c += eye.templateMultiMatch("mirror_init_starlight_bonus.png", threshold=0.7, recognize_area=[0, 0, 0, 0], is_show_result=False)
