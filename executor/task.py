@@ -730,6 +730,7 @@ def initCustomAction():
                 gift_places = gift_places[5:]
             if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
                 mk.scroll([0,-1], 5, rest_time=0.2)
+                sleep(0.5)
             else:
                 break
          
@@ -955,6 +956,7 @@ def initCustomAction():
             if (not eye.templateMactchExist("shop_scroll_block.png", recognize_area=[1375, 600, 55, 80])):
                 mk.scroll([0,-1], 5, rest_time=0.2)
                 gift_recognize_area = [790, 425, 640, 290]
+                sleep(0.5)
             else:
                 break
         

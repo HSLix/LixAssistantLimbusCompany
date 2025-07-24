@@ -156,8 +156,7 @@
             440
         ],
         "action_count": 2,
-        "action_rest": 0.5,
-        "post_delay": 0.5,
+        "action_rest": 1,
         "next": [
             "FullAutoMirrorClaimPreviousReward",
             "FullAutoInitMirrorStartOrResume"
@@ -195,10 +194,24 @@
     "FullAutoInitMirrorInitStartEgoGift": {
         "recognition": "TemplateMatch",
         "template": "mirror_init_selected_ego_gift.png",
+        "next": [
+            "FullAutoInitMirrorSwitchOffGiftSearch",
+            "FullAutoInitMirrorChooseStartEgoGift"
+        ]
+    },
+    "FullAutoInitMirrorSwitchOffGiftSearch": {
+        "recognition": "TemplateMatch",
+        "template": "mirror_init_activate_gift_search_on.png",
+        "action": "Click",
+        "next": "FullAutoInitMirrorChooseStartEgoGift"
+    },
+    "FullAutoInitMirrorChooseStartEgoGift": {
         "action": "Custom",
         "custom_name": "choose_start_ego_gift",
         "post_delay": 1,
-        "next": "FullAutoMirrorCircleCenter"
+        "next": [
+            "FullAutoMirrorCircleCenter"
+        ]
     },
     "FullAutoMirrorSelectThemePackComfirmNormalMode": {
         "recognition": "TemplateMatch",
