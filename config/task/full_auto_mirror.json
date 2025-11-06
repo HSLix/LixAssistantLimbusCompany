@@ -1,7 +1,4 @@
 {
-    "FullAutoEntrance": {
-        "next": "EXPEntrance"
-    },
     "MirrorEntrance": {
         "next": [
             "FullAutoMirrorCircleCenter",
@@ -336,7 +333,7 @@
         "threshold": 0.85,
         "action": "Key",
         "key": "p",
-        "action_rest": 0.3,
+        "post_delay": 0.5,
         "next": [
             "FullAutoClickEncounter",
             "FullAutoEnterEncounter"
@@ -348,7 +345,7 @@
         "threshold": 0.85,
         "action": "Click",
         "target": true,
-        "action_rest":0.3,
+        "post_delay":0.5    ,
         "next": [
             "FullAutoClickEncounter",
             "FullAutoEnterEncounter"
@@ -356,8 +353,9 @@
     },
     "FullAutoEnterEncounter": {
         "action": "Key",
-        "pre_delay":1,
         "key": "enter",
+        "action_count": 2,
+        "action_rest": 1,
         "next": [
             "FullAutoWaitFinishBattle",
             "FullAutoMirrorCircleCenter"
@@ -664,7 +662,19 @@
         "key": "enter",
         "action_count": 2,
         "action_rest": 1,
-        "next": "FullAutoMirrorGiveUpRewards"
+        "next": [
+            "FullAutoMirrorGiveUpRewards",
+            "FullAutoMirrorGetFailureRewards"
+        ]
+    },
+    "FullAutoMirrorGetFailureRewards": {
+        "action": "Key",
+        "pre_delay": 1,
+        "key": "enter",
+        "action_count": 8,
+        "action_rest": 1,
+        "post_delay": 3,
+        "next": "MirrorCheckpoint"
     },
     "FullAutoMirrorGiveUpRewards": {
         "action": "Click",

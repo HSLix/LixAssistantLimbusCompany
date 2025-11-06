@@ -28,6 +28,9 @@ msgstr ""
 msgid "Update Check Successful"
 msgstr "更新检查成功"
 
+msgid "Give up the failure reward"
+msgstr "放弃失败的奖励"
+
 #, python-brace-format
 msgid ""
 "You are using the latest version.\n"

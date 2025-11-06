@@ -10,19 +10,20 @@
         "ThreadEnable": false,
         "ThreadCheckpoint": 1,
         "MirrorEnable": true,
-        "MirrorCheckpoint": 99,
+        "MirrorCheckpoint": 34,
         "reward": false,
+        "MirrorGiveUpFailureReward": true,
         "EndAction": "\u65e0"
     },
     "semi_auto": {
         "AutoPBattle": true,
-        "SkipEvent": true,
+        "SkipEvent": false,
         "AutoClickNextStage": true,
         "AutoSelectRewardCard": true,
         "AutoSkipEgoGiftGet": true,
-        "AutoEnterMirror": true,
+        "AutoEnterMirror": false,
         "SemiAutoFullTeamToBattle": true,
-        "SemiAutoEventMakeChoiceGetEgo": true
+        "SemiAutoEventMakeChoiceGetEgo": false
     },
     "mirror_chyan": ""
 }

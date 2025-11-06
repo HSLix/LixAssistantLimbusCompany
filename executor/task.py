@@ -667,7 +667,6 @@ def initCustomAction():
 
                 if (sellable and eye.templateMactchExist("shop_triangle.png", recognize_area=[1285, 150, 60, 50])):
                     mk.pressKey("enter", press_count=2, rest_time=1)
-                    sleep(2)
                     wait_connecting()
                     continue # 如果售卖物品，重复检测该位置
                 # 否则跳出循环，检测下一个位置

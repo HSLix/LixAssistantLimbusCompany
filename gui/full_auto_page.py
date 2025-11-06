@@ -71,8 +71,9 @@ class FullAutoPage(QFrame):
         ])
 
         # 添加镜牢设置
+        self.mirrorGiveUpFailureRewardCheckBox = CheckBox()
         self.addConfigSection(_("镜牢设置"), [
-            
+            (_('Give up the failure reward'), self.mirrorGiveUpFailureRewardCheckBox)
         ])
     
     def addConfigSection(self, title, items):
@@ -283,6 +284,7 @@ class FullAutoPage(QFrame):
             "MirrorEnable": self.checkBox3.isChecked(),
             'MirrorCheckpoint': self.spinBox3.value(),  # Mirror 任务执行次数
             'reward': self.checkBox4.isChecked(),  # Reward 类型
+            'MirrorGiveUpFailureReward': self.mirrorGiveUpFailureRewardCheckBox.isChecked(),  # 镜牢失败放弃奖励
             'EndAction': self.endActionComboBox.currentText()  # 结束动作
         }
 
@@ -299,6 +301,7 @@ class FullAutoPage(QFrame):
             'SkipEXPLuxcavationStart': self.checkBox1.isChecked(),
             "SkipThreadLuxcavationStart": self.checkBox2.isChecked(),
             "FullAutoMirrorCircleCenter": self.checkBox3.isChecked(),
+            "FullAutoMirrorGiveUpRewards": self.mirrorGiveUpFailureRewardCheckBox.isChecked(),  # 镜牢失败放弃奖励
         }
 
     def load_config(self):
@@ -312,6 +315,7 @@ class FullAutoPage(QFrame):
             self.checkBox3.setChecked(full_auto_config.get('MirrorEnable', False))
             self.spinBox3.setValue(full_auto_config.get('MirrorCheckpoint', 0))
             self.checkBox4.setChecked(full_auto_config.get('reward', False))
+            self.mirrorGiveUpFailureRewardCheckBox.setChecked(full_auto_config.get('MirrorGiveUpFailureReward', False))
             
             # 加载结束动作设置
             end_action = full_auto_config.get('EndAction', _("无"))

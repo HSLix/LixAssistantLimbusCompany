@@ -17,7 +17,7 @@
         "Gregor": 5
     },
     "Team2": {
-        "enabled": true,
+        "enabled": false,
         "style": "Poise",
         "YiSang": 6,
         "Faust": 8,
@@ -68,16 +68,16 @@
         "enabled": true,
         "style": "Sinking",
         "YiSang": 3,
-        "Faust": 7,
-        "DonQuixote": 9,
-        "Ryoshu": 8,
-        "Meursault": 10,
+        "Faust": 8,
+        "DonQuixote": 10,
+        "Ryoshu": 9,
+        "Meursault": 11,
         "HongLu": 6,
         "Heathcliff": 2,
         "Ishmael": 4,
         "Rodion": 1,
-        "Sinclair": 11,
-        "Outis": 12,
+        "Sinclair": 12,
+        "Outis": 7,
         "Gregor": 5
     },
     "Team6": {
