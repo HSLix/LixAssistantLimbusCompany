@@ -1,0 +1,57 @@
+{
+    "event_entry":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"event_skip",
+            "repeat":3
+        },
+        "next":[
+            "event_pass_check",
+            "event_make_choice",
+            "event_get_result"
+        ]
+    },
+    "event_pass_check":{
+        "recognition":"template_match",
+        "action":"event_pass_check",
+        "params":{
+            "template":"choose_character_to_perform_the_check"
+        },
+        "next":[
+            "event_wait_connecting_disappear"
+        ]
+    },
+    "event_make_choice":{
+        "recognition":"template_match",
+        "action":"event_make_choice",
+        "params":{
+            "template":"event_choices"
+        },
+        "next":[
+            "event_get_result"
+        ]
+    },
+    "event_get_result":{
+        "action":"click",
+        "params":{
+            "target":[1120, 650]
+        },
+        "next":[
+            "event_wait_connecting_disappear"
+        ]
+    },
+    "event_wait_connecting_disappear":{
+        "action":"wait_connecting_disappear",
+        "params":{
+            "pre_delay":1,
+            "post_delay":2
+        },
+        "next":[
+            "event_entry"
+        ],
+        "interrupt":[
+
+        ]
+    }
+}

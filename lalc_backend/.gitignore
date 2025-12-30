@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+tmp_theme_packs
+logs
+
+pystand/__pycache__
+pystand/script/*
+pystand/site-packages/*
+
+lalc.zip

@@ -1,0 +1,75 @@
+{
+    "battle_entry": {
+        "desc":"该流水线的目的是完成“一次”战斗，由于 ego 执行过程中没什么明显的标志物，一旦发动就会脱离这里。所以外部调用这条线时，需要设置一个确认不再战斗的条件否则死循环来确保战斗彻底结束",
+        "next":[
+            "battle_winrate",
+            "wait_loading_tips_disappear"
+        ],
+        "interrupt":[
+
+        ]
+    },
+    "battle_winrate":{
+        "recognition": "template_match",
+        "action": "key",
+        "params":{
+            "template":"win_rate",
+            "key":"p"
+        },
+        "next":[
+            "battle_fight"
+        ]
+    },
+    "battle_fight":{
+        "recognition": "direct",
+        "action": "key",
+        "params":{
+            "key":"enter"
+        },
+        "next":[
+            "battle_winrate_click",
+            "battle_wait",
+            "wait_loading_tips_disappear"
+        ]
+    },
+    "battle_winrate_click":{
+        "recognition": "template_match",
+        "action": "click",
+        "params":{
+            "template":"win_rate"
+        },
+        "next":[
+            "battle_winrate",
+            "battle_winrate_click",
+            "battle_fight"
+        ]
+    }, 
+    "battle_wait":{
+        "recognition": "template_match",
+        "action": "wait_disappear",
+        "params":{
+            "template":"battle_ing",
+            "post_delay":3
+        },
+        "next":[
+            "battle_winrate",
+            "wait_loading_tips_disappear"
+        ],
+        "interrupt":[
+
+        ]
+    },
+    "wait_loading_tips_disappear":{
+        "recognition":"template_match",
+        "action":"wait_disappear",
+        "params":{
+            "template":"loading_tips"
+        },
+        "next":[
+
+        ],
+        "interrupt":[
+            
+        ]
+    }
+}

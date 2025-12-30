@@ -1,0 +1,55 @@
+{
+    "reward_entry":{
+        "next":[
+            "reward_enter_main_window"
+        ]
+    },
+    "reward_enter_main_window":{
+        "recognition":"template_match",
+        "action":"main_window_confirm",
+        "params":{
+            "template":"main_window_no_text"
+        },
+        "next":[
+            "enter_limbus_pass"
+        ]
+    },
+    "enter_limbus_pass":{
+        "action":"click",
+        "params":{
+            "target":[1070, 230]
+        },
+        "next":[
+            "enter_pass_mission"
+        ]
+    },
+    "enter_pass_mission":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"pass_missions"
+        },
+        "next":[
+            "confirm_all_coins"
+        ]
+    },
+    "confirm_all_coins":{
+        "action":"confirm_all_coins",
+        "next":[
+            "check_reward"
+        ]
+    },
+    "check_reward":{
+        "type":"check",
+        "action":"key",
+        "params":{
+            "disable_node":"reward_entry",
+            "key":"esc",
+            "execute_count": 0,
+            "target_count": 1
+        },
+        "next":[
+            "main_circle_center"
+        ]
+    }
+}

@@ -1,0 +1,24 @@
+{
+  "check_node_target_count": 0,
+  "luxcavation_mode": "enter",
+  "thread_stage": "50",
+  "team_orders": [
+    [
+      "Sinclair",
+      "Outis",
+      "Yi Sang",
+      "Gregor",
+      "Don Quixote",
+      "Rodion",
+      "Ishmael",
+      "Faust",
+      "Ryoshu",
+      "Meursault",
+      "Hong Lu",
+      "Heathcliff"
+    ]
+  ],
+  "team_indexes": [
+    3
+  ]
+}

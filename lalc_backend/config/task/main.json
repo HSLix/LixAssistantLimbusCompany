@@ -1,0 +1,42 @@
+{
+    "main":{
+        "action":"init_limbus_window",
+        "next":[
+            "touch_to_start",
+            "main_circle_center"
+        ]
+    },
+    "touch_to_start":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"clear_all_caches",
+            "target_offset":[400, -400],
+            "post_delay": 6
+        },
+        "next":[
+            "main_circle_center"
+        ]
+    },
+    "main_circle_center":{
+        "recognition":"template_match",
+        "action":"enter_enkephalin",
+        "params":{
+            "template":"main_drive_no_text"
+        },
+        "next":[
+            "check_and_get_mails",
+            "exp_entry",
+            "thread_entry",
+            "mirror_entry",
+            "reward_entry",
+            "end"
+        ]
+    },
+    "end":{
+        "desc": "这是要结束任务流水线的终点，虽然不强制终点导过来，但可以完整地标志任务结束",
+        "interrupt":[
+
+        ]
+    }
+}

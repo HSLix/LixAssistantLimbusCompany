@@ -1,0 +1,113 @@
+import sys
+import os
+import ctypes
+import re
+
+# 添加项目根目录和相关子目录到sys.path
+script_dir = os.path.dirname(os.path.abspath(__file__))  # 这是PyStand根目录
+print(f"script_dir: {script_dir}")
+
+# 优先添加script目录到sys.path开头，确保正确导入
+sys.path.insert(0, os.path.join(script_dir, 'script'))
+print(f"Added to sys.path: {os.path.join(script_dir, 'script')}")
+
+# 添加其他子目录
+sys.path.insert(1, os.path.join(script_dir, 'script', 'workflow'))
+sys.path.insert(2, os.path.join(script_dir, 'script', 'input'))
+sys.path.insert(3, os.path.join(script_dir, 'script', 'recognize'))
+sys.path.insert(4, os.path.join(script_dir, 'script', 'recognize', 'models'))
+sys.path.insert(5, os.path.join(script_dir, 'script', 'utils'))
+sys.path.insert(6, os.path.join(script_dir, 'script', 'config'))
+sys.path.insert(7, script_dir)  # PyStand根目录放在最后
+
+print(f"Full sys.path: {sys.path}")
+
+# 检查当前的路径上是否为全英文路径（英文字符 空格 下划线等常见符号），如果不是就用os.system('msg * "这是提醒内容"') 来中英文提醒需要把路径放到全英文的路径下，和非法字符，同时退出
+def is_valid_path(path):
+    """检查路径是否包含非英文字符"""
+    # 检查路径是否只包含字母、数字、空格、下划线、连字符和点
+    valid_pattern = re.compile(r'^[a-zA-Z0-9\s_\-./\\:]+$')
+    return valid_pattern.match(path) is not None
+
+if not is_valid_path(script_dir):
+    error_msg = "路径包含非英文字符！请将程序放在全英文路径下，例如: D:/LALC。Path contains non-English characters, please put the program in an English path."
+    os.system(f'msg * "{error_msg}"')
+    sys.exit(1)
+
+# 检查当前的路径上是否有叫做 lalc_frontend 的文件夹，有的话把某个变量设为 True
+frontend_exists = os.path.exists(os.path.join(script_dir, 'lalc_frontend'))
+
+# 设置当前工作目录为script目录，确保相对路径引用正确
+os.chdir(os.path.join(script_dir, 'script'))
+print(f"Current working directory changed to: {os.getcwd()}")
+
+def run_as_admin():
+    """以管理员权限重新运行PyStand.exe"""
+    try:
+        is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+    except Exception:
+        is_admin = False
+
+    if is_admin:
+        print("已是管理员权限")
+        return True
+
+    # 请求管理员权限，运行PyStand.exe
+    print("正在请求管理员权限...")
+    try:
+        # 获取PyStand.exe的路径
+        pystand_name = "LixAssistantLimbusCompany.exe" if frontend_exists else 'lalc_backend.exe'
+        pystand_exe = os.path.join(script_dir, pystand_name)
+        ret = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", pystand_exe, "", None, 1
+        )
+        # ShellExecuteW 返回值大于32表示成功
+        if ret <= 32:
+            error_msg = f"请求管理员权限失败，返回值: {ret}。Failed to request administrator privileges, return value: {ret}."
+            os.system(f'msg * "{error_msg}"')
+            return False
+        return False
+    except Exception as e:
+        error_msg = f"请求管理员权限时发生错误: {e}。An error occurred while requesting administrator privileges: {e}."
+        os.system(f'msg * "{error_msg}"')
+        return False
+
+# 检查是否以管理员权限运行，如果不是则请求权限
+if not run_as_admin():
+    print("该进程没有管理员权限，即将退出")
+    # 这里补充，如果前面发现根目录有 lalc_frontend,就静默运行 lalc_frontend/lalc_frontend.exe
+    if frontend_exists:
+        frontend_exe_path = os.path.join(script_dir, 'lalc_frontend', 'lalc_frontend.exe')
+        if os.path.exists(frontend_exe_path):
+            print("正在启动前端程序...")
+            # 静默运行前端程序，不显示控制台窗口
+            ctypes.windll.shell32.ShellExecuteW(
+                None, "open", frontend_exe_path, "", None, 0  # 最后一个参数0表示SW_HIDE，即隐藏窗口
+            )
+        else:
+            error_msg = f"前端程序不存在: {frontend_exe_path}。Frontend executable does not exist: {frontend_exe_path}."
+            os.system(f'msg * "{error_msg}"')
+    sys.exit(0)
+
+try:
+    # 导入并运行主程序
+    import main
+except Exception as e:
+    error_msg = f"导入main模块时发生错误: {e}。An error occurred while importing the main module: {e}."
+    os.system(f'msg * "{error_msg}"')
+    import traceback
+    traceback.print_exc()
+    input("按回车键关闭...")
+    sys.exit(1)
+
+if __name__ == "__main__":
+    try:
+        import asyncio
+        asyncio.run(main.amain())
+    except Exception as e:
+        error_msg = f"运行主程序时发生错误: {e}。An error occurred while running the main program: {e}."
+        os.system(f'msg * "{error_msg}"')
+        import traceback
+        traceback.print_exc()
+        input("按回车键关闭...")
+        sys.exit(1)

@@ -1,0 +1,48 @@
+{
+    "click":{
+        "desc":"该文件的任务节点都是占位用的，实质的执行内容由 Python 代码中设置。除了最基本的执行单元节点外，可能还会有一些特殊节点不好用 Json 构建",
+        "action":"click",
+        "params":{
+            "pre_delay":0,
+            "target":[1145, 141]
+        }
+    },
+    "key":{
+        "action":"key",
+        "params":{
+            "key":"esc"
+        }
+    },
+    "swipe":{
+        "action":"swipe",
+        "params":{
+            "pre_delay":0,
+            "begin":[114, 514],
+            "end":[19, 19]
+        }
+    },
+    "empty":{
+        "action":"empty"
+    },
+    "wait_disappear":{
+        "action":"wait_disappear"
+    },
+    "report_error":{
+        "action":"report_error",
+        "params":{
+            "error_msg":""
+        }
+    },
+    "wait_appear":{
+        "action":"wait_appear"
+    },
+    "choose_team":{
+        "action":"choose_team"
+    },
+    "ready_to_battle":{
+        "action":"ready_to_battle"
+    },
+    "init_limbus_window":{
+        "action":"init_limbus_window"
+    }
+}

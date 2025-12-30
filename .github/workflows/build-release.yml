@@ -2,154 +2,114 @@ name: Build and Release Windows Executable
 
 on:
   push:
-    tags:
-      - 'V*'  
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
-  build-and-release:
-    runs-on: windows-latest
-
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        fetch-tags: true
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.LALC_TOKEN }}
+          release-type: simple
 
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
 
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller
-        if (Test-Path requirements.txt) { pip install -r requirements.txt }
+  # 构建、打包、上传
+  build-and-upload:
+    runs-on: windows-latest
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    steps:
+      # ---------- 1. 检出 ----------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller lalc.spec
-        if (-not (Test-Path "dist\lalc.zip")) {
-          Write-Error "lalc.zip not found in dist directory!"
-          exit 1
-        }
+      # ---------- 2. 装工具 ----------
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          cache: true
 
-    - name: Generate Release Notes
-      id: release-notes
-      run: |
-        # 确保获取所有tags
-        git fetch --tags
-        
-        # 获取当前版本号
-        $currentVersion = $env:GITHUB_REF -replace 'refs/tags/V', ''
-        Write-Output "Current version: $currentVersion"
-        Write-Output "GITHUB_REF: $env:GITHUB_REF"
-        
-        # 列出所有可用的tags
-        Write-Output "Available tags:"
-        git tag -l | Write-Output
-        
-        # 获取当前tag的标注信息
-        $currentNotes = git show --no-patch --format='%B' "V$currentVersion" 2>$null
-        Write-Output "Tag message from V$currentVersion`: '$currentNotes'"
-        
-        # 如果还是为空，尝试其他方法获取tag信息
-        if ([string]::IsNullOrWhiteSpace($currentNotes)) {
-          # 尝试使用tag对象获取
-          $currentNotes = git show --no-patch --format='%B' "refs/tags/V$currentVersion" 2>$null
-          Write-Output "Tag message from refs/tags/V$currentVersion`: '$currentNotes'"
-        }
-        
-        # 如果仍然为空，尝试获取commit信息
-        if ([string]::IsNullOrWhiteSpace($currentNotes)) {
-          $currentNotes = git log -1 --pretty=%B
-          Write-Output "Fallback to commit message: '$currentNotes'"
-        }
+      - name: Install uv
+        run: |
+          powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+          echo "$HOME\.cargo\bin" >> $GITHUB_PATH
 
-        # 将分号替换为分号加换行符
-        $currentNotes = $currentNotes -replace ';', ";`n"
+      # ---------- 3. 后端初始化 ----------
+      - name: Backend uv sync
+        working-directory: lalc_backend
+        run: uv sync
 
-        # 固定提示语
-        $mirrorChyanLink = "- [已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)PS:收益由 Mirror 酱官方与 LALC 共享"
-        $quarkLink = "- 如果下载有问题，可以试下[夸克网盘](https://pan.quark.cn/s/333d6608dddd)|If you have any trouble downloading, you can use [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
-      
-        # 使用普通字符串拼接代替 here-string
-        $currentReleaseSection = "## V$currentVersion`n$currentNotes"
+      # ---------- 4. 前端初始化 ----------
+      - name: Frontend flutter pub get
+        working-directory: lalc_frontend
+        run: flutter pub get
 
-        # 使用GitHub API获取上一个Release的body内容
-        $headers = @{
-          "Authorization" = "token ${{ secrets.LALC_TOKEN }}"
-          "Accept" = "application/vnd.github.v3+json"
-        }
+      # ---------- 5. 打包 ----------
+      - name: Run packup_release.bat
+        shell: cmd
+        run: packup_release.bat
 
-        try {
-          $releases = Invoke-RestMethod -Uri "https://api.github.com/repos/${{ github.repository }}/releases?per_page=1" -Headers $headers
+      # ---------- 6. 读取原 Release Note 并拼接固定前缀 ----------
+      - name: Build final release note
+        id: final_note
+        shell: pwsh
+        run: |
+          # 固定前缀
+          $mirrorChyanLink = "- (推荐，速度快质量好）[已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)"
+          $githubLink      = "- (可能会限流)[GitHub 最新 Release 下载](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest) | [Download the latest release from GitHub](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest)"
+          $quarkLink       = "- (不定时更新)重要版本归档：[夸克网盘](https://pan.quark.cn/s/333d6608dddd) | Record Important Version in [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
+          $discordLink     = "- [加入 Discord 群聊](https://discord.gg/bVzCuBU4bC) | [Join the discord](https://discord.gg/bVzCuBU4bC)"
 
-          if ($releases) {
-            $previousReleaseBody = $releases[0].body
+          $prefix = "$mirrorChyanLink`n$githubLink`n$quarkLink`n$discordLink`n`n"
 
-            # 提取旧的 <details> 内容（如果存在）
-            $oldHistory = ""
-            if ($previousReleaseBody -match '(?s)<details>.*?</details>') {
-              $oldHistory = $matches[0] -replace '<details>\s*<summary>.*?</summary>\s*', '' -replace '</details>', ''
-            }
+          # 通过 GitHub CLI 读取
+          # 当前 release 的 body（release-please 已生成）
+          $tag   = "${{ needs.release-please.outputs.tag_name }}"
+          $bodyLines = gh release view $tag --json body --jq .body
+          $body = $bodyLines -join "`n"
 
-            # 提取上一版本的主要内容（非 <details> 部分），并去掉前两行
-            $previousMainContent = if ($previousReleaseBody -match '(?s)^[\s\S]*?(?=<details>)') {
-              # 分割内容为行数组并跳过前两行
-              $lines = $matches[0] -split "`n"
-              if ($lines.Count -gt 2) {
-                $lines[2..($lines.Count-1)] -join "`n"
-              } else {
-                ""
-              }
-            } else {
-              # 同样处理没有<details>的情况
-              $lines = $previousReleaseBody -split "`n"
-              if ($lines.Count -gt 2) {
-                $lines[2..($lines.Count-1)] -join "`n"
-              } else {
-                ""
-              }
-            }
+          # 合并：前缀 + 换行 + 原正文
+          $final = "$prefix`n$body"
 
-            # 使用普通字符串拼接
-            $newHistoryContent = "$previousMainContent`n`n$oldHistory"
+          # 写到文件（避免 bash 转义问题）
+          $final | Out-File -FilePath final_release_note.md -Encoding utf8
 
-            # 清理多余空白行
-            $newHistoryContent = $newHistoryContent -replace '\r?\n\s*\r?\n\s*\r?\n', "`n`n"
+          # 输出文件路径
+          echo "note_file=final_release_note.md" >> $env:GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.LALC_TOKEN }}
 
-            # 构建完整的发布说明
-            $fullReleaseNotes = "$mirrorChyanLink`n$quarkLink`n$currentReleaseSection`n<details>`n<summary>历史更新 | History</summary>`n`n$newHistoryContent`n</details>"
-          } else {
-            # 没有历史版本时只显示当前内容
-            $fullReleaseNotes = "$mirrorChyanLink`n$quarkLink`n`n$currentReleaseSection"
-          }
-        } catch {
-          Write-Output "无法获取历史发布: $_"
-          $fullReleaseNotes = "$quarkLink`n`n$currentReleaseSection"
-        }
-
-        echo "notes<<EOF" >> $env:GITHUB_OUTPUT
-        echo "$fullReleaseNotes" >> $env:GITHUB_OUTPUT
-        echo "EOF" >> $env:GITHUB_OUTPUT
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.LALC_TOKEN }}
-      with:
-        files: dist/lalc.zip
-        body: ${{ steps.release-notes.outputs.notes }}
-        tag_name: ${{ github.ref_name }}
-        name: Release ${{ github.ref_name }}
-        prerelease: ${{ contains(github.ref_name, 'alpha') || contains(github.ref_name, 'beta') }}
-
-    - name: Trigger MirrorChyanUploading
-      shell: bash
-      run: |
-        gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-uploading
-        gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-release-note
-      env:
-        GH_TOKEN: ${{ secrets.LALC_TOKEN }}
+      # ---------- 7. 上传资产 + 更新正文 ----------
+      - name: Upload asset & update release note
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.LALC_TOKEN }}
+        with:
+          tag_name: ${{ needs.release-please.outputs.tag_name }}
+          body_path: ${{ steps.final_note.outputs.note_file }}
+          files: lalc.zip          # 确认根目录存在
+          prerelease: ${{ contains(needs.release-please.outputs.tag_name, 'alpha') ||
+                          contains(needs.release-please.outputs.tag_name, 'beta') }}
+                          
+      # ---------- 8. 启动 MirrorChyan ----------
+      - name: Trigger MirrorChyanUploading
+        shell: bash
+        run: |
+          gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-uploading
+          gh workflow run --repo $GITHUB_REPOSITORY mirrorchyan-release-note
+        env:
+          GH_TOKEN: ${{ secrets.LALC_TOKEN }}

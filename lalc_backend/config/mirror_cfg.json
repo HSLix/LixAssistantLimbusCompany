@@ -1,0 +1,558 @@
+{
+  "check_node_target_count": 3,
+  "mirror_stop_purchase_gift_money": 600,
+  "mirror_team_styles": [
+    "Bleed",
+    "Poise",
+    "Burn",
+    "Charge",
+    "Sinking",
+    "Rupture"
+  ],
+  "mirror_team_ego_gift_styles": [
+    [
+      "Bleed"
+    ],
+    [
+      "Poise"
+    ],
+    [
+      "Burn"
+    ],
+    [
+      "Charge"
+    ],
+    [
+      "Sinking"
+    ],
+    [
+      "Rupture"
+    ]
+  ],
+  "mirror_team_ego_allow_list": [
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Pre-order Discount",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour"
+    ]
+  ],
+  "mirror_team_ego_block_list": [
+    [],
+    [],
+    [],
+    [],
+    [],
+    []
+  ],
+  "mirror_replace_skill": [
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Ishmael": [
+        1,
+        2,
+        3
+      ],
+      "Rodion": [
+        1,
+        2,
+        3
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        3,
+        2,
+        1
+      ],
+      "Don Quixote": [
+        3,
+        2,
+        1
+      ],
+      "Ryoshu": [
+        1,
+        2,
+        3
+      ],
+      "Meursault": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Sinclair": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Ishmael": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        3,
+        2,
+        1
+      ],
+      "Sinclair": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Faust": [
+        3,
+        2,
+        1
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Ryoshu": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Outis": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        3,
+        2,
+        1
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Ishmael": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        3,
+        2,
+        1
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Ishmael": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "mirror_shop_heal": [
+    false,
+    true,
+    false,
+    false,
+    false,
+    false
+  ],
+  "mirror_team_initial_ego_orders": [
+    [
+      1,
+      2,
+      3
+    ],
+    [
+      1,
+      2,
+      3
+    ],
+    [
+      1,
+      2,
+      3
+    ],
+    [
+      1,
+      2,
+      3
+    ],
+    [
+      1,
+      2,
+      3
+    ],
+    [
+      1,
+      2,
+      3
+    ]
+  ],
+  "mirror_team_stars": [
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ],
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ],
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ],
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ],
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ],
+    [
+      "0",
+      "2",
+      "6",
+      "7"
+    ]
+  ],
+  "team_orders": [
+    [
+      "Don Quixote",
+      "Rodion",
+      "Ishmael",
+      "Yi Sang",
+      "Hong Lu",
+      "Gregor",
+      "Heathcliff",
+      "Outis",
+      "Faust",
+      "Ryoshu",
+      "Meursault",
+      "Sinclair"
+    ],
+    [
+      "Ryoshu",
+      "Heathcliff",
+      "Hong Lu",
+      "Sinclair",
+      "Meursault",
+      "Don Quixote",
+      "Yi Sang",
+      "Faust",
+      "Gregor",
+      "Ishmael",
+      "Rodion",
+      "Outis"
+    ],
+    [
+      "Sinclair",
+      "Outis",
+      "Yi Sang",
+      "Gregor",
+      "Don Quixote",
+      "Rodion",
+      "Ishmael",
+      "Faust",
+      "Ryoshu",
+      "Meursault",
+      "Hong Lu",
+      "Heathcliff"
+    ],
+    [
+      "Don Quixote",
+      "Ryoshu",
+      "Faust",
+      "Outis",
+      "Yi Sang",
+      "Heathcliff",
+      "Hong Lu",
+      "Ishmael",
+      "Meursault",
+      "Rodion",
+      "Sinclair",
+      "Gregor"
+    ],
+    [
+      "Rodion",
+      "Heathcliff",
+      "Yi Sang",
+      "Ishmael",
+      "Hong Lu",
+      "Outis",
+      "Gregor",
+      "Faust",
+      "Ryoshu",
+      "Don Quixote",
+      "Meursault",
+      "Sinclair"
+    ],
+    [
+      "Hong Lu",
+      "Faust",
+      "Ryoshu",
+      "Rodion",
+      "Outis",
+      "Gregor",
+      "Sinclair",
+      "Don Quixote",
+      "Yi Sang",
+      "Meursault",
+      "Heathcliff",
+      "Ishmael"
+    ]
+  ],
+  "team_indexes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ]
+}

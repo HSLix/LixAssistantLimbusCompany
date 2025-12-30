@@ -1,0 +1,118 @@
+{
+    "wait_tips_disappear":{
+        "recognition":"template_match",
+        "action":"wait_disappear",
+        "params":{
+            "template":"loading_tips"
+        },
+        "next":[
+        ],
+        "interrupt":[
+
+        ]
+    },
+    "enter_enkephalin":{
+        "recognition":"template_match",
+        "action":"main_window_confirm",
+        "params":{
+            "template":"main_window_no_text"
+        },
+        "next":[
+            "game_language_confirm",
+            "check_enkephalin"
+        ]
+    },
+    "check_enkephalin":{
+        "action":"click",
+        "params":{
+            "target":[
+                390,
+                650
+            ],
+            "post_delay":1
+        },
+        "next":[
+            "recharge_enkephalin",
+            "get_enkephalin_module"
+        ]
+    },
+    "recharge_enkephalin":{
+        "recognition":"template_match",
+        "action":"recharge_enkephalin",
+        "params":{
+            "template":"charge_enkephalin"
+        },
+        "next":[
+            "recharge_enkephalin_check"
+        ]
+    },
+    "recharge_enkephalin_check":{
+        "type":"check",
+        "params":{
+            "disable_node":"recharge_enkephalin",
+            "execute_count": 0,
+            "target_count": 1
+        },
+        "next":[
+            "get_enkephalin_module"
+        ]
+    },
+    "get_enkephalin_module":{
+        "recognition":"template_match",
+        "action":"get_enkephalin_module",
+        "params":{
+            "template":"charge_enkephalin"
+        },
+        "next":[
+
+        ],
+        "interrupt":[
+            
+        ]
+    },
+    "wait_connecting_disappear":{
+        "recognition":"template_match",
+        "params":{
+            "template":"connecting",
+            "mask":[1000, 0, 300, 200]
+        },
+        "next":[
+            "error_handler"
+        ]
+    },
+    "main_drive_confirm":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"main_drive_no_text"
+        },
+        "next":[
+            "game_language_confirm"
+        ],
+        "interrupt":[
+
+        ]
+    },
+    "main_window_confirm":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"main_window_no_text"
+        },
+        "next":[
+            "game_language_confirm"
+        ],
+        "interrupt":[
+
+        ]
+    },
+    "game_language_confirm":{
+        "recognition":"template_match",
+        "inverse": true,
+        "action":"report_error",
+        "params":{
+            "template":"main_drive_with_text",
+            "error_msg":"请更换游戏语言为英语（English） | Please switch game language to English"
+        }
+    }
+}
