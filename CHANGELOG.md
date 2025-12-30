@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v1.0.0...v1.0.1) (2025-12-30)
+
+
+### Bug Fixes
+
+* 修复版本号的问题，完成重构 | the error of version, finish rebuilding ([6de7d21](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6de7d21730f381c6b02f6d7bcd0fdc5e51e52a9c))
+
 ## 1.0.0 (2025-12-30)
 
 
