@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v1.0.0...v1.0.1) (2025-12-30)
+## [4.0.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v1.0.0...v4.0.0) (2025-12-30)
 
 
 ### Bug Fixes
