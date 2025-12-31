@@ -44,6 +44,10 @@ class _HomePageState extends State<HomePage>
     'Reward',
     'At Last',
   ];
+  
+  // 教程资源路径常量
+  static const String _tutorialAssetPath = 'assets/doc/tutorial.md';
+  static const String _tutorialImgPrefix = 'assets/doc/img/';
 
   // 仅 UI 层使用：根据当前语言返回显示名字
   String _taskName(BuildContext ctx, String key) {
@@ -1601,71 +1605,45 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       );
-    } else if (panelType == 'Tutorial') {
-      // 从assets/doc/tutorial.md加载教程内容
+    }
+
+    if (panelType == 'Tutorial') {
       return FutureBuilder<String>(
-        future: DefaultAssetBundle.of(context).loadString('assets/doc/tutorial.md'),
+        future: DefaultAssetBundle.of(context)
+            .loadString(_tutorialAssetPath),          // 读取 assets 里的 md 文件
         builder: (context, snapshot) {
           if (snapshot.hasData) {
+            // 把 "/img/tutorial_*.png" 换成 "assets/doc/img/tutorial_*.png"
+            final md = snapshot.data!.replaceAllMapped(
+              RegExp(r'\/img\/(tutorial_\d+\.png)', multiLine: true),
+              (m) => '$_tutorialImgPrefix${m.group(1)}',
+            );
+
             return MarkdownBody(
-              data: snapshot.data!,
+              data: md,
+              sizedImageBuilder: (element) {
+                final url = element.uri.toString();
+                // 让本地图片用 AssetImage 加载
+                return Image.asset(url, fit: BoxFit.contain);
+              },
               styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                  height: 1.5,
-                ),
-                h1: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-                h2: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                h3: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-                a: const TextStyle(
-                  color: Colors.blue,
-                  decoration: TextDecoration.underline,
-                ),
-                listBullet: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+                p: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
+                h1: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                h2: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                listBullet: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
-            );
-          } else if (snapshot.hasError) {
-            return const Center(
-              child: Text(
-                '加载教程失败',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
-              ),
-            );
-          } else {
-            return const Center(
-              child: CircularProgressIndicator(),
             );
           }
+          if (snapshot.hasError) {
+            return Center(child: Text('教程加载失败：${snapshot.error}'));
+          }
+          return const Center(child: CircularProgressIndicator());
         },
       );
     }
-    
-    return const Text(
-      'Content not found.',
-      style: TextStyle(
-        color: Colors.white70,
-        fontSize: 16,
-      ),
-    );
+
+    return const Text('Content not found.',
+        style: TextStyle(color: Colors.white70, fontSize: 16));
   }
   
   // 构建右侧内容区域
