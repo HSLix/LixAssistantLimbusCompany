@@ -1,3 +1,4 @@
+[English Version(translated by google)](https://github-com.translate.goog/HSLix/LixAssistantLimbusCompany/blob/master/doc/CONTRIBUTING.md?_x_tr_sl=zh-CN&_x_tr_tl=en&_x_tr_hl=zh-CN&_x_tr_pto=wapp)
 # 项目架构简单介绍及开发建议
 - 推荐在 VSCode 进行开发
 
@@ -6,6 +7,8 @@
 - lalc_backend，后端，初始化时用 `uv sync` 来配置环境（uv 是一个 python 虚拟环境的工具，不了解的话请自行搜索下载使用）；由于涉及到平级目录互相调用，建议用 uv pip install -e . 来模块化项目。
 
 - 项目整体的打包用根目录的 packup_release.bat 文件，打包环境为 windows
+
+# 
 
 # Git commit message 建议
 - fork 到自己仓库后，建议自己另建一个分支（branch）开发，完成后先把新分支 push 到自己仓库，然后前往 [pr](https://github.com/HSLix/LixAssistantLimbusCompany/compare) 来新建自己的 pr，把你的分支合进来。

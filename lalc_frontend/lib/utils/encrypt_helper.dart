@@ -10,25 +10,21 @@ final _logger = Logger(
 );
 
 class EncryptHelper {
-  /// 获取设备ID - Windows平台使用wmic命令，其他平台使用platform_device_id包
+  /// 获取设备ID - Windows平台使用PowerShell的Get-CimInstance命令，其他平台使用platform_device_id包
   static Future<String> _getDeviceId() async {
     if (Platform.isWindows) {
       try {
         final result = Process.runSync(
-          'wmic', ['csproduct', 'get', 'UUID', '/value'],
+          'powershell', 
+          ['-Command', 'Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID'],
           runInShell: true,
         );
-        final lines = LineSplitter.split(result.stdout as String);
-        for (final line in lines) {
-          if (line.startsWith('UUID=')) {
-            final uuid = line.substring(5).trim();
-            if (uuid.isNotEmpty && !uuid.toUpperCase().startsWith('FFFFFFFF')) {
-              return uuid;
-            }
-          }
+        final uuid = (result.stdout as String).trim();
+        if (uuid.isNotEmpty && !uuid.toUpperCase().startsWith('FFFFFFFF')) {
+          return uuid;
         }
       } catch (e) {
-        _logger.e('获取设备ID时WMIC命令执行失败: $e');
+        _logger.e('获取设备ID时PowerShell命令执行失败: $e');
       }
     }
     
