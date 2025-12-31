@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.1.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.0.0...v4.1.0) (2025-12-31)
+
+
+### Features
+
+* 让游戏窗口保持规定大小 | keep the game window size in curtain shape ([06b4c8e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/06b4c8eb268901a9ddcc787efacd28ad74b35768))
+
+
+### Bug Fixes
+
+* 修复了教程没有正常显示的问题 | fix the bug of show the tutorial ([dadf1c7](https://github.com/HSLix/LixAssistantLimbusCompany/commit/dadf1c7921fd82a76dc72a8237fdd29d12894b6a))
+* 修复事件判定模板因更新失效的问题 | fix the error that lalc wold stuck at the event pass due to the change of pass words ([3dc08cb](https://github.com/HSLix/LixAssistantLimbusCompany/commit/3dc08cb6add0cda5c8685d91064b905fdc70b634))
+* 更换获取 UUID 的方式，避免个别设备没有 wmic 这个工具 | get rid of wmic to get the uuid ([daa88d7](https://github.com/HSLix/LixAssistantLimbusCompany/commit/daa88d776e16d2827508d31d3a8a538cc8965695))
+* 让英文路径报错时，能输出当前路径辅助调试 | add the detail of the english path error to show current path ([db08f5f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/db08f5f9e86c14e9a02e833d560443f8a3f7e30b))
+
 ## [4.0.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v1.0.0...v4.0.0) (2025-12-30)
 
 
