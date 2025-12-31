@@ -381,8 +381,9 @@ if __name__ == "__main__":
         # fill_mask_screenshot(input_handler.capture_screenshot(), 535, 480, 650, 50), # 商店第二行饰品名字
         # fill_mask_screenshot(input_handler.capture_screenshot(), 568, 100, 100, 80), # 商店金额
         # fill_mask_screenshot(input_handler.capture_screenshot(), 110, 120, 1090, 60), # 换层 ego 的顶
-        fill_mask_screenshot(input_handler.capture_screenshot(), 90, 175, 1090, 40), # 换层 ego 的名字
+        # fill_mask_screenshot(input_handler.capture_screenshot(), 90, 175, 1090, 40), # 换层 ego 的名字
         # fill_mask_screenshot(input_handler.capture_screenshot(), 280, 150, 300, 130), # enhance ego 的名字
+        # fill_mask_screenshot(input_handler.capture_screenshot(), 10, 580, 950, 60), # 事件判定
         # input_handler.capture_screenshot(),
         visualize=True,
         # merge_x=False,

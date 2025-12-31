@@ -91,6 +91,10 @@ class BackgroundInputState(InputState):
         return set_background_focus(hwnd)
 
 
+DEFAULT_WINDOW_WIDTH = 1302
+DEFAULT_WINDOW_HEIGHT = 776
+
+
 class _Input:
     _singleton = None  # 保存唯一实例，供 wait_input_idle 访问
 
@@ -209,13 +213,19 @@ class _Input:
         if self._hwnd:
             if self.set_focus():
                 self.refresh_window_state()
-                self.set_window_size()
+                # 只在当前窗口大小与默认大小不同时才设置窗口大小
+                if self._width != DEFAULT_WINDOW_WIDTH or self._height != DEFAULT_WINDOW_HEIGHT:
+                    self.set_window_size()
             
             mouse_in_window, mouse_x, mouse_y = is_mouse_in_window(self._hwnd)
             if reset and mouse_in_window:
                 logger.debug("检测到鼠标在游戏窗口内，尝试暂时移开鼠标")
                 move_mouse_to_top_right_corner(self._hwnd)
             
+            # 只在当前窗口大小与默认大小不同时才设置窗口大小
+            if self._width != DEFAULT_WINDOW_WIDTH or self._height != DEFAULT_WINDOW_HEIGHT:
+                self.set_window_size()
+                
             self.screenshot = take_screenshot(self._hwnd, width=self.width, height=self.height, save_path=save_path)
             # 复原
             if reset and mouse_in_window:
@@ -225,11 +235,16 @@ class _Input:
         else:
             raise Exception("hwnd init Error")
     
-    def set_window_size(self, width=1302, height=776):
+    def set_window_size(self, width=DEFAULT_WINDOW_WIDTH, height=DEFAULT_WINDOW_HEIGHT):
         """
         设置窗口尺寸为指定大小。
         注意：这需要实际调用窗口大小调整函数的实现。
         """
+        # 检查当前窗口大小是否已经等于目标大小
+        if self._width == width and self._height == height:
+            logger.debug(f"窗口大小已经是 {width}x{height}，跳过设置")
+            return
+        
         # 占位符用于实际窗口大小调整的实现
         # 通常会调用game_window模块中的函数
         self._width = width
