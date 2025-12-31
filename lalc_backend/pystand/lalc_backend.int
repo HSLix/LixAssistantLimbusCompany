@@ -75,7 +75,7 @@ def run_as_admin():
 # 检查是否以管理员权限运行，如果不是则请求权限
 if not run_as_admin():
     print("该进程没有管理员权限，即将退出")
-    # 这里补充，如果前面发现根目录有 lalc_frontend,就静默运行 lalc_frontend/lalc_frontend.exe
+    # 如果前面发现根目录有 lalc_frontend,就运行 lalc_frontend/lalc_frontend.exe
     if frontend_exists:
         frontend_exe_path = os.path.join(script_dir, 'lalc_frontend', 'lalc_frontend.exe')
         if os.path.exists(frontend_exe_path):
@@ -87,6 +87,9 @@ if not run_as_admin():
         else:
             error_msg = f"前端程序不存在: {frontend_exe_path}。Frontend executable does not exist: {frontend_exe_path}."
             os.system(f'msg * "{error_msg}"')
+
+    else:
+        print("没有检测到前端程序，跳过前端程序的启动")
     sys.exit(0)
 
 try:
