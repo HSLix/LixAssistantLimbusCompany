@@ -30,7 +30,7 @@ def is_valid_path(path):
     return valid_pattern.match(path) is not None
 
 if not is_valid_path(script_dir):
-    error_msg = "路径包含非英文字符！请将程序放在全英文路径下，例如: D:/LALC。Path contains non-English characters, please put the program in an English path."
+    error_msg = f"路径包含非英文字符！请将程序放在全英文路径下(例如：D:/LALC)，当前路径: {script_dir}。。Path contains non-English characters, please put the program in an English path(such as D:/LALC). Current path: {script_dir}"
     os.system(f'msg * "{error_msg}"')
     sys.exit(1)
 

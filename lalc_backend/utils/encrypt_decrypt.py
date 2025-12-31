@@ -16,16 +16,14 @@ def get_device_id():
     try:
         # 尝试使用不同方式获取设备ID，按优先级排序
         if platform.system() == "Windows":
-            # Windows系统
+            # Windows系统，使用PowerShell的Get-CimInstance命令
             out = subprocess.check_output(
-                'wmic csproduct get UUID /value',
+                'powershell "Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID"',
                 shell=True, stderr=subprocess.DEVNULL
-            ).decode('utf-8', errors='ignore')
-            for line in out.splitlines():
-                if line.startswith('UUID='):
-                    uuid = line.split('=', 1)[1].strip()
-                    if uuid and not uuid.upper().startswith('FFFFFFFF'):
-                        return uuid
+            ).decode('utf-8', errors='ignore').strip()
+            
+            if out and not out.upper().startswith('FFFFFFFF'):
+                return out
             raise RuntimeError("获取设备 ID 失败")
         else: 
             raise Exception("现阶段只支持 Windows 系统")
