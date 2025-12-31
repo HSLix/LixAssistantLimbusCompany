@@ -1,3 +1,4 @@
+[English Version(translated by google)](https://github-com.translate.goog/HSLix/LixAssistantLimbusCompany/blob/master/doc/CONTRIBUTING.md?_x_tr_sl=zh-CN&_x_tr_tl=en&_x_tr_hl=zh-CN&_x_tr_pto=wapp)
 # 项目架构简单介绍及开发建议
 - 推荐在 VSCode 进行开发
 
