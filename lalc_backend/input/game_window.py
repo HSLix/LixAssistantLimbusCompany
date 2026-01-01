@@ -9,20 +9,26 @@ from utils.logger import init_logger
 
 logger = init_logger()
 
+# 定义Windows API函数和结构体
+user32 = ctypes.windll.user32
+
+class POINT(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_long), ("y", ctypes.c_long)]
 
 def get_cursor_pos():
     """
-    获取当前鼠标位置
-    :return: (x, y) 鼠标坐标元组，如果失败则返回 (None, None)
+    使用 ctypes 调用 Windows API 获取鼠标位置（带 1 秒重试）
+    :return: (x, y) 鼠标坐标元组
     """
-    point = wintypes.POINT()
-    result = ctypes.windll.user32.GetCursorPos(ctypes.pointer(point))
-    while not result:
-        time.sleep(0.1)
-        logger.log("鼠标位置获取失败，正在尝试重新获取", level="WARNING")
-        result = ctypes.windll.user32.GetCursorPos(ctypes.pointer(point))
-    return point.x, point.y
-    
+    while True:
+        try:
+            point = POINT()
+            result = user32.GetCursorPos(ctypes.pointer(point))
+            if not result:          # API 返回 0 也视为失败
+                raise ctypes.WinError()
+            return point.x, point.y
+        except Exception:
+            time.sleep(1)           # 失败则休眠 1 秒后继续
 
 
 def set_background_focus(hwnd)->bool:

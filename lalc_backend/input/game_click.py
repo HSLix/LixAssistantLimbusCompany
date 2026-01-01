@@ -15,15 +15,18 @@ class POINT(ctypes.Structure):
 
 def get_cursor_pos():
     """
-    使用ctypes调用Windows API获取鼠标位置
+    使用 ctypes 调用 Windows API 获取鼠标位置（带 1 秒重试）
     :return: (x, y) 鼠标坐标元组
     """
-    point = POINT()
-    result = user32.GetCursorPos(ctypes.pointer(point))
-    if result:
-        return point.x, point.y
-    else:
-        raise Exception("Failed to get cursor position")
+    while True:
+        try:
+            point = POINT()
+            result = user32.GetCursorPos(ctypes.pointer(point))
+            if not result:          # API 返回 0 也视为失败
+                raise ctypes.WinError()
+            return point.x, point.y
+        except Exception:
+            time.sleep(1)           # 失败则休眠 1 秒后继续
 
 def get_client_rect(hwnd):
     """

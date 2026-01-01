@@ -17,15 +17,18 @@ class POINT(ctypes.Structure):
 
 def get_cursor_pos():
     """
-    使用ctypes调用Windows API获取鼠标位置
+    使用 ctypes 调用 Windows API 获取鼠标位置（带 1 秒重试）
     :return: (x, y) 鼠标坐标元组
     """
-    point = POINT()
-    result = user32.GetCursorPos(ctypes.pointer(point))
-    if result:
-        return point.x, point.y
-    else:
-        raise Exception("Failed to get cursor position")
+    while True:
+        try:
+            point = POINT()
+            result = user32.GetCursorPos(ctypes.pointer(point))
+            if not result:          # API 返回 0 也视为失败
+                raise ctypes.WinError()
+            return point.x, point.y
+        except Exception:
+            time.sleep(1)           # 失败则休眠 1 秒后继续
 
 def background_swipe(hwnd, start_x, start_y, end_x, end_y, speed=1):
     """
@@ -41,8 +44,6 @@ def background_swipe(hwnd, start_x, start_y, end_x, end_y, speed=1):
     if not hwnd or not win32gui.IsWindow(hwnd):
         raise Exception(f"错误：窗口句柄无效（hwnd={hwnd}）")
     
-    # set_focus(hwnd)
-
     try:
         # 将客户端坐标转换为屏幕坐标
         screen_start_point = win32gui.ClientToScreen(hwnd, (int(start_x), int(start_y)))
