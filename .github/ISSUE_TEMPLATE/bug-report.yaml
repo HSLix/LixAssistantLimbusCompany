@@ -31,7 +31,7 @@ body:
   - type: textarea
     id: log
     attributes:
-      label: 日志文件 | Log Files (Debug Info Warning Error)
+      label: 日志文件 | Log Files
       description: 请在日志页导出最上面的一份日志导出，放到网盘（夸克、百度……）或者 [WeTransfer](https://wetransfer.com/) 在这里放上链接 | Please export the top log on the log page and put it to the cloud disk (Quark, Baidu, etc.). Or [WeTransfer](https://wetransfer.com/)
     validations:
       required: true
