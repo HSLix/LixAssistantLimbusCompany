@@ -6,14 +6,14 @@
 ![教程](/img/tutorial_two_windows.png)
 
 
-# 快速上手
+# 快速上手 | Quick Start
 ![教程](/img/tutorial_01.png)
 ![教程](/img/tutorial_02.png)
 ![教程](/img/tutorial_03.png)
 ![教程](/img/tutorial_04.png)
 ![教程](/img/tutorial_05.png)
 
-# 配置详细说明
+# 配置详细说明 | Config Detail
 ![教程](/img/tutorial_06.png)
 ![教程](/img/tutorial_07.png)
 ![教程](/img/tutorial_08.png)
