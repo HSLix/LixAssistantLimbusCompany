@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.2.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.1.0...v4.2.0) (2026-01-01)
+
+
+### Features
+
+* 增加自动回归初始界面的代码 | can back to the init page automatically ([f348be2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f348be2c00b15e112a420e94c6225f037b5b9230))
+
+
+### Bug Fixes
+
+* 修复了选人时，取消选择中间顺序成员而已选成员顺序没有更新的bug | fix theerror of do not update the selected member when cancel the middle order sinner ([f42effa](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f42effaadf327d7ebb0ec119e16679dcc790e08b))
+* 前端打开失败，事件图片识别不良，固定镜牢难度，避免没有选择倾向饰品卡住 | fail to launch frontend, fail to recognize event pass, fix the normal of mirror, fail to stuck when choose prefer gift style ([4d3ff88](https://github.com/HSLix/LixAssistantLimbusCompany/commit/4d3ff881c1a98907e267b251c9c27dad63269928))
+
 ## [4.1.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.0.0...v4.1.0) (2025-12-31)
 
 
