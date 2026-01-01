@@ -160,6 +160,7 @@ class _HomePageState extends State<HomePage>
     setState(() => isLoadingReleaseInfo = true);
 
     try {
+      await _fetchLatestReleaseInfoFromBackup();
       // 首先尝试从GitHub获取
       final response = await http
           .get(Uri.parse(
@@ -187,7 +188,6 @@ class _HomePageState extends State<HomePage>
   ''';
         
         // 检查是否有新版本
-        
         String latestVersion = data['tag_name'].toString(); // 保持带V的格式
         
         if (isNewerVersion(currentVersion, latestVersion)) {
@@ -233,8 +233,10 @@ class _HomePageState extends State<HomePage>
         final data = json.decode(response.body)['data'];
         final versionName = data['version_name'] ?? 'Unknown';
         final releaseNote = data['release_note'] ?? 'No description provided';
+        String currentVersion = const String.fromEnvironment('CURRENT_VERSION', defaultValue: 'V0.0.0');
         
         final releaseInfo = '''
+  ${S.of(context).current_version}: $currentVersion
   ${S.of(context).latest_release}: $versionName
   $releaseNote
 
@@ -242,7 +244,6 @@ class _HomePageState extends State<HomePage>
   ''';
         
         // 检查是否有新版本
-        String currentVersion = const String.fromEnvironment('CURRENT_VERSION', defaultValue: '0.0.0');
         String latestVersion = versionName; // 保持带V的格式
         
         if (isNewerVersion(currentVersion, latestVersion)) {
@@ -345,6 +346,18 @@ class _HomePageState extends State<HomePage>
           taskConfigs[taskName] = configManager.taskConfigs[taskName]!.params['value'] ?? 'Do Nothing';
         } else {
           taskConfigs[taskName] = Map<String, dynamic>.from(configManager.taskConfigs[taskName]!.params);
+          // 为镜像迷宫任务初始化mirror_mode参数，如果不存在的话
+          if (taskName == 'Mirror' && !taskConfigs[taskName].containsKey('mirror_mode')) {
+            taskConfigs[taskName]['mirror_mode'] = 'normal'; // 默认为普通难度（单值）
+          } else if (taskName == 'Mirror' && taskConfigs[taskName]['mirror_mode'] is List) {
+            // 如果是旧的列表格式，转换为字符串格式
+            List modeList = taskConfigs[taskName]['mirror_mode'];
+            if (modeList.contains('normal')) {
+              taskConfigs[taskName]['mirror_mode'] = 'normal';
+            } else {
+              taskConfigs[taskName]['mirror_mode'] = modeList.first as String;
+            }
+          }
         }
         taskTeams[taskName] = List<int>.from(configManager.taskConfigs[taskName]!.teams);
       }
@@ -388,10 +401,23 @@ class _HomePageState extends State<HomePage>
             teams: [],
           );
         } else {
+          // 为镜像迷宫任务初始化mirror_mode参数，如果不存在的话
+          Map<String, dynamic> params = Map<String, dynamic>.from(taskConfigs[taskName] ?? {});
+          if (taskName == 'Mirror' && !params.containsKey('mirror_mode')) {
+            params['mirror_mode'] = 'normal'; // 默认为普通难度（单值）
+          } else if (taskName == 'Mirror' && params['mirror_mode'] is List) {
+            // 如果是旧的列表格式，转换为字符串格式
+            List modeList = params['mirror_mode'];
+            if (modeList.contains('normal')) {
+              params['mirror_mode'] = 'normal';
+            } else {
+              params['mirror_mode'] = modeList.first as String;
+            }
+          }
           configManager.taskConfigs[taskName] = TaskConfig(
             enabled: taskEnabled[i],
             count: taskCounts[taskName] ?? 1,
-            params: Map<String, dynamic>.from(taskConfigs[taskName] ?? {}),
+            params: params,
             teams: List<int>.from(taskTeams[taskName] ?? []),
           );
         }
@@ -1140,6 +1166,45 @@ class _HomePageState extends State<HomePage>
                   }
                 },
               ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 10),
+        
+        // Mirror难度选择下拉框
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_difficulty, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            DropdownButton<String>(
+              value: taskConfigs['Mirror']['mirror_mode'] is List
+                  ? (taskConfigs['Mirror']['mirror_mode'] as List).first as String
+                  : taskConfigs['Mirror']['mirror_mode'] as String?,
+              items: <String>[
+                          'normal'
+                          // , 'hard'
+                          ]
+                  .map<DropdownMenuItem<String>>((String value) {
+                String displayText = value == 'normal' 
+                    ? S.of(context).mirror_difficulty_normal 
+                    : S.of(context).mirror_difficulty_hard;
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(displayText, style: const TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    taskConfigs['Mirror']['mirror_mode'] = newValue;
+                    // 保存配置
+                    _saveConfigToManager();
+                  });
+                }
+              },
+              dropdownColor: Colors.grey[800],
+              style: const TextStyle(color: Colors.white),
             ),
           ],
         ),

@@ -621,6 +621,18 @@ class _LogPageState extends State<LogPage> {
                 if (entry != null) {
                   entries.add(entry);
                   parsedCount++;
+                } else {
+                  // 如果解析失败且有前一个日志项，将内容追加到前一个日志项的消息中
+                  if (entries.isNotEmpty) {
+                    final lastEntry = entries.last;
+                    final updatedEntry = LogEntry(
+                      timestamp: lastEntry.timestamp,
+                      level: lastEntry.level,
+                      message: '${lastEntry.message}\n$line',
+                      imagePath: lastEntry.imagePath,
+                    );
+                    entries[entries.length - 1] = updatedEntry;
+                  }
                 }
                 
                 // 每处理1000行更新一次进度和UI，避免界面冻结
@@ -1375,6 +1387,18 @@ class _LogPageState extends State<LogPage> {
           if (entry != null) {
             entries.add(entry);
             parsedCount++;
+          } else {
+            // 如果解析失败且有前一个日志项，将内容追加到前一个日志项的消息中
+            if (entries.isNotEmpty) {
+              final lastEntry = entries.last;
+              final updatedEntry = LogEntry(
+                timestamp: lastEntry.timestamp,
+                level: lastEntry.level,
+                message: '${lastEntry.message}\n$line',
+                imagePath: lastEntry.imagePath,
+              );
+              entries[entries.length - 1] = updatedEntry;
+            }
           }
           
           // 每处理1000行更新一次进度和UI，避免界面冻结

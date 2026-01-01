@@ -191,5 +191,8 @@
   "thread": "纺锤采光",
   "mirror": "镜像迷宫",
   "reward": "奖励",
-  "at_last": "运行结束"
+  "at_last": "运行结束",
+  "mirror_difficulty": "镜像迷宫难度",
+  "mirror_difficulty_normal": "普通",
+  "mirror_difficulty_hard": "困难"
 }

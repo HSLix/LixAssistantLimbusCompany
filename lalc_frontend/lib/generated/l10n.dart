@@ -1633,6 +1633,36 @@ class S {
   String get at_last {
     return Intl.message('At Last', name: 'at_last', desc: '', args: []);
   }
+
+  /// `Mirror Difficulty`
+  String get mirror_difficulty {
+    return Intl.message(
+      'Mirror Difficulty',
+      name: 'mirror_difficulty',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Normal`
+  String get mirror_difficulty_normal {
+    return Intl.message(
+      'Normal',
+      name: 'mirror_difficulty_normal',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Hard`
+  String get mirror_difficulty_hard {
+    return Intl.message(
+      'Hard',
+      name: 'mirror_difficulty_hard',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

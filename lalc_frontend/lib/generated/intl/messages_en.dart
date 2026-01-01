@@ -217,6 +217,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "member": MessageLookupByLibrary.simpleMessage("Member"),
     "member_count_label": MessageLookupByLibrary.simpleMessage("   Member: "),
     "mirror": MessageLookupByLibrary.simpleMessage("Mirror"),
+    "mirror_difficulty": MessageLookupByLibrary.simpleMessage(
+      "Mirror Difficulty",
+    ),
+    "mirror_difficulty_hard": MessageLookupByLibrary.simpleMessage("Hard"),
+    "mirror_difficulty_normal": MessageLookupByLibrary.simpleMessage("Normal"),
     "mirror_ego_gift_allow_block_list": MessageLookupByLibrary.simpleMessage(
       "Mirror Ego Gift Allow List & Block List",
     ),

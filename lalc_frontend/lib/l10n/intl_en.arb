@@ -191,5 +191,8 @@
   "thread": "Thread",
   "mirror": "Mirror",
   "reward": "Reward",
-  "at_last": "At Last"
+  "at_last": "At Last",
+  "mirror_difficulty": "Mirror Difficulty",
+  "mirror_difficulty_normal": "Normal",
+  "mirror_difficulty_hard": "Hard"
 }

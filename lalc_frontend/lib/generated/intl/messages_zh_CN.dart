@@ -157,6 +157,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "member": MessageLookupByLibrary.simpleMessage("成员"),
     "member_count_label": MessageLookupByLibrary.simpleMessage("   成员: "),
     "mirror": MessageLookupByLibrary.simpleMessage("镜像迷宫"),
+    "mirror_difficulty": MessageLookupByLibrary.simpleMessage("镜像迷宫难度"),
+    "mirror_difficulty_hard": MessageLookupByLibrary.simpleMessage("困难"),
+    "mirror_difficulty_normal": MessageLookupByLibrary.simpleMessage("普通"),
     "mirror_ego_gift_allow_block_list": MessageLookupByLibrary.simpleMessage(
       "镜像饰品白名单和黑名单",
     ),

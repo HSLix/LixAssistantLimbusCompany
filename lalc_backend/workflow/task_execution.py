@@ -464,6 +464,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
         gift_tag = "ego_gifts_" + style
         prefer_gifts.update(x[0] for x in get_images_by_tag(gift_tag))
     
+    mirror_team_style = cfg["mirror_team_styles"][cfg_index]
     gift_allow_list = cfg["mirror_team_ego_allow_list"][cfg_index]
     gift_block_list = cfg["mirror_team_ego_block_list"][cfg_index]
     prefer_gifts.update(gift_allow_list)
@@ -570,7 +571,10 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
         else:
             input_handler.click(1140, 120)
             time.sleep(1)
-            input_handler.click(*keyword_refresh_map[prefer_gift_styles[loop_count%len(prefer_gift_styles)]])
+            if len(prefer_gift_styles) == 0:
+                input_handler.click(*keyword_refresh_map[mirror_team_style])
+            else:
+                input_handler.click(*keyword_refresh_map[prefer_gift_styles[loop_count%len(prefer_gift_styles)]])
             time.sleep(0.5)
             input_handler.click(780, 570)
             self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -709,7 +713,7 @@ def exec_event_pass_check(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
     logger.log("事件通行证检查", tmp_screenshot)
     for s in ["very_high", "high", "normal", "low", "very_low"]:
-        res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s, threshold=0.9)
+        res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s)
         if len(res) > 0:
             input_handler.click(res[0][0], res[0][1])
             break
@@ -721,7 +725,9 @@ def exec_event_pass_check(self, node:TaskNode, func):
 @TaskExecution.register("event_make_choice")
 def exec_event_make_choice(self, node:TaskNode, func):
     # 使选项置中
-    input_handler.click(1200, 330)
+    scroll_strip_pos = recognize_handler.template_match(input_handler.capture_screenshot(), "event_scroll_strip")
+    if len(scroll_strip_pos) > 0:
+        input_handler.click(scroll_strip_pos[0][0], scroll_strip_pos[0][1])
     time.sleep(1)
     tmp_screenshot = input_handler.capture_screenshot()
     logger.log("事件选项处理", tmp_screenshot)
@@ -740,8 +746,6 @@ def exec_event_make_choice(self, node:TaskNode, func):
         # raise Exception("进入了普通情况，请人工检查是否需要补充事件匹配")
         for x, y in [(950, 200), (950, 290), (950, 380), (950, 450)]:
             input_handler.click(x, y)   
-
-    
 
 
 @TaskExecution.register("mirror_select_next_node")
@@ -820,6 +824,12 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
             detect_and_save_theme_pack(input_handler.capture_screenshot()) 
         
         tmp_screenshot = input_handler.capture_screenshot()
+
+        if recognize_handler.template_match(tmp_screenshot, "hard_mode") or recognize_handler.template_match(tmp_screenshot, "hard_clear_bonus"):
+            input_handler.click(905, 50)
+            logger.log("检测到镜牢开启困难模式，正在关闭")
+            time.sleep(5)
+            continue
         
         for theme_pack_name, val in theme_packs:
             cur_weight = val["weight"]

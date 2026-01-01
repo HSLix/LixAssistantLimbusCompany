@@ -160,6 +160,7 @@ if __name__ == "__main__":
         templates.append(get_image("event_pass_normal"))
         templates.append(get_image("event_pass_high"))
         templates.append(get_image("event_pass_very_high"))
+        # templates.append(get_image("event_scroll_strip"))
         # templates.append(get_image("Thunderbranch"))
         # templates.append(get_image("Lightning Rod"))
         # templates.append(get_image("Rest"))
