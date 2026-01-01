@@ -3,7 +3,7 @@
         "action":"init_limbus_window",
         "next":[
             "touch_to_start",
-            "main_circle_center"
+            "back_to_init_page"
         ]
     },
     "touch_to_start":{
@@ -15,7 +15,14 @@
             "post_delay": 6
         },
         "next":[
-            "main_circle_center"
+            "back_to_init_page"
+        ]
+    },
+    "back_to_init_page":{
+        "action":"back_to_init_page",
+        "next":[
+            "main_circle_center",
+            "back_to_init_page"
         ]
     },
     "main_circle_center":{

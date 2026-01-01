@@ -153,6 +153,33 @@ class TaskExecution:
 
 # ====== 以下开始写所有 task，全部用装饰器注册 =======
 # 如果一个节点的 action 与节点同名，那么下面返回的时候就不要再返回这个 action func 的返回值，否则会无限递归执行该 action
+@TaskExecution.register("back_to_init_page")
+def exec_back_to_init_page(self, node:TaskNode, func):
+    tmp_screenshot = input_handler.capture_screenshot()
+    
+    if recognize_handler.template_match(tmp_screenshot, "left_top_arrow"):
+        # 对于左上角有箭头的，总之先点了
+        pos = recognize_handler.template_match(tmp_screenshot, "left_top_arrow")
+        if len(pos) > 0:
+            input_handler.click(pos[0][0], pos[0][1])
+    elif recognize_handler.template_match(tmp_screenshot, "win_rate"):
+        input_handler.click(1230, 45)
+        time.sleep(2)
+        input_handler.click(640, 430)
+    elif recognize_handler.template_match(tmp_screenshot, "right_top_setting"):
+        # 先处理右上角有设置的，就当是镜牢内的情况
+        logger.log("检测到可能处于镜牢的其它情况，启动从设置返回")
+        input_handler.click(1230, 45)
+        time.sleep(2)
+        input_handler.click(730, 435)
+        time.sleep(2)
+        input_handler.key_press("enter")
+    else:
+        logger.debug("没检测到需要特殊处理的情况", tmp_screenshot)
+        time.sleep(5)
+    time.sleep(1)
+
+
 @TaskExecution.register("error_cannot_operate_the_game")
 def exec_error_cannot_operate_the_game_window(self, node:TaskNode, func):
     logger.log("开始重启 Limbus")
