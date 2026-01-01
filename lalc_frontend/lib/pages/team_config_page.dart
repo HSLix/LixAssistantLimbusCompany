@@ -158,13 +158,34 @@ class _TeamConfigPageState extends State<TeamConfigPage>
     final orders = teamOrders[selectedTeamIndex];
     setState(() {
       if (orders[memberIndex] == -1) {
+        // 如果当前成员未被选择，则添加到下一个可用顺序
         orders[memberIndex] = nextOrder;
       } else {
+        // 如果当前成员已被选择，则取消选择
         orders[memberIndex] = -1;
       }
+      
+      // 重新计算所有选中成员的顺序
+      _recalculateOrder();
+      
       // 保存配置
       _saveCurrentTeamConfig();
     });
+  }
+
+  // 重新计算选中成员的顺序
+  void _recalculateOrder() {
+    final orders = teamOrders[selectedTeamIndex];
+    // 获取所有选中的成员及其当前顺序
+    List<MapEntry<int, int>> selectedMembers = orders.asMap().entries
+        .where((entry) => entry.value != -1)
+        .toList()
+      ..sort((a, b) => a.value.compareTo(b.value)); // 按当前顺序排序
+
+    // 重新分配顺序号（从1开始）
+    for (int i = 0; i < selectedMembers.length; i++) {
+      orders[selectedMembers[i].key] = i + 1;
+    }
   }
 
   // 清空当前选择
