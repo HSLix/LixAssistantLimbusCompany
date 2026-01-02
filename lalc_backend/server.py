@@ -194,10 +194,10 @@ class ServerController:
                         # 特殊处理Mirror相关的队伍配置
                         if task_type == "Mirror":
                             # 队伍风格
-                            if "selectedStyleType" in team_config:
+                            if "selectedTeamStyleType" in team_config:
                                 if "mirror_team_styles" not in backend_config["mirror_cfg"]:
                                     backend_config["mirror_cfg"]["mirror_team_styles"] = []
-                                backend_config["mirror_cfg"]["mirror_team_styles"].append(team_config["selectedStyleType"])
+                                backend_config["mirror_cfg"]["mirror_team_styles"].append(team_config["selectedTeamStyleType"])
                             
                             # 偏好EGO饰品类型
                             if "selectedPreferEgoGiftTypes" in team_config:
