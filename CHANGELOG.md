@@ -1,5 +1,19 @@
 # Changelog
 
+## [4.4.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.3.0...v4.4.0) (2026-01-02)
+
+
+### Features
+
+* 增加对空饰品倾向的提醒，添加队伍倾向时也会添加到饰品倾向，去除时也会同步去除 | add the remind of empty gift style list, the gift sytle will add sytle when change team style list ([694cad2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/694cad24a81843b92697fd9043f134c78fd17d77))
+
+
+### Bug Fixes
+
+* 修复了启动程序报错无法延迟 | fix the bug that start programme can not sleep Fixed [#227](https://github.com/HSLix/LixAssistantLimbusCompany/issues/227) ([7921c7c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/7921c7cd15ed9077fff86f76ee33f016696bc5ac))
+* 修复了日志对于长段内容没能完全展示的错误 | fix the error of not display the whole content of log dialog ([78aa54a](https://github.com/HSLix/LixAssistantLimbusCompany/commit/78aa54adb504c22b3f944899f67270b4484c209f))
+* 增加队伍是否为空的检查，也算解决了卡在队伍选择的问题 | add the check of no team for tasks, avoid stucking when choosing the team ([ed70c07](https://github.com/HSLix/LixAssistantLimbusCompany/commit/ed70c0790cb18d1abf6da3809798513e5696c790))
+
 ## [4.3.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.2.0...v4.3.0) (2026-01-02)
 
 
