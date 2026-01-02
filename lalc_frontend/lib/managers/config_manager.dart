@@ -4,11 +4,11 @@ import 'package:logger/logger.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
-import '../utils/zip_helper.dart';
+import '../../utils/zip_helper.dart';
 import 'package:flutter/material.dart';
 import 'package:platform_device_id/platform_device_id.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import '../utils/encrypt_helper.dart';
+import '../../utils/encrypt_helper.dart';
 
 /// 语言状态管理类
 class LanguageManager with ChangeNotifier {
@@ -141,11 +141,13 @@ class UserConfig {
   String? language;  // 改为可空类型，null表示跟随系统
   bool autoStart;
   String? mirrorChanCDK;
+  String? themeMode; // 添加主题模式配置，'light' 或 'dark'
 
   UserConfig({
     this.language,  // 默认值改为null，表示跟随系统
     this.autoStart = false,
     this.mirrorChanCDK,
+    this.themeMode = "dark", // 默认值为null，表示使用暗色主题
   });
 
   factory UserConfig.fromJson(Map<String, dynamic> json) {
@@ -153,6 +155,7 @@ class UserConfig {
       language: json['language'] as String?,  // 移除默认值
       autoStart: json['autoStart'] as bool? ?? false,
       mirrorChanCDK: json['mirrorChanCDK'] as String?,
+      themeMode: json['themeMode'] as String?, // 添加主题模式
     );
   }
 
@@ -160,6 +163,7 @@ class UserConfig {
         'language': language,
         'autoStart': autoStart,
         'mirrorChanCDK': mirrorChanCDK,
+        'themeMode': themeMode,
       };
 }
 

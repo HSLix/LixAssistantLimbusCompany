@@ -5,12 +5,12 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:toastification/toastification.dart';
-import '../config_manager.dart';
+import '../managers/config_manager.dart';
 import '../generated/l10n.dart';
 import 'package:provider/provider.dart';
 import '../utils/zip_helper.dart';
 import 'package:path_provider/path_provider.dart';
-import '../websocket_manager.dart';
+import '../managers/websocket_manager.dart';
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 

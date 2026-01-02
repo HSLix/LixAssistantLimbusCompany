@@ -24,7 +24,7 @@ class MessageLookup extends MessageLookupByLibrary {
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "add_teams": MessageLookupByLibrary.simpleMessage("Add Teams"),
     "all_tasks_started": MessageLookupByLibrary.simpleMessage(
-      "All tasks start",
+      "All tasks started",
     ),
     "allow_list": MessageLookupByLibrary.simpleMessage("Allow List"),
     "alphabetical": MessageLookupByLibrary.simpleMessage("A-Z"),
@@ -111,6 +111,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "daily_lunacy_purchase_hint": MessageLookupByLibrary.simpleMessage(
       "Hint: This is the count lalc will purchase enkephalin with lunary today.",
     ),
+    "dark_mode": MessageLookupByLibrary.simpleMessage("Dark Mode"),
     "default_text": MessageLookupByLibrary.simpleMessage("Default"),
     "delete": MessageLookupByLibrary.simpleMessage("Delete"),
     "delete_failed": MessageLookupByLibrary.simpleMessage("Delete Failed"),
@@ -194,6 +195,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Language setting saved successfully",
     ),
     "latest_release": MessageLookupByLibrary.simpleMessage("Latest Release"),
+    "light_mode": MessageLookupByLibrary.simpleMessage("Light Mode"),
     "load_config": MessageLookupByLibrary.simpleMessage("Load Config"),
     "load_config_warning": MessageLookupByLibrary.simpleMessage(
       "Loading config will overwrite current config, are you sure?",
@@ -267,7 +269,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "No other configs\nJust claim all the coins on the task board",
     ),
     "no_team_configured": MessageLookupByLibrary.simpleMessage(
-      "No team configured, please add a team first",
+      "No team configured, please configure at least one team before starting the task.",
     ),
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("No Team for now"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage(

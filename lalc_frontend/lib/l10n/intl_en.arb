@@ -197,7 +197,9 @@
   "mirror_difficulty_hard": "Hard",
   "new_version_available": "New version available!",
   "check_announcement_for_details": "Check the announcement for details.",
-  "all_tasks_started": "All tasks start",
   "task_start_error": "Task cannot start",
-  "no_team_configured": "No team configured, please add a team first"
+  "no_team_configured": "No team configured, please configure at least one team before starting the task.",
+  "all_tasks_started": "All tasks started",
+  "light_mode": "Light Mode",
+  "dark_mode": "Dark Mode"
 }

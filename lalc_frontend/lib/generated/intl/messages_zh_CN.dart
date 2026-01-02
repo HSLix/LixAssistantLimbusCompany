@@ -23,7 +23,7 @@ class MessageLookup extends MessageLookupByLibrary {
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "add_teams": MessageLookupByLibrary.simpleMessage("添加队伍"),
-    "all_tasks_started": MessageLookupByLibrary.simpleMessage("所有任务开始执行"),
+    "all_tasks_started": MessageLookupByLibrary.simpleMessage("所有任务顺利开始"),
     "allow_list": MessageLookupByLibrary.simpleMessage("白名单"),
     "alphabetical": MessageLookupByLibrary.simpleMessage("A-Z"),
     "announcement": MessageLookupByLibrary.simpleMessage("公告"),
@@ -85,6 +85,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "daily_lunacy_purchase_hint": MessageLookupByLibrary.simpleMessage(
       "提示: 这是今日将用狂气购买脑啡肽的次数。",
     ),
+    "dark_mode": MessageLookupByLibrary.simpleMessage("深色模式"),
     "default_text": MessageLookupByLibrary.simpleMessage("默认"),
     "delete": MessageLookupByLibrary.simpleMessage("删除"),
     "delete_failed": MessageLookupByLibrary.simpleMessage("删除失败"),
@@ -140,6 +141,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "language_setting": MessageLookupByLibrary.simpleMessage("语言设置"),
     "language_setting_saved": MessageLookupByLibrary.simpleMessage("语言设置保存成功"),
     "latest_release": MessageLookupByLibrary.simpleMessage("最新版本"),
+    "light_mode": MessageLookupByLibrary.simpleMessage("浅色模式"),
     "load_config": MessageLookupByLibrary.simpleMessage("读取配置"),
     "load_config_warning": MessageLookupByLibrary.simpleMessage(
       "读取操作将会覆盖当前配置，确定要读取吗？",
@@ -191,7 +193,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "没有其他配置\n只是领取任务面板上的所有积分",
     ),
     "no_team_configured": MessageLookupByLibrary.simpleMessage(
-      "未配置执行队伍，请至少配置一个队伍后再开始任务",
+      "未配置执行队伍，请至少配置一个队伍后再开始任务。",
     ),
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("暂无队伍"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage("暂无主题包数据"),

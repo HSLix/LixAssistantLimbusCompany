@@ -1,7 +1,7 @@
 import 'package:lalc_frontend/main.dart';
-import 'package:lalc_frontend/config_manager.dart'; // 添加配置管理器导入
-import 'package:lalc_frontend/task_status_manager.dart'; // 添加任务状态管理器导入
-import 'package:lalc_frontend/websocket_manager.dart'; // 添加WebSocket管理器导入
+import 'package:lalc_frontend/managers/config_manager.dart'; // 添加配置管理器导入
+import 'package:lalc_frontend/managers/task_status_manager.dart'; // 添加任务状态管理器导入
+import 'package:lalc_frontend/managers/websocket_manager.dart'; // 添加WebSocket管理器导入
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

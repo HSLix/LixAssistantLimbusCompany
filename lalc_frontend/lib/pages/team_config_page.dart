@@ -1,6 +1,6 @@
 import 'package:lalc_frontend/main.dart';
-import 'package:lalc_frontend/config_manager.dart';
-import 'package:lalc_frontend/websocket_manager.dart';
+import 'package:lalc_frontend/managers/config_manager.dart';
+import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:math' as math;

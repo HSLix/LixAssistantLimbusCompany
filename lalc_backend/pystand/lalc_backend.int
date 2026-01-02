@@ -65,7 +65,8 @@ try:
     # 检查是否以管理员权限运行，如果不是则请求权限
     if not run_as_admin():
         print("已申请管理员权限并重新启动，当前进程 3 秒后退出...")
-        time.sleep(3)
+        from time import sleep
+        sleep(3)
         sys.exit(0)
 
     # 如果前面发现根目录有 lalc_frontend,就运行 lalc_frontend/lalc_frontend.exe

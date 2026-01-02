@@ -1,7 +1,7 @@
 import 'dart:io' show Directory, File;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lalc_frontend/websocket_manager.dart';
+import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
@@ -935,16 +935,24 @@ class _LogPageState extends State<LogPage> {
                     
                     // 日志消息
                     Expanded(
-                      child: Text(
-                        uiState.isExpanded 
-                            ? _formatJsonInMessage(entry.message) 
-                            : displayedMessage,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxHeight: uiState.isExpanded ? double.infinity : 100, // 展开时取消最大高度限制
                         ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: uiState.isExpanded ? null : 2,
+                        child: SingleChildScrollView( // 添加滚动视图以处理长内容
+                          scrollDirection: Axis.vertical,
+                          child: Text(
+                            uiState.isExpanded 
+                                ? _formatJsonInMessage(entry.message) 
+                                : displayedMessage,
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                            overflow: uiState.isExpanded ? null : TextOverflow.ellipsis, // 展开时不截断文本
+                            maxLines: uiState.isExpanded ? null : 2, // 展开时显示全部行数
+                          ),
+                        ),
                       ),
                     ),
                     

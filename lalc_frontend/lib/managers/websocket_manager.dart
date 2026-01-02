@@ -4,8 +4,8 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
-import 'package:lalc_frontend/task_status_manager.dart';
-import 'package:lalc_frontend/config_manager.dart';
+import 'package:lalc_frontend/managers/task_status_manager.dart';
+import 'package:lalc_frontend/managers/config_manager.dart';
 
 class WebSocketManager with ChangeNotifier {
   static final WebSocketManager _instance = WebSocketManager._internal();

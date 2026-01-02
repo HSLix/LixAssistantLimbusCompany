@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:lalc_frontend/task_status_manager.dart';
-import 'package:lalc_frontend/websocket_manager.dart';
+import 'package:lalc_frontend/managers/task_status_manager.dart';
+import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:toastification/toastification.dart';
 import '../generated/l10n.dart'; // 添加国际化支持
 

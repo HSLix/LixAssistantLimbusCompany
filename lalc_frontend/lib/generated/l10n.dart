@@ -1684,16 +1684,6 @@ class S {
     );
   }
 
-  /// `All tasks start`
-  String get all_tasks_started {
-    return Intl.message(
-      'All tasks start',
-      name: 'all_tasks_started',
-      desc: '',
-      args: [],
-    );
-  }
-
   /// `Task cannot start`
   String get task_start_error {
     return Intl.message(
@@ -1704,14 +1694,34 @@ class S {
     );
   }
 
-  /// `No team configured, please add a team first`
+  /// `No team configured, please configure at least one team before starting the task.`
   String get no_team_configured {
     return Intl.message(
-      'No team configured, please add a team first',
+      'No team configured, please configure at least one team before starting the task.',
       name: 'no_team_configured',
       desc: '',
       args: [],
     );
+  }
+
+  /// `All tasks started`
+  String get all_tasks_started {
+    return Intl.message(
+      'All tasks started',
+      name: 'all_tasks_started',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Light Mode`
+  String get light_mode {
+    return Intl.message('Light Mode', name: 'light_mode', desc: '', args: []);
+  }
+
+  /// `Dark Mode`
+  String get dark_mode {
+    return Intl.message('Dark Mode', name: 'dark_mode', desc: '', args: []);
   }
 }
 

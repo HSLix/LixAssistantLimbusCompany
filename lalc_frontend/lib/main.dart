@@ -8,18 +8,19 @@ import 'package:lalc_frontend/pages/team_config_page.dart';
 import 'package:lalc_frontend/pages/theme_pack_page.dart';
 import 'package:lalc_frontend/pages/about_page.dart';
 import 'package:lalc_frontend/pages/log_page.dart';
-import 'package:lalc_frontend/config_manager.dart';
-import 'package:lalc_frontend/task_status_manager.dart';
+import 'package:lalc_frontend/managers/config_manager.dart';
+import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/debug_path.dart';
-import 'package:lalc_frontend/websocket_manager.dart';
+import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
 import 'package:toastification/toastification.dart';
-import 'package:lalc_frontend/themes/microsoft_theme.dart'; // 导入Microsoft主题
+// 导入Microsoft主题
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'generated/l10n.dart';
+import 'package:lalc_frontend/managers/theme_manager.dart'; // 导入新的ThemeManager
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,6 +31,9 @@ void main() async {
 
   // 初始化配置管理器
   await ConfigManager().init();
+  
+  // 初始化主题管理器
+  ThemeManager().initMode(ConfigManager().userConfig.themeMode);
   
   // 打印调试信息
   await printAppDocPath();
@@ -122,6 +126,8 @@ class _MyAppState extends State<MyApp> {
       }
     });
   }
+
+  // 切换主题模式
 
   void _handleWebSocketUpdate() {
     // 处理 WebSocket 更新，如果有错误则显示长时间 Toast
@@ -346,15 +352,18 @@ class _MyAppState extends State<MyApp> {
           }
           return languageManager;
         }),
+        ChangeNotifierProvider(create: (_) => ThemeManager()), // 添加ThemeManager
       ],
-      child: Consumer<LanguageManager>(
-        builder: (context, languageManager, child) {
+      child: Consumer2<LanguageManager, ThemeManager>( // 监听语言和主题
+        builder: (context, languageManager, themeManager, child) {
+          // 获取当前主题模式
+          
           return ToastificationWrapper(
             child: MaterialApp(
               navigatorKey: navigatorKey, // 确保navigatorKey被MaterialApp使用
               debugShowCheckedModeBanner: false,
               // 应用Microsoft主题，替换原有的自定义主题设置
-              theme: MicrosoftTheme.darkTheme, // 使用深色Microsoft主题
+              theme: themeManager.currentTheme, // 关键：动态读取
               localizationsDelegates: const [
                 S.delegate, // 确保S.delegate在localizationsDelegates中
                 GlobalMaterialLocalizations.delegate,
@@ -442,6 +451,14 @@ class _MyAppState extends State<MyApp> {
                               icon: Icons.settings,
                               label: localization.sidebar_settings,
                             ),
+                            // 添加主题切换按钮
+                            // SidebarXItem(
+                            //   icon: themeManager.currentMode == 'dark' ? Icons.light_mode : Icons.dark_mode,
+                            //   label: themeManager.currentMode == 'dark' ? localization.light_mode : localization.dark_mode,
+                            //   onTap: () {
+                            //     ThemeManager().toggle();
+                            //   },
+                            // ),
                             // 添加Discord图标
                             SidebarXItem(
                               icon: Icons.discord,

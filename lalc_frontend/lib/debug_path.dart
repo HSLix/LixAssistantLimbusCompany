@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:lalc_frontend/config_manager.dart';
+import 'package:lalc_frontend/managers/config_manager.dart';
 
 Future<void> printAppDocPath() async {
   try {
