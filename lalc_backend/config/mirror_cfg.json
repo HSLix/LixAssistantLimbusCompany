@@ -1,15 +1,18 @@
 {
-  "check_node_target_count": 3,
+  "check_node_target_count": 0,
   "mirror_stop_purchase_gift_money": 600,
   "mirror_team_styles": [
+    "Rupture",
     "Bleed",
     "Poise",
     "Burn",
     "Charge",
-    "Sinking",
-    "Rupture"
+    "Sinking"
   ],
   "mirror_team_ego_gift_styles": [
+    [
+      "Rupture"
+    ],
     [
       "Bleed"
     ],
@@ -24,9 +27,6 @@
     ],
     [
       "Sinking"
-    ],
-    [
-      "Rupture"
     ]
   ],
   "mirror_team_ego_allow_list": [
@@ -37,7 +37,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -48,7 +47,9 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
     ],
     [
       "Lithograph",
@@ -57,7 +58,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -68,7 +68,9 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
     ],
     [
       "Lithograph",
@@ -77,7 +79,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -88,7 +89,8 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -97,7 +99,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -108,7 +109,9 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
     ],
     [
       "Lithograph",
@@ -117,7 +120,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -128,7 +130,9 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
     ],
     [
       "Lithograph",
@@ -137,7 +141,6 @@
       "Carmilla",
       "Milepost of Survival",
       "Phlebotomy Pack",
-      "Pre-order Discount",
       "Prejudice",
       "Prestige Card",
       "Relationship Piece of",
@@ -148,7 +151,9 @@
       "Clear Mirror, Calm Water",
       "Nebulizer",
       "Melted Eyeball",
-      "Downpour"
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
     ]
   ],
   "mirror_team_ego_block_list": [
@@ -160,6 +165,43 @@
     []
   ],
   "mirror_replace_skill": [
+    {
+      "Faust": [
+        3,
+        2,
+        1
+      ],
+      "Ryoshu": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        3,
+        2,
+        1
+      ],
+      "Sinclair": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
     {
       "Yi Sang": [
         1,
@@ -192,9 +234,9 @@
         3
       ],
       "Gregor": [
-        1,
+        3,
         2,
-        3
+        1
       ]
     },
     {
@@ -288,9 +330,9 @@
         3
       ],
       "Ryoshu": [
-        1,
+        3,
         2,
-        3
+        1
       ],
       "Hong Lu": [
         1,
@@ -303,43 +345,6 @@
         1
       ],
       "Outis": [
-        1,
-        2,
-        3
-      ]
-    },
-    {
-      "Yi Sang": [
-        1,
-        2,
-        3
-      ],
-      "Hong Lu": [
-        3,
-        2,
-        1
-      ],
-      "Heathcliff": [
-        3,
-        2,
-        1
-      ],
-      "Ishmael": [
-        3,
-        2,
-        1
-      ],
-      "Rodion": [
-        1,
-        2,
-        3
-      ],
-      "Outis": [
-        3,
-        2,
-        1
-      ],
-      "Gregor": [
         1,
         2,
         3
@@ -385,7 +390,7 @@
   ],
   "mirror_shop_heal": [
     false,
-    true,
+    false,
     false,
     false,
     false,
@@ -398,9 +403,9 @@
       3
     ],
     [
+      3,
       1,
-      2,
-      3
+      2
     ],
     [
       1,
@@ -426,54 +431,68 @@
   "mirror_team_stars": [
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ],
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ],
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ],
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ],
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ],
     [
       "0",
-      "2",
       "6",
-      "7"
+      "7",
+      "3"
     ]
   ],
   "team_orders": [
     [
+      "Hong Lu",
+      "Faust",
+      "Rodion",
+      "Ryoshu",
+      "Sinclair",
+      "Outis",
+      "Ishmael",
+      "Heathcliff",
+      "Gregor",
+      "Yi Sang",
+      "Don Quixote",
+      "Meursault"
+    ],
+    [
       "Don Quixote",
       "Rodion",
-      "Ishmael",
-      "Yi Sang",
-      "Hong Lu",
+      "Meursault",
       "Gregor",
+      "Yi Sang",
+      "Ishmael",
       "Heathcliff",
       "Outis",
+      "Hong Lu",
       "Faust",
       "Ryoshu",
-      "Meursault",
       "Sinclair"
     ],
     [
@@ -492,15 +511,15 @@
     ],
     [
       "Sinclair",
-      "Outis",
       "Yi Sang",
       "Gregor",
-      "Don Quixote",
-      "Rodion",
-      "Ishmael",
-      "Faust",
-      "Ryoshu",
       "Meursault",
+      "Ishmael",
+      "Rodion",
+      "Outis",
+      "Faust",
+      "Don Quixote",
+      "Ryoshu",
       "Hong Lu",
       "Heathcliff"
     ],
@@ -531,28 +550,14 @@
       "Don Quixote",
       "Meursault",
       "Sinclair"
-    ],
-    [
-      "Hong Lu",
-      "Faust",
-      "Ryoshu",
-      "Rodion",
-      "Outis",
-      "Gregor",
-      "Sinclair",
-      "Don Quixote",
-      "Yi Sang",
-      "Meursault",
-      "Heathcliff",
-      "Ishmael"
     ]
   ],
   "team_indexes": [
+    6,
     1,
     2,
     3,
     4,
-    5,
-    6
+    5
   ]
 }

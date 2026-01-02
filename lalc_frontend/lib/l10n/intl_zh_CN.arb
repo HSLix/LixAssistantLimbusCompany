@@ -194,5 +194,7 @@
   "at_last": "运行结束",
   "mirror_difficulty": "镜像迷宫难度",
   "mirror_difficulty_normal": "普通",
-  "mirror_difficulty_hard": "困难"
+  "mirror_difficulty_hard": "困难",
+  "new_version_available": "有新版本可用！",
+  "check_announcement_for_details": "查看公告了解详情。"
 }

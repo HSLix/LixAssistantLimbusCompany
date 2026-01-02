@@ -174,7 +174,7 @@ class LALCLogger:
             )
             
             if result.returncode == 0:
-                self.log(f"图片压缩成功: {image_path}")
+                self.debug(f"图片压缩成功: {image_path}")
                 return True
             else:
                 self.log(f"图片压缩失败: {image_path}, 错误: {result.stderr.strip()}", level="WARNING")

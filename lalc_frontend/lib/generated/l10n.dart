@@ -1663,6 +1663,26 @@ class S {
       args: [],
     );
   }
+
+  /// `New version available!`
+  String get new_version_available {
+    return Intl.message(
+      'New version available!',
+      name: 'new_version_available',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Check the announcement for details.`
+  String get check_announcement_for_details {
+    return Intl.message(
+      'Check the announcement for details.',
+      name: 'check_announcement_for_details',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

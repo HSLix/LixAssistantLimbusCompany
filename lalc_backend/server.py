@@ -1,8 +1,6 @@
 import asyncio
 import websockets
 import json
-import uuid
-import logging
 import traceback
 from typing import Set, Dict, Any, Optional
 from datetime import datetime
@@ -14,6 +12,7 @@ from utils.logger import init_logger
 from utils.encrypt_decrypt import decrypt_cdk
 from input.input_handler import input_handler
 
+logger = init_logger()
 
 # -------------------- WebSocket 服务器 --------------------
 class ServerController:

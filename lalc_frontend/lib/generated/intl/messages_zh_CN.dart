@@ -49,6 +49,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "cdk_saved": MessageLookupByLibrary.simpleMessage("CDK 保存成功"),
     "cdk_status": MessageLookupByLibrary.simpleMessage("CDK 状态"),
+    "check_announcement_for_details": MessageLookupByLibrary.simpleMessage(
+      "查看公告了解详情。",
+    ),
     "check_how_to_use_app": MessageLookupByLibrary.simpleMessage(
       "查看如何使用 LALC，即使是堂吉诃德也能轻易读懂",
     ),
@@ -173,6 +176,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "missing_required_files": MessageLookupByLibrary.simpleMessage(
       "所选ZIP文件缺少必要的配置文件",
     ),
+    "new_version_available": MessageLookupByLibrary.simpleMessage("有新版本可用！"),
     "no_gift_data": MessageLookupByLibrary.simpleMessage("暂无饰品数据"),
     "no_local_configs": MessageLookupByLibrary.simpleMessage("暂无本地配置"),
     "no_logs_match_criteria": MessageLookupByLibrary.simpleMessage(

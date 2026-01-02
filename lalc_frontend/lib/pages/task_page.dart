@@ -9,6 +9,7 @@ import 'package:toastification/toastification.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart'; // 添加 Markdown 解析导入
+import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n.dart'; // 添加国际化支持
 import 'dart:async'; // 添加Timer需要的导入
 
@@ -47,7 +48,6 @@ class _HomePageState extends State<HomePage>
   
   // 教程资源路径常量
   static const String _tutorialAssetPath = 'assets/doc/tutorial.md';
-  static const String _tutorialImgPrefix = 'assets/doc/img/';
 
   // 仅 UI 层使用：根据当前语言返回显示名字
   String _taskName(BuildContext ctx, String key) {
@@ -180,11 +180,6 @@ class _HomePageState extends State<HomePage>
   ${S.of(context).published_at}: ${data['published_at']?.toString().split('T')[0] ?? 'Unknown'}
 
   ${data['body'] ?? 'No description provided'}
-
-  Download links:
-  ${(data['assets'] as List).map((asset) => '- ${asset['browser_download_url']}').join('\n')}
-
-  Visit the full release page: https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest 
   ''';
         
         // 检查是否有新版本
@@ -195,6 +190,20 @@ class _HomePageState extends State<HomePage>
             isVersionOutdated = true;
             latestReleaseInfo = releaseInfo;
             isLoadingReleaseInfo = false;
+          });
+          
+          // 检测到新版本，显示提示
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              toastification.show(
+                context: context,
+                title: Text(S.of(context).new_version_available),
+                description: Text(S.of(context).check_announcement_for_details),
+                autoCloseDuration: const Duration(seconds: 5),
+                type: ToastificationType.info,
+                style: ToastificationStyle.flatColored,
+              );
+            }
           });
         } else {
           setState(() {
@@ -239,8 +248,6 @@ class _HomePageState extends State<HomePage>
   ${S.of(context).current_version}: $currentVersion
   ${S.of(context).latest_release}: $versionName
   $releaseNote
-
-  Visit the full release page: https://mirrorchyan.com/zh/projects?rid=LALC&channel=stable
   ''';
         
         // 检查是否有新版本
@@ -1639,6 +1646,11 @@ class _HomePageState extends State<HomePage>
       // 使用Markdown解析显示公告内容
       return MarkdownBody(
         data: content,
+        onTapLink: (text, href, title) {        // ← 新增 onTapLink
+          if (href != null) {
+            launchUrl(Uri.parse(href));
+          }
+        },
         styleSheet: MarkdownStyleSheet(
           p: const TextStyle(
             color: Colors.white70,
@@ -1660,7 +1672,7 @@ class _HomePageState extends State<HomePage>
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
-          a: const TextStyle(
+          a: const TextStyle(      // ← 新增链接样式
             color: Colors.blue,
             decoration: TextDecoration.underline,
           ),
@@ -1678,18 +1690,25 @@ class _HomePageState extends State<HomePage>
             .loadString(_tutorialAssetPath),          // 读取 assets 里的 md 文件
         builder: (context, snapshot) {
           if (snapshot.hasData) {
-            // 把 "/img/tutorial_*.png" 换成 "assets/doc/img/tutorial_*.png"
-            final md = snapshot.data!.replaceAllMapped(
-              RegExp(r'\/img\/(tutorial_\d+\.png)', multiLine: true),
-              (m) => '$_tutorialImgPrefix${m.group(1)}',
-            );
+            final md = snapshot.data!;
 
             return MarkdownBody(
               data: md,
+              onTapLink: (text, href, title) {
+                if (href != null) {
+                  launchUrl(Uri.parse(href));
+                }
+              },
               sizedImageBuilder: (element) {
                 final url = element.uri.toString();
-                // 让本地图片用 AssetImage 加载
-                return Image.asset(url, fit: BoxFit.contain);
+
+                // 只渲染本地图片，参考 about_page 的实现
+                if (url.startsWith('/img/')) {
+                  return Image.asset('assets/doc$url', fit: BoxFit.contain);
+                }
+
+                // 其它图片路径一律跳过（不显示）
+                return const SizedBox.shrink();
               },
               styleSheet: MarkdownStyleSheet(
                 p: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),

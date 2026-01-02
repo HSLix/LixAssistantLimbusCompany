@@ -51,6 +51,9 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "cdk_saved": MessageLookupByLibrary.simpleMessage("CDK saved successfully"),
     "cdk_status": MessageLookupByLibrary.simpleMessage("CDK Status"),
+    "check_announcement_for_details": MessageLookupByLibrary.simpleMessage(
+      "Check the announcement for details.",
+    ),
     "check_how_to_use_app": MessageLookupByLibrary.simpleMessage(
       "Check how to use LALC, which even Don Quixote can read easily.",
     ),
@@ -240,6 +243,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "mirrorchan_cdk": MessageLookupByLibrary.simpleMessage("MirrorChan CDK"),
     "missing_required_files": MessageLookupByLibrary.simpleMessage(
       "Selected directory is missing required config files",
+    ),
+    "new_version_available": MessageLookupByLibrary.simpleMessage(
+      "New version available!",
     ),
     "no_gift_data": MessageLookupByLibrary.simpleMessage("No gift data"),
     "no_local_configs": MessageLookupByLibrary.simpleMessage(

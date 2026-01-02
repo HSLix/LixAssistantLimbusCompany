@@ -194,5 +194,7 @@
   "at_last": "At Last",
   "mirror_difficulty": "Mirror Difficulty",
   "mirror_difficulty_normal": "Normal",
-  "mirror_difficulty_hard": "Hard"
+  "mirror_difficulty_hard": "Hard",
+  "new_version_available": "New version available!",
+  "check_announcement_for_details": "Check the announcement for details."
 }
