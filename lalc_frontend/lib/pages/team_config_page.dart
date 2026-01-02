@@ -38,7 +38,7 @@ List<EgoGift> egoGifts = [];
 // 为每个队伍保存独立配置的数据结构
 class TeamPageConfig {  // 重命名以避免与config_manager.dart中的TeamConfig冲突
   bool shopHealAll;
-  String selectedStyleType;
+  String selectedTeamStyleType;
   Set<String> selectedAccessoryTypes;
   Set<String> selectedPreferEgoGiftTypes;
   Map<String, String> giftName2Status;
@@ -51,7 +51,7 @@ class TeamPageConfig {  // 重命名以避免与config_manager.dart中的TeamCon
 
   TeamPageConfig({
     this.shopHealAll = false,
-    this.selectedStyleType = 'Bleed',
+    this.selectedTeamStyleType = 'Bleed',
     required this.selectedAccessoryTypes,
     required this.selectedPreferEgoGiftTypes,
     required this.giftName2Status,
@@ -66,7 +66,7 @@ class TeamPageConfig {  // 重命名以避免与config_manager.dart中的TeamCon
   // 创建副本，防止引用问题
   TeamPageConfig copyWith({
     bool? shopHealAll,
-    String? selectedStyleType,
+    String? selectedTeamStyleType,
     Set<String>? selectedAccessoryTypes,
     Set<String>? selectedPreferEgoGiftTypes,
     Map<String, String>? giftName2Status,
@@ -79,7 +79,7 @@ class TeamPageConfig {  // 重命名以避免与config_manager.dart中的TeamCon
   }) {
     return TeamPageConfig(
       shopHealAll: shopHealAll ?? this.shopHealAll,
-      selectedStyleType: selectedStyleType ?? this.selectedStyleType,
+      selectedTeamStyleType: selectedTeamStyleType ?? this.selectedTeamStyleType,
       selectedAccessoryTypes: selectedAccessoryTypes ?? Set<String>.from(this.selectedAccessoryTypes),
       selectedPreferEgoGiftTypes: selectedPreferEgoGiftTypes ?? Set<String>.from(this.selectedPreferEgoGiftTypes),
       giftName2Status: giftName2Status ?? Map<String, String>.from(this.giftName2Status),
@@ -245,7 +245,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
     configManager.teamConfigs[selectedTeamIndex] = TeamConfig(
       selectedMembers: selectedMembers, // 正确保存选中的成员列表
       shopHealAll: currentTeamConfig.shopHealAll,
-      selectedStyleType: currentTeamConfig.selectedStyleType,
+      selectedTeamStyleType: currentTeamConfig.selectedTeamStyleType,
       selectedPreferEgoGiftTypes: List<String>.from(currentTeamConfig.selectedPreferEgoGiftTypes),
       selectedAccessoryTypes: List<String>.from(currentTeamConfig.selectedAccessoryTypes),
       giftName2Status: Map<String, String>.from(currentTeamConfig.giftName2Status),
@@ -428,7 +428,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
         final teamConfig = configManager.teamConfigs[i]!;
         teamConfigs[i] = TeamPageConfig(
           shopHealAll: teamConfig.shopHealAll,
-          selectedStyleType: teamConfig.selectedStyleType,
+          selectedTeamStyleType: teamConfig.selectedTeamStyleType,
           selectedAccessoryTypes: Set<String>.from(teamConfig.selectedAccessoryTypes),
           selectedPreferEgoGiftTypes: Set<String>.from(teamConfig.selectedPreferEgoGiftTypes),
           giftName2Status: Map<String, String>.from(teamConfig.giftName2Status),
@@ -802,7 +802,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                           ),
                           DropdownButton<String>(
                             alignment: Alignment.center,
-                            value: currentTeamConfig.selectedStyleType,
+                            value: currentTeamConfig.selectedTeamStyleType,
                             items: styleTypes
                                 .where((type) => type != "Keywordless") // 过滤掉"Keywordless"
                                 .map((String type) {
@@ -819,7 +819,30 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                             }).toList(),
                             onChanged: (newValue) {
                               setState(() {
-                                teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(selectedStyleType: newValue);
+                                if (newValue != null) {
+                                  // 创建新的prefer ego gift types集合
+                                  Set<String> updatedPreferTypes = 
+                                      Set<String>.from(currentTeamConfig.selectedPreferEgoGiftTypes);
+                                  
+                                  // 移除旧的team style（如果存在于selectedPreferEgoGiftTypes中）
+                                  if (currentTeamConfig.selectedPreferEgoGiftTypes
+                                      .contains(currentTeamConfig.selectedTeamStyleType)) {
+                                    updatedPreferTypes.remove(currentTeamConfig.selectedTeamStyleType);
+                                  }
+                                  
+                                  // 添加新的team style
+                                  updatedPreferTypes.add(newValue);
+                                  
+                                  teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(
+                                    selectedTeamStyleType: newValue,
+                                    selectedPreferEgoGiftTypes: updatedPreferTypes,
+                                  );
+                                } else {
+                                  // 如果newValue为null，只更新team style
+                                  teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(
+                                    selectedTeamStyleType: newValue!,
+                                  );
+                                }
                                 _saveCurrentTeamConfig(); // 保存配置到ConfigManager
                               });
                             },
@@ -1777,7 +1800,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
   TeamPageConfig _defaultTeamConfig(int teamIndex) {
     return TeamPageConfig(
       shopHealAll: false,
-      selectedStyleType: 'Bleed',
+      selectedTeamStyleType: 'Bleed',
       selectedAccessoryTypes: <String>{},
       selectedPreferEgoGiftTypes: <String>{},
       giftName2Status: {
@@ -1839,7 +1862,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
           : 'Team ${i + 1}';
       
       // 获取队伍流派类型
-      final teamStyle = teamConfig?.selectedStyleType ?? 'Bleed';
+      final teamStyle = teamConfig?.selectedTeamStyleType ?? 'Bleed';
       
       // 计算已选择成员数量
       final selectedMembers = teamConfig?.selectedMembers.length ?? 0;

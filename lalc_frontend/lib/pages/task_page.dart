@@ -67,6 +67,37 @@ class _HomePageState extends State<HomePage>
   // 每个任务的开启状态（Mail 和 Reward 强制开启）
   List<bool> taskEnabled = [true, true, true, true, true, true, true];
 
+  /* ===== 真正检查：已选队伍但"首选饰品流派"为空 ===== */
+  List<int> _findTeamsWithEmptyPreferTypes() {
+    final configManager = ConfigManager();
+    final List<int> emptyList = [];
+
+    for (int i = 0; i < 20; i++) {
+      final teamCfg = configManager.teamConfigs[i];
+      if (teamCfg == null) continue;
+
+      // 1. 只关心被任务实际引用的队伍
+      bool isUsed = false;
+      for (final taskEntry in configManager.taskConfigs.entries) {
+        final taskCfg = taskEntry.value;
+        if (taskCfg.enabled &&
+            taskCfg.count > 0 &&
+            taskCfg.teams.contains(i + 1)) {
+          isUsed = true;
+          break;
+        }
+      }
+      if (!isUsed) continue;
+
+      // 2. 关键判断：selectedPreferEgoGiftTypes 为空
+      if (teamCfg.selectedPreferEgoGiftTypes.isEmpty) {
+        emptyList.add(i + 1);
+      }
+    }
+    return emptyList;
+  }
+
+
   // 仅 EXP / Thread / Mirror 有次数
   Map<String, int> taskCounts = {
     'EXP': 1,
@@ -523,6 +554,26 @@ class _HomePageState extends State<HomePage>
       }
       return; // 直接终止，不再往下执行
     }
+
+    /* ===== 新增：已选队伍但饰品风格完全未配置 ===== */
+    final emptyPreferTeams = _findTeamsWithEmptyPreferTypes();
+    if (emptyPreferTeams.isNotEmpty) {
+      for (final teamNo in emptyPreferTeams) {
+        if (mounted) {
+          toastification.show(
+            context: context,
+            title: Text(S.of(context).task_start_error),
+            description: Text('Team $teamNo  '
+                '${S.of(context).no_prefer_ego_type_configured}'), // 文案见下
+            autoCloseDuration: const Duration(seconds: 4),
+            type: ToastificationType.error,
+            style: ToastificationStyle.flatColored,
+          );
+        }
+      }
+      return; // 终止
+    }
+    /* ============================================= */
 
     // 2. 原有启动逻辑保持不变
     final taskStatusManager = Provider.of<TaskStatusManager>(context, listen: false);
@@ -1344,7 +1395,7 @@ class _HomePageState extends State<HomePage>
         : 'Team $teamNumber';
     
     // 获取队伍流派类型
-    final actualTeamStyle = teamConfig?.selectedStyleType ?? 'Bleed';
+    final actualTeamStyle = teamConfig?.selectedTeamStyleType ?? 'Bleed';
     
     // 计算已选择成员数量
     final actualSelectedMembers = teamConfig?.selectedMembers.length ?? 0;
@@ -1468,7 +1519,7 @@ class _HomePageState extends State<HomePage>
           : 'Team ${i + 1}';
       
       // 获取队伍流派类型
-      final teamStyle = teamConfig?.selectedStyleType ?? 'Bleed';
+      final teamStyle = teamConfig?.selectedTeamStyleType ?? 'Bleed';
       
       // 计算已选择成员数量
       final selectedMembers = teamConfig?.selectedMembers.length ?? 0;

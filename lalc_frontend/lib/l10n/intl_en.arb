@@ -201,5 +201,6 @@
   "no_team_configured": "No team configured, please configure at least one team before starting the task.",
   "all_tasks_started": "All tasks started",
   "light_mode": "Light Mode",
-  "dark_mode": "Dark Mode"
+  "dark_mode": "Dark Mode",
+  "no_prefer_ego_type_configured": "Missing preferred ego-gift types"
 }

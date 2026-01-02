@@ -268,6 +268,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_other_configs_reward": MessageLookupByLibrary.simpleMessage(
       "No other configs\nJust claim all the coins on the task board",
     ),
+    "no_prefer_ego_type_configured": MessageLookupByLibrary.simpleMessage(
+      "Missing preferred ego-gift types",
+    ),
     "no_team_configured": MessageLookupByLibrary.simpleMessage(
       "No team configured, please configure at least one team before starting the task.",
     ),

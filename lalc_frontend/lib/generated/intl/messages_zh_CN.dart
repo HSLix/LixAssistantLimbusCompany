@@ -192,6 +192,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_other_configs_reward": MessageLookupByLibrary.simpleMessage(
       "没有其他配置\n只是领取任务面板上的所有积分",
     ),
+    "no_prefer_ego_type_configured": MessageLookupByLibrary.simpleMessage(
+      "未配置首选饰品流派",
+    ),
     "no_team_configured": MessageLookupByLibrary.simpleMessage(
       "未配置执行队伍，请至少配置一个队伍后再开始任务。",
     ),

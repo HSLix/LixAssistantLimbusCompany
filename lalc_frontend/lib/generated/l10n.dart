@@ -1723,6 +1723,16 @@ class S {
   String get dark_mode {
     return Intl.message('Dark Mode', name: 'dark_mode', desc: '', args: []);
   }
+
+  /// `Missing preferred ego-gift types`
+  String get no_prefer_ego_type_configured {
+    return Intl.message(
+      'Missing preferred ego-gift types',
+      name: 'no_prefer_ego_type_configured',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

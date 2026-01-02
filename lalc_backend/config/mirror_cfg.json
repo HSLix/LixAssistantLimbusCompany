@@ -1,5 +1,5 @@
 {
-  "check_node_target_count": 0,
+  "check_node_target_count": 12,
   "mirror_stop_purchase_gift_money": 600,
   "mirror_team_styles": [
     "Rupture",
@@ -10,21 +10,15 @@
     "Sinking"
   ],
   "mirror_team_ego_gift_styles": [
-    [
-      "Rupture"
-    ],
-    [
-      "Bleed"
-    ],
+    [],
+    [],
     [
       "Poise"
     ],
     [
       "Burn"
     ],
-    [
-      "Charge"
-    ],
+    [],
     [
       "Sinking"
     ]
@@ -430,36 +424,42 @@
   ],
   "mirror_team_stars": [
     [
+      "4",
       "0",
       "6",
       "7",
       "3"
     ],
     [
+      "4",
       "0",
       "6",
       "7",
       "3"
     ],
     [
+      "4",
       "0",
       "6",
       "7",
       "3"
     ],
     [
+      "4",
       "0",
       "6",
       "7",
       "3"
     ],
     [
+      "4",
       "0",
       "6",
       "7",
       "3"
     ],
     [
+      "4",
       "0",
       "6",
       "7",

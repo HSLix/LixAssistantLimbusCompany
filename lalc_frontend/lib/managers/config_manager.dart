@@ -202,7 +202,7 @@ class TaskConfig {
 class TeamConfig {
   List<String> selectedMembers;
   bool shopHealAll;
-  String selectedStyleType;
+  String selectedTeamStyleType;
   List<String> selectedPreferEgoGiftTypes;
   List<String> selectedAccessoryTypes;
   Map<String, String> giftName2Status;
@@ -216,7 +216,7 @@ class TeamConfig {
   TeamConfig({
     required this.selectedMembers,
     required this.shopHealAll,
-    required this.selectedStyleType,
+    required this.selectedTeamStyleType,
     required this.selectedPreferEgoGiftTypes,
     required this.selectedAccessoryTypes,
     required this.giftName2Status,
@@ -232,7 +232,7 @@ class TeamConfig {
     return TeamConfig(
       selectedMembers: List<String>.from(json['selectedMembers'] as List? ?? []),
       shopHealAll: json['shopHealAll'] as bool? ?? false,
-      selectedStyleType: json['selectedStyleType'] as String? ?? 'Bleed',
+      selectedTeamStyleType: json['selectedTeamStyleType'] as String? ?? 'Bleed',
       selectedPreferEgoGiftTypes:
           List<String>.from(json['selectedPreferEgoGiftTypes'] as List? ?? []),
       selectedAccessoryTypes:
@@ -257,7 +257,7 @@ class TeamConfig {
   Map<String, dynamic> toJson() => {
         'selectedMembers': selectedMembers,
         'shopHealAll': shopHealAll,
-        'selectedStyleType': selectedStyleType,
+        'selectedTeamStyleType': selectedTeamStyleType,
         'selectedPreferEgoGiftTypes': selectedPreferEgoGiftTypes,
         'selectedAccessoryTypes': selectedAccessoryTypes,
         'giftName2Status': giftName2Status,
@@ -505,7 +505,7 @@ class ConfigManager {
         teamName: "Team ${i+1}",
         selectedMembers: [],
         shopHealAll: false,
-        selectedStyleType: 'Bleed',
+        selectedTeamStyleType: 'Bleed',
         selectedPreferEgoGiftTypes: [],
         selectedAccessoryTypes: [],
         giftName2Status: {
@@ -662,7 +662,7 @@ class ConfigManager {
       final copiedConfig = TeamConfig(
         selectedMembers: List<String>.from(sourceConfig.selectedMembers),
         shopHealAll: sourceConfig.shopHealAll,
-        selectedStyleType: sourceConfig.selectedStyleType,
+        selectedTeamStyleType: sourceConfig.selectedTeamStyleType,
         selectedPreferEgoGiftTypes: List<String>.from(sourceConfig.selectedPreferEgoGiftTypes),
         selectedAccessoryTypes: List<String>.from(sourceConfig.selectedAccessoryTypes),
         giftName2Status: Map<String, String>.from(sourceConfig.giftName2Status),
