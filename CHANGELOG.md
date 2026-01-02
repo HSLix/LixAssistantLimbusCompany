@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.3.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.2.0...v4.3.0) (2026-01-02)
+
+
+### Features
+
+* 增加了新版本更新的提醒 | add the notification of the new version ([764cca0](https://github.com/HSLix/LixAssistantLimbusCompany/commit/764cca0476133438d92d136d1f4bcb08e52175e6))
+
+
+### Bug Fixes
+
+* 修复了主程序启动时莫名闪退没有报错提示的问题 | fix the missing the message box for the error in main programme ([576b11b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/576b11b76e3b4acd030f982e3c5dc2559763b326))
+* 修复了因为各种中间窗口，无法获取鼠标坐标，导致程序中断 | fix the intterupt for the error of aucquiring cursor position ([8d5d1cf](https://github.com/HSLix/LixAssistantLimbusCompany/commit/8d5d1cf3ad21b3382b110b9fd539820f175d9d10))
+
 ## [4.2.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.1.0...v4.2.0) (2026-01-01)
 
 
