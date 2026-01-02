@@ -76,7 +76,7 @@ try:
             print("正在启动前端程序...")
             # 启动前端程序，检查返回值
             ret = ctypes.windll.shell32.ShellExecuteW(
-                None, "open", frontend_exe_path, "", None, 1  # 最后一个参数1表示SW_SHOWNORMAL，正常显示窗口
+                None, "open", "explorer", frontend_exe_path, "", None, 1  # 最后一个参数1表示SW_SHOWNORMAL，正常显示窗口
             )
             if ret <= 32:
                 raise Exception(f"启动前端程序失败，返回值: {ret}。Failed to start frontend executable, return value: {ret}.")

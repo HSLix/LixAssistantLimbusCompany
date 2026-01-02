@@ -885,6 +885,7 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
 
     if not res_pos:
         res_pos = recognize_handler.template_match(input_handler.capture_screenshot(), "theme_pack_detail")
+        logger.log("没有检测到已知主题包，启动随机选择")
     if len(res_pos) == 0:
         logger.log("主题包检测异常，已有模板匹配失败，且随机选择也失败了，这里跳过选择", level="ERROR")
         return
