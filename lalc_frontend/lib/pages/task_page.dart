@@ -336,6 +336,21 @@ class _HomePageState extends State<HomePage>
     return false; // 相同或解析失败时返回false
   }
 
+  /// 返回空队伍的任务名（英文 key）
+  List<String> _findTasksWithEmptyTeam() {
+    final List<String> emptyList = [];
+    for (int i = 0; i < _taskKeys.length; i++) {
+      final key = _taskKeys[i];
+      // 只有 EXP / Thread / Mirror 支持队伍配置
+      if (!const {'EXP', 'Thread', 'Mirror'}.contains(key)) continue;
+      if (taskEnabled[i] && (taskCounts[key] ?? 0) > 0) {
+        final teams = taskTeams[key] ?? [];
+        if (teams.isEmpty) emptyList.add(key);
+      }
+    }
+    return emptyList;
+  }
+  
   // 从配置管理器加载配置
   void _loadConfigFromManager() {
     final configManager = ConfigManager();
@@ -490,7 +505,26 @@ class _HomePageState extends State<HomePage>
   }
 
   void _startAllTasks() {
-    // 获取任务状态管理器并开始任务
+    // 1. 空队伍检查
+    final emptyTasks = _findTasksWithEmptyTeam();
+    if (emptyTasks.isNotEmpty) {
+      for (final taskKey in emptyTasks) {
+        if (mounted) {
+          toastification.show(
+            context: context,
+            title: Text(S.of(context).task_start_error),
+            description: Text('${_taskName(context, taskKey)}  '
+                '${S.of(context).no_team_configured}'),
+            autoCloseDuration: const Duration(seconds: 4),
+            type: ToastificationType.error,
+            style: ToastificationStyle.flatColored,
+          );
+        }
+      }
+      return; // 直接终止，不再往下执行
+    }
+
+    // 2. 原有启动逻辑保持不变
     final taskStatusManager = Provider.of<TaskStatusManager>(context, listen: false);
     
     // 获取WebSocket管理器并发送配置和start命令
@@ -516,13 +550,15 @@ class _HomePageState extends State<HomePage>
             // 使用全局的sidebarController切换到WorkPage (索引为1)
             sidebarController.selectIndex(1);
             
-            toastification.show(
-              context: context,
-              title: const Text('所有任务已开始执行'),
-              autoCloseDuration: const Duration(seconds: 3),
-              type: ToastificationType.success,
-              style: ToastificationStyle.flatColored,
-            );
+            if (mounted) {
+              toastification.show(
+                context: context,
+                title: Text(S.of(context).all_tasks_started),
+                autoCloseDuration: const Duration(seconds: 3),
+                type: ToastificationType.success,
+                style: ToastificationStyle.flatColored,
+              );
+            }
           });
         }
       });
@@ -536,13 +572,15 @@ class _HomePageState extends State<HomePage>
         // 使用全局的sidebarController切换到WorkPage (索引为1)
         sidebarController.selectIndex(1);
         
-        toastification.show(
-          context: context,
-          title: const Text('所有任务已开始执行'),
-          autoCloseDuration: const Duration(seconds: 3),
-          type: ToastificationType.success,
-          style: ToastificationStyle.flatColored,
-        );
+        if (mounted) {
+          toastification.show(
+            context: context,
+            title: Text(S.of(context).all_tasks_started),
+            autoCloseDuration: const Duration(seconds: 3),
+            type: ToastificationType.success,
+            style: ToastificationStyle.flatColored,
+          );
+        }
       });
     }
   }

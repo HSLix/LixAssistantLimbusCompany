@@ -23,6 +23,9 @@ class MessageLookup extends MessageLookupByLibrary {
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "add_teams": MessageLookupByLibrary.simpleMessage("Add Teams"),
+    "all_tasks_started": MessageLookupByLibrary.simpleMessage(
+      "All tasks start",
+    ),
     "allow_list": MessageLookupByLibrary.simpleMessage("Allow List"),
     "alphabetical": MessageLookupByLibrary.simpleMessage("A-Z"),
     "announcement": MessageLookupByLibrary.simpleMessage("Announcement"),
@@ -263,6 +266,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_other_configs_reward": MessageLookupByLibrary.simpleMessage(
       "No other configs\nJust claim all the coins on the task board",
     ),
+    "no_team_configured": MessageLookupByLibrary.simpleMessage(
+      "No team configured, please add a team first",
+    ),
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("No Team for now"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage(
       "No theme packs available",
@@ -334,6 +340,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "task_config": MessageLookupByLibrary.simpleMessage("Task Config"),
     "task_paused": MessageLookupByLibrary.simpleMessage("Task Paused"),
     "task_resumed": MessageLookupByLibrary.simpleMessage("Task Resumed"),
+    "task_start_error": MessageLookupByLibrary.simpleMessage(
+      "Task cannot start",
+    ),
     "task_started": MessageLookupByLibrary.simpleMessage("Task Started"),
     "task_stopped": MessageLookupByLibrary.simpleMessage("Task Stopped"),
     "task_team_config": MessageLookupByLibrary.simpleMessage(

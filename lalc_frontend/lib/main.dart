@@ -127,6 +127,27 @@ class _MyAppState extends State<MyApp> {
     // 处理 WebSocket 更新，如果有错误则显示长时间 Toast
   }
 
+  /// 返回空队伍的任务名（英文 key）
+  List<String> _findTasksWithEmptyTeam(BuildContext context) {
+    final List<String> emptyList = [];
+    final configManager = ConfigManager();
+    
+    // 检查EXP、Thread、Mirror任务
+    for (String taskKey in const ['EXP', 'Thread', 'Mirror']) {
+      if (configManager.taskConfigs.containsKey(taskKey)) {
+        final taskConfig = configManager.taskConfigs[taskKey]!;
+        // 检查任务是否启用且执行次数大于0
+        if (taskConfig.enabled && taskConfig.count > 0) {
+          // 检查任务队伍是否为空
+          if (taskConfig.teams.isEmpty) {
+            emptyList.add(taskKey);
+          }
+        }
+      }
+    }
+    return emptyList;
+  }
+
   // 打开Discord链接的方法
   Future<void> _launchDiscordUrl() async {
     final Uri url = Uri.parse('https://discord.gg/bVzCuBU4bC');
@@ -217,6 +238,25 @@ class _MyAppState extends State<MyApp> {
             
             switch (command) {
               case 'start':
+                // 1. 空队伍检查 - 通过ConfigManager获取配置
+                final emptyTasks = _findTasksWithEmptyTeam(context);
+                if (emptyTasks.isNotEmpty) {
+                  for (final taskKey in emptyTasks) {
+                    if (context.mounted) {
+                      toastification.show(
+                        context: context,
+                        title: Text(S.of(context).task_start_error),
+                        description: Text('$taskKey  '
+                            '${S.of(context).no_team_configured}'),
+                        autoCloseDuration: const Duration(seconds: 4),
+                        type: ToastificationType.error,
+                        style: ToastificationStyle.flatColored,
+                      );
+                    }
+                  }
+                  return; // 终止
+                }
+                
                 webSocketManager.startTask();
                 debugPrint('Hotkey triggered: Ctrl+Alt+S (Start)');
                 // 使用全局的sidebarController切换到WorkPage (索引为1)

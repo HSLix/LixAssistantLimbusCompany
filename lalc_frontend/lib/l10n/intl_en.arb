@@ -196,5 +196,8 @@
   "mirror_difficulty_normal": "Normal",
   "mirror_difficulty_hard": "Hard",
   "new_version_available": "New version available!",
-  "check_announcement_for_details": "Check the announcement for details."
+  "check_announcement_for_details": "Check the announcement for details.",
+  "all_tasks_started": "All tasks start",
+  "task_start_error": "Task cannot start",
+  "no_team_configured": "No team configured, please add a team first"
 }

@@ -1683,6 +1683,36 @@ class S {
       args: [],
     );
   }
+
+  /// `All tasks start`
+  String get all_tasks_started {
+    return Intl.message(
+      'All tasks start',
+      name: 'all_tasks_started',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Task cannot start`
+  String get task_start_error {
+    return Intl.message(
+      'Task cannot start',
+      name: 'task_start_error',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `No team configured, please add a team first`
+  String get no_team_configured {
+    return Intl.message(
+      'No team configured, please add a team first',
+      name: 'no_team_configured',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

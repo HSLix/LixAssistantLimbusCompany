@@ -23,6 +23,7 @@ class MessageLookup extends MessageLookupByLibrary {
   final messages = _notInlinedMessages(_notInlinedMessages);
   static Map<String, Function> _notInlinedMessages(_) => <String, Function>{
     "add_teams": MessageLookupByLibrary.simpleMessage("添加队伍"),
+    "all_tasks_started": MessageLookupByLibrary.simpleMessage("所有任务开始执行"),
     "allow_list": MessageLookupByLibrary.simpleMessage("白名单"),
     "alphabetical": MessageLookupByLibrary.simpleMessage("A-Z"),
     "announcement": MessageLookupByLibrary.simpleMessage("公告"),
@@ -189,6 +190,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_other_configs_reward": MessageLookupByLibrary.simpleMessage(
       "没有其他配置\n只是领取任务面板上的所有积分",
     ),
+    "no_team_configured": MessageLookupByLibrary.simpleMessage(
+      "未配置执行队伍，请至少配置一个队伍后再开始任务",
+    ),
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("暂无队伍"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage("暂无主题包数据"),
     "none": MessageLookupByLibrary.simpleMessage("无"),
@@ -246,6 +250,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "task_config": MessageLookupByLibrary.simpleMessage("任务配置"),
     "task_paused": MessageLookupByLibrary.simpleMessage("任务已暂停"),
     "task_resumed": MessageLookupByLibrary.simpleMessage("任务已恢复"),
+    "task_start_error": MessageLookupByLibrary.simpleMessage("任务无法启动"),
     "task_started": MessageLookupByLibrary.simpleMessage("任务已开始"),
     "task_stopped": MessageLookupByLibrary.simpleMessage("任务已停止"),
     "task_team_config": MessageLookupByLibrary.simpleMessage("任务队伍配置"),
