@@ -202,5 +202,11 @@
   "all_tasks_started": "All tasks started",
   "light_mode": "Light Mode",
   "dark_mode": "Dark Mode",
-  "no_prefer_ego_type_configured": "Missing preferred ego-gift types"
+  "no_prefer_ego_type_configured": "Missing preferred ego-gift types",
+  "websocket_not_connected": "WebSocket not connected, please connect to server first",
+  "task_already_running": "Task is already running",
+  "task_operation_failed": "Operation failed",
+  "task_start_failed": "Task start failed",
+  "task_already_paused": "Task is already paused",
+  "task_already_stopped": "Task is already stopped"
 }

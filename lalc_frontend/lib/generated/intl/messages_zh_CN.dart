@@ -252,10 +252,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "stop_purchase_gift_money": MessageLookupByLibrary.simpleMessage(
       "停止购买饰品的金钱额度",
     ),
+    "task_already_paused": MessageLookupByLibrary.simpleMessage("任务已经暂停"),
+    "task_already_running": MessageLookupByLibrary.simpleMessage("任务已在运行"),
+    "task_already_stopped": MessageLookupByLibrary.simpleMessage("任务已经停止"),
     "task_config": MessageLookupByLibrary.simpleMessage("任务配置"),
+    "task_operation_failed": MessageLookupByLibrary.simpleMessage("操作失败"),
     "task_paused": MessageLookupByLibrary.simpleMessage("任务已暂停"),
     "task_resumed": MessageLookupByLibrary.simpleMessage("任务已恢复"),
     "task_start_error": MessageLookupByLibrary.simpleMessage("任务无法启动"),
+    "task_start_failed": MessageLookupByLibrary.simpleMessage("任务启动失败"),
     "task_started": MessageLookupByLibrary.simpleMessage("任务已开始"),
     "task_stopped": MessageLookupByLibrary.simpleMessage("任务已停止"),
     "task_team_config": MessageLookupByLibrary.simpleMessage("任务队伍配置"),
@@ -288,6 +293,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "version": MessageLookupByLibrary.simpleMessage("版本"),
     "websocket_disconnected": MessageLookupByLibrary.simpleMessage(
       "未连接到 LALC 后端",
+    ),
+    "websocket_not_connected": MessageLookupByLibrary.simpleMessage(
+      "WebSocket 未连接，请先连接服务器",
     ),
     "weight": MessageLookupByLibrary.simpleMessage("权重"),
     "will_copy": MessageLookupByLibrary.simpleMessage("将复制"),

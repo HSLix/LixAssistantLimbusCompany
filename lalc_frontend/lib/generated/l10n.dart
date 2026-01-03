@@ -1733,6 +1733,66 @@ class S {
       args: [],
     );
   }
+
+  /// `WebSocket not connected, please connect to server first`
+  String get websocket_not_connected {
+    return Intl.message(
+      'WebSocket not connected, please connect to server first',
+      name: 'websocket_not_connected',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Task is already running`
+  String get task_already_running {
+    return Intl.message(
+      'Task is already running',
+      name: 'task_already_running',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Operation failed`
+  String get task_operation_failed {
+    return Intl.message(
+      'Operation failed',
+      name: 'task_operation_failed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Task start failed`
+  String get task_start_failed {
+    return Intl.message(
+      'Task start failed',
+      name: 'task_start_failed',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Task is already paused`
+  String get task_already_paused {
+    return Intl.message(
+      'Task is already paused',
+      name: 'task_already_paused',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Task is already stopped`
+  String get task_already_stopped {
+    return Intl.message(
+      'Task is already stopped',
+      name: 'task_already_stopped',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

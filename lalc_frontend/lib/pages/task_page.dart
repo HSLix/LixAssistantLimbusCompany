@@ -2,6 +2,7 @@ import 'package:lalc_frontend/main.dart';
 import 'package:lalc_frontend/managers/config_manager.dart'; // 添加配置管理器导入
 import 'package:lalc_frontend/managers/task_status_manager.dart'; // 添加任务状态管理器导入
 import 'package:lalc_frontend/managers/websocket_manager.dart'; // 添加WebSocket管理器导入
+import 'package:lalc_frontend/managers/command_gateway.dart'; // 导入命令网关
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -20,7 +21,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
+class _HomePageState extends State<HomePage> 
     with TickerProviderStateMixin {
   int selectedTaskIndex = -1;
   String selectedInfoPanel = ''; // 添加信息面板选择变量
@@ -68,34 +69,6 @@ class _HomePageState extends State<HomePage>
   List<bool> taskEnabled = [true, true, true, true, true, true, true];
 
   /* ===== 真正检查：已选队伍但"首选饰品流派"为空 ===== */
-  List<int> _findTeamsWithEmptyPreferTypes() {
-    final configManager = ConfigManager();
-    final List<int> emptyList = [];
-
-    for (int i = 0; i < 20; i++) {
-      final teamCfg = configManager.teamConfigs[i];
-      if (teamCfg == null) continue;
-
-      // 1. 只关心被任务实际引用的队伍
-      bool isUsed = false;
-      for (final taskEntry in configManager.taskConfigs.entries) {
-        final taskCfg = taskEntry.value;
-        if (taskCfg.enabled &&
-            taskCfg.count > 0 &&
-            taskCfg.teams.contains(i + 1)) {
-          isUsed = true;
-          break;
-        }
-      }
-      if (!isUsed) continue;
-
-      // 2. 关键判断：selectedPreferEgoGiftTypes 为空
-      if (teamCfg.selectedPreferEgoGiftTypes.isEmpty) {
-        emptyList.add(i + 1);
-      }
-    }
-    return emptyList;
-  }
 
 
   // 仅 EXP / Thread / Mirror 有次数
@@ -367,20 +340,6 @@ class _HomePageState extends State<HomePage>
     return false; // 相同或解析失败时返回false
   }
 
-  /// 返回空队伍的任务名（英文 key）
-  List<String> _findTasksWithEmptyTeam() {
-    final List<String> emptyList = [];
-    for (int i = 0; i < _taskKeys.length; i++) {
-      final key = _taskKeys[i];
-      // 只有 EXP / Thread / Mirror 支持队伍配置
-      if (!const {'EXP', 'Thread', 'Mirror'}.contains(key)) continue;
-      if (taskEnabled[i] && (taskCounts[key] ?? 0) > 0) {
-        final teams = taskTeams[key] ?? [];
-        if (teams.isEmpty) emptyList.add(key);
-      }
-    }
-    return emptyList;
-  }
   
   // 从配置管理器加载配置
   void _loadConfigFromManager() {
@@ -535,105 +494,35 @@ class _HomePageState extends State<HomePage>
     });
   }
 
-  void _startAllTasks() {
-    // 1. 空队伍检查
-    final emptyTasks = _findTasksWithEmptyTeam();
-    if (emptyTasks.isNotEmpty) {
-      for (final taskKey in emptyTasks) {
-        if (mounted) {
-          toastification.show(
-            context: context,
-            title: Text(S.of(context).task_start_error),
-            description: Text('${_taskName(context, taskKey)}  '
-                '${S.of(context).no_team_configured}'),
-            autoCloseDuration: const Duration(seconds: 4),
-            type: ToastificationType.error,
-            style: ToastificationStyle.flatColored,
-          );
-        }
+  void _startAllTasks() async {
+    // 使用CommandGateway发送命令，预检逻辑已移至网关内部
+    final ok = await CommandGateway().sendTaskCommand(context, TaskCommand.start, (success, msg) {
+      if (!success && mounted) {
+        toastification.show(
+          context: context,
+          title: Text(msg ?? S.of(context).task_start_failed),
+          type: ToastificationType.error,
+          style: ToastificationStyle.flatColored,
+        );
+        return;
       }
-      return; // 直接终止，不再往下执行
-    }
-
-    /* ===== 新增：已选队伍但饰品风格完全未配置 ===== */
-    final emptyPreferTeams = _findTeamsWithEmptyPreferTypes();
-    if (emptyPreferTeams.isNotEmpty) {
-      for (final teamNo in emptyPreferTeams) {
-        if (mounted) {
-          toastification.show(
-            context: context,
-            title: Text(S.of(context).task_start_error),
-            description: Text('Team $teamNo  '
-                '${S.of(context).no_prefer_ego_type_configured}'), // 文案见下
-            autoCloseDuration: const Duration(seconds: 4),
-            type: ToastificationType.error,
-            style: ToastificationStyle.flatColored,
-          );
-        }
+      
+      /* 成功分支保持原逻辑 */
+      // 使用全局的sidebarController切换到WorkPage (索引为1)
+      sidebarController.selectIndex(1);
+      
+      if (mounted) {
+        toastification.show(
+          context: context,
+          title: Text(S.of(context).all_tasks_started),
+          autoCloseDuration: const Duration(seconds: 3),
+          type: ToastificationType.success,
+          style: ToastificationStyle.flatColored,
+        );
       }
-      return; // 终止
-    }
-    /* ============================================= */
-
-    // 2. 原有启动逻辑保持不变
-    final taskStatusManager = Provider.of<TaskStatusManager>(context, listen: false);
+    });
     
-    // 获取WebSocket管理器并发送配置和start命令
-    final webSocketManager = Provider.of<WebSocketManager>(context, listen: false);
-    
-    // 检查WebSocket连接状态，如果没有连接则尝试连接
-    if (!webSocketManager.isConnected) {
-      // 初始化WebSocket连接
-      webSocketManager.initialize();
-      
-      // 在连接建立后再执行后续操作
-      // 使用定时器检查连接状态
-      Timer.periodic(const Duration(milliseconds: 500), (timer) {
-        if (webSocketManager.isConnected) {
-          timer.cancel(); // 取消定时器
-          
-          // 发送所有配置
-          webSocketManager.sendConfigurations();
-          
-          // 发送开始命令
-          taskStatusManager.startTask();
-          webSocketManager.sendCommand('start', () {
-            // 使用全局的sidebarController切换到WorkPage (索引为1)
-            sidebarController.selectIndex(1);
-            
-            if (mounted) {
-              toastification.show(
-                context: context,
-                title: Text(S.of(context).all_tasks_started),
-                autoCloseDuration: const Duration(seconds: 3),
-                type: ToastificationType.success,
-                style: ToastificationStyle.flatColored,
-              );
-            }
-          });
-        }
-      });
-    } else {
-      // 发送所有配置
-      webSocketManager.sendConfigurations();
-      
-      // 发送开始命令
-      taskStatusManager.startTask();
-      webSocketManager.sendCommand('start', () {
-        // 使用全局的sidebarController切换到WorkPage (索引为1)
-        sidebarController.selectIndex(1);
-        
-        if (mounted) {
-          toastification.show(
-            context: context,
-            title: Text(S.of(context).all_tasks_started),
-            autoCloseDuration: const Duration(seconds: 3),
-            type: ToastificationType.success,
-            style: ToastificationStyle.flatColored,
-          );
-        }
-      });
-    }
+    if (!ok) return;
   }
 
   @override

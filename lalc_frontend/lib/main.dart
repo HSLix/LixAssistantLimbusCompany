@@ -12,6 +12,7 @@ import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/debug_path.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
+import 'package:lalc_frontend/managers/command_gateway.dart'; // 导入命令网关
 import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:hotkey_manager/hotkey_manager.dart';
@@ -20,6 +21,7 @@ import 'package:toastification/toastification.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'generated/l10n.dart';
 import 'package:lalc_frontend/managers/theme_manager.dart'; // 导入新的ThemeManager
+import 'package:url_launcher/url_launcher.dart'; // 添加url_launcher导入
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,11 +107,8 @@ class _MyAppState extends State<MyApp> {
             final context = navigatorKey.currentContext!;
             // 确保组件仍处于活动状态再使用context
             if (context.mounted) {
-              // 获取WebSocketManager实例
-              final webSocketManager = Provider.of<WebSocketManager>(context, listen: false);
-              
-              // 调用_startTask方法（实际上是startTask）
-              webSocketManager.startTask();
+              // 使用CommandGateway发送开始命令
+              CommandGateway().sendTaskCommand(context, TaskCommand.start);
               
               // 切换到工作页面
               sidebarController.selectIndex(1);
@@ -208,75 +207,26 @@ class _MyAppState extends State<MyApp> {
           final context = navigatorKey.currentContext!;
           // 确保组件仍处于活动状态再使用context
           if (context.mounted) {
-            final webSocketManager = Provider.of<WebSocketManager>(context, listen: false);
-            final taskStatusManager = Provider.of<TaskStatusManager>(context, listen: false);
+            // 获取CommandGateway实例
+            final commandGateway = CommandGateway();
             
-            switch (command) {
-              case 'start':
-                webSocketManager.startTask();
-                debugPrint('Hotkey triggered: Ctrl+Alt+S (Start)');
-                // 使用全局的sidebarController切换到WorkPage (索引为1)
-                sidebarController.selectIndex(1);
-                // 使用正确的上下文显示toast
-                if (context.mounted) {
-                  toastification.show(
-                    context: context,
-                    title: Text(S.of(context).task_started),
-                    autoCloseDuration: const Duration(seconds: 2),
-                    type: ToastificationType.success,
-                    style: ToastificationStyle.flatColored,
-                  );
-                }
-                break;
-                
-              case 'pause':
-                if (taskStatusManager.isRunning && !taskStatusManager.isPaused) {
-                  webSocketManager.pauseTask();
-                  debugPrint('Hotkey triggered: Ctrl+Alt+P (Pause)');
-                  if (context.mounted) {
-                    toastification.show(
-                      context: context,
-                      title: Text(S.of(context).task_paused),
-                      autoCloseDuration: const Duration(seconds: 2),
-                      type: ToastificationType.info,
-                      style: ToastificationStyle.flatColored,
-                    );
-                  }
-                }
-                break;
-                
-              case 'resume':
-                if (taskStatusManager.isPaused) {
-                  webSocketManager.resumeTask();
-                  debugPrint('Hotkey triggered: Ctrl+Alt+R (Resume)');
-                  if (context.mounted) {
-                    toastification.show(
-                      context: context,
-                      title: Text(S.of(context).task_resumed),
-                      autoCloseDuration: const Duration(seconds: 2),
-                      type: ToastificationType.info,
-                      style: ToastificationStyle.flatColored,
-                    );
-                  }
-                }
-                break;
-                
-              case 'stop':
-                if (taskStatusManager.isRunning || taskStatusManager.isPaused) {
-                  webSocketManager.stopTask();
-                  debugPrint('Hotkey triggered: Ctrl+Alt+Q (Stop)');
-                  if (context.mounted) {
-                    toastification.show(
-                      context: context,
-                      title: Text(S.of(context).task_stopped),
-                      autoCloseDuration: const Duration(seconds: 2),
-                      type: ToastificationType.error,
-                      style: ToastificationStyle.flatColored,
-                    );
-                  }
-                }
-                break;
-            }
+            // 将命令字符串映射到TaskCommand枚举
+            final cmd = {
+              'start': TaskCommand.start,
+              'pause': TaskCommand.pause,
+              'resume': TaskCommand.resume,
+              'stop': TaskCommand.stop,
+            }[command]!;
+            
+            commandGateway.sendTaskCommand(context, cmd, (success, msg) {
+              if (!success && navigatorKey.currentContext != null) {
+                toastification.show(
+                  context: navigatorKey.currentContext!,
+                  title: Text(msg ?? S.of(navigatorKey.currentContext!).task_operation_failed),
+                  type: ToastificationType.error,
+                );
+              }
+            });
           }
         } else {
           debugPrint('Navigator key not initialized yet');
@@ -410,7 +360,18 @@ class _MyAppState extends State<MyApp> {
                             //   },
                             // ),
                             // 添加Discord图标
-                            // Discord链接已移除
+                            SidebarXItem(
+                              icon: Icons.discord, 
+                              label: "Discord",
+                              onTap: () async {
+                                final Uri url = Uri.parse('https://discord.gg/bVzCuBU4bC');
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url);
+                                } else {
+                                  throw 'Could not launch $url';
+                                }
+                              },
+                            ),
                           ],
                         ),
                         Expanded(

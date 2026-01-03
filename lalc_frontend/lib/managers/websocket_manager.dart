@@ -29,9 +29,6 @@ class WebSocketManager with ChangeNotifier {
   // 新增：下载类响应的常驻回调
   final Map<String, void Function(Map<String, dynamic>)> _downloadCallbacks = {};
 
-  // 添加待执行命令队列
-  final List<_PendingCommand> _pendingCommands = [];
-
   // 添加错误回调函数
   void Function(String)? _onError;
 
@@ -217,9 +214,6 @@ class WebSocketManager with ChangeNotifier {
         notifyListeners();
         debugPrint('WebSocket连接成功');
         _addLogMessage('WebSocket连接成功');
-        
-        // 执行待处理的命令
-        _executePendingCommands();
       }
 
       switch (type) {
@@ -573,17 +567,6 @@ class WebSocketManager with ChangeNotifier {
     if (!_isConnected) {
       debugPrint('WebSocket未连接，无法发送配置');
       _addLogMessage('WebSocket未连接，无法发送配置');
-      
-      // 将发送配置作为一个特殊命令添加到待处理队列
-      _pendingCommands.add(_PendingCommand('_sendConfigurations', [], onComplete));
-      
-      // 如果未连接且未正在连接，则尝试自动连接
-      if (!_isConnecting) {
-        debugPrint('尝试自动连接WebSocket');
-        _addLogMessage('尝试自动连接WebSocket');
-        connect();
-      }
-      
       return;
     }
 
@@ -612,17 +595,6 @@ class WebSocketManager with ChangeNotifier {
     if (!_isConnected) {
       debugPrint('WebSocket未连接，无法发送命令: $command');
       _addLogMessage('WebSocket未连接，无法发送命令: $command');
-      
-      // 将命令添加到待处理队列
-      _pendingCommands.add(_PendingCommand(command, [], onComplete));
-      
-      // 如果未连接且未正在连接，则尝试自动连接
-      if (!_isConnecting) {
-        debugPrint('尝试自动连接WebSocket');
-        _addLogMessage('尝试自动连接WebSocket');
-        connect();
-      }
-      
       return;
     }
 
@@ -681,17 +653,6 @@ class WebSocketManager with ChangeNotifier {
     if (!_isConnected) {
       debugPrint('WebSocket未连接，无法发送命令: $command');
       _addLogMessage('WebSocket未连接，无法发送命令: $command');
-      
-      // 将命令添加到待处理队列
-      _pendingCommands.add(_PendingCommand(command, args, onComplete));
-      
-      // 如果未连接且未正在连接，则尝试自动连接
-      if (!_isConnecting) {
-        debugPrint('尝试自动连接WebSocket');
-        _addLogMessage('尝试自动连接WebSocket');
-        connect();
-      }
-      
       return;
     }
 
@@ -792,23 +753,6 @@ class WebSocketManager with ChangeNotifier {
   }
   
   // 执行待处理命令
-  void _executePendingCommands() {
-    if (!_isConnected) return;
-    
-    for (final pendingCommand in _pendingCommands) {
-      if (pendingCommand.command == '_sendConfigurations') {
-        // 处理特殊命令：发送配置
-        sendConfigurations(pendingCommand.onComplete);
-      } else if (pendingCommand.args.isEmpty) {
-        sendCommand(pendingCommand.command, pendingCommand.onComplete);
-      } else {
-        sendCommandWithArgs(pendingCommand.command, pendingCommand.args, null, pendingCommand.onComplete);
-      }
-    }
-    
-    // 清空待处理命令队列
-    _pendingCommands.clear();
-  }
 
   /// 下载最新版本
   Future<void> downloadUpdate({
@@ -874,10 +818,7 @@ class WebSocketManager with ChangeNotifier {
       taskStatusManager.startTask();
       sendCommand('start');
     } else {
-      // 如果未连接，则先尝试连接，连接成功后再发送命令
-      sendConfigurations();
-      taskStatusManager.startTask();
-      sendCommand('start');
+      debugPrint('WebSocket未连接，无法开始任务');
     }
   }
 
@@ -912,11 +853,3 @@ class WebSocketManager with ChangeNotifier {
   }
 }
 
-// 定义待处理命令类
-class _PendingCommand {
-  final String command;
-  final List<String> args;
-  final void Function()? onComplete;
-
-  _PendingCommand(this.command, this.args, [this.onComplete]);
-}

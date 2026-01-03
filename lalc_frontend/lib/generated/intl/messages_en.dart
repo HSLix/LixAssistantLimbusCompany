@@ -342,11 +342,26 @@ class MessageLookup extends MessageLookupByLibrary {
     "stop_purchase_gift_money": MessageLookupByLibrary.simpleMessage(
       "Stop Purchase Gift Money",
     ),
+    "task_already_paused": MessageLookupByLibrary.simpleMessage(
+      "Task is already paused",
+    ),
+    "task_already_running": MessageLookupByLibrary.simpleMessage(
+      "Task is already running",
+    ),
+    "task_already_stopped": MessageLookupByLibrary.simpleMessage(
+      "Task is already stopped",
+    ),
     "task_config": MessageLookupByLibrary.simpleMessage("Task Config"),
+    "task_operation_failed": MessageLookupByLibrary.simpleMessage(
+      "Operation failed",
+    ),
     "task_paused": MessageLookupByLibrary.simpleMessage("Task Paused"),
     "task_resumed": MessageLookupByLibrary.simpleMessage("Task Resumed"),
     "task_start_error": MessageLookupByLibrary.simpleMessage(
       "Task cannot start",
+    ),
+    "task_start_failed": MessageLookupByLibrary.simpleMessage(
+      "Task start failed",
     ),
     "task_started": MessageLookupByLibrary.simpleMessage("Task Started"),
     "task_stopped": MessageLookupByLibrary.simpleMessage("Task Stopped"),
@@ -396,6 +411,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "version": MessageLookupByLibrary.simpleMessage("Version"),
     "websocket_disconnected": MessageLookupByLibrary.simpleMessage(
       "Can not connect to LALC backend",
+    ),
+    "websocket_not_connected": MessageLookupByLibrary.simpleMessage(
+      "WebSocket not connected, please connect to server first",
     ),
     "weight": MessageLookupByLibrary.simpleMessage("Weight"),
     "will_copy": MessageLookupByLibrary.simpleMessage("It will copy"),

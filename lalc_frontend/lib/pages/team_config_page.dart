@@ -636,14 +636,14 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                                                   Image.asset(
                                                     _getSinnerImagePath(imageName),
                                                     width: imageSize,
-                                                    height: imageSize * 1.1,
+                                                    height: imageSize,
                                                     fit: BoxFit.cover,
                                                     errorBuilder: (context, error, stackTrace) {
                                                       // 如果网络图片加载失败，回退到assets
                                                       return Image.asset(
                                                         'assets/sinners/$imageName.png',
                                                         width: imageSize,
-                                                        height: imageSize * 1.1,
+                                                        height: imageSize,
                                                         fit: BoxFit.cover,
                                                       );
                                                     },
