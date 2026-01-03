@@ -39,7 +39,8 @@
     "wait_mailbox_connecting_disappear":{
         "action":"wait_connecting_disappear",
         "next":[
-            "confirm_all_reward"
+            "confirm_all_reward",
+            "exit_mailbox"
         ]
     },
     "confirm_all_reward":{
