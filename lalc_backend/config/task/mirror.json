@@ -239,7 +239,8 @@
     "mirror_shop_leave_confirm":{
         "action":"key",
         "params":{
-            "key":"enter"
+            "key":"enter",
+            "post_delay": 2
         },
         "next":[
             "mirror_circle_center"
