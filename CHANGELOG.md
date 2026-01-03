@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.4.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.4.0...v4.4.1) (2026-01-03)
+
+
+### Bug Fixes
+
+* 修复了前端出现多个网关发送和接收信息的问题 | remove the useless gateway ([08345cc](https://github.com/HSLix/LixAssistantLimbusCompany/commit/08345ccb42933722035a60684fa3479e1954443c))
+* 尝试修复主程序无法启动前端的问题 | try to fix can not launch front end [#229](https://github.com/HSLix/LixAssistantLimbusCompany/issues/229) ([be3f0f8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/be3f0f859071311a01b6f1683525885dc9941710))
+
 ## [4.4.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.3.0...v4.4.0) (2026-01-02)
 
 
