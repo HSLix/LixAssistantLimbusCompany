@@ -25,7 +25,7 @@
 ![教程](/img/tutorial_1_04.png)
 
 ## 工作页 | Work Page
-![教程](/img/tutorial_1_09.png)
+![教程](/img/tutorial_1_10.png)
 
 ## 队伍配置页 | Team Config Page
 ![教程](/img/tutorial_1_05.png)
@@ -36,7 +36,7 @@
 ![教程](/img/tutorial_1_08.png)
 
 # 日志页 | Log Page
-![教程](/img/tutorial_1_10.png)
+![教程](/img/tutorial_1_11.png)
 
 
 ## 设置页 | Setting Page
