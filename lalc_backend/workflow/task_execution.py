@@ -4,6 +4,7 @@
 import time
 import difflib
 import asyncio
+from typing import Callable
 
 from input.input_handler import input_handler
 from recognize.img_recognizer import recognize_handler
@@ -54,9 +55,29 @@ class TaskExecution:
 
         # 自动注册所有装饰器登记的函数
         self._register_decorated_handlers()
+        
+        # ---------- 性能统计 ----------
+        self._perf: dict[str, dict[str, float | int]] = {}   # handler_name -> {"count": int, "total": float}
+        
         logger.log("TaskExecution 初始化完成")
 
-    
+
+    def _timed_handler(self, handler_name: str, handler: Callable) -> Callable:
+        """
+        为每个注册的 handler 包一层计时器
+        """
+        import time
+        def wrapper(*args, **kwargs):
+            st = time.perf_counter()
+            try:
+                return handler(*args, **kwargs)
+            finally:
+                cost = time.perf_counter() - st
+                stat = self._perf.setdefault(handler_name, {"count": 0, "total": 0.0})
+                stat["count"] += 1
+                stat["total"] += cost
+        return wrapper
+
     def _get_using_cfg_index(self, cfg_type:str) -> int:
         cfg = self._get_using_cfg(cfg_type)
         using_team_len = len(cfg["team_orders"]) 
@@ -90,12 +111,18 @@ class TaskExecution:
         """
         for name, func in TaskExecution.DECORATED_HANDLERS.items():
             bound = func.__get__(self, TaskExecution)
-
-            # 加入 handler 表
+            bound = self._timed_handler(name, bound)   # 包计时器
             self.handlers[name] = bound
 
             # 自动绑定为 self.exec_click / self.exec_wait_disappear / ...
             setattr(self, f"exec_{name}", bound)
+
+
+    def get_perf_summary(self) -> dict[str, dict[str, float | int]]:
+        """
+        供 AsyncTaskPipeline 调用，返回性能统计副本
+        """
+        return self._perf.copy()
 
 
     # --------- 执行入口 ---------
@@ -165,8 +192,8 @@ def exec_back_to_init_page(self, node:TaskNode, func):
         input_handler.click(1230, 45)
         time.sleep(2)
         input_handler.click(640, 430)
-    elif recognize_handler.template_match(tmp_screenshot, "right_top_setting"):
-        # 先处理右上角有设置的，就当是镜牢内的情况
+    elif recognize_handler.template_match(tmp_screenshot, "right_top_setting") or recognize_handler.template_match(tmp_screenshot, "pack_search"):
+        # 先处理主题页（这个的设置好像不同），或其它右上角有设置的，就当是镜牢内的情况
         logger.log("检测到可能处于镜牢的其它情况，启动从设置返回")
         input_handler.click(1230, 45)
         time.sleep(2)

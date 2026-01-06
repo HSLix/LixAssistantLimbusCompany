@@ -1,11 +1,6 @@
 import asyncio
-import threading
 import traceback
 from typing import Dict, Any, Callable, Optional
-import sys
-import os
-import subprocess
-import platform
 
 # 添加上级目录到路径中，以便导入模块
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -58,20 +53,23 @@ class AsyncTaskPipeline:
 
     def _send_finish_notification(self):
         """
-        统一发送任务结束通知（Windows 原生 Toast）
+        统一发送任务结束通知（plyer 跨平台版）
         经验采光|EXP：xx
         纺锤采光|Thread: xx
         镜像迷宫|Mirror: xx
         """
         try:
-            from workflow.task_registry import get_task          # 延迟导入
-            import ctypes
-            ctypes.windll.user32.DefWindowProcW.restype = ctypes.c_long  
-            from win10toast import ToastNotifier                # 第三方库
+            from workflow.task_registry import get_task  # 延迟导入
+            from plyer import notification
             import platform
+            import os
+            ico_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "MagicAndWonder.ico")
+            self.logger.debug(ico_path)
 
+            # 仅 Windows 弹窗；如以后想支持 mac/Linux，直接删掉下面判断即可
             if platform.system() != "Windows":
-                return                                          # 仅 Windows 生效
+                self.logger.log("暂时仅支持 Windows 平台的通知")
+                return
 
             exp_cnt = get_task("exp_check").get_param("execute_count")
             thd_cnt = get_task("thread_check").get_param("execute_count")
@@ -81,11 +79,12 @@ class AsyncTaskPipeline:
                     f"纺锤采光|Thread: {thd_cnt}\n"
                     f"镜像迷宫|Mirror: {mir_cnt}")
 
-            ToastNotifier().show_toast(
+            notification.notify(
                 title="LALC 任务结束",
-                msg=text,
-                duration=10,        # 秒，之后自动消失
-                threaded=True,      # 不阻塞主线程
+                message=text,
+                timeout=10,            # 显示秒数
+                app_icon=ico_path,         # 如要换图标，给 .ico 绝对路径即可
+                app_name="LALC"
             )
         except Exception as e:
             self.logger.log(f"发送通知失败: {e}", level="WARNING")
@@ -218,6 +217,17 @@ class AsyncTaskPipeline:
         finally:
             # 确保在任何情况下都将_worker_task重置为None
             self._worker_task = None
+            # ---------- TaskExecution handler 性能统计（一条 log） ----------
+            if self.task_execution:          # 确保已实例化
+                perf = self.task_execution.get_perf_summary()
+                if perf:
+                    parts = []
+                    for name, data in perf.items():
+                        cnt   = data["count"]
+                        total = data["total"]
+                        avg   = total / cnt if cnt else 0
+                        parts.append(f"{name}:{cnt}次 {total:.3f}s {avg:.3f}s/次")
+                    self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts))
             self.logger.debug("异步任务工作协程结束运行")
             self._send_finish_notification()
 

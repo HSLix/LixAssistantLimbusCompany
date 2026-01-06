@@ -23,6 +23,7 @@ xcopy "img" "pystand\script\img\" /E /I /Y /Q
 xcopy "input" "pystand\script\input\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 copy "main.py" "pystand\script\"
 copy "server.py" "pystand\script\"
+copy "MagicAndWonder.ico" "pystand\script\"
 xcopy "utils" "pystand\script\utils\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 xcopy "workflow" "pystand\script\workflow\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 xcopy "recognize" "pystand\script\recognize\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
