@@ -208,5 +208,8 @@
   "task_operation_failed": "操作失败",
   "task_start_failed": "任务启动失败",
   "task_already_paused": "任务已经暂停",
-  "task_already_stopped": "任务已经停止"
+  "task_already_stopped": "任务已经停止",
+  "mirror_shop_fuse_ego_gifts": "镜像商店融合饰品",
+  "mirror_shop_replace_skill_purchase_ego_gifts": "镜像商店替换技能&购买饰品",
+  "mirror_shop_enhance_ego_gifts": "镜像商店升级饰品"
 }

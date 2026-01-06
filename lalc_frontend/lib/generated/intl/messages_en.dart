@@ -239,9 +239,19 @@ class MessageLookup extends MessageLookupByLibrary {
     "mirror_prefer_ego_gift_style": MessageLookupByLibrary.simpleMessage(
       "Mirror Prefer Ego Gift Style",
     ),
+    "mirror_shop_enhance_ego_gifts": MessageLookupByLibrary.simpleMessage(
+      "Mirror Shop Enhance Ego Gifts",
+    ),
+    "mirror_shop_fuse_ego_gifts": MessageLookupByLibrary.simpleMessage(
+      "Mirror Shop Fuse Ego Gifts",
+    ),
     "mirror_shop_heal": MessageLookupByLibrary.simpleMessage(
       "Mirror Shop Heal",
     ),
+    "mirror_shop_replace_skill_purchase_ego_gifts":
+        MessageLookupByLibrary.simpleMessage(
+          "Mirror Shop Replace Skill & Purchase Ego Gifts",
+        ),
     "mirror_star_config": MessageLookupByLibrary.simpleMessage(
       "Mirror Star Config",
     ),

@@ -1793,6 +1793,36 @@ class S {
       args: [],
     );
   }
+
+  /// `Mirror Shop Fuse Ego Gifts`
+  String get mirror_shop_fuse_ego_gifts {
+    return Intl.message(
+      'Mirror Shop Fuse Ego Gifts',
+      name: 'mirror_shop_fuse_ego_gifts',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Mirror Shop Replace Skill & Purchase Ego Gifts`
+  String get mirror_shop_replace_skill_purchase_ego_gifts {
+    return Intl.message(
+      'Mirror Shop Replace Skill & Purchase Ego Gifts',
+      name: 'mirror_shop_replace_skill_purchase_ego_gifts',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Mirror Shop Enhance Ego Gifts`
+  String get mirror_shop_enhance_ego_gifts {
+    return Intl.message(
+      'Mirror Shop Enhance Ego Gifts',
+      name: 'mirror_shop_enhance_ego_gifts',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

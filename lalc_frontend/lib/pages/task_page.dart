@@ -1193,6 +1193,63 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
+        
+        const SizedBox(height: 10),
+        
+        // 添加三个布尔选项
+        // 饰品合成
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_shop_fuse_ego_gifts, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Switch(
+              value: taskConfigs['Mirror']['enable_fuse_ego_gifts'] ?? true,
+              onChanged: (bool value) {
+                setState(() {
+                  taskConfigs['Mirror']['enable_fuse_ego_gifts'] = value;
+                  // 保存配置
+                  _saveConfigToManager();
+                });
+              },
+            ),
+          ],
+        ),
+        
+        // 技能替换&饰品购买
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_shop_replace_skill_purchase_ego_gifts, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Switch(
+              value: taskConfigs['Mirror']['enable_replace_skill_purchase_ego_gifts'] ?? true,
+              onChanged: (bool value) {
+                setState(() {
+                  taskConfigs['Mirror']['enable_replace_skill_purchase_ego_gifts'] = value;
+                  // 保存配置
+                  _saveConfigToManager();
+                });
+              },
+            ),
+          ],
+        ),
+        
+        // 饰品升级
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_shop_enhance_ego_gifts, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Switch(
+              value: taskConfigs['Mirror']['enable_enhance_ego_gifts'] ?? true,
+              onChanged: (bool value) {
+                setState(() {
+                  taskConfigs['Mirror']['enable_enhance_ego_gifts'] = value;
+                  // 保存配置
+                  _saveConfigToManager();
+                });
+              },
+            ),
+          ],
+        ),
       ],
     );
   }

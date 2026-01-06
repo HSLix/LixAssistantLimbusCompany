@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
         # templates.append(get_image("Dark Vestige"))
         # templates.append(get_image("Faint Vestige"))
-        templates.append(get_image("no_mail_in_storage"))
+        templates.append(get_image("charge_enkephalin"))
 
         # templates.append(get_image("node_regular_encounter"))
         # templates.append(get_image("node_event"))

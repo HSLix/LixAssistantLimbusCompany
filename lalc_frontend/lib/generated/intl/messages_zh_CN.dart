@@ -173,7 +173,15 @@ class MessageLookup extends MessageLookupByLibrary {
     "mirror_prefer_ego_gift_style": MessageLookupByLibrary.simpleMessage(
       "镜牢首选 EGO 饰品流派",
     ),
+    "mirror_shop_enhance_ego_gifts": MessageLookupByLibrary.simpleMessage(
+      "镜像商店升级饰品",
+    ),
+    "mirror_shop_fuse_ego_gifts": MessageLookupByLibrary.simpleMessage(
+      "镜像商店融合饰品",
+    ),
     "mirror_shop_heal": MessageLookupByLibrary.simpleMessage("商店全体疗伤"),
+    "mirror_shop_replace_skill_purchase_ego_gifts":
+        MessageLookupByLibrary.simpleMessage("镜像商店替换技能&购买饰品"),
     "mirror_star_config": MessageLookupByLibrary.simpleMessage("配置初始星光"),
     "mirrorchan_cdk": MessageLookupByLibrary.simpleMessage("MirrorChan CDK"),
     "missing_required_files": MessageLookupByLibrary.simpleMessage(

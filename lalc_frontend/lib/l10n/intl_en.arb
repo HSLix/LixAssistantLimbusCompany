@@ -208,5 +208,8 @@
   "task_operation_failed": "Operation failed",
   "task_start_failed": "Task start failed",
   "task_already_paused": "Task is already paused",
-  "task_already_stopped": "Task is already stopped"
+  "task_already_stopped": "Task is already stopped",
+  "mirror_shop_fuse_ego_gifts": "Mirror Shop Fuse Ego Gifts",
+  "mirror_shop_replace_skill_purchase_ego_gifts": "Mirror Shop Replace Skill & Purchase Ego Gifts",
+  "mirror_shop_enhance_ego_gifts": "Mirror Shop Enhance Ego Gifts"
 }

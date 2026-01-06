@@ -171,6 +171,14 @@ class ServerController:
             # stopPurchaseGiftMoney映射到mirror_stop_purchase_gift_money
             if "stopPurchaseGiftMoney" in mirror_params:
                 backend_config["mirror_cfg"]["mirror_stop_purchase_gift_money"] = mirror_params["stopPurchaseGiftMoney"]
+            
+            # 新增三个布尔配置参数
+            if "enable_fuse_ego_gifts" in mirror_params:
+                backend_config["mirror_cfg"]["enable_fuse_ego_gifts"] = mirror_params["enable_fuse_ego_gifts"]
+            if "enable_replace_skill_purchase_ego_gifts" in mirror_params:
+                backend_config["mirror_cfg"]["enable_replace_skill_purchase_ego_gifts"] = mirror_params["enable_replace_skill_purchase_ego_gifts"]
+            if "enable_enhance_ego_gifts" in mirror_params:
+                backend_config["mirror_cfg"]["enable_enhance_ego_gifts"] = mirror_params["enable_enhance_ego_gifts"]
         
         # 处理teamConfigs
         team_configs = frontend_config.get("teamConfigs", {})

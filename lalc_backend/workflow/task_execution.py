@@ -352,6 +352,19 @@ enhance_sell_place = [
 
 @TaskExecution.register("mirror_shop_enhance_ego_gifts")
 def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
+    # 检查配置是否启用此功能
+    cfg_type = node.get_param("cfg_type")
+    cfg = self._get_using_cfg(cfg_type)
+    cfg_index = self._get_using_cfg_index(cfg_type)
+    
+    # 检查是否启用增强EGO饰品功能
+    enable_enhance = cfg.get("enable_enhance_ego_gifts", True)
+    if not enable_enhance:
+        logger.log("根据配置跳过EGO饰品升级")
+        # 点击 leave，为离开商店做准备
+        input_handler.click(1120, 640)
+        return
+    
     while True:
         input_handler.click(160, 390)
         time.sleep(1)
@@ -479,6 +492,17 @@ keyword_refresh_map = {
 
 @TaskExecution.register("mirror_shop_replace_skill_and_purchase_ego_gifts")
 def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, func):
+    # 检查配置是否启用此功能
+    cfg_type = node.get_param("cfg_type")
+    cfg = self._get_using_cfg(cfg_type)
+    cfg_index = self._get_using_cfg_index(cfg_type)
+    
+    # 检查是否启用替换技能和购买EGO饰品功能
+    enable_replace_and_purchase = cfg.get("enable_replace_skill_purchase_ego_gifts", True)
+    if not enable_replace_and_purchase:
+        logger.log("根据配置跳过技能替换和EGO饰品购买")
+        return
+    
     logger.log("替换技能并购买EGO饰品")
     cfg_type = node.get_param("cfg_type")
     cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
@@ -625,6 +649,17 @@ fuse_ego_gift_style_map = {
 
 @TaskExecution.register("mirror_shop_fuse_ego_gifts")
 def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
+    # 检查配置是否启用此功能
+    cfg_type = node.get_param("cfg_type")
+    cfg = self._get_using_cfg(cfg_type)
+    cfg_index = self._get_using_cfg_index(cfg_type)
+    
+    # 检查是否启用融合EGO饰品功能
+    enable_fuse = cfg.get("enable_fuse_ego_gifts", True)
+    if not enable_fuse:
+        logger.log("根据配置跳过EGO饰品融合")
+        return
+    
     logger.log("融合EGO饰品")
     # 确保 EGO 数量够了进合成
     input_handler.click(280, 390)
@@ -699,7 +734,6 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
             break
 
     input_handler.click(500, 590)
- 
 
 @TaskExecution.register("mirror_shop_heal_sinner")
 def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):

@@ -1,6 +1,9 @@
 {
   "check_node_target_count": 12,
   "mirror_stop_purchase_gift_money": 600,
+  "enable_fuse_ego_gifts": false,
+  "enable_replace_skill_purchase_ego_gifts": false,
+  "enable_enhance_ego_gifts": false,
   "mirror_team_styles": [
     "Sinking",
     "Rupture",
