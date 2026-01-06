@@ -15,6 +15,7 @@ dependencies = [
     "pywin32>=311",
     "rapidocr>=3.4.3",
     "websockets>=15.0.1",
+    "win10toast>=0.9",
 ]
 
 [tool.setuptools.packages.find]

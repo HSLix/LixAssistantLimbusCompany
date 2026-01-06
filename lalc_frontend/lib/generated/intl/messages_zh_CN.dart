@@ -283,7 +283,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "team_style_label": MessageLookupByLibrary.simpleMessage("  队伍流派: "),
     "theme_pack_config": MessageLookupByLibrary.simpleMessage("主题包配置"),
     "thread": MessageLookupByLibrary.simpleMessage("纺锤采光"),
-    "thread_stage": MessageLookupByLibrary.simpleMessage("纽关关卡"),
+    "thread_stage": MessageLookupByLibrary.simpleMessage("纺锤关卡"),
     "to": MessageLookupByLibrary.simpleMessage("到"),
     "tutorial": MessageLookupByLibrary.simpleMessage("教程"),
     "update_bat_path": MessageLookupByLibrary.simpleMessage("更新批处理文件路径"),

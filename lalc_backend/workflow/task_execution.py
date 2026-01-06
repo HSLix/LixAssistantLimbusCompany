@@ -150,7 +150,6 @@ class TaskExecution:
         return res
 
 
-
 # ====== 以下开始写所有 task，全部用装饰器注册 =======
 # 如果一个节点的 action 与节点同名，那么下面返回的时候就不要再返回这个 action func 的返回值，否则会无限递归执行该 action
 @TaskExecution.register("back_to_init_page")

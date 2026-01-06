@@ -4,6 +4,8 @@ import traceback
 from typing import Dict, Any, Callable, Optional
 import sys
 import os
+import subprocess
+import platform
 
 # 添加上级目录到路径中，以便导入模块
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -53,6 +55,40 @@ class AsyncTaskPipeline:
         :param callback: 回调函数，无参数
         """
         self._completion_callback = callback
+
+    def _send_finish_notification(self):
+        """
+        统一发送任务结束通知（Windows 原生 Toast）
+        经验采光|EXP：xx
+        纺锤采光|Thread: xx
+        镜像迷宫|Mirror: xx
+        """
+        try:
+            from workflow.task_registry import get_task          # 延迟导入
+            import ctypes
+            ctypes.windll.user32.DefWindowProcW.restype = ctypes.c_long  
+            from win10toast import ToastNotifier                # 第三方库
+            import platform
+
+            if platform.system() != "Windows":
+                return                                          # 仅 Windows 生效
+
+            exp_cnt = get_task("exp_check").get_param("execute_count")
+            thd_cnt = get_task("thread_check").get_param("execute_count")
+            mir_cnt = get_task("mirror_check").get_param("execute_count")
+
+            text = (f"经验采光|EXP：{exp_cnt}\n"
+                    f"纺锤采光|Thread: {thd_cnt}\n"
+                    f"镜像迷宫|Mirror: {mir_cnt}")
+
+            ToastNotifier().show_toast(
+                title="LALC 任务结束",
+                msg=text,
+                duration=10,        # 秒，之后自动消失
+                threaded=True,      # 不阻塞主线程
+            )
+        except Exception as e:
+            self.logger.log(f"发送通知失败: {e}", level="WARNING")
 
     @property
     def state(self):
@@ -183,6 +219,7 @@ class AsyncTaskPipeline:
             # 确保在任何情况下都将_worker_task重置为None
             self._worker_task = None
             self.logger.debug("异步任务工作协程结束运行")
+            self._send_finish_notification()
 
     async def pause(self):
         """

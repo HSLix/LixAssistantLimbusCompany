@@ -8,7 +8,7 @@ from workflow.task_node import TaskNode
 
 TASK_REGISTRY = {}
 
-def get_task(task_name:str):
+def get_task(task_name:str) -> TaskNode:
     if task_name not in TASK_REGISTRY:
         raise KeyError(f"未找到名称为 '{task_name}' 的任务节点")
     return TASK_REGISTRY[task_name]
