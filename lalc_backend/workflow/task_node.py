@@ -144,7 +144,7 @@ class TaskNode:
             origin_task = self.get_param("origin")
             return (self.name, origin_task.do_action, origin_task.get_next)
         
-        self.params["execute_count"] = 0
+        # self.params["execute_count"] = 0
         # 检查完成，走正常检测流程
         # origin_task.enable = False
         disable_task = self.get_param("disable_node")
