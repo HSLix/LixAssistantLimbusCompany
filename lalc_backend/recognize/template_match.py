@@ -155,11 +155,11 @@ if __name__ == "__main__":
         register_images_from_directory()
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
       
-        # templates.append(get_image("event_pass_very_low"))
-        # templates.append(get_image("event_pass_low"))
-        # templates.append(get_image("event_pass_normal"))
-        # templates.append(get_image("event_pass_high"))
-        # templates.append(get_image("event_pass_very_high"))
+        templates.append(get_image("event_pass_very_low"))
+        templates.append(get_image("event_pass_low"))
+        templates.append(get_image("event_pass_normal"))
+        templates.append(get_image("event_pass_high"))
+        templates.append(get_image("event_pass_very_high"))
 
         # templates.append(get_image("event_scroll_strip"))
         # templates.append(get_image("Thunderbranch"))
@@ -170,7 +170,8 @@ if __name__ == "__main__":
 
         # templates.append(get_image("Dark Vestige"))
         # templates.append(get_image("Faint Vestige"))
-        templates.append(get_image("right_top_setting"))
+        
+        # templates.append(get_image("right_top_setting"))
 
         # templates.append(get_image("node_regular_encounter"))
         # templates.append(get_image("node_event"))

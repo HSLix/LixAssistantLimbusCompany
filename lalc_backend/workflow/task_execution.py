@@ -798,12 +798,17 @@ def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
 @TaskExecution.register("event_pass_check")
 def exec_event_pass_check(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.log("事件通行证检查", tmp_screenshot)
+    logger.log("事件判定检查", tmp_screenshot)
+    recognized = False
     for s in ["very_high", "high", "normal", "low", "very_low"]:
         res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s)
         if len(res) > 0:
+            recognized = True
             input_handler.click(res[0][0], res[0][1])
             break
+    if not recognized:
+        logger.debug("事件判定检测失败，启用小唐")
+        input_handler.click(210, 650)
     time.sleep(1)
     input_handler.click(1120, 650)
     

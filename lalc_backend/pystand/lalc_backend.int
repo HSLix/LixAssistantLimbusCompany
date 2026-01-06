@@ -2,6 +2,7 @@ import sys
 import os
 import ctypes
 import re
+import asyncio
 
 try:
     # 添加项目根目录和相关子目录到sys.path
@@ -69,26 +70,31 @@ try:
         sleep(3)
         sys.exit(0)
 
-    # 如果前面发现根目录有 lalc_frontend,就运行 lalc_frontend/lalc_frontend.exe
-    if frontend_exists:
+    async def launch_frontend_after(delay: int = 3):
+        """延迟 delay 秒后再启动前端"""
+        await asyncio.sleep(delay)          # 像 Python 的 time.sleep，但不会阻塞事件循环
         frontend_exe_path = os.path.join(script_dir, 'lalc_frontend', 'lalc_frontend.exe')
         if os.path.exists(frontend_exe_path):
-            print("正在启动前端程序...")
-            # 启动前端程序，检查返回值
+            print(f"[launch_frontend_after] 启动前端程序（已延迟 {delay} 秒）...")
             ret = ctypes.windll.shell32.ShellExecuteW(
-                None, "open", "explorer", frontend_exe_path, "", None, 1  # 最后一个参数1表示SW_SHOWNORMAL，正常显示窗口
+                None, "open", "explorer", str(frontend_exe_path), "", 1
             )
             if ret <= 32:
-                raise Exception(f"启动前端程序失败，返回值: {ret}。Failed to start frontend executable, return value: {ret}.")
+                raise RuntimeError(f"启动前端失败，返回值: {ret}")
         else:
-            raise Exception(f"前端程序不存在: {frontend_exe_path}。Frontend executable does not exist: {frontend_exe_path}.")
-    else:
-        print("没有检测到前端程序，跳过前端程序的启动")
+            print("前端可执行文件不存在，跳过启动")
 
-    # 导入并运行主程序
-    import main
-    import asyncio
-    asyncio.run(main.amain())
+    async def main_wrapper():
+        """把原来的同步 main 包一层，实现延迟启动前端"""
+        # 如果前面发现根目录有 lalc_frontend, 就调度一个延迟任务
+        if frontend_exists:
+            asyncio.create_task(launch_frontend_after(2))
+
+        # 立即导入并运行真正的后端主循环
+        import main
+        await main.amain()          # 这里会阻塞到后端整个生命周期结束
+    
+    asyncio.run(main_wrapper())
 
 except Exception as e:
     error_msg = f"运行主程序时发生错误（An error occurred）: {e}"
