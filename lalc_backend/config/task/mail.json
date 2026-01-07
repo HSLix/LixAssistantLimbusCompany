@@ -67,6 +67,7 @@
     },
     "check_mail":{
         "type":"check",
+        "action": "check_out_update",
         "params":{
             "disable_node":"mail_entry",
             "execute_count": 0,

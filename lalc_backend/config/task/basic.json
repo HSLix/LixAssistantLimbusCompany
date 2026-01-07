@@ -44,5 +44,8 @@
     },
     "init_limbus_window":{
         "action":"init_limbus_window"
+    },
+    "check_out_update": {
+        "action": "check_out_update"
     }
 }

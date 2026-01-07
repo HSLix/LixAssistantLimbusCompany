@@ -17,6 +17,7 @@
             "template":"inferno",
             "target":[510, 310],
             "repeat": 2,
+            "repeat_interval": 1, 
             "post_delay": 1
         },
         "next":[
@@ -293,6 +294,7 @@
     },
     "mirror_check":{
         "type":"check",
+        "action": "check_out_update",
         "params":{
             "origin":"main_circle_center",
             "disable_node":"mirror_entry",

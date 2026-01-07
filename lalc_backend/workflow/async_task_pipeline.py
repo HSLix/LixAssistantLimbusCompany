@@ -6,7 +6,7 @@ from typing import Dict, Any, Callable, Optional
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from workflow.task_registry import get_task, init_tasks
-from workflow.task_execution import TaskExecution, set_server_ref
+from workflow.task_execution import TaskExecution, get_server_ref
 from utils.config_manager import initialize_configs
 from utils.logger import init_logger
 
@@ -91,9 +91,9 @@ class AsyncTaskPipeline:
                 self.logger.log("暂时仅支持 Windows 平台的通知", level="WARNING")
                 return
 
-            exp_cnt = get_task("exp_check").get_param("execute_count")
-            thd_cnt = get_task("thread_check").get_param("execute_count")
-            mir_cnt = get_task("mirror_check").get_param("execute_count")
+            exp_cnt = counts["exp"]
+            thd_cnt = counts["thread"]
+            mir_cnt = counts["mirror"]
 
             text = (f"经验采光|EXP：{exp_cnt}\n"
                     f"纺锤采光|Thread: {thd_cnt}\n"
@@ -122,12 +122,19 @@ class AsyncTaskPipeline:
           }
         }
         """
+        
         if self._server_ref is None:
+            self._server_ref = get_server_ref()
+        
+        if self._server_ref is None:
+            self.logger.log(f"远程服务器连接异常，广播任务完成次数失败", level="WARNING")
             return
+        
         await self._server_ref.broadcast({
             "type": "task_completion",
             "payload": counts,
         })
+        self.logger.log(f"已发送本轮任务完成次数：{counts}")
 
     @property
     def state(self):

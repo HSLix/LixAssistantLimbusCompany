@@ -226,6 +226,13 @@ class MessageLookup extends MessageLookupByLibrary {
     "member": MessageLookupByLibrary.simpleMessage("Member"),
     "member_count_label": MessageLookupByLibrary.simpleMessage("   Member: "),
     "mirror": MessageLookupByLibrary.simpleMessage("Mirror"),
+    "mirror_battle_fail_handle": MessageLookupByLibrary.simpleMessage(
+      "Mirror Dungeon Battle Fail Handle",
+    ),
+    "mirror_battle_fail_option_continue_next_team":
+        MessageLookupByLibrary.simpleMessage(
+          "Settle rewards and let next team continue",
+        ),
     "mirror_difficulty": MessageLookupByLibrary.simpleMessage(
       "Mirror Difficulty",
     ),

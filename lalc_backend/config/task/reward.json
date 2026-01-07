@@ -41,12 +41,20 @@
     },
     "check_reward":{
         "type":"check",
-        "action":"key",
+        "action": "check_out_update",
         "params":{
             "disable_node":"reward_entry",
-            "key":"esc",
             "execute_count": 0,
             "target_count": 1
+        },
+        "next":[
+            "exit_reward"
+        ]
+    },
+    "exit_reward": {
+        "action": "key",
+        "params":{
+            "key":"esc"
         },
         "next":[
             "main_circle_center"

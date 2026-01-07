@@ -196,7 +196,7 @@
   "mirror_difficulty_normal": "普通",
   "mirror_difficulty_hard": "困难",
   "new_version_available": "有新版本可用！",
-  "check_announcement_for_details": "查看公告了解详情。",
+  "check_announcement_for_details": "详情请查看公告面板。",
   "task_start_error": "任务无法启动",
   "no_team_configured": "未配置执行队伍，请至少配置一个队伍后再开始任务。",
   "all_tasks_started": "所有任务顺利开始",
@@ -209,10 +209,12 @@
   "task_start_failed": "任务启动失败",
   "task_already_paused": "任务已经暂停",
   "task_already_stopped": "任务已经停止",
-  "mirror_shop_fuse_ego_gifts": "镜像商店融合饰品",
-  "mirror_shop_replace_skill_purchase_ego_gifts": "镜像商店替换技能&购买饰品",
-  "mirror_shop_enhance_ego_gifts": "镜像商店升级饰品",
+  "mirror_shop_fuse_ego_gifts": "镜牢商店融合E.G.O.饰品",
+  "mirror_shop_replace_skill_purchase_ego_gifts": "镜牢商店替换技能和购买E.G.O.饰品",
+  "mirror_shop_enhance_ego_gifts": "镜牢商店强化E.G.O.饰品",
   "selected_teams": "已选择队伍",
   "just_p": "纯粹的P",
-  "semi_auto_started": "半自动任务已开始"
+  "semi_auto_started": "半自动任务已开始",
+  "mirror_battle_fail_handle": "镜像迷宫战斗失败处理",
+  "mirror_battle_fail_option_continue_next_team": "结算奖励并让下个队伍继续"
 }

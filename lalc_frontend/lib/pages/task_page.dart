@@ -1168,8 +1168,8 @@ class _HomePageState extends State<HomePage>
                   ? (taskConfigs['Mirror']['mirror_mode'] as List).first as String
                   : taskConfigs['Mirror']['mirror_mode'] as String?,
               items: <String>[
-                          'normal'
-                          // , 'hard'
+                          'normal',
+                          'hard',  
                           ]
                   .map<DropdownMenuItem<String>>((String value) {
                 String displayText = value == 'normal' 
@@ -1184,6 +1184,40 @@ class _HomePageState extends State<HomePage>
                 if (newValue != null) {
                   setState(() {
                     taskConfigs['Mirror']['mirror_mode'] = newValue;
+                    // 保存配置
+                    _saveConfigToManager();
+                  });
+                }
+              },
+              dropdownColor: Colors.grey[800],
+              style: const TextStyle(color: Colors.white),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 10),
+        
+        // 镜像迷宫战斗失败处理下拉框
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_battle_fail_handle, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            DropdownButton<String>(
+              value: taskConfigs['Mirror']['battle_fail_handle'] ?? 'continue_next_team',
+              items: <String>['continue_next_team']
+                  .map<DropdownMenuItem<String>>((String value) {
+                String displayText = value == 'continue_next_team' 
+                    ? S.of(context).mirror_battle_fail_option_continue_next_team 
+                    : value;
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(displayText, style: const TextStyle(color: Colors.white)),
+                );
+              }).toList(),
+              onChanged: (String? newValue) {
+                if (newValue != null) {
+                  setState(() {
+                    taskConfigs['Mirror']['battle_fail_handle'] = newValue;
                     // 保存配置
                     _saveConfigToManager();
                   });

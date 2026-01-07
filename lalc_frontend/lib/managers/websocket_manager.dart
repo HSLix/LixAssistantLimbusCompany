@@ -4,6 +4,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/foundation.dart';
+import 'package:mutex/mutex.dart';   // ① 换新库
 import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
 
@@ -11,6 +12,10 @@ class WebSocketManager with ChangeNotifier {
   static final WebSocketManager _instance = WebSocketManager._internal();
   factory WebSocketManager() => _instance;
   WebSocketManager._internal();
+
+  /* ========== 互斥锁 ========== */
+  static final _connectLock = Mutex();   // ② 全局锁
+  /* ============================ */
 
   WebSocketChannel? _channel;
   bool _isConnected = false;
@@ -86,45 +91,48 @@ class WebSocketManager with ChangeNotifier {
 
   // 连接到WebSocket服务器
   Future<void> connect() async {
-    // 如果已经在连接或已连接，则直接返回
-    if (_isConnecting || _isConnected) {
-      debugPrint('WebSocket已在连接中或已连接，跳过重复连接');
-      return;
-    }
-    
-    _isConnecting = true;
-    notifyListeners();
-    
-    // 获取当前要尝试连接的URL
-    final currentUrl = _getNextServerUrl();
-    
-    try {
-      debugPrint('尝试连接到 $currentUrl (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
-      _addLogMessage('正在连接到 $currentUrl... (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
+    // 所有调用者排队，拿到锁的人才能继续
+    await _connectLock.protect(() async {   // ③ 临界区开始
+      // 如果已经在连接或已连接，则直接返回
+      if (_isConnecting || _isConnected) {
+        debugPrint('WebSocket已在连接中或已连接，跳过重复连接');
+        return;
+      }
       
-      _channel = WebSocketChannel.connect(Uri.parse(currentUrl));
-      // 注意：这里不再立即设置_isConnected为true，等待收到服务器消息后再确认连接成功
-      // _reconnectAttempts保持不变，直到真正连接成功才重置
-      
-      // 监听消息
-      _channel!.stream.listen(
-        _handleMessage,
-        onError: _handleError,
-        onDone: _handleDisconnect,
-      );
-      
-      // 启动心跳机制
-      _startHeartbeat();
-    } catch (e) {
-      _isConnecting = false;
+      _isConnecting = true;
       notifyListeners();
-      debugPrint('WebSocket连接失败: $e');
-      _addLogMessage('WebSocket连接失败: $e');
-      // 连接失败时增加端口索引并安排重新连接
-      _reconnectAttempts++;
-      _currentPortIndex = (_currentPortIndex + 1) % _portsToTry.length;
-      _scheduleReconnect(const Duration(milliseconds: 500));
-    }
+      
+      // 获取当前要尝试连接的URL
+      final currentUrl = _getNextServerUrl();
+      
+      try {
+        debugPrint('尝试连接到 $currentUrl (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
+        _addLogMessage('正在连接到 $currentUrl... (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
+        
+        _channel = WebSocketChannel.connect(Uri.parse(currentUrl));
+        // 注意：这里不再立即设置_isConnected为true，等待收到服务器消息后再确认连接成功
+        // _reconnectAttempts保持不变，直到真正连接成功才重置
+        
+        // 监听消息
+        _channel!.stream.listen(
+          _handleMessage,
+          onError: _handleError,
+          onDone: _handleDisconnect,
+        );
+        
+        // 启动心跳机制
+        _startHeartbeat();
+      } catch (e) {
+        _isConnecting = false;
+        notifyListeners();
+        debugPrint('WebSocket连接失败: $e');
+        _addLogMessage('WebSocket连接失败: $e');
+        // 连接失败时增加端口索引并安排重新连接
+        _reconnectAttempts++;
+        _currentPortIndex = (_currentPortIndex + 1) % _portsToTry.length;
+        _scheduleReconnect(const Duration(milliseconds: 500));
+      }
+    });                                       // ④ 临界区结束
   }
 
   // 处理连接失败
@@ -279,6 +287,7 @@ class WebSocketManager with ChangeNotifier {
           break;
           
         case 'task_completion':
+          debugPrint('收到task_completion消息: ${data['payload']}');
           final Map<String, dynamic> counts =
               (data['payload'] as Map<String, dynamic>).cast<String, dynamic>();
           // 将Map<String, dynamic>转换为Map<String, int>
@@ -293,6 +302,7 @@ class WebSocketManager with ChangeNotifier {
               intCounts[entry.key] = int.tryParse(entry.value.toString()) ?? 0;
             }
           }
+          debugPrint('转换后的完成次数: $intCounts');
           _rotateTeamsAccordingToCounts(intCounts);
           break;
           
@@ -429,30 +439,40 @@ class WebSocketManager with ChangeNotifier {
 
   /// 根据后端给出的完成次数，就地轮换本地队伍列表
   void _rotateTeamsAccordingToCounts(Map<String, int> counts) {
+    debugPrint('收到任务完成通知，准备轮换队伍: $counts');
     final cm = ConfigManager();
 
     void rotateOne(String taskKey, String cfgKey) {
       final done = counts[taskKey] ?? 0;
+      debugPrint('$taskKey 完成任务数: $done');
       if (done <= 0) return;
 
       // 1. 读当前顺序（1-base）
       final oldTeams = List<int>.from(cm.taskConfigs[cfgKey]?.teams ?? []);
+      debugPrint('$cfgKey 原队伍顺序: $oldTeams');
       if (oldTeams.isEmpty) return;
 
       // 2. 轮转
       final steps = done % oldTeams.length;
       final newTeams = oldTeams.sublist(steps)..addAll(oldTeams.take(steps));
+      debugPrint('$cfgKey 新队伍顺序: $newTeams');
 
       // 3. 写回内存
       cm.taskConfigs[cfgKey]?.teams = newTeams;
+      
+      // 4. 保存到文件
+      cm.saveTaskConfig();
+      
+      debugPrint('$cfgKey 队伍轮换完成');
     }
 
-    rotateOne('exp',   'EXP');
-    rotateOne('thread','Thread');
-    rotateOne('mirror','Mirror');
+    rotateOne('exp', 'EXP');
+    rotateOne('thread', 'Thread');
+    rotateOne('mirror', 'Mirror');
 
-    // 4. 通知所有监听者（TaskPage 会自动 rebuild）
+    // 5. 通知所有监听者（TaskPage 会自动 rebuild）
     notifyListeners();
+    debugPrint('队伍轮换通知已发送');
   }
 
   // 获取日志文件夹列表

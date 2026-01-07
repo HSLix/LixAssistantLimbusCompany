@@ -6,23 +6,87 @@
   "enable_enhance_ego_gifts": false,
   "mirror_mode": "hard",
   "mirror_team_styles": [
-    "Poise"
+    "Poise",
+    "Bleed"
   ],
   "mirror_team_ego_gift_styles": [
     [
       "Poise"
+    ],
+    [
+      "Bleed"
     ]
   ],
   "mirror_team_ego_allow_list": [
-    []
+    [],
+    [
+      "Lithograph",
+      "Homeward",
+      "Golden Urn",
+      "Carmilla",
+      "Milepost of Survival",
+      "Phlebotomy Pack",
+      "Prejudice",
+      "Prestige Card",
+      "Relationship Piece of",
+      "Renewed Merch",
+      "Wealth",
+      "Voracious Hammer",
+      "Lunar Memory",
+      "Clear Mirror, Calm Water",
+      "Nebulizer",
+      "Melted Eyeball",
+      "Downpour",
+      "Eclipse of Scarlet Moths",
+      "Artistic Sense"
+    ]
   ],
   "mirror_team_ego_block_list": [
+    [],
     []
   ],
   "mirror_replace_skill": [
-    {}
+    {},
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Ishmael": [
+        1,
+        2,
+        3
+      ],
+      "Rodion": [
+        1,
+        2,
+        3
+      ],
+      "Gregor": [
+        3,
+        2,
+        1
+      ]
+    }
   ],
   "mirror_shop_heal": [
+    false,
     false
   ],
   "mirror_team_initial_ego_orders": [
@@ -30,10 +94,22 @@
       1,
       2,
       3
+    ],
+    [
+      3,
+      1,
+      2
     ]
   ],
   "mirror_team_stars": [
-    []
+    [],
+    [
+      "4",
+      "0",
+      "6",
+      "7",
+      "3"
+    ]
   ],
   "team_orders": [
     [
@@ -49,9 +125,24 @@
       "Sinclair",
       "Outis",
       "Gregor"
+    ],
+    [
+      "Don Quixote",
+      "Rodion",
+      "Meursault",
+      "Gregor",
+      "Yi Sang",
+      "Ishmael",
+      "Heathcliff",
+      "Outis",
+      "Hong Lu",
+      "Faust",
+      "Ryoshu",
+      "Sinclair"
     ]
   ],
   "team_indexes": [
-    8
+    8,
+    1
   ]
 }

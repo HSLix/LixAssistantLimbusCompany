@@ -51,7 +51,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "cdk_saved": MessageLookupByLibrary.simpleMessage("CDK 保存成功"),
     "cdk_status": MessageLookupByLibrary.simpleMessage("CDK 状态"),
     "check_announcement_for_details": MessageLookupByLibrary.simpleMessage(
-      "查看公告了解详情。",
+      "详情请查看公告面板。",
     ),
     "check_how_to_use_app": MessageLookupByLibrary.simpleMessage(
       "查看如何使用 LALC，即使是堂吉诃德也能轻易读懂",
@@ -164,6 +164,11 @@ class MessageLookup extends MessageLookupByLibrary {
     "member": MessageLookupByLibrary.simpleMessage("成员"),
     "member_count_label": MessageLookupByLibrary.simpleMessage("   成员: "),
     "mirror": MessageLookupByLibrary.simpleMessage("镜像迷宫"),
+    "mirror_battle_fail_handle": MessageLookupByLibrary.simpleMessage(
+      "镜像迷宫战斗失败处理",
+    ),
+    "mirror_battle_fail_option_continue_next_team":
+        MessageLookupByLibrary.simpleMessage("结算奖励并让下个队伍继续"),
     "mirror_difficulty": MessageLookupByLibrary.simpleMessage("镜像迷宫难度"),
     "mirror_difficulty_hard": MessageLookupByLibrary.simpleMessage("困难"),
     "mirror_difficulty_normal": MessageLookupByLibrary.simpleMessage("普通"),
@@ -175,14 +180,14 @@ class MessageLookup extends MessageLookupByLibrary {
       "镜牢首选 EGO 饰品流派",
     ),
     "mirror_shop_enhance_ego_gifts": MessageLookupByLibrary.simpleMessage(
-      "镜像商店升级饰品",
+      "镜牢商店强化E.G.O.饰品",
     ),
     "mirror_shop_fuse_ego_gifts": MessageLookupByLibrary.simpleMessage(
-      "镜像商店融合饰品",
+      "镜牢商店融合E.G.O.饰品",
     ),
     "mirror_shop_heal": MessageLookupByLibrary.simpleMessage("商店全体疗伤"),
     "mirror_shop_replace_skill_purchase_ego_gifts":
-        MessageLookupByLibrary.simpleMessage("镜像商店替换技能&购买饰品"),
+        MessageLookupByLibrary.simpleMessage("镜牢商店替换技能和购买E.G.O.饰品"),
     "mirror_star_config": MessageLookupByLibrary.simpleMessage("配置初始星光"),
     "mirrorchan_cdk": MessageLookupByLibrary.simpleMessage("MirrorChan CDK"),
     "missing_required_files": MessageLookupByLibrary.simpleMessage(

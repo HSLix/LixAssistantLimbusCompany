@@ -12,6 +12,10 @@ except ImportError:
 
     # from task_registry import get_task
 
+from utils.logger import init_logger
+
+
+logger = init_logger()
 
 
 class TaskNode:
@@ -135,11 +139,6 @@ class TaskNode:
         """
         检查点的获取下个节点，如果已经执行的次数达到了目标次数，就会跳转到 next，同时会把 origin 的 enable 设置为 False，否则跳到 origin
         """
-        if self.get_param("execute_count") == 0:
-            self.params["execute_count"] = 1
-        else:
-            self.params["execute_count"] += 1
-        
         if self.get_param("execute_count") < self.get_param("target_count"):
             origin_task = self.get_param("origin")
             return (self.name, origin_task.do_action, origin_task.get_next)

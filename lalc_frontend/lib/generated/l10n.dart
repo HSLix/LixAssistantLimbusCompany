@@ -1848,6 +1848,26 @@ class S {
       args: [],
     );
   }
+
+  /// `Mirror Dungeon Battle Fail Handle`
+  String get mirror_battle_fail_handle {
+    return Intl.message(
+      'Mirror Dungeon Battle Fail Handle',
+      name: 'mirror_battle_fail_handle',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Settle rewards and let next team continue`
+  String get mirror_battle_fail_option_continue_next_team {
+    return Intl.message(
+      'Settle rewards and let next team continue',
+      name: 'mirror_battle_fail_option_continue_next_team',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

@@ -185,6 +185,13 @@ class TaskExecution:
 
 # ====== 以下开始写所有 task，全部用装饰器注册 =======
 # 如果一个节点的 action 与节点同名，那么下面返回的时候就不要再返回这个 action func 的返回值，否则会无限递归执行该 action
+@TaskExecution.register("check_out_update")
+def exec_check_out_update(self, node:TaskNode, func):
+    old = node.get_param("execute_count", 0)
+    node.set_param("execute_count", old + 1)
+    logger.log(f"[check_out_update] 节点<{node.name}> 计数 + 1，当前：{old + 1}")
+
+
 @TaskExecution.register("mirror_defeat")
 def exec_mirror_defeat(self, node:TaskNode, func):
     logger.log("镜牢刷取失败", input_handler.capture_screenshot())

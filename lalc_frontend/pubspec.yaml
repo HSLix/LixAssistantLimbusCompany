@@ -54,6 +54,7 @@ dependencies:
   intl: ^0.20.2
   intl_utils: ^2.8.13
   url_launcher: ^6.3.2
+  mutex: ^3.1.0
 
 dev_dependencies:
   flutter_test:

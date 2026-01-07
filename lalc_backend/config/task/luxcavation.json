@@ -99,6 +99,7 @@
     },
     "exp_check":{
         "type":"check",
+        "action": "check_out_update",
         "params":{
             "origin":"exp_select_stage",
             "disable_node":"exp_entry",
@@ -239,6 +240,7 @@
     },
     "thread_check":{
         "type":"check",
+        "action": "check_out_update",
         "params":{
             "origin":"thread_select_stage",
             "disable_node":"thread_entry"

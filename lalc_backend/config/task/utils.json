@@ -48,6 +48,7 @@
     },
     "recharge_enkephalin_check":{
         "type":"check",
+        "action": "check_out_update",
         "params":{
             "disable_node":"recharge_enkephalin",
             "execute_count": 0,
