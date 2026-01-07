@@ -1823,6 +1823,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Selected Teams`
+  String get selected_teams {
+    return Intl.message(
+      'Selected Teams',
+      name: 'selected_teams',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

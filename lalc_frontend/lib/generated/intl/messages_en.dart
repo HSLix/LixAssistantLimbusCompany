@@ -331,6 +331,7 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "selected": MessageLookupByLibrary.simpleMessage("SELECTED"),
     "selected_stars": MessageLookupByLibrary.simpleMessage("Selected Stars"),
+    "selected_teams": MessageLookupByLibrary.simpleMessage("Selected Teams"),
     "server": MessageLookupByLibrary.simpleMessage("Server"),
     "set": MessageLookupByLibrary.simpleMessage("Set"),
     "sidebar_about": MessageLookupByLibrary.simpleMessage("About"),

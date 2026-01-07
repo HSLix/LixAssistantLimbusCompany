@@ -1490,7 +1490,7 @@ class _HomePageState extends State<HomePage>
             
             return CheckboxListTile(
               title: Text('${team['name']}'),
-              subtitle: Text('Team Index: $teamNumber   Member: ${team['selectedMembers']}/12   Team Style:${team['style']} '),
+              subtitle: Text('${S.of(context).team_index_label} $teamNumber   ${S.of(context).member_count_label} ${team['selectedMembers']}/12   ${S.of(context).team_style_label} ${team['style']} '),
               value: isSelected,
               onChanged: (bool? value) {
                 setState(() {
@@ -1623,7 +1623,7 @@ class _HomePageState extends State<HomePage>
         teamNames.add(teamName);
       }
       
-      String teamsText = 'Teams: ${teamNames.join(', ')}';
+      String teamsText = '${S.of(context).selected_teams}: ${teamNames.join(', ')}';
       previewWidgets.add(
         Text(
           teamsText,

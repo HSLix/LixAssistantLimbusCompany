@@ -241,6 +241,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "select_your_teams": MessageLookupByLibrary.simpleMessage("选择您的队伍"),
     "selected": MessageLookupByLibrary.simpleMessage("已选择"),
     "selected_stars": MessageLookupByLibrary.simpleMessage("选中的星光"),
+    "selected_teams": MessageLookupByLibrary.simpleMessage("已选择队伍"),
     "server": MessageLookupByLibrary.simpleMessage("服务器"),
     "set": MessageLookupByLibrary.simpleMessage("已设置"),
     "sidebar_about": MessageLookupByLibrary.simpleMessage("关于"),
