@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_markdown/flutter_markdown.dart'; // 添加 Markdown 解析导入
 import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n.dart'; // 添加国际化支持
+import '../utils/style_type_helper.dart'; // 添加新的工具类导入
 import 'dart:async'; // 添加Timer需要的导入
 
 class HomePage extends StatefulWidget {
@@ -1346,6 +1347,9 @@ class _HomePageState extends State<HomePage>
     // 计算已选择成员数量
     final actualSelectedMembers = teamConfig?.selectedMembers.length ?? 0;
     
+    // 根据语言本地化流派类型
+    String localizedTeamStyle = StyleTypeHelper.getLocalizedStyleType(actualTeamStyle, context);
+    
     return Container(
       key: ValueKey('$taskName-$teamNumber'),
       margin: const EdgeInsets.only(bottom: 8),
@@ -1378,7 +1382,7 @@ class _HomePageState extends State<HomePage>
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${S.of(context).team_index_label}$teamNumber${S.of(context).member_count_label}$actualSelectedMembers/12${S.of(context).team_style_label}$actualTeamStyle',
+                        '${S.of(context).team_index_label}$teamNumber${S.of(context).member_count_label}$actualSelectedMembers/12${S.of(context).team_style_label}$localizedTeamStyle',
                         style: const TextStyle(
                           color: Colors.grey,
                           fontSize: 14,
@@ -1488,9 +1492,12 @@ class _HomePageState extends State<HomePage>
             final teamNumber = team['number'];
             final isSelected = taskTeams[taskName]?.contains(teamNumber) ?? false;
             
+            // 根据语言本地化流派类型
+            String localizedTeamStyle = StyleTypeHelper.getLocalizedStyleType(team['style'], context);
+            
             return CheckboxListTile(
               title: Text('${team['name']}'),
-              subtitle: Text('${S.of(context).team_index_label} $teamNumber   ${S.of(context).member_count_label} ${team['selectedMembers']}/12   ${S.of(context).team_style_label} ${team['style']} '),
+              subtitle: Text('${S.of(context).team_index_label} $teamNumber   ${S.of(context).member_count_label} ${team['selectedMembers']}/12   ${S.of(context).team_style_label} $localizedTeamStyle '),
               value: isSelected,
               onChanged: (bool? value) {
                 setState(() {

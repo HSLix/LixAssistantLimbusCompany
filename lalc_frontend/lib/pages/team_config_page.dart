@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import '../generated/l10n.dart';
+import '../utils/style_type_helper.dart'; // 添加新的工具类导入
 
 // 罪人名字的中英文对照
 const sinnerNames = [
@@ -23,15 +24,6 @@ class EgoGift {
 
   EgoGift({required this.name, required this.type, required this.image});
 }
-
-// 流派类型的中英文对照
-const List<String> styleTypes = [
-  "Bleed", "Burn", "Rupture", "Poise", "Tremor", "Blunt", "Pierce", "Slash", "Charge", "Sinking", "Keywordless"
-];
-
-const List<String> styleTypesZh = [
-  "流血", "燃烧", "破裂", "呼吸法", "震颤", "打击", "突刺", "斩击", "充能", "沉沦", "泛用"
-];
 
 List<EgoGift> egoGifts = [];
 
@@ -307,7 +299,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
     egoGifts.clear();
 
     // 添加一些默认饰品数据用于演示
-    for (var type in styleTypes) {
+    for (var type in StyleTypeHelper.styleTypes) {
       egoGifts.add(EgoGift(
         name: '$type Default Gift',
         type: type,
@@ -795,7 +787,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _isChineseLocale(context) ? "队伍流派" : "Team Style",
+                            S.of(context).team_style_label,
                             style: TextStyle(
                               fontSize: 22,
                             ),
@@ -803,46 +795,38 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                           DropdownButton<String>(
                             alignment: Alignment.center,
                             value: currentTeamConfig.selectedTeamStyleType,
-                            items: styleTypes
+                            items: StyleTypeHelper.getStyleTypeKeys()
                                 .where((type) => type != "Keywordless") // 过滤掉"Keywordless"
-                                .map((String type) {
-                              // 获取对应的中文名称
-                              final int typeIndex = styleTypes.indexOf(type);
-                              final String displayType = _isChineseLocale(context) 
-                                  ? styleTypesZh[typeIndex] 
-                                  : type;
+                                .map((String key) {
                               return DropdownMenuItem<String>( 
                                 alignment: Alignment.center,
-                                value: type,
-                                child: Text(displayType, style: const TextStyle(color: Colors.white)),
+                                value: key,
+                                child: Text(
+                                  StyleTypeHelper.getLocalizedStyleType(key, context),
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               );
                             }).toList(),
-                            onChanged: (newValue) {
+                            onChanged: (String? newKey) {
+                              if (newKey == null) return;
                               setState(() {
-                                if (newValue != null) {
-                                  // 创建新的prefer ego gift types集合
-                                  Set<String> updatedPreferTypes = 
-                                      Set<String>.from(currentTeamConfig.selectedPreferEgoGiftTypes);
-                                  
-                                  // 移除旧的team style（如果存在于selectedPreferEgoGiftTypes中）
-                                  if (currentTeamConfig.selectedPreferEgoGiftTypes
-                                      .contains(currentTeamConfig.selectedTeamStyleType)) {
-                                    updatedPreferTypes.remove(currentTeamConfig.selectedTeamStyleType);
-                                  }
-                                  
-                                  // 添加新的team style
-                                  updatedPreferTypes.add(newValue);
-                                  
-                                  teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(
-                                    selectedTeamStyleType: newValue,
-                                    selectedPreferEgoGiftTypes: updatedPreferTypes,
-                                  );
-                                } else {
-                                  // 如果newValue为null，只更新team style
-                                  teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(
-                                    selectedTeamStyleType: newValue!,
-                                  );
+                                // 创建新的prefer ego gift types集合
+                                Set<String> updatedPreferTypes = 
+                                    Set<String>.from(currentTeamConfig.selectedPreferEgoGiftTypes);
+                                
+                                // 移除旧的team style（如果存在于selectedPreferEgoGiftTypes中）
+                                if (currentTeamConfig.selectedPreferEgoGiftTypes
+                                    .contains(currentTeamConfig.selectedTeamStyleType)) {
+                                  updatedPreferTypes.remove(currentTeamConfig.selectedTeamStyleType);
                                 }
+                                
+                                // 添加新的team style
+                                updatedPreferTypes.add(newKey);
+                                
+                                teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(
+                                  selectedTeamStyleType: newKey,
+                                  selectedPreferEgoGiftTypes: updatedPreferTypes,
+                                );
                                 _saveCurrentTeamConfig(); // 保存配置到ConfigManager
                               });
                             },
@@ -856,7 +840,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Text(
-                            _isChineseLocale(context) ? "启程EGO饰品" : "Initial Ego Gifts",
+                            S.of(context).initial_ego_gifts,
                             style: TextStyle(
                               fontSize: 22,
                             ),
@@ -964,7 +948,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _isChineseLocale(context) ? "镜像饰品配置" : "Mirror Ego Gift Config",
+                            S.of(context).mirror_ego_gift_config,
                             style: TextStyle(
                               fontSize: 22,
                             ),
@@ -981,7 +965,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "${_isChineseLocale(context) ? "首选类型" : "Preferred Types"}: ",
+                            "${S.of(context).preferred_types}: ",
                             style: const TextStyle(
                               fontSize: 16,
                             ),
@@ -989,17 +973,10 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                           Flexible(
                             child: Text(
                               () {
-                                // 将英文类型转换为本地化显示
+                                // 使用StyleTypeHelper将英文类型转换为本地化显示
                                 List<String> localizedTypes = [];
                                 for (String type in currentTeamConfig.selectedPreferEgoGiftTypes) {
-                                  final int typeIndex = styleTypes.indexOf(type);
-                                  if (typeIndex != -1) {
-                                    localizedTypes.add(_isChineseLocale(context) 
-                                        ? styleTypesZh[typeIndex] 
-                                        : type);
-                                  } else {
-                                    localizedTypes.add(type);
-                                  }
+                                  localizedTypes.add(StyleTypeHelper.getLocalizedStyleType(type, context));
                                 }
                                 return localizedTypes.join(", ");
                               }(),
@@ -1020,7 +997,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            _isChineseLocale(context) ? "技能替换配置" : "Skill Replacement Config",
+                            S.of(context).skill_replacement_config,
                             style: TextStyle(
                               fontSize: 22,
                             ),
@@ -1038,7 +1015,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "${_isChineseLocale(context) ? "启用角色" : "Enabled Characters"}: ",
+                            "${S.of(context).enabled_characters}: ",
                             style: const TextStyle(
                               fontSize: 16,
                             ),
@@ -1582,22 +1559,17 @@ class _TeamConfigPageState extends State<TeamConfigPage>
           ),
           const SizedBox(height: 10,),
           Wrap(
-            children: styleTypes.map((type) {
-              // 获取对应的中文名称
-              final int typeIndex = styleTypes.indexOf(type);
-              final String displayType = _isChineseLocale(context) 
-                  ? styleTypesZh[typeIndex] 
-                  : type;
+            children: StyleTypeHelper.getStyleTypeKeys().map((key) {
               return FilterChip(
-                label: Text(displayType, style: const TextStyle(color: Colors.white)),
-                selected: currentTeamConfig.selectedPreferEgoGiftTypes.contains(type),
-                onSelected: (isSelected) {
+                label: Text(StyleTypeHelper.getLocalizedStyleType(key, context), style: const TextStyle(color: Colors.white)),
+                selected: currentTeamConfig.selectedPreferEgoGiftTypes.contains(key),
+                onSelected: (bool selected) {
                   setState(() {
                     final updatedSet = Set<String>.from(currentTeamConfig.selectedPreferEgoGiftTypes);
-                    if (isSelected) {
-                      updatedSet.add(type);
+                    if (selected) {
+                      updatedSet.add(key);
                     } else {
-                      updatedSet.remove(type);
+                      updatedSet.remove(key);
                     }
                     teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(selectedPreferEgoGiftTypes: updatedSet);
                     _saveCurrentTeamConfig(); // 保存配置到ConfigManager
@@ -1617,22 +1589,17 @@ class _TeamConfigPageState extends State<TeamConfigPage>
           const SizedBox(height: 10,),
           // 饰品种类筛选
           Wrap(
-            children: styleTypes.map((type) {
-              // 获取对应的中文名称
-              final int typeIndex = styleTypes.indexOf(type);
-              final String displayType = _isChineseLocale(context) 
-                  ? styleTypesZh[typeIndex] 
-                  : type;
+            children: StyleTypeHelper.getStyleTypeKeys().map((key) {
               return FilterChip(
-                label: Text(displayType, style: const TextStyle(color: Colors.white)),
-                selected: currentTeamConfig.selectedAccessoryTypes.contains(type),
-                onSelected: (isSelected) {
+                label: Text(StyleTypeHelper.getLocalizedStyleType(key, context), style: const TextStyle(color: Colors.white)),
+                selected: currentTeamConfig.selectedAccessoryTypes.contains(key),
+                onSelected: (bool selected) {
                   setState(() {
                     final updatedSet = Set<String>.from(currentTeamConfig.selectedAccessoryTypes);
-                    if (isSelected) {
-                      updatedSet.add(type);
+                    if (selected) {
+                      updatedSet.add(key);
                     } else {
-                      updatedSet.remove(type);
+                      updatedSet.remove(key);
                     }
                     teamConfigs[selectedTeamIndex] = currentTeamConfig.copyWith(selectedAccessoryTypes: updatedSet);
                     _saveCurrentTeamConfig(); // 保存配置到ConfigManager
@@ -1715,13 +1682,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         overflow: TextOverflow.ellipsis,
                       ),
                       subtitle: Text(
-                        () {
-                          // 获取对应的中文名称
-                          final int typeIndex = styleTypes.indexOf(accessory.type);
-                          return _isChineseLocale(context) && typeIndex != -1
-                              ? styleTypesZh[typeIndex] 
-                              : accessory.type;
-                        }(), 
+                        StyleTypeHelper.getLocalizedStyleType(accessory.type, context),
                         style: const TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                       trailing: SizedBox(
@@ -1885,12 +1846,6 @@ class _TeamConfigPageState extends State<TeamConfigPage>
             final teamNumber = team['number'];
             final isSelected = selectedTeamIndex == teamNumber - 1;
             
-            // 获取对应的中文名称
-            final int styleIndex = styleTypes.indexOf(team['style']);
-            final String displayStyle = _isChineseLocale(context) && styleIndex != -1
-                ? styleTypesZh[styleIndex] 
-                : team['style'];
-            
             return Card(
               color: isSelected ? Colors.blueGrey[700] : Colors.grey[800],
               child: InkWell(
@@ -1913,7 +1868,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${_isChineseLocale(context) ? "队伍索引" : "Team Index"}: $teamNumber   ${_isChineseLocale(context) ? "成员" : "Member"}: ${team['selectedMembers']}/12   ${_isChineseLocale(context) ? "队伍流派" : "Team Style"}:$displayStyle ',
+                        '${_isChineseLocale(context) ? "队伍索引" : "Team Index"}: $teamNumber   ${_isChineseLocale(context) ? "成员" : "Member"}: ${team['selectedMembers']}/12   ${StyleTypeHelper.getLocalizedStyleType(team['style'], context)} ',
                         style: const TextStyle(
                           color: Colors.grey,
                         ),
