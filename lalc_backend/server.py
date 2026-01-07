@@ -103,7 +103,7 @@ class ServerController:
         })
 
     # ---------- 工具 ----------
-    async def send_json(self, ws: websockets.WebSocketServerProtocol, data: dict):
+    async def send_json(self, ws, data: dict):
         await ws.send(json.dumps(data))
 
     async def broadcast(self, data: dict):
@@ -333,7 +333,7 @@ class ServerController:
                 break
 
     # ---------- 业务路由 ----------
-    async def handle_command(self, ws: websockets.WebSocketServerProtocol, cmd: str, msg_id: str, args_list=None):
+    async def handle_command(self, ws, cmd: str, msg_id: str, args_list=None):
         base_cmd = cmd
         # 如果客户端已经拆好，就直接用
         if args_list is not None:
@@ -368,6 +368,11 @@ class ServerController:
                 await self.pipeline.start("main")
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
                 self.lalc_logger.debug(f"收到 start 命令，已启动任务流水线")
+            elif base_cmd == "semi_auto_start":
+                input_handler.reset() 
+                await self.pipeline.start("semi_auto_main")
+                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
+                self.lalc_logger.debug(f"收到 semi_auto_start 命令，已启动任务流水线")
             elif base_cmd == "get_latest_version":
                 from utils.update_manager import get_latest_version
                 version = get_latest_version()
@@ -869,7 +874,7 @@ class ServerController:
             })
 
     # ---------- 连接生命周期 ----------
-    async def client_handler(self, ws: websockets.WebSocketServerProtocol):
+    async def client_handler(self, ws):
         self.clients.add(ws)
         self.lalc_logger.debug(f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}")
         await self.send_json(ws, {"type": "response", "id": "12138", "payload": {"status": "success", "message": "connection confirm"}})

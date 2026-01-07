@@ -4,10 +4,18 @@ import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/generated/l10n.dart';
 
-enum TaskCommand { start, pause, resume, stop }
+enum TaskCommand { start, pause, resume, stop, semiAutoStart }
 
 extension _TaskCommandExt on TaskCommand {
   String get name => toString().split('.').last;
+  String get backendCommand {
+    switch (this) {
+      case TaskCommand.semiAutoStart:
+        return 'semi_auto_start';   // 后端认识的字符串
+      default:
+        return name;
+    }
+  }
 }
 
 /// 全局唯一指令网关
@@ -34,6 +42,7 @@ class CommandGateway with ChangeNotifier {
     /* --------- 1. 状态机合法性检查 --------- */
     switch (cmd) {
       case TaskCommand.start:
+      case TaskCommand.semiAutoStart:          // ← 新增
         if (status.isRunning) {
           onComplete?.call(false, S.of(context).task_already_running);
           return false;
@@ -51,7 +60,7 @@ class CommandGateway with ChangeNotifier {
     }
 
     /* --------- 2. 空队伍 / 空流派检查（仅对 start 命令） --------- */
-    if (cmd == TaskCommand.start) {
+    if (cmd == TaskCommand.start || cmd == TaskCommand.semiAutoStart) {
       final emptyTeams = _findTasksWithEmptyTeam();
       if (emptyTeams.isNotEmpty) {
         onComplete?.call(
@@ -74,13 +83,13 @@ class CommandGateway with ChangeNotifier {
     }
 
     /* --------- 3. 发送配置（仅对 start 命令） --------- */
-    if (cmd == TaskCommand.start) {
+    if (cmd == TaskCommand.start || cmd == TaskCommand.semiAutoStart) {
       final ws = WebSocketManager();
       ws.sendConfigurations();
     }
 
     /* --------- 4. 真正发命令 --------- */
-    ws.sendCommand(cmd.name, () => onComplete?.call(true, null));
+    ws.sendCommand(cmd.backendCommand, () => onComplete?.call(true, null));
     return true;
   }
 

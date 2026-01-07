@@ -326,6 +326,40 @@ class _WorkPageState extends State<WorkPage> // 修复继承错误
                 ),
               ),
               
+              // ================= 纯粹的P / Just P 按钮（新增） =================
+              Tooltip(
+                message: '', // 无快捷键
+                child: ElevatedButton(
+                  onPressed: !taskStatus.isRunning
+                      ? () => CommandGateway().sendTaskCommand(context, TaskCommand.semiAutoStart, (success, msg) {
+                          if (!success && mounted) {
+                            toastification.show(
+                              context: context,
+                              title: Text(msg ?? S.of(context).task_operation_failed),
+                              type: ToastificationType.error,
+                              style: ToastificationStyle.flatColored,
+                            );
+                          } else if (mounted && success) {
+                            toastification.show(
+                              context: context,
+                              title: Text(S.of(context).semi_auto_started),
+                              autoCloseDuration: const Duration(seconds: 2),
+                              type: ToastificationType.success,
+                              style: ToastificationStyle.flatColored,
+                            );
+                          }
+                        }
+                      )
+                    : null,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: Text(S.of(context).just_p),
+                ),
+              ),
+
               // 连接按钮
               ElevatedButton(
                 onPressed: webSocketManager.isConnected

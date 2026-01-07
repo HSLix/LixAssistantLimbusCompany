@@ -1833,6 +1833,21 @@ class S {
       args: [],
     );
   }
+
+  /// `Just P`
+  String get just_p {
+    return Intl.message('Just P', name: 'just_p', desc: '', args: []);
+  }
+
+  /// `Semi-auto task started`
+  String get semi_auto_started {
+    return Intl.message(
+      'Semi-auto task started',
+      name: 'semi_auto_started',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

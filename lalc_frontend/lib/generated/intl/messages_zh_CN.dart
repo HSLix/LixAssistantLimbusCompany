@@ -127,6 +127,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "initial_ego_gifts": MessageLookupByLibrary.simpleMessage("启程 EGO 饰品"),
     "invalid_log_folder": MessageLookupByLibrary.simpleMessage("无效的日志 ZIP 文件"),
     "irreversible": MessageLookupByLibrary.simpleMessage("此操作不可撤销。"),
+    "just_p": MessageLookupByLibrary.simpleMessage("纯粹的P"),
     "lalcLogDirNotExist": MessageLookupByLibrary.simpleMessage("日志文件夹不存在"),
     "lalcLogExportSuccess": MessageLookupByLibrary.simpleMessage("日志导出成功"),
     "lalc_folder_not_exist": MessageLookupByLibrary.simpleMessage(
@@ -242,6 +243,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("已选择"),
     "selected_stars": MessageLookupByLibrary.simpleMessage("选中的星光"),
     "selected_teams": MessageLookupByLibrary.simpleMessage("已选择队伍"),
+    "semi_auto_started": MessageLookupByLibrary.simpleMessage("半自动任务已开始"),
     "server": MessageLookupByLibrary.simpleMessage("服务器"),
     "set": MessageLookupByLibrary.simpleMessage("已设置"),
     "sidebar_about": MessageLookupByLibrary.simpleMessage("关于"),

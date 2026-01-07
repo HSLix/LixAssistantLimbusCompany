@@ -173,6 +173,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "irreversible": MessageLookupByLibrary.simpleMessage(
       "This action is irreversible.",
     ),
+    "just_p": MessageLookupByLibrary.simpleMessage("Just P"),
     "lalcLogDirNotExist": MessageLookupByLibrary.simpleMessage(
       "Not Exist Log Dir",
     ),
@@ -332,6 +333,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "selected": MessageLookupByLibrary.simpleMessage("SELECTED"),
     "selected_stars": MessageLookupByLibrary.simpleMessage("Selected Stars"),
     "selected_teams": MessageLookupByLibrary.simpleMessage("Selected Teams"),
+    "semi_auto_started": MessageLookupByLibrary.simpleMessage(
+      "Semi-auto task started",
+    ),
     "server": MessageLookupByLibrary.simpleMessage("Server"),
     "set": MessageLookupByLibrary.simpleMessage("Set"),
     "sidebar_about": MessageLookupByLibrary.simpleMessage("About"),

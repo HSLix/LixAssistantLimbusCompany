@@ -212,5 +212,7 @@
   "mirror_shop_fuse_ego_gifts": "Mirror Shop Fuse Ego Gifts",
   "mirror_shop_replace_skill_purchase_ego_gifts": "Mirror Shop Replace Skill & Purchase Ego Gifts",
   "mirror_shop_enhance_ego_gifts": "Mirror Shop Enhance Ego Gifts",
-  "selected_teams": "Selected Teams"
+  "selected_teams": "Selected Teams",
+  "just_p": "Just P",
+  "semi_auto_started": "Semi-auto task started"
 }

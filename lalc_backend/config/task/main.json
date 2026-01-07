@@ -46,5 +46,15 @@
         "interrupt":[
 
         ]
+    },
+    "semi_auto_main":{
+        "desc": "半自动的入口，暂且只是纯粹的P，也只用这个",
+        "action":"battle_entry",
+        "params":{
+            "post_delay": 1
+        },
+        "next": [
+            "semi_auto_main"
+        ]
     }
 }
