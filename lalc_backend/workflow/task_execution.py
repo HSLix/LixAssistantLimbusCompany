@@ -349,9 +349,10 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
         last_acquire_ego_gift
     ]
 
-    final_select = select_orders[0]
-    input_handler.click(final_select[1], final_select[2])
-    time.sleep(0.5)
+    for choice in select_orders[::-1]:
+        input_handler.click(choice[1], choice[2])
+        time.sleep(0.5)
+
     input_handler.key_press("enter")
     self.exec_wait_disappear(get_task("wait_connecting_disappear"))
 
@@ -1142,7 +1143,20 @@ def exec_ready_to_battle(self, node: TaskNode, func):
         cfg_index = self._get_using_cfg_index(cfg_type)
 
         team_order = cfg["team_orders"][cfg_index]
+        
+        # 遍历team_order中指定的成员
         for member in team_order:
+            if member in team_order_map:
+                input_handler.click(*team_order_map[member])
+        
+        # 找出未被team_order包含的成员
+        remaining_members = []
+        for member in team_order_map:
+            if member not in team_order:
+                remaining_members.append(member)
+        
+        # 按顺序选择未被选中的成员
+        for member in remaining_members:
             input_handler.click(*team_order_map[member])
     
     input_handler.click(1140, 590)

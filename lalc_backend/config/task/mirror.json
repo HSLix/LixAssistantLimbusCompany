@@ -140,7 +140,7 @@
         "recognition":"template_match",
         "action":"mirror_select_theme_pack",
         "params":{
-            "pre_delay":3,
+            "pre_delay":4,
             "template":"pack_search"
         },
         "next":[
