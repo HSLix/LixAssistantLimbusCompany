@@ -4,6 +4,7 @@
   "enable_fuse_ego_gifts": false,
   "enable_replace_skill_purchase_ego_gifts": false,
   "enable_enhance_ego_gifts": false,
+  "mirror_mode": "hard",
   "mirror_team_styles": [
     "Poise"
   ],

@@ -122,7 +122,10 @@
             "mirror_select_encounter_reward_card",
             "mirror_select_floor_ego_gift",
             "mirror_victory",
-            "mirror_entry"
+            "mirror_defeat",
+            "mirror_entry",
+            "mirror_choose_star",
+            "mirror_select_initial_ego_gift"
         ]
     },
     "mirror_ego_gift_get":{
@@ -275,6 +278,16 @@
             "template":"victory"
         },
         "next":[
+            "mirror_check"
+        ]
+    },
+    "mirror_defeat":{
+        "recognition":"template_match",
+        "action":"mirror_defeat",
+        "params": {
+            "template":"all_sinners_have_been_killed"
+        },
+        "next": [
             "mirror_check"
         ]
     },

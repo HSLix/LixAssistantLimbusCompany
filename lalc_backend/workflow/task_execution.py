@@ -185,6 +185,31 @@ class TaskExecution:
 
 # ====== 以下开始写所有 task，全部用装饰器注册 =======
 # 如果一个节点的 action 与节点同名，那么下面返回的时候就不要再返回这个 action func 的返回值，否则会无限递归执行该 action
+@TaskExecution.register("mirror_defeat")
+def exec_mirror_defeat(self, node:TaskNode, func):
+    logger.log("镜牢刷取失败", input_handler.capture_screenshot())
+    input_handler.click(770, 450)
+    input_handler.click(650, 525)
+
+    while len(recognize_handler.template_match(input_handler.capture_screenshot(), "defeat")) == 0:
+        time.sleep(0.5)
+        continue
+
+    for _ in range(4):
+        input_handler.key_press("enter")
+        time.sleep(1)
+    self.exec_wait_disappear(get_task("wait_connecting_disappear"))
+    for _ in range(3):
+        input_handler.key_press("enter")
+        time.sleep(1)
+    
+    if len(recognize_handler.template_match(input_handler.capture_screenshot(), "exploration_reward")) > 0:
+        logger.debug("检测到结算失败，启动放弃奖励", input_handler.capture_screenshot())
+        input_handler.click(395, 550)
+        time.sleep(1)
+        input_handler.key_press("enter")
+
+
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
@@ -263,6 +288,7 @@ def exec_mirror_victory(self, node:TaskNode, func):
             input_handler.key_press("enter")
             time.sleep(1)
     else:
+        # 不领取奖励
         for _ in range(2):
             input_handler.key_press("enter")
             time.sleep(1)
@@ -482,7 +508,7 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
                 break
         
         if need_more_money >= 2:
-                break
+            break
 
         # 退出条件：要么检测不到滑块，要么滑块在最底下
         slider = recognize_handler.template_match(tmp_screenshot, "slider", mask=[1080, 190, 80, 360])
@@ -912,9 +938,9 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
 
     res_name = ""
     res_pos = None
-    cfg = self._get_using_cfg("theme_pack")
+    theme_pack_cfg = self._get_using_cfg("theme_pack")
 
-    theme_packs = sorted(cfg.items(), key=lambda theme_pack:theme_pack[1]["weight"], reverse=True)
+    theme_packs = sorted(theme_pack_cfg.items(), key=lambda theme_pack:theme_pack[1]["weight"], reverse=True)
     stop = False
     refresh = False
     while not stop:
@@ -924,18 +950,30 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
         
         tmp_screenshot = input_handler.capture_screenshot()
 
-        if recognize_handler.template_match(tmp_screenshot, "hard_mode") or recognize_handler.template_match(tmp_screenshot, "hard_clear_bonus"):
-            input_handler.click(905, 50)
-            logger.log("检测到镜牢开启困难模式，正在关闭")
-            time.sleep(5)
-            continue
+        # 从mirror配置中获取mirror_mode
+        mirror_cfg = self._get_using_cfg("mirror")
+        mirror_mode = mirror_cfg.get("mirror_mode", "normal")  # 默认为normal模式
+        
+        # 只有在mirror_mode为"normal"时才检测困难模式并切换
+        if mirror_mode == "normal":
+            if recognize_handler.template_match(tmp_screenshot, "hard_mode") or recognize_handler.template_match(tmp_screenshot, "hard_clear_bonus"):
+                input_handler.click(905, 50)
+                logger.log("现需要刷取普通镜牢，检测到镜牢开启困难模式，正在关闭")
+                time.sleep(5)
+                continue
+        else:
+            if recognize_handler.template_match(tmp_screenshot, "normal_mode") or recognize_handler.template_match(tmp_screenshot, "normal_clear_bonus"):
+                input_handler.click(905, 50)
+                logger.log("现需要刷取困难镜牢，检测到镜牢开启普通模式，正在关闭")
+                time.sleep(5)
+                continue
         
         for theme_pack_name, val in theme_packs:
             cur_weight = val["weight"]
             tmp = recognize_handler.template_match(tmp_screenshot, theme_pack_name)
             if len(tmp) > 0:
                 logger.log(f"检测到卡包 {theme_pack_name},权重：{cur_weight}")
-                if not res_pos or cur_weight > cfg[res_name]["weight"]:
+                if not res_pos or cur_weight > theme_pack_cfg[res_name]["weight"]:
                     res_pos = tmp
                     res_name = theme_pack_name
                     if cur_weight > 10:
@@ -962,7 +1000,7 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
         logger.log("主题包检测异常，已有模板匹配失败，且随机选择也失败了，这里跳过选择", level="ERROR")
         return
     
-    logger.log(f"最后选择到了卡包：{res_name}, 对应权重：{cfg[res_name]['weight']}", input_handler.capture_screenshot())
+    logger.log(f"最后选择到了卡包：{res_name}, 对应权重：{theme_pack_cfg[res_name]['weight']}", input_handler.capture_screenshot())
     input_handler.swipe(res_pos[0][0], res_pos[0][1], res_pos[0][0], res_pos[0][1]+400)
 
 
