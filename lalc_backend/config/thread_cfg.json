@@ -1,5 +1,5 @@
 {
-  "check_node_target_count": 1,
+  "check_node_target_count": 0,
   "luxcavation_mode": "enter",
   "thread_stage": "50",
   "team_orders": [
@@ -16,24 +16,9 @@
       "Ryoshu",
       "Hong Lu",
       "Heathcliff"
-    ],
-    [
-      "Ryoshu",
-      "Heathcliff",
-      "Hong Lu",
-      "Sinclair",
-      "Meursault",
-      "Don Quixote",
-      "Yi Sang",
-      "Faust",
-      "Gregor",
-      "Ishmael",
-      "Rodion",
-      "Outis"
     ]
   ],
   "team_indexes": [
-    3,
-    2
+    3
   ]
 }

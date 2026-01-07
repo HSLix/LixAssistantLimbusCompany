@@ -211,6 +211,8 @@ class _Input:
         截取游戏窗口屏幕并存储在screenshot属性中。
         """
         if self._hwnd:
+            wait_input_idle()
+            
             if self.set_focus():
                 self.refresh_window_state()
                 # 只在当前窗口大小与默认大小不同时才设置窗口大小

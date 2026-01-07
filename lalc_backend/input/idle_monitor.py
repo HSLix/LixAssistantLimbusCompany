@@ -14,6 +14,7 @@ class IdleMonitor:
         self.mouse_listener = None
         self.keyboard_listener = None
         self.mouse_pressed = False  # 跟踪鼠标按键状态
+        self.last_action = ""
 
     # 记录鼠标活动
     def on_move(self, x, y):
@@ -54,7 +55,9 @@ class IdleMonitor:
     def record_activity(self, activity:str):
         if self.test_mode:
             print(activity)
-        logger.debug(activity)
+        if activity != self.last_action:
+            logger.debug(activity)
+            self.last_action = activity
         self.last_input_time = time.time()
 
     # 检查空闲时间
@@ -101,6 +104,8 @@ class IdleMonitor:
         # 等待监听线程结束
         self.mouse_listener.join()
         self.keyboard_listener.join()
+
+        self.last_action = ""
 
 # 用法
 def wait_input_idle(idle_time=0.4, test_mode=False):
