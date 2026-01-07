@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.5.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.4.1...v4.5.0) (2026-01-07)
+
+
+### Features
+
+* 初步适配困难模式 | suit a part of hard mode ([e07a741](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e07a741774d6317cd14cb27304476655bcccb027))
+* 增加半自动模式（纯P） | add semi auto mode(just p) ([7c02e3f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/7c02e3f1f365c8420cb2c8be96e192c82ef6eda1))
+* 增加性能监测 | add the monitor of actions ([49e762d](https://github.com/HSLix/LixAssistantLimbusCompany/commit/49e762da4e422664dbb2a2dd2b89cd4d26deba8f))
+* 增加运行结果通知 | add the notification of a single run ([acfa18b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/acfa18b1827ac2dacaceaf9857ae19a875ed6c45))
+* 增加镜像地牢商店的自定义选项 | add the custom choice for mirror shop ([6a47331](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6a4733123e8a3e28333c6d183b745e1ed6fcf2a1))
+* 增加队伍自动轮换更新 | add the auto rotate team ([3c27e72](https://github.com/HSLix/LixAssistantLimbusCompany/commit/3c27e72668fd33dbc3f9dda71524b6d1208c42e3))
+
+
+### Bug Fixes
+
+* 修复了以前不会选满人的bug | fix the bug that previous version can not select as more sinner as possible ([0ed9a7e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/0ed9a7ebd297a50d532949bcdd592eb68667b5b1))
+* 修复了任务执行次数无法正确统计的问题 | fix the bug the can not report the count of task execution correctly ([a21a561](https://github.com/HSLix/LixAssistantLimbusCompany/commit/a21a561397f80e0bfb72ed8d8ad1846913f0e96f))
+* 修复了任务页队伍流派国际化缺漏，以及队伍配置页国际化不规范的问题 | fix the missing of l10n for team style in task page and hte problem of l10n in team config page ([836b310](https://github.com/HSLix/LixAssistantLimbusCompany/commit/836b310ae787a4e17072226f1c7e60c5cc92ea5c))
+* 修复了前端刚启动时没有连接的问题 | fix the error that frontend do not connect to websocket at the beginning ([958043d](https://github.com/HSLix/LixAssistantLimbusCompany/commit/958043dd548a6aab69fef0f52314162926a10b24))
+* 修复了队伍轮换没有正常启动的问题 | fix the bug that team rotate error ([a5d9d38](https://github.com/HSLix/LixAssistantLimbusCompany/commit/a5d9d38bc46d9cc1770516f1665895b3f8872f64))
+* 修复了鼠标活动时，仍可能抢占的bug | fix the bug that it will take the control of your mouse even if you are using it ([ceb7a26](https://github.com/HSLix/LixAssistantLimbusCompany/commit/ceb7a260665093538ca7a605d69e1561baf56bcb))
+* 修复任务页国际化不完全的问题 | fix the l10n of taskpage ([f61597b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f61597bed9cace1184fcd3755c00a566dcd5f80d))
+* 增加镜牢商店结束后的延迟，避免因为错位识别导致卡住 | add the delay after finish the mirror shop ([18992cb](https://github.com/HSLix/LixAssistantLimbusCompany/commit/18992cb17fe231acd0860886dd3ec593d61464f5))
+
 ## [4.4.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.4.0...v4.4.1) (2026-01-03)
 
 
