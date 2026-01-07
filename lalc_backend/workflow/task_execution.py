@@ -23,6 +23,12 @@ def set_server_ref(server):
     global _server_to_push
     _server_to_push = server
 
+def get_server_ref():
+    if _server_to_push is None:
+        logger.log("远程服务器为空", level="WARNING")
+        return
+    return _server_to_push
+
 class TaskExecution:
 
     # --------- 类级别：装饰器注册表 ---------

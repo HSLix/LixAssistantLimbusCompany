@@ -6,7 +6,7 @@ from typing import Dict, Any, Callable, Optional
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from workflow.task_registry import get_task, init_tasks
-from workflow.task_execution import TaskExecution
+from workflow.task_execution import TaskExecution, set_server_ref
 from utils.config_manager import initialize_configs
 from utils.logger import init_logger
 
@@ -36,6 +36,14 @@ class AsyncTaskPipeline:
         self._completion_callback: Optional[Callable[[], None]] = None
         # 添加状态属性
         self._state = self.STATE_STOPPED
+        # 添加server引用
+        self._server_ref = None
+
+    def set_server_ref(self, server):
+        """
+        设置服务器引用，用于广播消息
+        """
+        self._server_ref = server
 
     def set_error_callback(self, callback: Callable[[str, str], None]):
         """
@@ -58,6 +66,18 @@ class AsyncTaskPipeline:
         纺锤采光|Thread: xx
         镜像迷宫|Mirror: xx
         """
+        # ---------- 广播本轮各任务完成次数 ----------
+        from workflow.task_registry import get_task   # 已在文件头部
+
+        counts = {
+            "exp":   get_task("exp_check").get_param("execute_count"),
+            "thread":get_task("thread_check").get_param("execute_count"),
+            "mirror":get_task("mirror_check").get_param("execute_count"),
+        }
+        # 只要有一个 >0 就发，前端自己决定要不要轮换
+        if any(v > 0 for v in counts.values()):
+            asyncio.create_task(self._broadcast_task_completion(counts))
+
         try:
             from workflow.task_registry import get_task  # 延迟导入
             from plyer import notification
@@ -68,7 +88,7 @@ class AsyncTaskPipeline:
 
             # 仅 Windows 弹窗；如以后想支持 mac/Linux，直接删掉下面判断即可
             if platform.system() != "Windows":
-                self.logger.log("暂时仅支持 Windows 平台的通知")
+                self.logger.log("暂时仅支持 Windows 平台的通知", level="WARNING")
                 return
 
             exp_cnt = get_task("exp_check").get_param("execute_count")
@@ -88,6 +108,26 @@ class AsyncTaskPipeline:
             )
         except Exception as e:
             self.logger.log(f"发送通知失败: {e}", level="WARNING")
+
+    async def _broadcast_task_completion(self, counts: dict[str, int]):
+        """
+        向所有前端客户端广播本轮任务完成次数。
+        消息格式：
+        {
+          "type": "task_completion",
+          "payload": {
+            "exp": 1,
+            "thread": 0,
+            "mirror": 2
+          }
+        }
+        """
+        if self._server_ref is None:
+            return
+        await self._server_ref.broadcast({
+            "type": "task_completion",
+            "payload": counts,
+        })
 
     @property
     def state(self):

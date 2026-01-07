@@ -278,6 +278,24 @@ class WebSocketManager with ChangeNotifier {
           }
           break;
           
+        case 'task_completion':
+          final Map<String, dynamic> counts =
+              (data['payload'] as Map<String, dynamic>).cast<String, dynamic>();
+          // 将Map<String, dynamic>转换为Map<String, int>
+          final Map<String, int> intCounts = {};
+          for (final entry in counts.entries) {
+            if (entry.value is int) {
+              intCounts[entry.key] = entry.value as int;
+            } else if (entry.value is num) {
+              intCounts[entry.key] = entry.value.toInt();
+            } else {
+              // 如果值不是数字类型，尝试解析为整数
+              intCounts[entry.key] = int.tryParse(entry.value.toString()) ?? 0;
+            }
+          }
+          _rotateTeamsAccordingToCounts(intCounts);
+          break;
+          
         case 'error':
           // 异步错误广播
           final errorMsg = data['payload']?['message'] as String? ?? 'Unknown error';
@@ -407,6 +425,34 @@ class WebSocketManager with ChangeNotifier {
         // 这种响应类型通常由特定的请求处理，这里只是记录日志
         break;
     }
+  }
+
+  /// 根据后端给出的完成次数，就地轮换本地队伍列表
+  void _rotateTeamsAccordingToCounts(Map<String, int> counts) {
+    final cm = ConfigManager();
+
+    void rotateOne(String taskKey, String cfgKey) {
+      final done = counts[taskKey] ?? 0;
+      if (done <= 0) return;
+
+      // 1. 读当前顺序（1-base）
+      final oldTeams = List<int>.from(cm.taskConfigs[cfgKey]?.teams ?? []);
+      if (oldTeams.isEmpty) return;
+
+      // 2. 轮转
+      final steps = done % oldTeams.length;
+      final newTeams = oldTeams.sublist(steps)..addAll(oldTeams.take(steps));
+
+      // 3. 写回内存
+      cm.taskConfigs[cfgKey]?.teams = newTeams;
+    }
+
+    rotateOne('exp',   'EXP');
+    rotateOne('thread','Thread');
+    rotateOne('mirror','Mirror');
+
+    // 4. 通知所有监听者（TaskPage 会自动 rebuild）
+    notifyListeners();
   }
 
   // 获取日志文件夹列表
