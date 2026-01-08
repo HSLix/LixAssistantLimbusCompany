@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.5.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.5.0...v4.5.1) (2026-01-08)
+
+
+### Bug Fixes
+
+* 更换cdk加密解密为更通用的方法，注意此前保存的cdk失效，需要重新保存 | use a better method to save cdk, and the cdk you save now needs to be saved again Fixed [#232](https://github.com/HSLix/LixAssistantLimbusCompany/issues/232) ([b9341b6](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b9341b6d63cc11d59cf0d99147839d5b1967a2d6))
+
 ## [4.5.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.4.1...v4.5.0) (2026-01-07)
 
 
