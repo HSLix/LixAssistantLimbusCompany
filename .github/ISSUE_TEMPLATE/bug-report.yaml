@@ -32,7 +32,7 @@ body:
     id: log
     attributes:
       label: 日志文件 | Log Files
-      description: 请在日志页导出最上面的一份日志导出，放到网盘（夸克、百度……）或者 [WeTransfer](https://wetransfer.com/) 在这里放上链接 | Please export the top log on the log page and put it to the cloud disk (Quark, Baidu, etc.). Or [WeTransfer](https://wetransfer.com/)
+      description: 请在日志页导出最上面的一份[日志导出](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/tutorial.md#%E6%97%A5%E5%BF%97%E9%A1%B5--log-page)，放到网盘（夸克……）或者 [WeTransfer](https://wetransfer.com/) 在这里放上链接 | Please [export the top log](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/doc/tutorial.md#%E6%97%A5%E5%BF%97%E9%A1%B5--log-page) on the log page and put it to the cloud disk (Quark, Baidu, etc.). Or [WeTransfer](https://wetransfer.com/)
     validations:
       required: true
   - type: textarea
