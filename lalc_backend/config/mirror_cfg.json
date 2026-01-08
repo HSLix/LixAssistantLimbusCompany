@@ -1,24 +1,19 @@
 {
   "check_node_target_count": 1,
   "mirror_stop_purchase_gift_money": 600,
-  "enable_fuse_ego_gifts": false,
-  "enable_replace_skill_purchase_ego_gifts": false,
-  "enable_enhance_ego_gifts": false,
+  "enable_fuse_ego_gifts": true,
+  "enable_replace_skill_purchase_ego_gifts": true,
+  "enable_enhance_ego_gifts": true,
   "mirror_mode": "hard",
   "mirror_team_styles": [
-    "Poise",
-    "Bleed"
+    "Poise"
   ],
   "mirror_team_ego_gift_styles": [
     [
       "Poise"
-    ],
-    [
-      "Bleed"
     ]
   ],
   "mirror_team_ego_allow_list": [
-    [],
     [
       "Lithograph",
       "Homeward",
@@ -37,23 +32,30 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense"
+      "Eclipse of Scarlet Moths"
     ]
   ],
   "mirror_team_ego_block_list": [
-    [],
     []
   ],
   "mirror_replace_skill": [
-    {},
     {
       "Yi Sang": [
+        3,
+        2,
+        1
+      ],
+      "Don Quixote": [
+        3,
+        2,
+        1
+      ],
+      "Ryoshu": [
         1,
         2,
         3
       ],
-      "Don Quixote": [
+      "Meursault": [
         1,
         2,
         3
@@ -68,25 +70,14 @@
         2,
         1
       ],
-      "Ishmael": [
+      "Sinclair": [
         1,
         2,
         3
-      ],
-      "Rodion": [
-        1,
-        2,
-        3
-      ],
-      "Gregor": [
-        3,
-        2,
-        1
       ]
     }
   ],
   "mirror_shop_heal": [
-    false,
     false
   ],
   "mirror_team_initial_ego_orders": [
@@ -94,15 +85,9 @@
       1,
       2,
       3
-    ],
-    [
-      3,
-      1,
-      2
     ]
   ],
   "mirror_team_stars": [
-    [],
     [
       "4",
       "0",
@@ -113,36 +98,21 @@
   ],
   "team_orders": [
     [
-      "Yi Sang",
-      "Faust",
-      "Don Quixote",
       "Ryoshu",
-      "Meursault",
-      "Hong Lu",
       "Heathcliff",
-      "Ishmael",
-      "Rodion",
+      "Hong Lu",
       "Sinclair",
-      "Outis",
-      "Gregor"
-    ],
-    [
-      "Don Quixote",
-      "Rodion",
       "Meursault",
-      "Gregor",
+      "Don Quixote",
       "Yi Sang",
-      "Ishmael",
-      "Heathcliff",
-      "Outis",
-      "Hong Lu",
       "Faust",
-      "Ryoshu",
-      "Sinclair"
+      "Gregor",
+      "Ishmael",
+      "Rodion",
+      "Outis"
     ]
   ],
   "team_indexes": [
-    8,
-    1
+    2
   ]
 }

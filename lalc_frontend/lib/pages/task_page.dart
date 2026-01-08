@@ -818,6 +818,12 @@ class _HomePageState extends State<HomePage>
     // At Last配置
     if (taskName == 'At Last') {
       String currentValue = taskConfigs[taskName] ?? 'Do Nothing';
+      List<String> internalValues = [
+        'Do Nothing',
+        'Close LALC',
+        'Close Both',
+        'Shutdown PC'
+      ];
       List<String> options = [
         S.of(context).at_last_do_nothing,
         S.of(context).at_last_close_lalc,
@@ -825,24 +831,29 @@ class _HomePageState extends State<HomePage>
         S.of(context).at_last_shutdown_pc
       ];
       
+      // 确保当前值在合法值范围内
+      String validatedCurrentValue = internalValues.contains(currentValue) 
+          ? currentValue 
+          : 'Do Nothing';
+      
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             DropdownButton<String>(
               alignment: Alignment.center,
-              value: currentValue,
-              items: options.map<DropdownMenuItem<String>>((String value) {
+              value: validatedCurrentValue, // 使用验证后的值
+              items: List<DropdownMenuItem<String>>.generate(internalValues.length, (index) {
                 return DropdownMenuItem<String>(
                   alignment: Alignment.center,
-                  value: value,
-                  child: Text(value, style: const TextStyle(fontSize:20, color: Colors.white)),
+                  value: internalValues[index], // 使用唯一内部值作为选项值
+                  child: Text(options[index], style: const TextStyle(fontSize:20, color: Colors.white)),
                 );
-              }).toList(),
+              }),
               onChanged: (String? newValue) {
                 if (newValue != null) {
                   setState(() {
-                    taskConfigs[taskName] = newValue;
+                    taskConfigs[taskName] = newValue; // 保存内部值
                     // 保存配置
                     _saveConfigToManager();
                   });
@@ -1936,4 +1947,5 @@ class _HomePageState extends State<HomePage>
     ],
   );
 }
+
 }
