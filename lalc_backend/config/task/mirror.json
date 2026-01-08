@@ -172,7 +172,8 @@
         "recognition":"template_match",
         "action":"battle_entry",
         "params":{
-            "template":"win_rate"
+            "template":"win_rate",
+            "mask": [930, 500, 350, 100]
         },
         "next":[
             "mirror_circle_center"
