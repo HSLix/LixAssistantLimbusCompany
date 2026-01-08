@@ -8,6 +8,8 @@
 
 - 项目整体的打包用根目录的 packup_release.bat 文件，打包环境为 windows
 
+- 强烈推荐看本项目的 [DeepWiki](https://deepwiki.com/HSLix/LixAssistantLimbusCompany)，等陆爻齐看完再补充
+
 # Git commit message 建议
 - fork 到自己仓库后，建议自己另建一个分支（branch）开发，完成后先把新分支 push 到自己仓库，然后前往 [pr](https://github.com/HSLix/LixAssistantLimbusCompany/compare) 来新建自己的 pr，把你的分支合进来。
 - git commit 时，建议带上 feat: fix: chores: docs:，等前缀标明本次 commit 的类型，遵循 [conventionalcommits](https://www.conventionalcommits.org/en/v1.0.0/) 的规范要求来做的话，自动发版才会正常工作。以及在 message 的末尾，用 `Fixed #2` 可以关掉编号为 2 的 Issue，这样就不用在 pr 里面再次编辑了，下面引用其中一段：

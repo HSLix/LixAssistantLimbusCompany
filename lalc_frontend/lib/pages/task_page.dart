@@ -85,7 +85,7 @@ class _HomePageState extends State<HomePage>
     'At Last': 'Do Nothing',
     'EXP': {
       'luxcavationMode': 'Enter',
-      'expStage': '08',
+      'expStage': '09',
     },
     'Thread': {
       'luxcavationMode': 'Enter',
@@ -1007,14 +1007,14 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
-        // Exp Stage下拉框 (08到01)
+        // Exp Stage下拉框
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(S.of(context).exp_stage, style: const TextStyle(color: Colors.white, fontSize: 16)),
             DropdownButton<String>(
               value: expConfig['expStage'],
-              items: <String>['08', '07', '06', '05', '04', '03', '02', '01']
+              items: <String>['09', '08', '07', '06', '05', '04', '03', '02', '01']
                   .map<DropdownMenuItem<String>>((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
