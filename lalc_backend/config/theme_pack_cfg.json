@@ -3,13 +3,13 @@
     "weight": 10
   },
   "ASEA": {
-    "weight": 10
+    "weight": 20
   },
   "Addicting Lust": {
     "weight": 10
   },
   "Automated Factory": {
-    "weight": 1
+    "weight": 5
   },
   "Crawling Abyss": {
     "weight": 5
@@ -18,16 +18,16 @@
     "weight": 10
   },
   "Degraded Gloom": {
-    "weight": 10
+    "weight": 20
   },
   "Devoured Gluttony": {
-    "weight": 10
+    "weight": 20
   },
   "Dregs of the Manor": {
     "weight": 10
   },
   "Emotional Craving": {
-    "weight": 10
+    "weight": 20
   },
   "Emotional Flood": {
     "weight": 5
@@ -45,7 +45,7 @@
     "weight": 10
   },
   "Emotional Subservience": {
-    "weight": 10
+    "weight": 20
   },
   "Faith & Erosion": {
     "weight": 1
@@ -93,7 +93,7 @@
     "weight": 10
   },
   "Repressed Wrath": {
-    "weight": 10
+    "weight": 5
   },
   "Slicers & Dicers": {
     "weight": 10
@@ -126,7 +126,7 @@
     "weight": 10
   },
   "To be Crushed": {
-    "weight": 10
+    "weight": 5
   },
   "To be Pierced": {
     "weight": 10

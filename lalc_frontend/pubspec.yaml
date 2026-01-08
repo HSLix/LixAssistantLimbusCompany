@@ -79,20 +79,6 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/sinners/
-    - assets/theme_packs/
-    - assets/ego_gifts/Bleed/
-    - assets/ego_gifts/Blunt/
-    - assets/ego_gifts/Burn/
-    - assets/ego_gifts/Charge/
-    - assets/ego_gifts/Keywordless/
-    - assets/ego_gifts/Pierce/
-    - assets/ego_gifts/Poise/
-    - assets/ego_gifts/Rupture/
-    - assets/ego_gifts/Sinking/
-    - assets/ego_gifts/Slash/
-    - assets/ego_gifts/Tremor/
-    - assets/stars/
     - assets/doc/
     - assets/doc/img/
     - assets/

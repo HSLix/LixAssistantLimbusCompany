@@ -381,6 +381,7 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
         *acquire_with_owned,
         last_acquire_ego_gift
     ]
+    logger.debug(f"selected_orders:{select_orders}; prefer_gift_without_owned: {prefer_gift_without_owned}; acquire_without_owned:{acquire_without_owned}; acquire_with_owned:{acquire_with_owned}; last_acquire_ego_gift:{last_acquire_ego_gift};")
 
     for choice in select_orders[::-1]:
         input_handler.click(choice[1], choice[2])
@@ -765,7 +766,7 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
         logger.log("开始一轮饰品融合", tmp_screenshot)
         can_fuse = False
         for gift_name in useless_gifts:
-            res = recognize_handler.template_match(tmp_screenshot, gift_name, mask=detect_places, screenshot_scale=1, threshold=0.91)
+            res = recognize_handler.template_match(tmp_screenshot, gift_name, mask=detect_places, screenshot_scale=1, threshold=0.9)
             if len(res) > 0:
                 logger.log("融合，检测到无用饰品：%s" % gift_name)
                 input_handler.click(res[0][0], res[0][1])

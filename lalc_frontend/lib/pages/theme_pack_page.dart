@@ -4,8 +4,9 @@ import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
+import 'package:path/path.dart' as path;
 import '../generated/l10n.dart';
 
 // 排序选项枚举
@@ -22,7 +23,6 @@ class ThemePackPage extends StatefulWidget {
 }
 
 class ThemePackPageState extends State<ThemePackPage> {
-  // 存储从 assets/theme_packs 中获取的图片文件列表
   List<String> imageNames = [];
   List<int> weights = [];
   
@@ -69,43 +69,43 @@ class ThemePackPageState extends State<ThemePackPage> {
     super.dispose();
   }
 
-  // 从 assets/theme_packs 动态加载图片文件
+  // 动态加载图片文件
   Future<void> _loadImages() async {
-    try {
-      // 获取所有 asset 文件清单
-      final manifestContent = await rootBundle.loadString('AssetManifest.json');
-      
-      // 解析 JSON 内容
-      final Map<String, dynamic> manifestMap = json.decode(manifestContent);
-      
-      // 筛选出 theme_packs 目录下的所有图片文件
-      final List<String> themePackAssets = manifestMap.keys
-          .where((key) => key.startsWith('assets/theme_packs/'))
-          .toList();
-      
-      // 提取文件名部分
-      final List<String> fileNames = themePackAssets
-          .map((path) => path.split('/').last)
-          .toList();
-      
-      setState(() {
-        imageNames = fileNames;
-        // 从配置管理器加载权重
-        _loadWeightsFromManager();
-        // 初始化筛选和排序后的列表
-        _updateFilteredAndSortedThemes();
-      });
-    } catch (e) {
-      debugPrint('Error loading theme packs: $e');
-      // 如果出现异常，使用空列表
+    if (_imgRootAddress == null) {
+      // 还没拿到后端路径，先空着，等地址回来再刷
       setState(() {
         imageNames = [];
         weights = [];
-        weightControllers = []; // 清空控制器列表
-        // 初始化筛选和排序后的列表
+        weightControllers = [];
         _updateFilteredAndSortedThemes();
       });
+      return;
     }
+
+    final themePacksDir = Directory(path.join(_imgRootAddress!, 'theme_packs'));
+    if (!await themePacksDir.exists()) {
+      debugPrint('theme_packs 目录不存在: ${themePacksDir.path}');
+      setState(() {
+        imageNames = [];
+        weights = [];
+        weightControllers = [];
+        _updateFilteredAndSortedThemes();
+      });
+      return;
+    }
+
+    final pngFiles = <String>[];
+    await for (final entity in themePacksDir.list()) {
+      if (entity is File && entity.path.endsWith('.png')) {
+        pngFiles.add(path.basename(entity.path));
+      }
+    }
+
+    setState(() {
+      imageNames = pngFiles..sort();          // 按文件名排序
+      _loadWeightsFromManager();              // 读权重
+      _updateFilteredAndSortedThemes();       // 刷新界面
+    });
   }
   
   // 从配置管理器加载权重
@@ -191,6 +191,7 @@ class ThemePackPageState extends State<ThemePackPage> {
         setState(() {
           _imgRootAddress = address;
         });
+        _loadImages(); // 重新加载图片
       }
     } catch (e) {
       debugPrint('获取图片地址失败: $e');
@@ -198,13 +199,6 @@ class ThemePackPageState extends State<ThemePackPage> {
   }
   
   // 构建主题包图片路径
-  String _getThemePackImagePath(String imageName) {
-    if (_imgRootAddress != null) {
-      return '$_imgRootAddress/theme_packs/$imageName';
-    }
-    // Fallback to assets
-    return 'assets/theme_packs/$imageName';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -345,21 +339,28 @@ class ThemePackPageState extends State<ThemePackPage> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               // 图片
-                              Image.asset(
-                                _getThemePackImagePath(imageName),
-                                width: 150,
-                                height: fixedHeight * 0.7,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  // 如果网络图片加载失败，回退到assets
-                                  return Image.asset(
-                                    'assets/theme_packs/$imageName',
-                                    width: 150,
-                                    height: fixedHeight * 0.7,
-                                    fit: BoxFit.cover,
-                                  );
-                                },
-                              ),
+                              _imgRootAddress != null
+                                  ? Image.file(
+                                      File(path.join(_imgRootAddress!, 'theme_packs', imageName)),
+                                      width: 150,
+                                      height: fixedHeight * 0.7,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        // 图片加载失败，显示错误图标
+                                        return Container(
+                                          width: 150,
+                                          height: fixedHeight * 0.7,
+                                          color: Colors.grey,
+                                          child: const Icon(Icons.error, color: Colors.red),
+                                        );
+                                      },
+                                    )
+                                  : Container(
+                                      width: 150,
+                                      height: fixedHeight * 0.7,
+                                      color: Colors.grey,
+                                      child: const Icon(Icons.error, color: Colors.red),
+                                    ),
                               const SizedBox(height: 2),
                               // 图片名字
                               Text(

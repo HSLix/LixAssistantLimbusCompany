@@ -2,8 +2,9 @@ import 'package:lalc_frontend/main.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'dart:io';   // 新增
 import 'dart:math' as math;
+import 'package:path/path.dart' as path;  // 新增
 import '../generated/l10n.dart';
 import '../utils/style_type_helper.dart'; // 添加新的工具类导入
 
@@ -255,58 +256,45 @@ class _TeamConfigPageState extends State<TeamConfigPage>
 
   // 递归遍历assets/ego_gifts目录下的所有图片文件
   Future<void> _loadEgoGifts() async {
-    try {
-      // 使用新的 AssetManifest API 加载资产清单
-      final manifest = await DefaultAssetBundle.of(context).loadString('AssetManifest.json');
-      final Map<String, dynamic> json = jsonDecode(manifest);
+    if (_imgRootAddress == null) {
+      // 地址还没回来，先空着
+      setState(() {
+        egoGifts = [];
+      });
+      return;
+    }
 
-      // 清空现有的egoGifts列表
-      egoGifts.clear();
+    final egoRootDir = Directory(path.join(_imgRootAddress!, 'ego_gifts'));
+    if (!await egoRootDir.exists()) {
+      debugPrint('ego_gifts 目录不存在: ${egoRootDir.path}');
+      setState(() {
+        egoGifts = [];
+      });
+      return;
+    }
 
-      // 遍历所有以 assets/ego_gifts/ 开头的路径，找到所有子文件夹中的 .png 文件
-      for (final path in json.keys) {
-        // print(path);
-        if (path.startsWith('assets/ego_gifts/')) {
-          final pathParts = path.split('/');
-          if (pathParts.length >= 4) {
-            final type = pathParts[2]; // 类型是子目录名，例如 "Bleed"
-            final fileName = pathParts.sublist(3).join('/'); // 包含子目录的完整文件名
-            final displayName = fileName.replaceAll('.png', ''); // 获取饰品名称（去掉扩展名）
-
-            // 创建EgoGift对象并添加到列表
-            if (path.endsWith('.png')) {
-              egoGifts.add(EgoGift(
-                name: displayName,
-                type: type,
-                image: path,
-              ));
-            }
-          }
-        }
+    final List<EgoGift> tmp = [];
+    await for (final entity in egoRootDir.list(recursive: true)) {
+      if (entity is File && entity.path.endsWith('.png')) {
+        final relative = entity.path
+            .substring(egoRootDir.path.length + 1)   // 去掉根路径
+            .replaceAll(r'\', '/');                  // 统一用 /
+        final type = path.dirname(relative);        // 第一层目录就是类型
+        final name = path.basenameWithoutExtension(relative);
+        tmp.add(EgoGift(
+          name: name,
+          type: type,
+          image: 'assets/ego_gifts/$relative',   // 保留 assets 路径给兜底用
+        ));
       }
-
-      // print("Loaded ego gifts: $egoGifts");
-      setState(() {});
-    } catch (e) {
-      debugPrint('Error loading ego gifts: $e');
-      _loadDefaultEgoGifts();  // 加载默认数据作为备选
     }
+
+    setState(() {
+      egoGifts = tmp..sort((a, b) => a.name.compareTo(b.name));
+    });
   }
 
 
-  void _loadDefaultEgoGifts() {
-    // 清空现有列表
-    egoGifts.clear();
-
-    // 添加一些默认饰品数据用于演示
-    for (var type in StyleTypeHelper.styleTypes) {
-      egoGifts.add(EgoGift(
-        name: '$type Default Gift',
-        type: type,
-        image: 'assets/sinners/Yi Sang.png', // 使用已知存在的图像
-      ));
-    }
-  }
 
   // 检查当前是否为中文环境
   bool _isChineseLocale(BuildContext context) {
@@ -324,6 +312,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
         setState(() {
           _imgRootAddress = address;
         });
+        _loadEgoGifts(); // 重新加载饰品
       }
     } catch (e) {
       debugPrint('获取图片地址失败: $e');
@@ -333,27 +322,27 @@ class _TeamConfigPageState extends State<TeamConfigPage>
   // 构建罪人图片路径
   String _getSinnerImagePath(String imageName) {
     if (_imgRootAddress != null) {
-      return '$_imgRootAddress/sinners/$imageName.png';
+      return path.join(_imgRootAddress!, 'sinners', '$imageName.png');
     }
-    // Fallback to assets
-    return 'assets/sinners/$imageName.png';
+    // 返回null表示没有可用的后端地址
+    return '';
   }
 
   // 构建星光图片路径
   String _getStarImagePath(String imageName) {
     if (_imgRootAddress != null) {
-      return '$_imgRootAddress/stars/$imageName.png';
+      return path.join(_imgRootAddress!, 'mirror', 'stars', '$imageName.png');
     }
-    // Fallback to assets
-    return 'assets/stars/$imageName.png';
+    // 返回null表示没有可用的后端地址
+    return '';
   }
 
   // 构建EGO饰品图片路径
   String _getEgoGiftImagePath(String imagePath) {
     if (_imgRootAddress != null && imagePath.startsWith('assets/ego_gifts/')) {
       // 从assets路径转换为服务器路径
-      final relativePath = imagePath.replaceFirst('assets/', '');
-      return '$_imgRootAddress/$relativePath';
+      final relativePath = imagePath.replaceFirst('assets/ego_gifts/', '');
+      return path.join(_imgRootAddress!, 'ego_gifts', relativePath);
     }
     // Fallback to assets
     return imagePath;
@@ -625,21 +614,28 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                                                 mainAxisAlignment: MainAxisAlignment.center,
                                                 children: [
                                                   // 图片
-                                                  Image.asset(
-                                                    _getSinnerImagePath(imageName),
-                                                    width: imageSize,
-                                                    height: imageSize,
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (context, error, stackTrace) {
-                                                      // 如果网络图片加载失败，回退到assets
-                                                      return Image.asset(
-                                                        'assets/sinners/$imageName.png',
-                                                        width: imageSize,
-                                                        height: imageSize,
-                                                        fit: BoxFit.cover,
-                                                      );
-                                                    },
-                                                  ),
+                                                  _imgRootAddress != null
+                                                      ? Image.file(
+                                                          File(_getSinnerImagePath(imageName)),
+                                                          width: imageSize,
+                                                          height: imageSize,
+                                                          fit: BoxFit.cover,
+                                                          errorBuilder: (context, error, stackTrace) {
+                                                            // 图片加载失败，显示错误图标
+                                                            return Container(
+                                                              width: imageSize,
+                                                              height: imageSize,
+                                                              color: Colors.grey,
+                                                              child: const Icon(Icons.error, color: Colors.red),
+                                                            );
+                                                          },
+                                                        )
+                                                      : Container(
+                                                          width: imageSize,
+                                                          height: imageSize,
+                                                          color: Colors.grey,
+                                                          child: const Icon(Icons.error, color: Colors.red),
+                                                        ),
                                                   // 文本
                                                   Flexible(
                                                     fit: FlexFit.loose,
@@ -1163,21 +1159,28 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         // 角色图像
-                        Image.asset(
-                          _getSinnerImagePath(imageName),
-                          width: 50,
-                          height: 55,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // 如果网络图片加载失败，回退到assets
-                            return Image.asset(
-                              'assets/sinners/$imageName.png',
-                              width: 50,
-                              height: 55,
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        ),
+                        _imgRootAddress != null
+                            ? Image.file(
+                                File(_getSinnerImagePath(imageName)),
+                                width: 50,
+                                height: 55,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // 图片加载失败，显示错误图标
+                                  return Container(
+                                    width: 50,
+                                    height: 55,
+                                    color: Colors.grey,
+                                    child: const Icon(Icons.error, color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Container(
+                                width: 50,
+                                height: 55,
+                                color: Colors.grey,
+                                child: const Icon(Icons.error, color: Colors.red),
+                              ),
                         const SizedBox(height: 5),
                         // 角色名字（只展示，无交互）
                         Text(
@@ -1359,21 +1362,28 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           // 星光图像
-                          Image.asset(
-                            _getStarImagePath('mirror_${index.toString().padLeft(2, '0')}'),
-                            width: cellWidth * 0.8,
-                            height: fixedHeight * 0.5,
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              // 如果网络图片加载失败，回退到assets
-                              return Image.asset(
-                                'assets/stars/mirror_${index.toString().padLeft(2, '0')}.png',
-                                width: cellWidth * 0.8,
-                                height: fixedHeight * 0.5,
-                                fit: BoxFit.contain,
-                              );
-                            },
-                          ),
+                          _imgRootAddress != null
+                              ? Image.file(
+                                  File(_getStarImagePath('mirror_${index.toString().padLeft(2, '0')}')),
+                                  width: cellWidth * 0.8,
+                                  height: fixedHeight * 0.5,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    // 图片加载失败，显示错误图标
+                                    return Container(
+                                      width: cellWidth * 0.8,
+                                      height: fixedHeight * 0.5,
+                                      color: Colors.grey,
+                                      child: const Icon(Icons.error, color: Colors.red),
+                                    );
+                                  },
+                                )
+                              : Container(
+                                  width: cellWidth * 0.8,
+                                  height: fixedHeight * 0.5,
+                                  color: Colors.grey,
+                                  child: const Icon(Icons.error, color: Colors.red),
+                                ),
                           
                           // 选择复选框
                           Row(
@@ -1660,21 +1670,28 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                       contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       leading: ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Image.asset(
-                          _getEgoGiftImagePath(accessory.image), 
-                          width: 50, 
-                          height: 50,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            // 如果网络图片加载失败，回退到assets
-                            return Image.asset(
-                              accessory.image,
-                              width: 50,
-                              height: 50,
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        ),
+                        child: _imgRootAddress != null
+                            ? Image.file(
+                                File(_getEgoGiftImagePath(accessory.image)),
+                                width: 50,
+                                height: 50,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // 图片加载失败，显示错误图标
+                                  return Container(
+                                    width: 50,
+                                    height: 50,
+                                    color: Colors.grey,
+                                    child: const Icon(Icons.error, color: Colors.red),
+                                  );
+                                },
+                              )
+                            : Container(
+                                width: 50,
+                                height: 50,
+                                color: Colors.grey,
+                                child: const Icon(Icons.error, color: Colors.red),
+                              ),
                       ),
                       title: Text(
                         accessory.name, 

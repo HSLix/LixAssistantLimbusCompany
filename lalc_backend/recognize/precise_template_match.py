@@ -153,17 +153,18 @@ if __name__ == "__main__":
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
         # templates.append(get_image("hard_mode"))
         
-        templates.append(get_image("event_pass_very_low"))
-        templates.append(get_image("event_pass_low"))
-        templates.append(get_image("event_pass_normal"))
-        templates.append(get_image("event_pass_high"))
-        templates.append(get_image("event_pass_very_high"))
+        # templates.append(get_image("event_pass_very_low"))
+        # templates.append(get_image("event_pass_low"))
+        # templates.append(get_image("event_pass_normal"))
+        # templates.append(get_image("event_pass_high"))
+        # templates.append(get_image("event_pass_very_high"))
 
         # templates.append(get_image("reward_coin"))
         # templates.append(get_image("Thunderbranch"))
         # templates.append(get_image("Rest"))
         # templates.append(get_image("Entanglement Override Sequencer"))
         # templates.append(get_image("Bloodflame Sword"))
+        # templates.append(get_image("Perversion"))
 
         # templates.append(get_image("Lightning Axe"))
 
