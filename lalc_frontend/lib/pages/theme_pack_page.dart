@@ -7,6 +7,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
+import 'package:provider/provider.dart';
+import 'package:toastification/toastification.dart';
 import '../generated/l10n.dart';
 
 // 排序选项枚举
@@ -47,6 +49,9 @@ class ThemePackPageState extends State<ThemePackPage> {
   
   // 添加图片根地址变量
   String? _imgRootAddress;
+  
+  // 新增：与 LogPage 一模一样的两个字段
+  bool _isLoading = false;        // 刷新时转圈
 
   @override
   void initState() {
@@ -57,6 +62,39 @@ class ThemePackPageState extends State<ThemePackPage> {
     
     // 获取图片地址
     _getImageAddress();
+  }
+
+  // 完全模仿 LogPage 的 _refreshLogs
+  void _refreshThemePacks() {
+    final ws = context.read<WebSocketManager>();
+
+    // 1. 未连接 → 弹 Toast（和 LogPage 同一句话）
+    if (!ws.isConnected && !ws.isConnecting) {
+      toastification.show(
+        context: context,
+        title: Text(S.of(context).websocket_not_connected), // 已经国际化
+        style: ToastificationStyle.flatColored,
+        type: ToastificationType.error,
+        autoCloseDuration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    // 2. 已连接 → 重新去拿地址 + 重新扫磁盘
+    setState(() {
+      _isLoading = true;   // 开始转圈
+    });
+
+    // 3. 如果断了就自动连，然后刷新
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!ws.isConnected) ws.initialize();   // 自动重连
+      _getImageAddress().then((_) {            // 等地址回来
+        if (mounted) {
+          setState(() => _isLoading = false);  // 停转圈
+        }
+      });
+    });
   }
 
   @override
@@ -275,20 +313,28 @@ class ThemePackPageState extends State<ThemePackPage> {
                     }
                   },
                 ),
+                // 新增：刷新按钮（与 LogPage 同一图标、同一 tooltip）
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.white),
+                  onPressed: _refreshThemePacks,
+                  tooltip: S.of(context).refresh,   // 国际化已自带
+                ),
               ],
             ),
           ),
           // 主题包网格
           Expanded(
-            child: imageNames.isEmpty
-              ? Center(
-                  child: Text(
-                    S.of(context).no_theme_packs,
-                    style: const TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                )
-              : LayoutBuilder(
-                  builder: (_, constraints) {
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : imageNames.isEmpty
+                  ? Center(
+                      child: Text(
+                        S.of(context).no_theme_packs,
+                        style: const TextStyle(color: Colors.grey, fontSize: 16),
+                      ),
+                    )
+                  : LayoutBuilder(
+                      builder: (_, constraints) {
                     final double cellWidth = (constraints.maxWidth - 2 * 10) / 3;
                     const double maxDesiredHeight = 350; // 增加网格项高度
                     final double fixedHeight = math.min(
