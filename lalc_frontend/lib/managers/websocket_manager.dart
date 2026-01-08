@@ -726,7 +726,13 @@ class WebSocketManager with ChangeNotifier {
     final String requestId = id ?? _uuid.v4();
     
     debugPrint('[TX] Sending command: $command with args: $args and id: $requestId');
-    logger.d("Sending command: $command with args: $args and id: $requestId");
+    if(command == "encrypt_cdk") {
+      logger.d("Sending command: $command with *** and id: $requestId");
+    }
+    else {
+      logger.d("Sending command: $command with args: $args and id: $requestId");
+    }
+    
     _addLogMessage('发送命令: $command');
 
     _sendMessage({
@@ -916,6 +922,51 @@ class WebSocketManager with ChangeNotifier {
       taskStatusManager.stopTask();
       sendCommand('stop');
     }
+  }
+  
+  /// 加密CDK
+  Future<String?> encryptCDK(String plainCDK) async {
+    if (!_isConnected) {
+      debugPrint('WebSocket未连接，无法加密CDK');
+      return null;
+    }
+
+    final completer = Completer<String?>();
+    final requestId = _uuid.v4();
+
+    debugPrint('注册CDK加密回调函数，requestId: $requestId');
+    
+    // 注册一次性响应处理器
+    _pendingRequests[requestId] = (payload) {
+      debugPrint('执行CDK加密回调函数，requestId: $requestId');
+      if (!completer.isCompleted) {
+        final status = payload['status'] as String?;
+        if (status == 'success') {
+          final encryptedValue = payload['encrypted_value'] as String?;
+          debugPrint('完成CDK加密completer，requestId: $requestId, encryptedValue: $encryptedValue');
+          completer.complete(encryptedValue);
+        } else {
+          debugPrint('CDK加密失败，requestId: $requestId, status: $status');
+          completer.complete(null);
+        }
+      } else {
+        debugPrint('CDK加密completer已完成，requestId: $requestId');
+      }
+    };
+
+    // 发送加密CDK的命令，参数通过args传递
+    sendCommandWithArgs('encrypt_cdk', [plainCDK], requestId);
+
+    // 超时保护
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint('encryptCDK超时，移除请求处理器，requestId: $requestId');
+        _pendingRequests.remove(requestId);
+        debugPrint('CDK加密超时');
+        return null;
+      },
+    );
   }
 }
 

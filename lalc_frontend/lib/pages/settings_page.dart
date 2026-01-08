@@ -110,8 +110,8 @@ class _SettingsPageState extends State<SettingsPage> {
         // 如果CDK已经包含冒号，认为它已经是加密格式
         encryptedCDK = cdk;
       } else {
-        // 如果CDK不包含冒号，认为它是明文，需要加密
-        encryptedCDK = await ConfigManager().encryptCDK(cdk);
+        // 如果CDK不包含冒号，认为它是明文，需要通过WebSocket发送到服务器进行加密
+        encryptedCDK = await WebSocketManager().encryptCDK(cdk) ?? cdk;
       }
       _userConfig.mirrorChanCDK = encryptedCDK;
       debugPrint('MirrorChan CDK 已加密保存: $encryptedCDK');

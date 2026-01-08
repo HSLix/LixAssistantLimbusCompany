@@ -562,6 +562,36 @@ class ServerController:
                         self._download_task = None
                 
                 asyncio.create_task(_wrap())
+            elif base_cmd == "encrypt_cdk":
+                # 加密CDK的命令
+                if not args or len(args) < 1:
+                    await self.send_json(ws, {
+                        "type": "response", 
+                        "id": msg_id, 
+                        "payload": {
+                            "status": "error", 
+                            "message": "缺少要加密的CDK参数"
+                        }
+                    })
+                    return
+                
+                cdk_to_encrypt = args[0]
+                self.lalc_logger.debug(f"收到加密请求，CDK: ***")
+                
+                # 使用加密函数加密CDK
+                from utils.encrypt_decrypt import encrypt_cdk
+                encrypted_cdk = encrypt_cdk(cdk_to_encrypt)
+                
+                await self.send_json(ws, {
+                    "type": "response", 
+                    "id": msg_id, 
+                    "payload": {
+                        "status": "success", 
+                        "type": "encrypted_cdk",
+                        "encrypted_value": encrypted_cdk
+                    }
+                })
+                self.lalc_logger.debug(f"CDK加密完成，结果: {encrypted_cdk}")
             elif base_cmd == "cancel_download":
                 if self._download_task and not self._download_task.done():
                     self._download_task.cancel()

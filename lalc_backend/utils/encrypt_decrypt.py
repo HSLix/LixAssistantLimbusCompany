@@ -4,53 +4,77 @@ import platform
 import subprocess
 import uuid
 import os
+
+# 导入win32crypt模块用于Windows数据保护API
+try:
+    import win32crypt
+except ImportError:
+    raise Exception("警告: 未找到pywin32库，请运行'pip install pywin32'安装。")
 from utils.logger import init_logger
 
 logger = init_logger()
 
 
-def get_device_id():
-    """
-    获取设备唯一标识符
-    """
+
+
+def encrypt_cdk(text: str) -> str:
+    """使用当前Windows用户凭据加密CDK字符串"""
+    entropy = b"LALC"  
+    
+    if not text:
+        return ""
+
+    # 转换为字节
+    data = text.encode('utf-8')
+
+    # 加密数据（只能由同一用户在同一机器上解密）
     try:
-        # 尝试使用不同方式获取设备ID，按优先级排序
-        if platform.system() == "Windows":
-            # Windows系统，使用PowerShell的Get-CimInstance命令
-            out = subprocess.check_output(
-                'powershell "Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select-Object -ExpandProperty UUID"',
-                shell=True, stderr=subprocess.DEVNULL
-            ).decode('utf-8', errors='ignore').strip()
-            
-            if out and not out.upper().startswith('FFFFFFFF'):
-                return out
-            raise RuntimeError("获取设备 ID 失败")
-        else: 
-            raise Exception("现阶段只支持 Windows 系统")
+        encrypted_data = win32crypt.CryptProtectData(
+            data,
+            None,  # 描述字符串（可选）
+            entropy,  # 额外熵值（增强安全性）
+            None,  # 保留
+            None,  # 提示信息
+            0  # 默认标志：CRYPTPROTECT_UI_FORBIDDEN
+        )
+        # 返回Base64编码的加密结果
+        return base64.b64encode(encrypted_data).decode('utf-8')
     except Exception as e:
-        # 如果所有方法都失败，返回一个默认值
-        raise RuntimeError("获取设备 ID 失败")
+        logger.error(f"CDK加密失败: {e}")
+        # 加密失败时返回原文
+        return text
 
 
-# ---------- 异或加/解密 ----------
-_XOR_KEY = (get_device_id() + "LALC").encode('utf-8')   # 40 字节循环密钥
+def decrypt_cdk(encrypted_b64: str) -> str:
+    """使用当前Windows用户凭据解密CDK字符串"""
+    entropy = b"LALC" 
+    
+    if not encrypted_b64:
+        return ""
 
-
-def _xor_bytes(data: bytes) -> bytes:
-    return bytes(b ^ _XOR_KEY[i % len(_XOR_KEY)] for i, b in enumerate(data))
-
-
-def encrypt_cdk(plain: str) -> str:
-    return base64.b64encode(_xor_bytes(plain.encode('utf-8'))).decode('ascii')
-
-
-def decrypt_cdk(cipher: str) -> str:
+    if len(encrypted_b64) % 4 != 0:
+        logger.error("CDK解密失败: Base64编码格式不正确")
+        return encrypted_b64
+        
     try:
-        ans = _xor_bytes(base64.b64decode(cipher.encode('ascii'))).decode('utf-8')
-    except Exception as e:
-        raise Exception(f"CDK Decrypt ERROR:{e}")
-    return ans
+        # 解码Base64
+        encrypted_data = base64.b64decode(encrypted_b64)
 
+        # 解密数据
+        decrypted_data = win32crypt.CryptUnprotectData(
+            encrypted_data,
+            entropy,  # 必须与加密时相同的熵值
+            None,  # 保留
+            None,  # 提示信息
+            0  # 默认标志
+        )
+        
+        # 返回原始字符串
+        return decrypted_data[1].decode('utf-8')
+    except Exception as e:
+        logger.error(f"CDK解密失败: {e}")
+        # 解密失败时返回原始数据
+        return encrypted_b64
 
 
 def main():
@@ -68,10 +92,6 @@ def main():
     
     # 验证
     print(f"加解密是否成功: {original_cdk == decrypted}")
-    
-    # 测试获取设备ID
-    print(f"设备ID: {get_device_id()}")
-
 
 
 if __name__ == "__main__":
