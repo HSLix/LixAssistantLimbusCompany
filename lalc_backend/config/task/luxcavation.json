@@ -32,9 +32,16 @@
         },
         "next":[
             "exp_choose_team",
-            "exp_skip_battle"
+            "exp_skip_battle",
+            "exp_can_not_skip_battle"
         ]
     }, 
+    "exp_can_not_skip_battle": {
+        "action":"report_error",
+        "params":{
+            "error_msg":"该跳过未解锁 | Can not Skip Battle"
+        }
+    },
     "exp_skip_battle":{
         "recognition":"template_match",
         "action":"click",

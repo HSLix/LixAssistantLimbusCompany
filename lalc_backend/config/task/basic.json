@@ -36,12 +36,6 @@
     "wait_appear":{
         "action":"wait_appear"
     },
-    "choose_team":{
-        "action":"choose_team"
-    },
-    "ready_to_battle":{
-        "action":"ready_to_battle"
-    },
     "init_limbus_window":{
         "action":"init_limbus_window"
     },

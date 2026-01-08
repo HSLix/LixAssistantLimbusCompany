@@ -34,16 +34,7 @@
             "key":"enter"
         },
         "next":[
-            "mirror_select_next_node",
-            "mirror_choose_team",
-            "mirror_choose_star",
-            "mirror_select_initial_ego_gift",
-            "mirror_gift_search",
-            "mirror_shop_entry",
-            "mirror_select_theme_pack",
-            "mirror_event",
-            "mirror_select_encounter_reward_card",
-            "mirror_select_floor_ego_gift"
+            "mirror_circle_center"
         ]
     },
     "mirror_enter_last_week":{
@@ -120,13 +111,16 @@
             "mirror_battle",
             "mirror_event",
             "mirror_shop_entry",
+            "mirror_super_shop_entry",
             "mirror_select_encounter_reward_card",
             "mirror_select_floor_ego_gift",
             "mirror_victory",
             "mirror_defeat",
             "mirror_entry",
+            "mirror_choose_team",
             "mirror_choose_star",
-            "mirror_select_initial_ego_gift"
+            "mirror_select_initial_ego_gift",
+            "mirror_gift_search"
         ]
     },
     "mirror_ego_gift_get":{
@@ -244,7 +238,63 @@
         "action":"key",
         "params":{
             "key":"enter",
-            "post_delay": 2
+            "post_delay": 3
+        },
+        "next":[
+            "mirror_circle_center"
+        ]
+    },
+    "mirror_super_shop_entry":{
+        "recognition":"template_match",
+        "params":{
+            "template":"mirror_super_shop"
+        },
+        "next":[
+            "mirror_super_shop_heal_sinner"
+        ]
+    },
+    "mirror_super_shop_heal_sinner":{
+        "action":"mirror_shop_heal_sinner",
+        "params":{
+            "cfg_type":"mirror"
+        },
+        "next":[
+            "mirror_super_shop_fuse_ego_gifts"
+        ]
+    },
+    "mirror_super_shop_fuse_ego_gifts":{
+        "desc":"饰品合成，但用的是不需要的废品来合本体系的东西",
+        "action":"mirror_shop_fuse_ego_gifts",
+        "params":{
+            "cfg_type":"mirror"
+        },
+        "next":[
+            "mirror_super_shop_replace_skill_and_purchase_ego_gifts"
+        ]
+    },
+    "mirror_super_shop_replace_skill_and_purchase_ego_gifts":{
+        "action":"mirror_shop_replace_skill_and_purchase_ego_gifts",
+        "params":{
+            "cfg_type":"mirror"
+        },
+        "next":[
+            "mirror_super_shop_enhance_ego_gifts"
+        ]
+    },
+    "mirror_super_shop_enhance_ego_gifts":{
+        "action":"mirror_shop_enhance_ego_gifts",
+        "params":{
+            "cfg_type":"mirror"
+        },
+        "next":[
+            "mirror_super_shop_leave_confirm"
+        ]
+    },
+    "mirror_super_shop_leave_confirm":{
+        "action":"key",
+        "params":{
+            "key":"enter",
+            "post_delay": 3
         },
         "next":[
             "mirror_circle_center"

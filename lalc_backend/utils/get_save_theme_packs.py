@@ -9,6 +9,9 @@ from recognize.img_recognizer import recognize_handler
 from recognize.img_registry import get_images_by_tag, get_max_radio_of_theme_packs, register_images_from_directory
 from recognize.utils import pil_to_cv2, cv2_to_pil
 from input.input_handler import input_handler
+from utils.logger import init_logger
+
+logger = init_logger()
 
 
 
@@ -43,7 +46,7 @@ def detect_and_save_theme_pack(pil_img):
     matches.sort(key=lambda x: x[0])  # 按横坐标排序
 
     if not matches:
-        print("未检测到 theme pack")
+        logger.debug("未检测到 theme pack")
         return
 
     # ---- 2. 保存目录 ----
@@ -119,7 +122,7 @@ def detect_and_save_theme_pack(pil_img):
         # 如果processed_name已经存在于现有图像名称中，则跳过保存
         tmp = difflib.get_close_matches(processed_name, existing_names, cutoff=0.7)
         if len(tmp) > 0:
-            print(f"图片名字 {processed_name}.png 已存在，跳过保存")
+            logger.log(f"图片名字 {processed_name}.png 已存在，跳过保存")
             continue
 
         # 从图片上检查是否有重合的
@@ -128,7 +131,7 @@ def detect_and_save_theme_pack(pil_img):
         for theme_pack in existed_theme_packs:
             if recognize_handler.template_match(cropped, theme_pack[0]):
                 existed_flag = True
-                print(f"新检测的卡包 {processed_name} 与已有卡包 {theme_pack[0]} 图片相似，跳过保存")
+                logger.log(f"新检测的卡包 {processed_name} 与已有卡包 {theme_pack[0]} 图片相似，跳过保存")
                 break
         
         if existed_flag:
@@ -139,7 +142,7 @@ def detect_and_save_theme_pack(pil_img):
 
         register_images_from_directory()
 
-        print(f"已保存: {filename}")
+        logger.log(f"已保存新主题包: {filename}")
 
         # ⑥ 在原图画框
         # draw.rectangle((x1, y1, x2, y2), outline="red", width=3)

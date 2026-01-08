@@ -248,7 +248,7 @@ if __name__ == "__main__":
     # 示例：更新配置
     cm.update_exp_config({
         "check_node_name":"exp_check",
-        "luxcavation_mode": "skip_battle",
+        "luxcavation_mode": "skip battle",
         "exp_stage": "08",
         "check_node_target_count": 0,
         "team_indexes": [6],
@@ -257,7 +257,7 @@ if __name__ == "__main__":
     
     cm.update_thread_config({
         "check_node_name":"thread_check",
-        "luxcavation_mode": "skip_battle",
+        "luxcavation_mode": "skip battle",
         "thread_stage": "50",
         "check_node_target_count": 0,
         "team_indexes": [3],

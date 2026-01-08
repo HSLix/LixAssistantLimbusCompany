@@ -81,6 +81,12 @@
             "error_handler"
         ]
     },
+    "choose_team":{
+        "action":"choose_team"
+    },
+    "ready_to_battle":{
+        "action":"ready_to_battle"
+    },
     "main_drive_confirm":{
         "recognition":"template_match",
         "action":"click",
