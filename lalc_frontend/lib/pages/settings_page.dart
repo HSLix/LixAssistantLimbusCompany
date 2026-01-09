@@ -11,8 +11,6 @@ import 'package:provider/provider.dart';
 import '../utils/zip_helper.dart';
 import 'package:path_provider/path_provider.dart';
 import '../managers/websocket_manager.dart';
-import 'package:archive/archive.dart';
-import 'package:archive/archive_io.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -391,14 +389,15 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 显示下载进度弹窗
   void _showDownloadProgressDialog(String source) {
     double progress = 0.0;
-    StateSetter? progressStateSetter;
+    String _progressText = '${S.of(context).downloading_from} $source';
+    StateSetter? _dialogSetState;
     
     // 创建进度对话框
     final dialog = StatefulBuilder(
       builder: (BuildContext context, StateSetter setDialogState) {
-        progressStateSetter = setDialogState;
+        _dialogSetState = setDialogState;
         return AlertDialog(
-          title: Text('${S.of(context).downloading_from} $source'),
+          title: Text(_progressText),
           content: SizedBox(
             height: 150,
             child: Column(
@@ -435,6 +434,13 @@ class _SettingsPageState extends State<SettingsPage> {
       },
     );
 
+    // 暴露给外部更新文字
+    void updateProgressText(String txt) {
+      if (mounted) {
+        _dialogSetState?.call(() => _progressText = txt);
+      }
+    }
+
     // 显示对话框
     showDialog(
       context: context,
@@ -453,7 +459,7 @@ class _SettingsPageState extends State<SettingsPage> {
               // 修复进度值处理：将百分比转换为0-1之间的值
               final double normalized = p / 100.0;
               if (mounted) {
-                progressStateSetter!(() => progress = normalized.clamp(0.0, 1.0));
+                _dialogSetState?.call(() => progress = normalized.clamp(0.0, 1.0));
               }
             },
             onDone: () {
@@ -485,6 +491,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 );
               }
             },
+            updateProgressText: updateProgressText, // 传递更新文字的函数
           );
         });
         
@@ -505,34 +512,53 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   /// 解压更新包到LALC目录
+  /// 使用 PowerShell 的 Expand-Archive 命令解压，天然异步，不阻塞 UI
   Future<Directory> _unzipToLalcFolder(String zipPath) async {
     final updateDir = await _getUpdateDir();
     final targetLalc = Directory(path.join(updateDir.path, 'lalc'));
 
-    // 存在就删
+    // 1. 如果目标目录已存在，先删除
+    // PowerShell 的 Expand-Archive 默认不允许覆盖同名文件夹，
+    // 所以我们需要先确保目录是空的或不存在。
     if (await targetLalc.exists()) {
       await targetLalc.delete(recursive: true);
     }
 
-    // 用 archive 库解压
-    final bytes = File(zipPath).readAsBytesSync();
-    final archive = ZipDecoder().decodeBytes(bytes);
-    for (final file in archive) {
-      final filename = file.name;
-      if (file.isFile) {
-        final outFile = File(path.join(updateDir.path, filename))
-          ..createSync(recursive: true);
-        outFile.writeAsBytesSync(file.content);
-      } else {
-        Directory(path.join(updateDir.path, filename)).createSync(recursive: true);
+    try {
+      // 2. 调用 PowerShell 命令解压
+      // -Force: 强制覆盖文件（虽然我们删了目录，但加上更保险）
+      // 注意：在 PowerShell 中，如果参数包含空格，PowerShell 引擎通常会自动处理，
+      // 但作为 List 传递给 Dart Process 时，直接传路径字符串即可。
+      final result = await Process.run(
+        'powershell',
+        [
+          'Expand-Archive', 
+          '-Path', zipPath, 
+          '-DestinationPath', updateDir.path,
+          '-Force'
+        ],
+        runInShell: true, // Windows 上建议开启
+      );
+
+      // 3. 检查执行结果
+      if (result.exitCode != 0) {
+        // PowerShell 发生错误时，错误信息通常在 stderr 中
+        // 有时候退出码不是 0 但解压可能成功了，这里可以根据情况调整容错
+        logger.e('PowerShell 解压失败 (退出码 ${result.exitCode})');
+        logger.e('错误输出: ${result.stderr}');
+        throw Exception('解压失败: ${result.stderr}');
       }
+      
+      logger.d('更新包已通过 PowerShell 解压到: ${targetLalc.path}');
+    } catch (e) {
+      logger.e('解压过程出错: $e');
+      rethrow;
     }
 
-    // 记录绝对路径
-    final abs = targetLalc.resolveSymbolicLinksSync();
-    logger.d('更新包已解压到: $abs');
     return targetLalc;
   }
+
+
 
   /// 真实下载实现
   Future<void> _realDownload({
@@ -542,6 +568,7 @@ class _SettingsPageState extends State<SettingsPage> {
     required Function(double) onProgress,
     required VoidCallback onDone,
     required Function(String) onFail,
+    required Function(String) updateProgressText, // 添加更新文字的回调
   }) async {
     try {
       final updateDir = await _getUpdateDir();
@@ -563,10 +590,13 @@ class _SettingsPageState extends State<SettingsPage> {
           // 检查上下文是否仍然有效
           if (!mounted) return;
           
+          // 下载完成，先更新文字
+          updateProgressText(S.of(context).unzipping_after_download);
+          
           try {
             await _unzipToLalcFolder(zipPath);
             // 可以顺手把 zip 删掉
-            File(zipPath).deleteSync();
+            await File(zipPath).delete();
             
             // 关闭进度弹窗后显示确认弹窗
             if (mounted && Navigator.canPop(context)) {
@@ -593,24 +623,8 @@ class _SettingsPageState extends State<SettingsPage> {
             );
             
             if (confirm == true) {
-              // 用户选择自动更新，输出update_to.bat的绝对路径和项目自身路径
-              final updateDir = await _getUpdateDir();
-              final lalcDir = Directory('${updateDir.parent.path}/lalc');
-              final batFile = File('${lalcDir.path}/update_to.bat');
-              
-              // 获取项目自身的绝对路径
-              String executablePath = Platform.resolvedExecutable;
-              String projectDir = path.dirname(path.dirname(executablePath));
-              
-              if (mounted) {
-                toastification.show(
-                  context: context,
-                  title: Text('${S.of(context).update_bat_path}: ${batFile.path}\n${S.of(context).project_path}: $projectDir'),
-                  style: ToastificationStyle.flatColored,
-                  type: ToastificationType.info,
-                  autoCloseDuration: const Duration(seconds: 15),
-                );
-              }
+              // 启动更新脚本
+              _executeUpdateScript();
             } else {
               // 用户选择手动更新，打开下载的update文件夹
               final updateDir = await _getUpdateDir();
@@ -1711,6 +1725,9 @@ class _SettingsPageState extends State<SettingsPage> {
             autoCloseDuration: const Duration(seconds: 3),
           );
         }
+        // 向服务器发送 quit_lalc 命令
+        WebSocketManager().quitLALC();
+        
       } catch (e) {
         if (mounted) {
           toastification.show(

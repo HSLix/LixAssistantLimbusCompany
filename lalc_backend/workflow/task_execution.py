@@ -19,15 +19,46 @@ logger = init_logger()
 # 新增：让 TaskExecution 能把日志推给 Server
 _server_to_push = None          # 由 ServerController 启动时注入
 
+
 def set_server_ref(server):
     global _server_to_push
     _server_to_push = server
+
 
 def get_server_ref():
     if _server_to_push is None:
         logger.log("远程服务器为空", level="WARNING")
         return
     return _server_to_push
+
+
+def _safe_broadcast(msg: str) -> None:
+    """
+    线程安全：把消息投递到**主线程**事件循环，然后返回。
+    当前线程可以没有循环。
+    """
+    server = get_server_ref()
+    if server is None:
+        return
+    
+    # 获取保存的主循环
+    main_loop = getattr(server, 'loop', None)
+    if main_loop is None:
+        logger.log("服务器未保存主循环引用", level="WARNING")
+        return
+
+    if main_loop.is_closed():
+        logger.log("主事件循环已关闭，无法广播消息", level="WARNING")
+        return
+
+    coro = server.broadcast_task_log(msg)
+    
+    try:
+        asyncio.run_coroutine_threadsafe(coro, main_loop)
+    except RuntimeError as e:
+        logger.log(f"广播消息失败: {str(e)}", level="WARNING")
+
+
 
 class TaskExecution:
 
@@ -148,15 +179,7 @@ class TaskExecution:
         # 修改为：先写本地日志，再推一条 task_log 给 Server
         log_msg = f"任务{{{cur_task.name}}}正在执行：{{{func.__name__}}}-{{{action_name}}}"
         logger.log(log_msg)
-        if _server_to_push:
-            try:
-                # 检查是否有正在运行的事件循环
-                asyncio.get_running_loop()
-                # 如果有，则可以直接创建任务
-                asyncio.create_task(_server_to_push.broadcast_task_log(log_msg))
-            except RuntimeError:
-                # 如果没有运行的事件循环，则将任务提交到服务器的事件循环中
-                asyncio.run_coroutine_threadsafe(_server_to_push.broadcast_task_log(log_msg), _server_to_push.loop)
+        _safe_broadcast(log_msg)
 
         if action_name in self.handlers:
             time.sleep(cur_task.get_param("pre_delay"))
@@ -170,15 +193,7 @@ class TaskExecution:
         # 修改为：先写本地日志，再推一条 task_log 给 Server
         log_msg = f"任务{{{cur_task.name}}}已执行：{{{func.__name__}}}-{{{action_name}}}"
         logger.log(log_msg)
-        if _server_to_push:
-            try:
-                # 检查是否有正在运行的事件循环
-                asyncio.get_running_loop()
-                # 如果有，则可以直接创建任务
-                asyncio.create_task(_server_to_push.broadcast_task_log(log_msg))
-            except RuntimeError:
-                # 如果没有运行的事件循环，则将任务提交到服务器的事件循环中
-                asyncio.run_coroutine_threadsafe(_server_to_push.broadcast_task_log(log_msg), _server_to_push.loop)
+        _safe_broadcast(log_msg)
             
         return res
 

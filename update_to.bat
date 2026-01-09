@@ -42,10 +42,10 @@ rem ------------------------------------------------------------------
 rem 1. Terminate running processes
 rem ------------------------------------------------------------------
 echo [INFO] Terminating lalc_frontend and LixAssistantLimbusCompany ... >> "%LOG%"
-echo "正在关闭 lalc_frontend 和 LixAssistantLimbusCompany 进程" >> "%LOG%"
-taskkill /F /IM lalc_frontend.exe 2>nul >> "%LOG%"
+@REM echo "正在关闭 lalc_frontend 和 LixAssistantLimbusCompany 进程" >> "%LOG%"
+@REM taskkill /F /IM lalc_frontend.exe 2>nul >> "%LOG%"
 echo "等待 LixAssistantLimbusCompany 进程关闭中" >> "%LOG%"
-timeout /t 12 /nobreak >nul
+timeout /t 3 /nobreak >nul
 @REM taskkill /F /IM LixAssistantLimbusCompany.exe 2>nul >> "%LOG%"
 echo [INFO] Processes terminated. >> "%LOG%"
 

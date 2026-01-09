@@ -35,13 +35,13 @@ class ServerController:
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self._req_futures: Dict[str, asyncio.Future] = {}   # 用于 request/response 匹配
         self.lalc_logger = init_logger()
-        self.loop = None  # 添加事件循环引用
         self.received_configs = {}  # 存储接收到的配置
         self._timeout_task = None  # 超时检查任务
         self._last_client_disconnect_time = None  # 最后一个客户端断开连接的时间
         self._should_exit = False  # 退出标志
         self._download_task: Optional[asyncio.Task] = None   # 当前下载任务
         self._download_future: Optional[asyncio.Future] = None  # 下载结果 future
+        self.loop = None
 
     def _on_pipeline_error(self, error_msg: str, traceback_str: str):
         """
@@ -326,15 +326,30 @@ class ServerController:
             elapsed = datetime.now() - self._last_client_disconnect_time
             if elapsed.total_seconds() >= outdate_time:
                 self.lalc_logger.log(f"服务器超时自动关闭：超过{outdate_time}秒无客户端连接")
-                # 停止任务流水线
-                await self.pipeline.stop()
-                # 关闭服务器
-                if self.server:
-                    self.server.close()
-                    await self.server.wait_closed()
-                # 设置退出标志
-                self._should_exit = True
+                await self._shutdown_server()
                 break
+
+    async def _shutdown_server(self):
+        """优雅关闭：只需 cancel 两个任务即可"""
+        self.lalc_logger.log("开始关闭服务器...")
+        # 1. 通知客户端（可选）
+        if self.clients:
+            await asyncio.gather(
+                *[self.send_json(c, {"type":"response","payload":{"message":"server is shutting down"}})
+                  for c in self.clients],
+                return_exceptions=True
+            )
+        # 2. 停止流水线
+        await self.pipeline.stop()
+        # 3. 关闭服务器（让 wait_closed 返回）
+        if self.server:
+            self.server.close()
+        # 4. 取消两个长期任务 → gather 立即返回
+        if self._server_task and not self._server_task.done():
+            self._server_task.cancel()
+        if self._timeout_task and not self._timeout_task.done():
+            self._timeout_task.cancel()
+        self._should_exit = True
 
     # ---------- 业务路由 ----------
     async def handle_command(self, ws, cmd: str, msg_id: str, args_list=None):
@@ -406,6 +421,7 @@ class ServerController:
                 from utils.update_manager import download_lalc_release_asset
                 
                 def _progress(p):
+                    self.loop = asyncio.get_running_loop()
                     asyncio.run_coroutine_threadsafe(
                         self.send_json(ws, {
                             "type": "response", 
@@ -431,6 +447,15 @@ class ServerController:
                 async def _wrap():
                     try:
                         result = await task
+                        await self.send_json(ws, {
+                            "type": "response", 
+                            "id": msg_id, 
+                            "payload": {
+                                "status": "progress", 
+                                "type": "download_progress",
+                                "progress": 100
+                            }
+                        }),
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -500,6 +525,7 @@ class ServerController:
                 from utils.update_manager import download_lalc_from_mirrorchan
                 
                 def _progress(p):
+                    self.loop = asyncio.get_running_loop()
                     asyncio.run_coroutine_threadsafe(
                         self.send_json(ws, {
                             "type": "response", 
@@ -527,6 +553,15 @@ class ServerController:
                 async def _wrap():
                     try:
                         result = await task
+                        await self.send_json(ws, {
+                            "type": "response", 
+                            "id": msg_id, 
+                            "payload": {
+                                "status": "progress", 
+                                "type": "download_progress",
+                                "progress": 100
+                            }
+                        }),
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -890,6 +925,10 @@ class ServerController:
                         "entry": log_entry
                     }
                 })
+            elif base_cmd == "quit_lalc":
+                self.lalc_logger.log("收到quit_lalc命令，正在关闭服务器...")
+                await self._shutdown_server()
+                # 不再 send_json，避免对关闭的 ws 写数据
             else:
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"unknown command: {base_cmd}"}})
                 self.lalc_logger.debug(f"收到未知命令: {base_cmd}", level="ERROR")
@@ -958,38 +997,67 @@ class ServerController:
 
     # ---------- 启动入口 ----------
     async def run_server(self, host: str = "localhost", port_range=range(8765, 8767)):
-        self.loop = asyncio.get_running_loop()  # 保存事件循环引用
         for port in port_range:
             try:
-                self.server = await websockets.serve(
-                    self.client_handler, host, port,            # 减少大图流量
-                    ping_interval=None,             # 自己心跳
+                # 注意：这里不再 await，直接返回 server 对象
+                return await websockets.serve(
+                    self.client_handler, host, port,
+                    ping_interval=None,
                     ping_timeout=None
                 )
-                self.lalc_logger.log(f"WebSocket 服务器启动，监听 ws://{host}:{port}")
-                return port
             except OSError:
                 continue
         raise RuntimeError("无可用端口")
 
-    async def run_forever(self):
-        await self.run_server()
-        self.lalc_logger.debug("WebSocket 服务器开始运行")
-        
-        # 启动超时检查任务
-        self._timeout_task = asyncio.create_task(self._check_timeout())
-        
+    async def _server_coro(self):
+        """WebSocket 服务器协程：只要有一个客户端就永远活着"""
+        self.lalc_logger.debug("_server_coro 启动")
         try:
-            while not self._should_exit:
-                await asyncio.sleep(0.1)  # 短暂休眠以避免忙等待
+            await self.server.wait_closed()          # 关键：挂在这里直到外部 close()
+        except asyncio.CancelledError:
+            self.lalc_logger.debug("_server_coro 被取消")
+            raise
         finally:
-            # 取消超时检查任务
-            if self._timeout_task and not self._timeout_task.done():
-                self._timeout_task.cancel()
-                try:
-                    await self._timeout_task
-                except asyncio.CancelledError:
-                    pass
+            self.lalc_logger.debug("_server_coro 结束")
+
+    async def _timeout_coro(self):
+        """超时检查协程"""
+        self.lalc_logger.debug("_timeout_coro 启动")
+        try:
+            await self._check_timeout()              # 你已有的 while True 逻辑
+        except asyncio.CancelledError:
+            self.lalc_logger.debug("_timeout_coro 被取消")
+            raise
+        finally:
+            self.lalc_logger.debug("_timeout_coro 结束")
+
+    async def run_forever(self):
+        # 1. 启动 WebSocket 服务器
+        self.server = await self.run_server()
+        port = self.server.sockets[0].getsockname()[1]
+        self.loop = asyncio.get_running_loop()
+        self.lalc_logger.log(f"WebSocket 服务器启动，监听 ws://localhost:{port}")
+
+        # 2. 创建两个长期任务
+        self._server_task   = asyncio.create_task(self._server_coro())
+        self._timeout_task  = asyncio.create_task(self._timeout_coro())
+
+        # 3. 一并等待（任意一个崩溃都会触发 gather 返回）
+        try:
+            await asyncio.gather(self._server_task, self._timeout_task)
+        except asyncio.CancelledError:
+            # 外部调用 _shutdown_server() 时会 cancel()，这里正常吃掉
+            self.lalc_logger.debug("run_forever 收到 CancelledError，准备退出")
+        finally:
+            # 4. 确保两个任务都被取消
+            for t in (self._server_task, self._timeout_task):
+                if t and not t.done():
+                    t.cancel()
+                    try:
+                        await t
+                    except asyncio.CancelledError:
+                        pass
+            self.lalc_logger.debug("run_forever 结束，进程将退出")
 
 # -------------------- 入口 --------------------
 async def amain():

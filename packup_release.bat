@@ -8,12 +8,9 @@ if exist "README.md"       copy "README.md" "doc" >nul
 if exist "img"             xcopy "img" "doc\img" /s /e /i /y >nul
 @REM :: 2. Clean frontend
 echo [2/8] Cleaning frontend assets ...
-for %%D in (doc ego_gifts theme_packs) do (
-if exist "lalc_frontend\assets%%D" rmdir /s /q "lalc_frontend\assets%%D"
-)
+
 xcopy "doc"                         "lalc_frontend\assets\doc"         /s /e /i /y >nul
-xcopy "lalc_backend\img\ego_gifts"   "lalc_frontend\assets\ego_gifts"   /s /e /i /y >nul
-xcopy "lalc_backend\img\theme_packs" "lalc_frontend\assets\theme_packs" /s /e /i /y >nul
+
 @REM :: 3. Clean Release
 echo [3/8] Cleaning output folder ...
 cd /d "%~dp0"

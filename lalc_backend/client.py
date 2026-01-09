@@ -216,7 +216,7 @@ class ClientController:
             if cmd == "quit":
                 self._running = False
                 break
-            elif cmd in {"start", "pause", "resume", "stop", "get_img_address", "get_latest_version"}:
+            elif cmd in {"start", "pause", "resume", "stop", "get_img_address", "get_latest_version", "quit_lalc"}:
                 self.send_command(cmd)
             elif cmd == "get_log_folders":
                 self.send_command(cmd)

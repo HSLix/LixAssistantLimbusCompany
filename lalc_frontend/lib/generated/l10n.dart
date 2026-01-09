@@ -1868,6 +1868,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Download completed, unzipping...`
+  String get unzipping_after_download {
+    return Intl.message(
+      'Download completed, unzipping...',
+      name: 'unzipping_after_download',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {

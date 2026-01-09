@@ -408,6 +408,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "thread_stage": MessageLookupByLibrary.simpleMessage("Thread Stage"),
     "to": MessageLookupByLibrary.simpleMessage("to"),
     "tutorial": MessageLookupByLibrary.simpleMessage("Tutorial"),
+    "unzipping_after_download": MessageLookupByLibrary.simpleMessage(
+      "Download completed, unzipping...",
+    ),
     "update_bat_path": MessageLookupByLibrary.simpleMessage(
       "Update bat file path",
     ),

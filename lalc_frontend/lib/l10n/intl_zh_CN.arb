@@ -216,5 +216,6 @@
   "just_p": "纯粹的P",
   "semi_auto_started": "半自动任务已开始",
   "mirror_battle_fail_handle": "镜像迷宫战斗失败处理",
-  "mirror_battle_fail_option_continue_next_team": "结算奖励并让下个队伍继续"
+  "mirror_battle_fail_option_continue_next_team": "结算奖励并让下一队继续",
+  "unzipping_after_download": "下载完成，正在解压中..."
 }

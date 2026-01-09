@@ -15,8 +15,6 @@ from utils.logger import init_logger
 logger = init_logger()
 
 
-
-
 def encrypt_cdk(text: str) -> str:
     """使用当前Windows用户凭据加密CDK字符串"""
     entropy = b"LALC"  

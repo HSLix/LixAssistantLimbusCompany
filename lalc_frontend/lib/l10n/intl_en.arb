@@ -216,5 +216,6 @@
   "just_p": "Just P",
   "semi_auto_started": "Semi-auto task started",
   "mirror_battle_fail_handle": "Mirror Dungeon Battle Fail Handle",
-  "mirror_battle_fail_option_continue_next_team": "Settle rewards and let next team continue"
+  "mirror_battle_fail_option_continue_next_team": "Settle rewards and let next team continue",
+  "unzipping_after_download": "Download completed, unzipping..."
 }

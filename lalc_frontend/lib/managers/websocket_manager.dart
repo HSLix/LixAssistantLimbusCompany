@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:io'; // 添加dart:io导入以使用exit函数
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart';
 import 'package:uuid/uuid.dart';
@@ -967,6 +968,45 @@ class WebSocketManager with ChangeNotifier {
         return null;
       },
     );
+  }
+  
+  /// 退出LALC服务器
+  void quitLALC() {
+    if (!_isConnected) {
+      debugPrint('WebSocket未连接，无法发送quit_lalc命令');
+      return;
+    }
+
+    final String id = _uuid.v4();
+    debugPrint('[TX] Sending quit_lalc command with id: $id');
+
+    _sendMessage({
+      'type': 'request',
+      'id': id,
+      'payload': {
+        'command': 'quit_lalc',
+        'args': [],
+      },
+    });
+
+    // 注册响应处理器，收到响应后退出程序
+    _pendingRequests[id] = (payload) {
+      final String status = payload['status'] as String;
+      final String message = payload['message'] as String? ?? 'Quit command processed';
+      
+      if (status == 'success') {
+        debugPrint('服务器正在关闭: $message');
+        _addLogMessage('服务器正在关闭: $message');
+        
+        // 延迟退出前端程序，确保服务器关闭完成
+        Timer(const Duration(seconds: 1), () {
+          exit(0);
+        });
+      } else {
+        debugPrint('quit_lalc命令执行失败: $message');
+        _addLogMessage('quit_lalc命令执行失败: $message');
+      }
+    };
   }
 }
 

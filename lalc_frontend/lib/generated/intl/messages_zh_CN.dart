@@ -168,7 +168,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "镜像迷宫战斗失败处理",
     ),
     "mirror_battle_fail_option_continue_next_team":
-        MessageLookupByLibrary.simpleMessage("结算奖励并让下个队伍继续"),
+        MessageLookupByLibrary.simpleMessage("结算奖励并让下一队继续"),
     "mirror_difficulty": MessageLookupByLibrary.simpleMessage("镜像迷宫难度"),
     "mirror_difficulty_hard": MessageLookupByLibrary.simpleMessage("困难"),
     "mirror_difficulty_normal": MessageLookupByLibrary.simpleMessage("普通"),
@@ -294,6 +294,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "thread_stage": MessageLookupByLibrary.simpleMessage("纺锤关卡"),
     "to": MessageLookupByLibrary.simpleMessage("到"),
     "tutorial": MessageLookupByLibrary.simpleMessage("教程"),
+    "unzipping_after_download": MessageLookupByLibrary.simpleMessage(
+      "下载完成，正在解压中...",
+    ),
     "update_bat_path": MessageLookupByLibrary.simpleMessage("更新批处理文件路径"),
     "update_completed": MessageLookupByLibrary.simpleMessage(" 更新完成"),
     "update_from_github": MessageLookupByLibrary.simpleMessage("从 GitHub 更新"),
