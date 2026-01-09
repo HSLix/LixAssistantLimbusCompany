@@ -1,5 +1,23 @@
 # Changelog
 
+## [4.6.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.5.1...v4.6.0) (2026-01-09)
+
+
+### Features
+
+* 增加经验采光09 | add exp 09 ([45234ea](https://github.com/HSLix/LixAssistantLimbusCompany/commit/45234ea93bcdae63f4ca663065469d815abd7a40))
+* 给主题页动态刷新功能 | add fresh button on theme pack page ([f2137de](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f2137de438e65487fdb4b1e385e6dcf2e087441e))
+
+
+### Bug Fixes
+
+* 修复最后的界面无法打开 | fix the At last slide window ([6d2316e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6d2316e596bb30be46482aed8b30678a5d6a9d1d))
+* 修复因错误识别战斗标识导致卡死 | fix the stuck due to recognize the winrate in the wrong place ([f18f963](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f18f963fc4bf89d804cdb5b54efd131e5aeefcba))
+* 修复自动更新只下载不更新的问题，且修复自动更新会卡顿的问题 | fix the bug that update will not execute correctly and will not stuck again ([95dfe48](https://github.com/HSLix/LixAssistantLimbusCompany/commit/95dfe48f0d2ca0e4d746dec22329848306e089e0))
+* 修复跳过普通异常的问题 | fix the skip battle of exp and thread ([7edcd58](https://github.com/HSLix/LixAssistantLimbusCompany/commit/7edcd58ea7b2105eead10df1c0be1b465fe2bdd3))
+* 统一前后端图片来源 | make frontend and backend share with the same images ([8ed10b8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/8ed10b84a02e95c97c89946f0068828d17b7d910))
+* 补充任务预览内容 | add the preview of task ([2aeb3fd](https://github.com/HSLix/LixAssistantLimbusCompany/commit/2aeb3fdf5c3b59cec07ae6027a5a5a7bb0e06917))
+
 ## [4.5.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.5.0...v4.5.1) (2026-01-08)
 
 
