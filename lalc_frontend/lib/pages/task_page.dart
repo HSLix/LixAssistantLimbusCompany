@@ -597,7 +597,7 @@ class _HomePageState extends State<HomePage>
                             ),
                             
                             // 为EXP、Thread和Mirror任务添加信息预览
-                            if (task == 'EXP' || task == 'Thread' || task == 'Mirror')
+                            if (task == "Daily Lunacy Purchase" || task == 'EXP' || task == 'Thread' || task == 'Mirror')
                               _buildTaskPreview(task),
                           ],
                         ),
@@ -1586,19 +1586,35 @@ class _HomePageState extends State<HomePage>
   // 构建任务预览信息
   Widget _buildTaskPreview(String taskName) {
     List<Widget> previewWidgets = [];
-    
-    // 添加执行次数
-    final currentCount = taskCounts[taskName] ?? 0;
-    previewWidgets.add(
-      Text(
-        '${S.of(context).execution_count}: $currentCount',
-        style: const TextStyle(
-          color: Colors.grey,
-          fontSize: 12,
+    // 对于Daily Lunacy Purchase任务，添加购买数量信息
+    if (taskName == 'Daily Lunacy Purchase') {
+      final purchaseCount = taskConfigs[taskName] ?? 0;
+      previewWidgets.add(
+        Text(
+          '${S.of(context).daily_lunacy_purchase}: $purchaseCount',
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+          ),
+          overflow: TextOverflow.ellipsis,
         ),
-        overflow: TextOverflow.ellipsis,
-      ),
-    );
+      );
+    }
+
+    // 添加执行次数
+    if (taskName == "EXP" || taskName == "Thread" || taskName == "Mirror") {
+      final currentCount = taskCounts[taskName] ?? 0;
+      previewWidgets.add(
+        Text(
+          '${S.of(context).execution_count}: $currentCount',
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 12,
+          ),
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+    }
     
     // 对于EXP和Thread任务，添加Luxcavation Mode和Stage信息
     if (taskName == 'EXP' || taskName == 'Thread') {
@@ -1638,7 +1654,7 @@ class _HomePageState extends State<HomePage>
       }
     }
     
-    // 对于Mirror任务，添加Stop Purchase Gift Money信息
+    // 对于Mirror任务
     if (taskName == 'Mirror') {
       final config = taskConfigs[taskName];
       if (config is Map<String, dynamic>) {
@@ -1653,50 +1669,107 @@ class _HomePageState extends State<HomePage>
             overflow: TextOverflow.ellipsis,
           ),
         );
+        
+        // 添加Mirror难度信息
+        final mirrorMode = config['mirror_mode'] ?? 'normal';
+        String localizedMirrorMode = mirrorMode == 'normal' 
+            ? S.of(context).mirror_difficulty_normal 
+            : S.of(context).mirror_difficulty_hard;
+        previewWidgets.add(
+          Text(
+            '${S.of(context).mirror_difficulty}: $localizedMirrorMode',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+        
+        // 添加是否开启饰品合成选项
+        final enableFuseEgoGifts = config['enable_fuse_ego_gifts'] ?? true;
+        previewWidgets.add(
+          Text(
+            '${S.of(context).mirror_shop_fuse_ego_gifts}: ${enableFuseEgoGifts ? 'ON' : 'OFF'}',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+        
+        // 添加是否开启技能替换&饰品购买选项
+        final enableReplaceSkillPurchaseEgoGifts = config['enable_replace_skill_purchase_ego_gifts'] ?? true;
+        previewWidgets.add(
+          Text(
+            '${S.of(context).mirror_shop_replace_skill_purchase_ego_gifts}: ${enableReplaceSkillPurchaseEgoGifts ? 'ON' : 'OFF'}',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+        
+        // 添加是否开启饰品升级选项
+        final enableEnhanceEgoGifts = config['enable_enhance_ego_gifts'] ?? true;
+        previewWidgets.add(
+          Text(
+            '${S.of(context).mirror_shop_enhance_ego_gifts}: ${enableEnhanceEgoGifts ? 'ON' : 'OFF'}',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
       }
     }
     
     // 添加队伍名称信息
-    final teams = taskTeams[taskName] ?? [];
-    if (teams.isNotEmpty) {
-      // 获取队伍名称
-      final configManager = ConfigManager();
-      List<String> teamNames = [];
-      
-      for (int teamNumber in teams) {
-        final teamIndex = teamNumber - 1; // 转换为0-based索引
-        final teamConfig = configManager.teamConfigs[teamIndex];
+    if (taskName == "EXP" || taskName == "Thread" || taskName == "Mirror") {
+      final teams = taskTeams[taskName] ?? [];
+      if (teams.isNotEmpty) {
+        // 获取队伍名称
+        final configManager = ConfigManager();
+        List<String> teamNames = [];
         
-        // 获取队伍名称，如果没有设置则使用默认名称
-        final teamName = teamConfig?.teamName.isNotEmpty == true 
-            ? teamConfig!.teamName 
-            : 'Team $teamNumber';
-            
-        teamNames.add(teamName);
+        for (int teamNumber in teams) {
+          final teamIndex = teamNumber - 1; // 转换为0-based索引
+          final teamConfig = configManager.teamConfigs[teamIndex];
+          
+          // 获取队伍名称，如果没有设置则使用默认名称
+          final teamName = teamConfig?.teamName.isNotEmpty == true 
+              ? teamConfig!.teamName 
+              : 'Team $teamNumber';
+              
+          teamNames.add(teamName);
+        }
+        
+        String teamsText = '${S.of(context).selected_teams}: ${teamNames.join(', ')}';
+        previewWidgets.add(
+          Text(
+            teamsText,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      } else {
+        previewWidgets.add(
+          const Text(
+            'Teams: None',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
       }
-      
-      String teamsText = '${S.of(context).selected_teams}: ${teamNames.join(', ')}';
-      previewWidgets.add(
-        Text(
-          teamsText,
-          style: const TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      );
-    } else {
-      previewWidgets.add(
-        const Text(
-          'Teams: None',
-          style: TextStyle(
-            color: Colors.grey,
-            fontSize: 12,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      );
     }
     
     return Padding(
