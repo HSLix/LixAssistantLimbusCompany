@@ -1111,6 +1111,11 @@ class _LogPageState extends State<LogPage> {
       // 检查解压后的目录是否包含 run.log 文件和 images 文件夹
       final runLogFile = File('${tempUnzipDir.path}/run.log');
       final imagesDir = Directory('${tempUnzipDir.path}/images');
+
+      // 如果 images 目录不存在，就新建一个
+      if (!await imagesDir.exists()) {
+        await imagesDir.create(recursive: true);
+      }
       
       if (!await runLogFile.exists() || !await imagesDir.exists()) {
         if (mounted) {
