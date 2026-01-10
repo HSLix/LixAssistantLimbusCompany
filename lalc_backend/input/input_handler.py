@@ -155,7 +155,7 @@ class _Input:
     
     def reset(self):
         """
-        重置InputHandler到初始状态，包括恢复暂停标志、清除停止标志、重新查找窗口句柄
+        重置InputHandler到初始状态，包括恢复暂停标志、清除停止标志、重新查找窗口句柄、重置任务执行次数
         """
         # 恢复到非暂停状态（即激活状态）
         self._pause_flag.set()

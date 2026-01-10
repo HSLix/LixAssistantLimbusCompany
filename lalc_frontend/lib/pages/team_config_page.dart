@@ -1236,9 +1236,9 @@ class _TeamConfigPageState extends State<TeamConfigPage>
   Widget _buildReorderableSkillList(String characterName, bool isSkillReplacementEnabled) {
     // 获取当前角色的技能顺序配置，默认为[[1,2],[2,3],[1,3]]
     List<List<int>> skillOrders = currentTeamConfig.skillReplacementOrders[characterName] ?? [
-      [1, 2],
+      [1, 3],
       [2, 3],
-      [1, 3]
+      [1, 2]
     ];
     
     return ReorderableListView(
@@ -1790,9 +1790,9 @@ class _TeamConfigPageState extends State<TeamConfigPage>
       skillReplacementOrders: {
         for (var name in sinnerNames)
           name: [
-            [1, 2],
+            [1, 3],
             [2, 3],
-            [1, 3]
+            [1, 2]
           ],
       },
       teamName: "Team ${teamIndex + 1}", // 设置默认队伍名称

@@ -144,7 +144,7 @@ class AsyncTaskPipeline:
         """
         return self._state
 
-    def refresh_target_count(self):
+    def refresh_execute_target_count(self):
         """
         根据 shared params 的内容，把几个 target count 的值给覆盖一下
         """
@@ -153,6 +153,8 @@ class AsyncTaskPipeline:
             check_task.set_param("target_count", self.shared_params[cfg_name]["check_node_target_count"])
             if check_task.get_param("target_count") == 0:
                 check_task.get_param("disable_node").enable = False
+            
+            check_task.set_param('execute_count', 0)
 
     def add_start_task(self, task_name: str):
         """
@@ -178,7 +180,7 @@ class AsyncTaskPipeline:
             self.task_stack.append((pre_task_name, do_action_func))
 
         # 刷新任务节点执行次数
-        self.refresh_target_count()
+        self.refresh_execute_target_count()
         self.logger.debug(f"添加起始任务: {task_name}")
 
     async def start(self, entry: str):
