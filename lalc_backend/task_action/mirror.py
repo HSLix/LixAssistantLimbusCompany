@@ -127,7 +127,7 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
         last_acquire_ego_gift
     ]
 
-    # 筛选出x坐标与其他点x坐标差值>=50的点，从前往后保留第一个
+    # 筛选出x坐标与其他点x坐标差值的点，从前往后保留第一个
     filtered_select_orders = []
     for point in select_orders:
         x, y = point[1], point[2]  # 假设坐标在元组的第二、三个元素
@@ -135,7 +135,7 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
         
         for existing_point in filtered_select_orders:
             existing_x = existing_point[1]
-            if abs(x - existing_x) < 50:
+            if abs(x - existing_x) < 100:
                 is_duplicate = True
                 break
         
