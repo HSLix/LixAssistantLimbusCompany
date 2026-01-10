@@ -211,8 +211,6 @@ class _Input:
         截取游戏窗口屏幕并存储在screenshot属性中。
         """
         if self._hwnd:
-            wait_input_idle()
-            
             if self.set_focus():
                 self.refresh_window_state()
                 # 只在当前窗口大小与默认大小不同时才设置窗口大小
@@ -222,6 +220,7 @@ class _Input:
             mouse_in_window, mouse_x, mouse_y = is_mouse_in_window(self._hwnd)
             if reset and mouse_in_window:
                 logger.debug("检测到鼠标在游戏窗口内，尝试暂时移开鼠标")
+                wait_input_idle(idle_time=0.1)
                 move_mouse_to_top_right_corner(self._hwnd)
             
             # 只在当前窗口大小与默认大小不同时才设置窗口大小

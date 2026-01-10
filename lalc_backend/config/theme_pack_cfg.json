@@ -140,6 +140,9 @@
   "Yield My Flesh to Claim Their Bones": {
     "weight": 5
   },
+  "Abnormal Seismi Zone": {
+    "weight": 10
+  },
   "Crushing External Force": {
     "weight": 10
   },
@@ -149,10 +152,31 @@
   "Dizzying Waves": {
     "weight": 10
   },
+  "Excessive Gluttong": {
+    "weight": 10
+  },
   "Line1": {
     "weight": 10
   },
+  "Miracle in District 20 BokGak": {
+    "weight": 10
+  },
   "Season of the Flame": {
+    "weight": 10
+  },
+  "Sinking Pang": {
+    "weight": 10
+  },
+  "Tangling Lust": {
+    "weight": 10
+  },
+  "The Evil Defining": {
+    "weight": 10
+  },
+  "The Infinite Procession": {
+    "weight": 10
+  },
+  "Tyrannical Pride": {
     "weight": 10
   },
   "Unrelenting Might": {

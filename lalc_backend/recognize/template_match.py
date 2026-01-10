@@ -151,7 +151,7 @@ if __name__ == "__main__":
     try:
         templates = []
         screenshot = input_handler.capture_screenshot()
-        screenshot = mask_screenshot(screenshot, 140, 270, 150, 150)
+        # screenshot = mask_screenshot(screenshot, 140, 270, 150, 150)
         register_images_from_directory()
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
       
@@ -169,7 +169,8 @@ if __name__ == "__main__":
         # templates.append(get_image("Bloodflame Sword"))
         # templates.append(get_image("Perversion"))
 
-        templates.append(get_image("empty_fuse_gift_place"))
+        templates.append(get_image("mirror_theme_pack_new"))
+        templates.append(get_image("theme_pack_detail"))
 
         # templates.append(get_image("Dark Vestige"))
         # templates.append(get_image("Faint Vestige"))

@@ -28,9 +28,10 @@ def exec_mirror_defeat(self, node:TaskNode, func):
 @TaskExecution.register("mirror_victory")
 def exec_mirror_victory(self, node:TaskNode, func):
     logger.log("处理镜牢胜利结算", input_handler.capture_screenshot())
-    cfg = self._get_using_cfg("other_task")
-    test_mode = cfg["test_mode"]
-    if not test_mode:
+    mirror_cfg = self._get_using_cfg("mirror")
+    accept_reward = mirror_cfg["accept_reward"]
+
+    if accept_reward:
         for _ in range(4):
             input_handler.key_press("enter")
             time.sleep(1)
@@ -125,13 +126,29 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
         *acquire_with_owned,
         last_acquire_ego_gift
     ]
-    logger.debug(f"selected_orders:{select_orders}; prefer_gift_without_owned: {prefer_gift_without_owned}; acquire_without_owned:{acquire_without_owned}; acquire_with_owned:{acquire_with_owned}; last_acquire_ego_gift:{last_acquire_ego_gift};")
 
-    for choice in select_orders[::-1]:
-        input_handler.click(choice[1], choice[2])
+    # 筛选出x坐标与其他点x坐标差值>=50的点，从前往后保留第一个
+    filtered_select_orders = []
+    for point in select_orders:
+        x, y = point[1], point[2]  # 假设坐标在元组的第二、三个元素
+        is_duplicate = False
+        
+        for existing_point in filtered_select_orders:
+            existing_x = existing_point[1]
+            if abs(x - existing_x) < 50:
+                is_duplicate = True
+                break
+        
+        if not is_duplicate:
+            filtered_select_orders.append(point)
+
+    logger.debug(f"selected_orders:{select_orders}; filtered_select_orders:{filtered_select_orders}; prefer_gift_without_owned: {prefer_gift_without_owned}; acquire_without_owned:{acquire_without_owned}; acquire_with_owned:{acquire_with_owned}; last_acquire_ego_gift:{last_acquire_ego_gift};")
+    
+    for choice in filtered_select_orders[::-1]:
+        input_handler.click(choice[1], choice[2]+20)
         time.sleep(0.5)
 
-    input_handler.key_press("enter")
+    input_handler.click(1130, 580)
     self.exec_wait_disappear(get_task("wait_connecting_disappear"))
 
 
@@ -336,7 +353,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
     max_ego_gifts_radio = get_max_radio_of_ego_gifts()
     logger.debug(f"本次倾向购买饰品名单：{prefer_gifts}")
 
-    def exec_replace_skill():
+    def exec_replace_skill() -> bool:
+        replaced = False
         name_of_who_can_replace = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[535, 320, 165, 50])
         if len(name_of_who_can_replace) > 0:
             name_of_who_can_replace = name_of_who_can_replace[0]
@@ -361,9 +379,11 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                 input_handler.click(790, 535)
                 time.sleep(0.5)
                 input_handler.click(790, 535)
+                replaced = True
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
         else:
             logger.log("替换技能名字识别异常，跳过技能替换部分", level="WARNING")
+        return replaced
     
     def exec_purchase_ego_gifts():
         gifts = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[535, 325, 650, 50])
@@ -414,7 +434,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
         logger.log("开始一轮技能替换&饰品购买", tmp_screenshot)
         is_replace_skill_sold_out = len(recognize_handler.template_match(tmp_screenshot, "shop_purchased", mask=[550, 200, 140, 50])) > 0
         if not is_replace_skill_sold_out:
-            exec_replace_skill()
+            if exec_replace_skill():
+                continue
 
         can_purchase = exec_purchase_ego_gifts()
        
@@ -641,8 +662,6 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
 @TaskExecution.register("mirror_select_theme_pack")
 def exec_mirror_theme_pack(self, node: TaskNode, func):
     logger.log("选择镜牢主题包", input_handler.capture_screenshot())
-    cfg = self._get_using_cfg("other_task")
-    test_mode = cfg["test_mode"]
 
     res_name = ""
     res_pos = None
@@ -652,9 +671,8 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
     stop = False
     refresh = False
     while not stop:
-        if test_mode:
-            # 实验模式下为识别并命名主题包
-            detect_and_save_theme_pack(input_handler.capture_screenshot()) 
+        # 识别并命名主题包
+        detect_and_save_theme_pack(input_handler.capture_screenshot()) 
         
         tmp_screenshot = input_handler.capture_screenshot()
 
@@ -675,6 +693,13 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
                 logger.log("现需要刷取困难镜牢，检测到镜牢开启普通模式，正在关闭")
                 time.sleep(5)
                 continue
+
+        theme_pack_new = recognize_handler.template_match(tmp_screenshot, "mirror_theme_pack_new")
+        if len(theme_pack_new) > 0:
+            logger.log("检测到未探索的卡包，优先探索")
+            res_pos = theme_pack_new
+            res_name = "New Theme Pack's Name"
+            break
         
         for theme_pack_name, val in theme_packs:
             cur_weight = val["weight"]
@@ -708,7 +733,11 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
         logger.log("主题包检测异常，已有模板匹配失败，且随机选择也失败了，这里跳过选择", level="ERROR")
         return
     
-    logger.log(f"最后选择到了卡包：{res_name}, 对应权重：{theme_pack_cfg[res_name]['weight']}", input_handler.capture_screenshot())
+    if res_name in theme_pack_cfg:
+        logger.log(f"最后选择到了卡包：{res_name}, 对应权重：{theme_pack_cfg[res_name]['weight']}", input_handler.capture_screenshot())
+    else:
+        logger.log(f"最后选择到了卡包：{res_name}, 但本次执行中未找到，临时赋予权重：-999, 下次执行将自动进入配置", input_handler.capture_screenshot())
+    
     input_handler.swipe(res_pos[0][0], res_pos[0][1], res_pos[0][0], res_pos[0][1]+400)
 
 

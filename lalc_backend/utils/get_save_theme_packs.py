@@ -40,6 +40,8 @@ def detect_and_save_theme_pack(pil_img):
       6. 画框+最终展示
     :return [(主题包名, 主题包中心横坐标, 主题包中心纵坐标)]
     """
+    get_new_theme_pack = False
+    logger.log("识别并保存未存储的主题包（非 new，new 的卡包不会显示真正包", pil_img)
 
     # ---- 1. 模板匹配检测 ----
     matches = recognize_handler.template_match(pil_img, "theme_pack_detail")
@@ -70,8 +72,29 @@ def detect_and_save_theme_pack(pil_img):
 
     existed_theme_packs = get_images_by_tag("theme_packs")
 
-    max_theme_pack_radio = get_max_radio_of_theme_packs()
+    # max_theme_pack_radio = get_max_radio_of_theme_packs()
     
+    # 没有进入过的主题包，不能留档，等探索后再留
+    theme_pack_new = recognize_handler.template_match(pil_img, "mirror_theme_pack_new")
+
+    # 过滤matches，移除与theme_pack_new位置相近的项
+    filtered_matches = []
+    for match in matches:
+        mx, my = match[0], match[1]
+        
+        # 检查是否有theme_pack_new在其x坐标-180范围内（同时考虑y坐标的接近性）
+        skip_match = False
+        for new_x, new_y, _ in theme_pack_new:
+            if mx - new_x <= 180 and abs(my - new_y) <= 50:  # 添加y坐标检查，避免垂直方向差异过大
+                logger.debug(f"检测到 new 标记，剔除主题包位置 ({mx}, {my}) 不做图片保存记录")
+                skip_match = True
+                break
+        
+        if not skip_match:
+            filtered_matches.append(match)
+    
+    matches = filtered_matches
+
     # 遍历所有匹配项
     for idx, match in enumerate(matches):
         cx, cy = match[0], match[1]
@@ -120,9 +143,9 @@ def detect_and_save_theme_pack(pil_img):
         existing_names = [name for name, _ in existing_theme_packs]
         
         # 如果processed_name已经存在于现有图像名称中，则跳过保存
-        tmp = difflib.get_close_matches(processed_name, existing_names, cutoff=0.7)
+        tmp = difflib.get_close_matches(processed_name, existing_names, cutoff=0.9)
         if len(tmp) > 0:
-            logger.log(f"图片名字 {processed_name}.png 已存在，跳过保存")
+            logger.debug(f"图片名字 {processed_name}.png 已存在，跳过保存")
             continue
 
         # 从图片上检查是否有重合的
@@ -131,7 +154,7 @@ def detect_and_save_theme_pack(pil_img):
         for theme_pack in existed_theme_packs:
             if recognize_handler.template_match(cropped, theme_pack[0]):
                 existed_flag = True
-                logger.log(f"新检测的卡包 {processed_name} 与已有卡包 {theme_pack[0]} 图片相似，跳过保存")
+                logger.debug(f"新检测的卡包 {processed_name} 与已有卡包 {theme_pack[0]} 图片相似，跳过保存")
                 break
         
         if existed_flag:
@@ -140,10 +163,9 @@ def detect_and_save_theme_pack(pil_img):
         filename = os.path.join(save_dir, f"{processed_name}.png")
         cropped.save(filename)
 
-        register_images_from_directory()
-
+        get_new_theme_pack = True
         logger.log(f"已保存新主题包: {filename}")
-
+        
         # ⑥ 在原图画框
         # draw.rectangle((x1, y1, x2, y2), outline="red", width=3)
         # input_handler.key_press("esc")
@@ -151,6 +173,10 @@ def detect_and_save_theme_pack(pil_img):
 
     # ---- 5. 显示最终图像 ----
     # pil_img.show()
+
+    if get_new_theme_pack:
+        register_images_from_directory()
+
     return processed_theme_packs
 
 if __name__ == "__main__":
