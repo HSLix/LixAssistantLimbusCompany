@@ -18,7 +18,7 @@ body:
     id: describe
     attributes:
       label: 问题描述 | Bug Description
-      description: 请尽可能详细描述你的问题，越详细修复得很可能越快 | Please describe your problem as detailed as possible, the more detailed the description, the faster it might get fixed.
+      description: 请尽可能详细描述你的问题，尤其是问题发生的大致时间，越详细修复得很可能越快 | Please describe your problem as detailed as possible, especially the time when it occurred. The more detailed it is, the faster it is likely to be fixed
     validations:
       required: true
   - type: textarea
@@ -39,7 +39,7 @@ body:
     id: screenshots
     attributes:
       label: 录屏/截图 | Record Video/Screenshot
-      description: 上传你发生此问题时的录屏/截图 | Upload the video/screenshot when encountering this bug
+      description: 上传你发生此问题时的录屏/截图，可以在日志页找到 | Upload the video/screenshot when encountering this bug
     validations:
       required: false
   - type: textarea
