@@ -609,7 +609,7 @@ class WebSocketManager with ChangeNotifier {
   // 发送心跳
   void _sendHeartbeat() {
     _heartbeatTimeoutTimer?.cancel();
-    _heartbeatTimeoutTimer = Timer(const Duration(seconds: 5), () {
+    _heartbeatTimeoutTimer = Timer(const Duration(seconds: 20), () {
       debugPrint('心跳超时，连接可能已断开');
       _addLogMessage('心跳超时，连接可能已断开');
       _isConnected = false;

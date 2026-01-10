@@ -156,6 +156,10 @@ class _HomePageState extends State<HomePage>
         webSocketManager.initialize();
       }
     });
+
+
+    String currentVersion = const String.fromEnvironment('CURRENT_VERSION', defaultValue: 'V0.0.0');
+    logger.d("当前版本：$currentVersion");
   }
   
   // 获取GitHub最新的Release信息
@@ -362,14 +366,11 @@ class _HomePageState extends State<HomePage>
           // 为镜像迷宫任务初始化mirror_mode参数，如果不存在的话
           if (taskName == 'Mirror' && !taskConfigs[taskName].containsKey('mirror_mode')) {
             taskConfigs[taskName]['mirror_mode'] = 'normal'; // 默认为普通难度（单值）
-          } else if (taskName == 'Mirror' && taskConfigs[taskName]['mirror_mode'] is List) {
-            // 如果是旧的列表格式，转换为字符串格式
-            List modeList = taskConfigs[taskName]['mirror_mode'];
-            if (modeList.contains('normal')) {
-              taskConfigs[taskName]['mirror_mode'] = 'normal';
-            } else {
-              taskConfigs[taskName]['mirror_mode'] = modeList.first as String;
-            }
+          } 
+          
+          // 为镜像迷宫任务初始化accept_reward参数，如果不存在的话
+          if (taskName == 'Mirror' && !taskConfigs[taskName].containsKey('accept_reward')) {
+            taskConfigs[taskName]['accept_reward'] = true; // 默认开启
           }
         }
         taskTeams[taskName] = List<int>.from(configManager.taskConfigs[taskName]!.teams);
@@ -427,6 +428,12 @@ class _HomePageState extends State<HomePage>
               params['mirror_mode'] = modeList.first as String;
             }
           }
+          
+          // 为镜像迷宫任务初始化accept_reward参数，如果不存在的话
+          if (taskName == 'Mirror' && !params.containsKey('accept_reward')) {
+            params['accept_reward'] = true; // 默认开启
+          }
+          
           configManager.taskConfigs[taskName] = TaskConfig(
             enabled: taskEnabled[i],
             count: taskCounts[taskName] ?? 1,
@@ -1296,6 +1303,24 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
+        
+        // 接受结算奖励
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(S.of(context).mirror_accept_reward, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            Switch(
+              value: taskConfigs['Mirror']['accept_reward'] ?? true,
+              onChanged: (bool value) {
+                setState(() {
+                  taskConfigs['Mirror']['accept_reward'] = value;
+                  // 保存配置
+                  _saveConfigToManager();
+                });
+              },
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -1717,6 +1742,19 @@ class _HomePageState extends State<HomePage>
         previewWidgets.add(
           Text(
             '${S.of(context).mirror_shop_enhance_ego_gifts}: ${enableEnhanceEgoGifts ? 'ON' : 'OFF'}',
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+        
+        // 添加是否开启接受结算奖励选项
+        final acceptReward = config['accept_reward'] ?? true;
+        previewWidgets.add(
+          Text(
+            '${S.of(context).mirror_accept_reward}: ${acceptReward ? 'ON' : 'OFF'}',
             style: const TextStyle(
               color: Colors.grey,
               fontSize: 12,

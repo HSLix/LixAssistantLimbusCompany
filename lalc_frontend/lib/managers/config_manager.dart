@@ -454,6 +454,7 @@ class ConfigManager {
           'enable_fuse_ego_gifts': true,
           'enable_replace_skill_purchase_ego_gifts': true,
           'enable_enhance_ego_gifts': true,
+          'accept_reward': true,
         },
         teams: [],
       ),

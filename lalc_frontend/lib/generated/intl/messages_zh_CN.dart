@@ -164,6 +164,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "member": MessageLookupByLibrary.simpleMessage("成员"),
     "member_count_label": MessageLookupByLibrary.simpleMessage("   成员: "),
     "mirror": MessageLookupByLibrary.simpleMessage("镜像迷宫"),
+    "mirror_accept_reward": MessageLookupByLibrary.simpleMessage("接受结算奖励"),
     "mirror_battle_fail_handle": MessageLookupByLibrary.simpleMessage(
       "镜像迷宫战斗失败处理",
     ),

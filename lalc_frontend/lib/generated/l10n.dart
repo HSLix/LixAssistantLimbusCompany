@@ -1824,6 +1824,16 @@ class S {
     );
   }
 
+  /// `Accept Reward`
+  String get mirror_accept_reward {
+    return Intl.message(
+      'Accept Reward',
+      name: 'mirror_accept_reward',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `Selected Teams`
   String get selected_teams {
     return Intl.message(
