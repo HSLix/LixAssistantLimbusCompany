@@ -16,13 +16,15 @@
             "post_delay": 6
         },
         "next":[
-            "main_circle_center"
+            "main_circle_center",
+            "touch_to_start"
         ]
     },
     "back_to_init_page":{
         "action":"back_to_init_page",
         "next":[
             "main_circle_center",
+            "touch_to_start",
             "back_to_init_page"
         ]
     },

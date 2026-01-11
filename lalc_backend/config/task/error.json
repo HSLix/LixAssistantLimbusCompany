@@ -6,7 +6,8 @@
             "error_server_is_under_sceduled_maintenance",
             "error_cannot_operate_the_game",
             "error_download_data",
-            "error_new_download_added"
+            "error_new_download_added",
+            "error_network_is_unstable"
         ]
     },  
     "error_weekly_record_has_been_reset":{
@@ -101,5 +102,13 @@
         "next":[
             "wait_connecting_disappear"
         ]
+    },
+    "error_network_is_unstable": {
+        "desc" : "应对网络不稳定，重启",
+        "recognition" : "template_match",
+        "action":"error_cannot_operate_the_game",
+        "params":{
+            "template":"network_is_unstable"
+        }
     }
 }

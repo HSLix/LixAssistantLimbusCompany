@@ -130,13 +130,13 @@ class ServerController:
 
     async def _heartbeat_checker(self, ws: websockets.WebSocketServerProtocol):
         """
-        每 3 秒检查一次：如果最后一次心跳超过 3 秒就踢人
+        检查心跳间隔时间超过阈值就踢人
         """
         try:
             while ws in self.clients:          # 只要还在集合里就持续检查
                 now = asyncio.get_event_loop().time()
                 last = self._last_pong.get(ws, now)
-                if now - last > 3:
+                if now - last > 10:
                     await self._kick_client(ws)
                     break                      # 已经踢掉，结束协程
                 await asyncio.sleep(0.5)       # 每 0.5 秒扫描一次，精度足够
@@ -147,7 +147,7 @@ class ServerController:
 
     def _reset_heartbeat(self, ws: websockets.WebSocketServerProtocol):
         """
-        收到心跳时重置时间，并重新调度 3 秒定时器
+        收到心跳时重置时间，并重新调度定时器
         """
         now = asyncio.get_event_loop().time()
         self._last_pong[ws] = now
@@ -155,7 +155,7 @@ class ServerController:
         old_task = self._ping_tasks.pop(ws, None)
         if old_task and not old_task.done():
             old_task.cancel()
-        # 新建 3 秒定时器
+        # 新建定时器
         self._ping_tasks[ws] = asyncio.create_task(self._heartbeat_checker(ws))
 
     # ---------- 工具 ----------
@@ -1025,7 +1025,7 @@ class ServerController:
 
                 # 心跳
                 if data.get("type") == "heartbeat":
-                    self._reset_heartbeat(ws)          # 重置 3 秒定时器
+                    self._reset_heartbeat(ws)     
                     await self.send_json(ws, {"type": "heartbeat_ack"})
                     continue
 

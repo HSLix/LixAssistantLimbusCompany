@@ -17,6 +17,12 @@
 ![platform](https://img.shields.io/badge/platform-Windows-purple)
 ![license](https://img.shields.io/badge/license-AGPL3.0-orange)
 
+[![mirrorc](https://img.shields.io/badge/Mirror%E9%85%B1-%239af3f6?logo=countingworkspro&logoColor=4f46e5)](https://mirrorchyan.com/zh/projects?rid=LALC&channel=stable)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/HSLix/LixAssistantLimbusCompany)
+
+
+🌟喜欢本项目就在[仓库](https://github.com/HSLix/LixAssistantLimbusCompany)右上角点个星星吧🌟
+
 [**简体中文**](https://github.com/HSLix/LixAssistantLimbusCompany/blob/master/README.md) | [English(translated by google)](https://github-com.translate.goog/HSLix/LixAssistantLimbusCompany/blob/master/README.md?_x_tr_sl=auto&_x_tr_tl=en&_x_tr_hl=zh-CN&_x_tr_pto=wapp)
           
 
@@ -24,7 +30,7 @@
 
 - 是月计次世代 ~~大嘘~~ 手游(Steam?) LimbusCompany 的助手
 
-- GitHub现存**维护时间最长**的 Limbus 长草项目（之一）历史**悠久**（2023.07.10-?）
+- GitHub 现存**维护时间最长**的 Limbus 长草项目（之一）历史**悠久**（2023.07.10-?）
 
 - 从思想上，拜师 [MaaFramework](https://github.com/MaaXYZ/MaaFramework)，算 Maa 的不记名弟子吧
 
@@ -34,7 +40,7 @@
 - [LixAssistantLimbusCompany](#lixassistantlimbuscompany)
   - [声明](#声明)
   - [实用功能和亮点](#实用功能和亮点)
-  - [下载方式](#下载方式)
+  - [下载指引](#下载指引)
   - [使用说明](#使用说明)
   - [图示样例](#图示样例)
   - [视频教程](#视频教程)
@@ -53,24 +59,25 @@
 
 ## 实用功能和亮点
 
-- 只要下载**一次**，后续的更新都可在软件内完成
-- 支持**全自动**刷取 **经验本** EXP，**纽本** Thread， **镜牢** Mirror
-- 支持**队伍轮换**与队伍**流派选择**
-- 支持**饰品**黑名单和白名单
-- 支持**脑啡肽**的自动购买和转换
-- 自带详情**日志**记录，轻松查看具体执行过程
-- 支持**自定义任务**，具体可查看[指导说明](./doc/CONTRIBUTING.md)
-- 支持**自定义主题卡包权重**
+- 只要下载 **一次**，后续的更新都可在软件内完成
+- 支持 **全自动** 刷取 **经验本** EXP，**纽本** Thread， **镜牢** Mirror（普通和困难）
+- 支持 **半自动** 辅助按 p 战斗
+- 支持 **队伍轮换**（完成任务后自动调整设置，无需多次编辑） 与队伍 **流派选择**（多流派支持）
+- 支持 **饰品** 黑名单和白名单
+- 支持 **脑啡肽** 的自动购买和转换
+- 自带详情 **日志** 记录，轻松查看具体执行过程
+- 支持 **自定义任务**，具体可查看[指导说明](./doc/CONTRIBUTING.md)
+- 支持通过图像界面轻松 **自定义主题卡包权重**
 - **解压即用**，不用辛苦配置环境
 - 所见即所得，lim（x->∞）零成本入门使用 
 
 
-## 首次下载方式
+## 下载指引
 - MirrorChan 渠道（推荐，真的很快）：点击 [MirrorChan 项目选择](https://mirrorchyan.com/zh/projects?rid=LALC&channel=stable)，输入 CDK 并开始下载。
 
 - GitHub 渠道：点击 [最新版本](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest) 并下载最新版中叫 LALC.zip 的，解压后运行 `LixAssistantLimbusCompany.exe` 即可。
 
-- 如果是第一次安装电脑软件，可以看看 [堂吉诃德都能学会的安装指引](./doc/download_guide.md)
+- 无论是否 **第一次** 安装，都可以看看 [堂吉诃德都能学会的安装指引](/doc/download_guide.md)
 
 ---
 ## 使用说明
@@ -111,7 +118,7 @@
 
 1. 首先，LALC 的下载与使用完全免费，所以不必付费；
 
-2. 其次，金钱来之不易，而且作者并不急需打赏，作者更希望看到您能帮忙给本项目点个 Star，这对本项目已经是大力支持了！！！
+2. 其次，金钱来之不易，而且作者并不急需打赏，作者更希望看到您能帮忙给本项目点个 🌟星星(Star)🌟，这对本项目已经是大力支持了！！！
 
 3. 最后，这笔钱您还能有很多其他用处，买个香喷喷的大肉包犒劳自己的胃，买朵鲜花献于自己心爱之人，或者买下84本赛季通行证也不错；
 

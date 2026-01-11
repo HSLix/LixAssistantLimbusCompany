@@ -363,8 +363,13 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
             need_to_replace_skill = cfg["mirror_replace_skill"][cfg_index]
             skill_order = None
             for name in need_to_replace_skill.keys():
-                if name in name_of_who_can_replace[0]:
-                    logger.log(f"检测到罪人{name}可以且应该做技能替换")
+                print(name)
+                if name == "Ryoshu":
+                    check_name = "Ry"
+                else:
+                    check_name = name
+                if check_name in name_of_who_can_replace[0]:
+                    logger.log(f"检测到罪人{name}可以且应该做技能替换, 匹配值{check_name}")
                     input_handler.click(name_of_who_can_replace[1], name_of_who_can_replace[2]-80)
                     skill_order = need_to_replace_skill[name][::-1]
                     time.sleep(1)
@@ -703,7 +708,7 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
         
         for theme_pack_name, val in theme_packs:
             cur_weight = val["weight"]
-            tmp = recognize_handler.template_match(tmp_screenshot, theme_pack_name)
+            tmp = recognize_handler.template_match(tmp_screenshot, theme_pack_name, mask_template=[20, 20, 130, 290])
             if len(tmp) > 0:
                 logger.log(f"检测到卡包 {theme_pack_name},权重：{cur_weight}")
                 if not res_pos or cur_weight > theme_pack_cfg[res_name]["weight"]:
