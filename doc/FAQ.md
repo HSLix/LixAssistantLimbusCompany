@@ -37,4 +37,4 @@
 
 ### 12. 程序启动报错 Dll load Failed，就像 [Issue #240](https://github.com/HSLix/LixAssistantLimbusCompany/issues/240) 一样
 这是由于你的计算机上缺乏一些必要的运行组件，可以通过从 [微软的官网](https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-170) 按照自己的平台，下载对应的包进行安装。
-> https://github.com/microsoft/onnxruntime/issues/16116#issuecomment-1768732885
+> https://github.com/HSLix/LixAssistantLimbusCompany/issues/240#issuecomment-3733556365

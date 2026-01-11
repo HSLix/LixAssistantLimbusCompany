@@ -42,6 +42,8 @@ class ServerController:
         self._download_task: Optional[asyncio.Task] = None   # 当前下载任务
         self._download_future: Optional[asyncio.Future] = None  # 下载结果 future
         self.loop = None
+        self._last_pong: Dict[websockets.WebSocketServerProtocol, float] = {}
+        self._ping_tasks: Dict[websockets.WebSocketServerProtocol, asyncio.Task] = {}
 
     def _on_pipeline_error(self, error_msg: str, traceback_str: str):
         """
@@ -101,6 +103,60 @@ class ServerController:
                 "message": msg
             }
         })
+
+    # ---------- 心跳相关 ----------
+    async def _kick_client(self, ws: websockets.WebSocketServerProtocol):
+        """
+        真正执行踢人：关闭连接、清理资源、广播
+        """
+        addr = ws.remote_address
+        self.lalc_logger.debug(f"心跳超时，踢掉客户端 {addr}")
+        # 1. 关闭 TCP 连接
+        await ws.close(code=1000, reason="heartbeat timeout")
+        # 2. 清理数据结构
+        self.clients.discard(ws)
+        self._last_pong.pop(ws, None)
+        task = self._ping_tasks.pop(ws, None)
+        if task and not task.done():
+            task.cancel()
+        # 3. 广播断连信息
+        await self.broadcast({
+            "type": "client_timeout",
+            "payload": {
+                "address": str(addr),
+                "message": "client heartbeat timeout"
+            }
+        })
+
+    async def _heartbeat_checker(self, ws: websockets.WebSocketServerProtocol):
+        """
+        每 3 秒检查一次：如果最后一次心跳超过 3 秒就踢人
+        """
+        try:
+            while ws in self.clients:          # 只要还在集合里就持续检查
+                now = asyncio.get_event_loop().time()
+                last = self._last_pong.get(ws, now)
+                if now - last > 3:
+                    await self._kick_client(ws)
+                    break                      # 已经踢掉，结束协程
+                await asyncio.sleep(0.5)       # 每 0.5 秒扫描一次，精度足够
+        except asyncio.CancelledError:
+            raise                            # 允许取消
+        except Exception as e:
+            self.lalc_logger.debug(f"心跳检查协程异常 {e}", level="ERROR")
+
+    def _reset_heartbeat(self, ws: websockets.WebSocketServerProtocol):
+        """
+        收到心跳时重置时间，并重新调度 3 秒定时器
+        """
+        now = asyncio.get_event_loop().time()
+        self._last_pong[ws] = now
+        # 如果已存在旧定时器，先取消
+        old_task = self._ping_tasks.pop(ws, None)
+        if old_task and not old_task.done():
+            old_task.cancel()
+        # 新建 3 秒定时器
+        self._ping_tasks[ws] = asyncio.create_task(self._heartbeat_checker(ws))
 
     # ---------- 工具 ----------
     async def send_json(self, ws, data: dict):
@@ -953,6 +1009,8 @@ class ServerController:
     async def client_handler(self, ws):
         self.clients.add(ws)
         self.lalc_logger.debug(f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}")
+        # 初始化心跳
+        self._reset_heartbeat(ws)
         await self.send_json(ws, {"type": "response", "id": "12138", "payload": {"status": "success", "message": "connection confirm"}})
         # await self.send_json(ws, {"type": "error", "id": "12139", "payload": {"status": "fail", "message": "test error type"}})
 
@@ -967,6 +1025,7 @@ class ServerController:
 
                 # 心跳
                 if data.get("type") == "heartbeat":
+                    self._reset_heartbeat(ws)          # 重置 3 秒定时器
                     await self.send_json(ws, {"type": "heartbeat_ack"})
                     continue
 
@@ -992,6 +1051,11 @@ class ServerController:
             await self.send_json(ws, {"type": "error", "payload": str(e)})
         finally:
             self.clients.discard(ws)
+            # 清理心跳相关资源
+            self._last_pong.pop(ws, None)
+            task = self._ping_tasks.pop(ws, None)
+            if task and not task.done():
+                task.cancel()
             self.lalc_logger.debug(f"客户端移除 {ws.remote_address} 剩余 {len(self.clients)}")
             
             # 如果没有客户端连接了，记录断开时间

@@ -35,14 +35,15 @@ class ImageRecognizer:
             raise Exception(f"图片初始化异常：{e}")
         
 
-    def template_match(self, screenshot:Image.Image, template:str, threshold=0.8, visualize=False, grayscale=True, mask=None, screenshot_scale=1):
+    def template_match(self, screenshot:Image.Image, template:str, threshold=0.8, visualize=False, grayscale=True, mask=None, mask_template=None, screenshot_scale=1):
         """
         模板匹配
         :param screenshot: PIL图像对象，来自game_input.screenshot
         :param template: 模板图像名字（无后缀）
         :param threshold: 匹配阈值
         :param visualize: 是否可视化匹配结果
-        :param mask: 对图片掩码/裁剪
+        :param mask: 对目标图片掩码/裁剪
+        :param mask_template: 对模板图片掩码/裁剪
         :param screenshot_scale: 对目标图片的缩放倍率
         :return: 匹配结果列表，每个元素包含(中心x坐标, 中心y坐标, 匹配分数)
         """
@@ -50,13 +51,15 @@ class ImageRecognizer:
             mask = [0, 0, input_handler.width, input_handler.height]
         template_name = template 
         template = get_image(template)
+        if not mask_template is None:
+            template = mask_screenshot(template, *mask_template)
         screenshot = mask_screenshot(screenshot, *mask)
         tmp = template_match(screenshot, template, threshold, visualize, grayscale, screenshot_scale)
         res = []
         for i in tmp:
             res.append((i[0]+mask[0], i[1]+mask[1], i[2]))
         log_pic = None if len(res) == 0 else screenshot
-        logger.debug(f"执行模板匹配，模板{template_name}, 对目标图片做截取{mask}，匹配结果：{res}", log_pic)
+        logger.debug(f"执行模板匹配，模板{template_name}, 对目标图片做截取{mask}, 对模板图片做截取{mask_template}, 匹配结果: {res}", log_pic)
         return res
     
 
@@ -67,7 +70,7 @@ class ImageRecognizer:
         :param template: 模板图像名字（无后缀）
         :param threshold: 匹配阈值
         :param visualize: 是否可视化匹配结果
-        :param mask: 对图片掩码/裁剪
+        :param mask: 对目标图片掩码/裁剪
         :param screenshot_scale: 对目标图片的缩放倍率
         :return: 匹配结果列表，每个元素包含(中心x坐标, 中心y坐标, 匹配分数)
         """
@@ -158,7 +161,7 @@ class ImageRecognizer:
         :param threshold: 亮度阈值，高于此值的区域被认为是"亮"的方框
         :param visualize: 是否可视化匹配结果
         :param grayscale: 是否将图像转换为灰度图
-        :param mask: 对图片掩码/裁剪
+        :param mask: 对目标图片掩码/裁剪
         :param screenshot_scale: 对目标图片的缩放倍率
         :param box_width: 检测窗口的宽度（像素）
         :param box_height: 检测窗口的高度（像素）

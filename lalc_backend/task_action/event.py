@@ -7,7 +7,7 @@ def exec_event_pass_check(self, node:TaskNode, func):
     logger.log("事件判定检查", tmp_screenshot)
     recognized = False
     for s in ["very_high", "high", "normal", "low", "very_low"]:
-        res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s, 0.82)
+        res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s, mask=[20, 590, 950, 60])
         if len(res) > 0:
             recognized = True
             input_handler.click(res[0][0], res[0][1])

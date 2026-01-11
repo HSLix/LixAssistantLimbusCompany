@@ -102,7 +102,7 @@
     },
     "mirror_circle_center":{
         "desc":"镜牢初始化后，到结算的中间过程汇总，由于模块不多，也没有很严格的流程，所以直接死循环处理",
-        "action":"wait_connecting_disappear",
+        "action":"error_handler",
         "next":[
             "mirror_ego_gift_get",
             "mirror_select_theme_pack",

@@ -222,6 +222,7 @@ class _Input:
                 logger.debug("检测到鼠标在游戏窗口内，尝试暂时移开鼠标")
                 wait_input_idle(idle_time=0.1)
                 move_mouse_to_top_right_corner(self._hwnd)
+                time.sleep(0.5)# 让鼠标移走后的动画加载完
             
             # 只在当前窗口大小与默认大小不同时才设置窗口大小
             if self._width != DEFAULT_WINDOW_WIDTH or self._height != DEFAULT_WINDOW_HEIGHT:

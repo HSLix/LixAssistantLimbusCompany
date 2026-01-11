@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:mutex/mutex.dart';   // ① 换新库
 import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
+import 'package:path/path.dart' as path; // 添加path库导入
 
 class WebSocketManager with ChangeNotifier {
   static final WebSocketManager _instance = WebSocketManager._internal();
@@ -599,7 +600,7 @@ class WebSocketManager with ChangeNotifier {
   // 启动心跳机制
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_isConnected) {
         _sendHeartbeat();
       }
@@ -630,16 +631,19 @@ class WebSocketManager with ChangeNotifier {
   }
 
   // 发送配置
-  void sendConfigurations([void Function()? onComplete]) {
+  Future<void> sendConfigurations([void Function()? onComplete]) async {
     if (!_isConnected) {
       debugPrint('WebSocket未连接，无法发送配置');
       _addLogMessage('WebSocket未连接，无法发送配置');
       return;
     }
 
-    final configManager = ConfigManager();
+    // 首先获取最新的主题包配置
+    await syncThemePackConfig();
     
-    // 构建包含所有配置的数据结构
+    final configManager = ConfigManager();
+
+      // 构建包含所有配置的数据结构
     final configData = {
       'type': 'configurations',
       'payload': {
@@ -649,12 +653,60 @@ class WebSocketManager with ChangeNotifier {
       }
     };
 
-    // 发送配置数据
-    _sendMessage(configData);
-    _addLogMessage('已发送配置数据');
-    
-    // 执行完成回调
-    onComplete?.call();
+      // 发送配置数据
+      _sendMessage(configData);
+      _addLogMessage('已发送配置数据');
+      
+      // 执行完成回调
+      onComplete?.call();
+  }
+
+  // 同步主题包配置
+  Future<void> syncThemePackConfig() async {
+    // 尝试获取图片地址以同步主题包配置
+    try {
+      final address = await getImgAddress();
+      if (address != null) {
+        // 如果获取到了地址，我们可以利用它来同步主题包配置
+        // 这里模拟ThemePackPage的配置同步逻辑
+        final configManager = ConfigManager();
+        final themePacksDir = Directory('$address/theme_packs');
+        
+        if (await themePacksDir.exists()) {
+          final pngFiles = <String>[];
+          await for (final entity in themePacksDir.list()) {
+            if (entity is File && entity.path.endsWith('.png')) {
+              pngFiles.add(path.basename(entity.path));
+            }
+          }
+
+          // 获取当前的主题包权重配置
+          final currentWeights = Map<String, int>.from(configManager.themePackWeights);
+          final newWeights = <String, int>{};
+
+          // 处理现有的主题包文件
+          for (final fileName in pngFiles) {
+            final cleanFileName = fileName.endsWith('.png') ? fileName.substring(0, fileName.length - 4) : fileName;
+            
+            // 如果旧配置中有这个键，继承它的值；否则使用默认值10
+            if (currentWeights.containsKey(cleanFileName)) {
+              newWeights[cleanFileName] = currentWeights[cleanFileName]!;
+            } else {
+              newWeights[cleanFileName] = 10; // 默认权重为10
+            }
+          }
+
+          // 更新ConfigManager中的权重
+          configManager.themePackWeights.clear();
+          configManager.themePackWeights.addAll(newWeights);
+          
+          // 保存更新后的配置
+          configManager.saveThemePackConfig();
+        }
+      }
+    } catch (e) {
+      debugPrint('同步主题包配置时出错: $e');
+    }
   }
 
   // 发送命令

@@ -2,14 +2,20 @@
   "A Certain World": {
     "weight": 10
   },
-  "ASEA": {
-    "weight": 20
+  "Abnormal Seismi Zone": {
+    "weight": 10
   },
   "Addicting Lust": {
     "weight": 10
   },
+  "ASEA": {
+    "weight": 20
+  },
   "Automated Factory": {
     "weight": 5
+  },
+  "Burning Haze": {
+    "weight": 10
   },
   "Crawling Abyss": {
     "weight": 5
@@ -17,11 +23,20 @@
   "Crushers & Breakers": {
     "weight": 10
   },
+  "Crushing External Force": {
+    "weight": 10
+  },
+  "Deep Sigh": {
+    "weight": 10
+  },
   "Degraded Gloom": {
     "weight": 20
   },
   "Devoured Gluttony": {
     "weight": 20
+  },
+  "Dizzying Waves": {
+    "weight": 10
   },
   "Dregs of the Manor": {
     "weight": 10
@@ -47,6 +62,9 @@
   "Emotional Subservience": {
     "weight": 20
   },
+  "Excessive Gluttong": {
+    "weight": 1
+  },
   "Faith & Erosion": {
     "weight": 1
   },
@@ -55,6 +73,9 @@
   },
   "Flat-broke Gamblers": {
     "weight": 20
+  },
+  "Four Houses and Greed": {
+    "weight": 10
   },
   "Full-Stopped by a Bullet": {
     "weight": 10
@@ -65,22 +86,46 @@
   "Hell's Chicken": {
     "weight": 100
   },
+  "Inert Sloth": {
+    "weight": 1
+  },
   "Insignificant Envy": {
     "weight": 10
-  },
-  "LCB Reguar Checkup": {
-    "weight": 1
   },
   "Lake World": {
     "weight": 20
   },
+  "LCB Reguar Checkup": {
+    "weight": 1
+  },
+  "Line 1": {
+    "weight": 10
+  },
+  "Line 2": {
+    "weight": 1
+  },
+  "Line 4 Section#3": {
+    "weight": 10
+  },
+  "Line 5": {
+    "weight": 10
+  },
+  "Marder on.the WARP Express BokGak": {
+    "weight": 5
+  },
+  "Miracle in District 20 BokGak": {
+    "weight": 10
+  },
   "Miracle in District 20": {
+    "weight": 10
+  },
+  "Mountain of Corpses, Sea of Blood": {
     "weight": 10
   },
   "Murder on the WARP Express": {
     "weight": 1
   },
-  "Nagel und Hammer": {
+  "Nagel and Hammer": {
     "weight": 10
   },
   "Nest, Workshop, and Technology": {
@@ -92,8 +137,26 @@
   "Piercers & Penetrators": {
     "weight": 10
   },
+  "Pitiful Envy": {
+    "weight": 10
+  },
+  "Poised Breathing": {
+    "weight": 5
+  },
   "Repressed Wrath": {
     "weight": 5
+  },
+  "Rising Power Supply": {
+    "weight": 10
+  },
+  "Season of the Flame": {
+    "weight": 10
+  },
+  "Sinking Deluge": {
+    "weight": 1
+  },
+  "Sinking Pang": {
+    "weight": 10
   },
   "Slicers & Dicers": {
     "weight": 10
@@ -101,11 +164,23 @@
   "Spring Cultivation": {
     "weight": 10
   },
+  "Sunk Gloom": {
+    "weight": 10
+  },
+  "Tangling Lust": {
+    "weight": 10
+  },
   "Tearful Things": {
+    "weight": 10
+  },
+  "The Evil Defining": {
     "weight": 10
   },
   "The Forgotten": {
     "weight": 20
+  },
+  "The Infinite Procession": {
+    "weight": 10
   },
   "The Moon of Violet": {
     "weight": 10
@@ -113,17 +188,26 @@
   "The Outcast": {
     "weight": 5
   },
+  "The Unchanging": {
+    "weight": 10
+  },
   "The Unconfronting": {
     "weight": 10
   },
   "The Unloving": {
     "weight": 1
   },
+  "Thunder and Lightning": {
+    "weight": 10
+  },
+  "Timekilling Time BokGak": {
+    "weight": 1
+  },
   "Timekilling Time": {
     "weight": 1
   },
   "To be Cleaved": {
-    "weight": 10
+    "weight": 20
   },
   "To be Crushed": {
     "weight": 5
@@ -134,58 +218,22 @@
   "Treadwheel Sloth": {
     "weight": 5
   },
-  "Vain Pride": {
-    "weight": 5
-  },
-  "Yield My Flesh to Claim Their Bones": {
-    "weight": 5
-  },
-  "Abnormal Seismi Zone": {
-    "weight": 10
-  },
-  "Burning Haze": {
-    "weight": 10
-  },
-  "Crushing External Force": {
-    "weight": 10
-  },
-  "Deep Sigh": {
-    "weight": 10
-  },
-  "Dizzying Waves": {
-    "weight": 10
-  },
-  "Excessive Gluttong": {
-    "weight": 10
-  },
-  "Line1": {
-    "weight": 10
-  },
-  "Miracle in District 20 BokGak": {
-    "weight": 10
-  },
-  "Season of the Flame": {
-    "weight": 10
-  },
-  "Sinking Pang": {
-    "weight": 10
-  },
-  "Tangling Lust": {
-    "weight": 10
-  },
-  "The Evil Defining": {
-    "weight": 10
-  },
-  "The Infinite Procession": {
-    "weight": 10
-  },
   "Trickled Sanguin Blood": {
     "weight": 10
   },
   "Tyrannical Pride": {
-    "weight": 10
+    "weight": 5
   },
   "Unrelenting Might": {
+    "weight": 1
+  },
+  "Vain Pride": {
+    "weight": 5
+  },
+  "Vield My Flesh to Claim Their Bones BokGak": {
     "weight": 10
+  },
+  "Yield My Flesh to Claim Their Bones": {
+    "weight": 5
   }
 }

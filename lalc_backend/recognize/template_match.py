@@ -150,9 +150,11 @@ if __name__ == "__main__":
     # 加载测试图像
     try:
         templates = []
-        screenshot = input_handler.capture_screenshot()
+        # screenshot = input_handler.capture_screenshot()
         # screenshot = mask_screenshot(screenshot, 140, 270, 150, 150)
+        
         register_images_from_directory()
+        screenshot = get_image("TURMDS")
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
       
         # templates.append(get_image("event_pass_very_low"))
@@ -168,6 +170,9 @@ if __name__ == "__main__":
         # templates.append(get_image("Entanglement Override Sequencer"))
         # templates.append(get_image("Bloodflame Sword"))
         # templates.append(get_image("Perversion"))
+        # templates.append(get_image("Charred Disk"))
+
+        templates.append(mask_screenshot(get_image("Spring Cultivation"), 20, 20, 130, 290))
 
         # templates.append(get_image("mirror_theme_pack_new"))
         # templates.append(get_image("theme_pack_detail"))

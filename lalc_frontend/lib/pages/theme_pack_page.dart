@@ -229,7 +229,14 @@ class ThemePackPageState extends State<ThemePackPage> {
         setState(() {
           _imgRootAddress = address;
         });
-        _loadImages(); // 重新加载图片
+        
+        // 使用WebSocketManager的同步逻辑来更新配置
+        await wsManager.syncThemePackConfig();
+        
+        // 加载图片
+        _loadImages();
+        
+        debugPrint('Theme pack configuration synced and loaded.');
       }
     } catch (e) {
       debugPrint('获取图片地址失败: $e');
@@ -237,7 +244,6 @@ class ThemePackPageState extends State<ThemePackPage> {
   }
   
   // 构建主题包图片路径
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(

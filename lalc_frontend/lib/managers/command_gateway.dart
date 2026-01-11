@@ -84,8 +84,7 @@ class CommandGateway with ChangeNotifier {
 
     /* --------- 3. 发送配置（仅对 start 命令） --------- */
     if (cmd == TaskCommand.start || cmd == TaskCommand.semiAutoStart) {
-      final ws = WebSocketManager();
-      ws.sendConfigurations();
+      await ws.sendConfigurations();
     }
 
     /* --------- 4. 真正发命令 --------- */
