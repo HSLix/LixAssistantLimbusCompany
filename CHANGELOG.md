@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.7.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.6.0...v4.7.0) (2026-01-10)
+
+
+### Features
+
+* 增加结算奖励自定义 | add the choice of accept the reward or not ([ea55925](https://github.com/HSLix/LixAssistantLimbusCompany/commit/ea559256f95266c1cfcb81a5a96c4fef7dcdcf13))
+
+
+### Bug Fixes
+
+* 修复了对于还没执行过的日志的导入错误问题 | fix the error the import the log of never execute the task ([cb93ef7](https://github.com/HSLix/LixAssistantLimbusCompany/commit/cb93ef757896d46980b452e3d1f254d8c3724f84))
+* 尝试修复关底饰品选择不了 | try fixing the error of select floor ego gift [#236](https://github.com/HSLix/LixAssistantLimbusCompany/issues/236) ([c7a98c7](https://github.com/HSLix/LixAssistantLimbusCompany/commit/c7a98c7e765e3f3f82ba35d58ccaa576eb7bdd4b))
+
 ## [4.6.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.5.1...v4.6.0) (2026-01-09)
 
 
