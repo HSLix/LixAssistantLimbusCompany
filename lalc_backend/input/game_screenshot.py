@@ -48,9 +48,10 @@ def take_screenshot(hwnd, width=None, height=None, save_path=None):
     save_dc.SelectObject(save_bitmap)
 
     # 捕获客户区内容
-    success = user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 3)  # PW_PRINTCLIENT
-    if not success:
-        raise ctypes.WinError(ctypes.get_last_error())
+    success = False
+    while not success:
+        success = user32.PrintWindow(hwnd, save_dc.GetSafeHdc(), 3)  # PW_PRINTCLIENT
+        time.sleep(0.01)
 
     # 解析位图数据
     bmp_info = save_bitmap.GetInfo()

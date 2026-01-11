@@ -247,7 +247,7 @@ def move_mouse_to_top_right_corner(hwnd):
     left, top, right, bottom = rect.left, rect.top, rect.right, rect.bottom
     
     # 计算右上角坐标（稍微向内偏移几个像素，避免边界问题）
-    corner_x = right - 5
+    corner_x = right - 50
     corner_y = top + 5
     
     # 移动鼠标到窗口右上角
