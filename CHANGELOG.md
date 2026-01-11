@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.7.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.7.0...v4.7.1) (2026-01-11)
+
+
+### Bug Fixes
+
+* 修复了主题包自更新可能引发的配置不统一问题 | fix the bug that configs are different between backend and frontend ([f23045a](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f23045aa354d79af0bd67517202577d2d604f345))
+* 修复了全是 very low 无法选择的 bug | fix the stuck in the event pass ([16fc547](https://github.com/HSLix/LixAssistantLimbusCompany/commit/16fc547f3d9ce070f20d71e5f28e1bf3a100a78c))
+* 修复了后端对于主题包更新后残留的处理 | add the remove of the outdated theme pack data ([e1e5bfe](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e1e5bfe4f96d22d45c2998f66bdc4391f533e464))
+* 修复了执行次数没有归零的错误 | fix the bug that execute count can not reset ([5afb14c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/5afb14cee8aef6c883f6858b6a2da1cb5c5bb49f))
+* 修复楼层末选饰品重复点击的问题 | fix the bug that duplicate click of floor ego gift ([f1d64d6](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f1d64d66ef773033d795e31787a1574db383acd8))
+
 ## [4.7.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.6.0...v4.7.0) (2026-01-10)
 
 
