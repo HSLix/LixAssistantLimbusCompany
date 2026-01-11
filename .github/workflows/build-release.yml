@@ -70,7 +70,7 @@ jobs:
         run: |
           # 固定前缀
           $mirrorChyanLink = "- (推荐，速度快质量好）[已有 Mirror酱 CDK？前往 Mirror酱 高速下载](https://mirrorchyan.com/zh/projects?rid=LALC)"
-          $githubLink      = "- (可能会限流)[GitHub 最新 Release 下载](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest) | [Download the latest release from GitHub](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest)"
+          $githubLink      = "- (GitHub 有时会限制)[GitHub 最新 Release 下载](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest) | [Download the latest release from GitHub](https://github.com/HSLix/LixAssistantLimbusCompany/releases/latest)"
           $quarkLink       = "- (不定时更新)重要版本归档：[夸克网盘](https://pan.quark.cn/s/333d6608dddd) | Record Important Version in [KuakeDrive](https://pan.quark.cn/s/333d6608dddd)."
           $discordLink     = "- [加入 Discord 群聊](https://discord.gg/bVzCuBU4bC) | [Join the discord](https://discord.gg/bVzCuBU4bC)"
 

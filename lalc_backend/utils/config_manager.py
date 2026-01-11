@@ -151,6 +151,7 @@ class ConfigManager:
         更新主题包配置
         :param config: 新的主题包配置
         """
+        self.theme_pack_cfg.clear()
         self.theme_pack_cfg.update(config)
 
     def initialize_theme_pack_config(self):
@@ -159,24 +160,33 @@ class ConfigManager:
         1. 首先读取已有的配置
         2. 遍历 img/theme_packs 文件夹下的图片
         3. 以图片名为 key，值为一个字典，包含权重值 weight，默认为 10
+        4. 删除在配置中存在但在 img/theme_packs 目录中不存在的项
         """
         # 先加载已有的配置
         self.theme_pack_cfg = self._load_config_file(self.theme_pack_cfg_file)
         
         # 遍历 img/theme_packs 文件夹
         theme_packs_dir = "img/theme_packs"
+        existing_files = set()
+        
         if os.path.exists(theme_packs_dir):
             for filename in os.listdir(theme_packs_dir):
                 # 检查是否为 PNG 文件
                 if filename.endswith(".png"):
                     # 获取文件名（不含扩展名）作为 key
                     name = os.path.splitext(filename)[0]
+                    existing_files.add(name)
                     
                     # 如果该主题包尚未在配置中，则添加默认配置
                     if name not in self.theme_pack_cfg:
                         self.theme_pack_cfg[name] = {
                             "weight": 10
                         }
+        
+        # 删除在配置中存在但在 img/theme_packs 目录中不存在的项
+        for key in self.theme_pack_cfg:
+            if key not in existing_files:
+                del self.theme_pack_cfg[key]
 
         # 保存更新后的配置
         self._save_config_file(self.theme_pack_cfg_file, self.theme_pack_cfg)

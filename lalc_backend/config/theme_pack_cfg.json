@@ -80,7 +80,7 @@
   "Full-Stopped by a Bullet": {
     "weight": 10
   },
-  "Hatred and Des pair": {
+  "Hatred and Despair": {
     "weight": 10
   },
   "Hell's Chicken": {
@@ -90,6 +90,9 @@
     "weight": 1
   },
   "Insignificant Envy": {
+    "weight": 10
+  },
+  "La Manchaland Reopening": {
     "weight": 10
   },
   "Lake World": {
@@ -105,10 +108,10 @@
     "weight": 1
   },
   "Line 4 Section#3": {
-    "weight": 10
+    "weight": 1
   },
   "Line 5": {
-    "weight": 10
+    "weight": 1
   },
   "Marder on.the WARP Express BokGak": {
     "weight": 5
@@ -179,6 +182,9 @@
   "The Forgotten": {
     "weight": 20
   },
+  "The Heartbreaking": {
+    "weight": 10
+  },
   "The Infinite Procession": {
     "weight": 10
   },
@@ -231,7 +237,7 @@
     "weight": 5
   },
   "Vield My Flesh to Claim Their Bones BokGak": {
-    "weight": 10
+    "weight": 5
   },
   "Yield My Flesh to Claim Their Bones": {
     "weight": 5
