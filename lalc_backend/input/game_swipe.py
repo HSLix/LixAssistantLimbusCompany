@@ -76,9 +76,10 @@ def background_swipe(hwnd, start_x, start_y, end_x, end_y, speed=1):
             ctypes.windll.user32.SetCursorPos(current_x, current_y)
             time.sleep(sleep_time)
         
-        time.sleep(0.5)
+        time.sleep(0.3)
         # 使用后台释放函数结束拖拽
         background_release(hwnd, end_x, end_y)
+        time.sleep(0.3)
 
         ctypes.windll.user32.SetCursorPos(origin_x, origin_y)
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lalc_frontend/main.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
+import 'package:lalc_frontend/utils/websocket_helper.dart'; // 导入WebSocketHelper
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
@@ -66,7 +67,7 @@ class ThemePackPageState extends State<ThemePackPage> {
 
   // 完全模仿 LogPage 的 _refreshLogs
   void _refreshThemePacks() {
-    final ws = context.read<WebSocketManager>();
+    final ws = WebSocketHelper.getManager(); // 使用WebSocketHelper
 
     // 1. 未连接 → 弹 Toast（和 LogPage 同一句话）
     if (!ws.isConnected && !ws.isConnecting) {
@@ -222,7 +223,7 @@ class ThemePackPageState extends State<ThemePackPage> {
   // 获取图片地址
   Future<void> _getImageAddress() async {
     try {
-      final wsManager = WebSocketManager();
+      final wsManager = WebSocketHelper.getManager(); // 使用WebSocketHelper
       wsManager.initialize();
       final address = await wsManager.getImgAddress();
       if (address != null) {

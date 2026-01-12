@@ -2,6 +2,7 @@ import 'dart:io' show Directory, File;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
+import 'package:lalc_frontend/utils/websocket_helper.dart'; // 导入WebSocketHelper
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as path;
@@ -158,7 +159,7 @@ class _LogPageState extends State<LogPage> {
   }
 
   void _loadLogFolders() {
-    final websocketManager = context.read<WebSocketManager>();
+    final websocketManager = WebSocketHelper.getManager(); // 使用WebSocketHelper获取实例
     // 如果没有连接，则自动连接
     if (!websocketManager.isConnected && !websocketManager.isConnecting) {
       // 使用addPostFrameCallback确保不在build过程中调用initialize
@@ -184,7 +185,7 @@ class _LogPageState extends State<LogPage> {
       _logEntries.clear();
     });
     
-    final websocketManager = context.read<WebSocketManager>();
+    final websocketManager = WebSocketHelper.getManager(); // 使用WebSocketHelper获取实例
     // 使用addPostFrameCallback确保不在build过程中调用方法
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -249,55 +250,116 @@ class _LogPageState extends State<LogPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        websocketManager.isConnected 
-                          ? Icons.circle 
-                          : (websocketManager.isConnecting 
-                              ? Icons.access_time 
-                              : Icons.warning),
-                        color: websocketManager.isConnected 
-                          ? Colors.green 
-                          : (websocketManager.isConnecting 
-                              ? Colors.orange 
-                              : Colors.red),
-                        size: 16,
-                      ),
-                      SizedBox(width: 8),
-                      Text(
-                        websocketManager.isConnected 
-                          ? S.of(context).connected
-                          : (websocketManager.isConnecting 
-                              ? S.of(context).connecting 
-                              : S.of(context).disconnected),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(
+                          websocketManager.isConnected 
+                            ? Icons.circle 
+                            : (websocketManager.isConnecting 
+                                ? Icons.access_time 
+                                : Icons.warning),
+                          color: websocketManager.isConnected 
+                            ? Colors.green 
+                            : (websocketManager.isConnecting 
+                                ? Colors.orange 
+                                : Colors.red),
+                          size: 16,
                         ),
-                      ),
-                      SizedBox(width: 16),
-                      // 添加日志级别选择复选框
-                      ...['ERROR', 'WARNING', 'INFO', 'DEBUG'].map((level) {
-                        Color color;
-                        switch (level) {
-                          case 'ERROR':
-                            color = Colors.red;
-                            break;
-                          case 'WARNING':
-                            color = Colors.orange;
-                            break;
-                          case 'INFO':
-                            color = Colors.green;
-                            break;
-                          case 'DEBUG':
-                            color = Colors.blue;
-                            break;
-                          default:
-                            color = Colors.white;
-                        }
+                        SizedBox(width: 8),
+                        Text(
+                          websocketManager.isConnected 
+                            ? S.of(context).connected
+                            : (websocketManager.isConnecting 
+                                ? S.of(context).connecting 
+                                : S.of(context).disconnected),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        // 添加日志级别选择复选框
+                        ...['ERROR', 'WARNING', 'INFO', 'DEBUG'].map((level) {
+                          Color color;
+                          switch (level) {
+                            case 'ERROR':
+                              color = Colors.red;
+                              break;
+                            case 'WARNING':
+                              color = Colors.orange;
+                              break;
+                            case 'INFO':
+                              color = Colors.green;
+                              break;
+                            case 'DEBUG':
+                              color = Colors.blue;
+                              break;
+                            default:
+                              color = Colors.white;
+                          }
+                          
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Theme(
+                                data: Theme.of(context).copyWith(
+                                  unselectedWidgetColor: Colors.white,
+                                ),
+                                child: Checkbox(
+                                  value: _selectedLevels.contains(level),
+                                  onChanged: (checked) => _onLevelChanged(level, checked),
+                                  activeColor: color,
+                                  checkColor: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                level, 
+                                style: TextStyle(
+                                  color: Colors.white, 
+                                  fontSize: 12
+                                )
+                              ),
+                              SizedBox(width: 8),
+                            ],
+                          );
+                        }),
+                        // 添加搜索框
+                        Flexible(
+                          fit: FlexFit.loose, 
+                            child: SizedBox(
+                              height: 40,
+                              width: double.infinity,
+                              child: TextField(
+                                  controller: _searchController,
+                                  style: TextStyle(color: Colors.white, fontSize: 14),
+                                  decoration: InputDecoration(
+                                    hintText: S.of(context).search_logs,
+                                    hintStyle: TextStyle(color: Colors.grey[400], fontSize: 12),
+                                    filled: true,
+                                    fillColor: Colors.grey[700],
+                                    contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 16),
+                                  ),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchQuery = value;
+                                      _resetPagination(); // 重置分页
+                                      _filterLogs();
+                                    });
+                                  },
+                                ),
+                            ),
+                        ),
+                          
                         
-                        return Row(
+                        
+                        // 添加筛选带图片日志的开关
+                        Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Theme(
@@ -305,14 +367,14 @@ class _LogPageState extends State<LogPage> {
                                 unselectedWidgetColor: Colors.white,
                               ),
                               child: Checkbox(
-                                value: _selectedLevels.contains(level),
-                                onChanged: (checked) => _onLevelChanged(level, checked),
-                                activeColor: color,
+                                value: _showOnlyImageLogs,
+                                onChanged: _onShowOnlyImageLogsChanged,
+                                activeColor: Colors.purple,
                                 checkColor: Colors.white,
                               ),
                             ),
                             Text(
-                              level, 
+                              S.of(context).pic_only, 
                               style: TextStyle(
                                 color: Colors.white, 
                                 fontSize: 12
@@ -320,66 +382,14 @@ class _LogPageState extends State<LogPage> {
                             ),
                             SizedBox(width: 8),
                           ],
-                        );
-                      }),
-                      // 添加搜索框
-                      SizedBox(
-                        width: 150,
-                        child: TextField(
-                          controller: _searchController,
-                          style: TextStyle(color: Colors.white, fontSize: 14),
-                          decoration: InputDecoration(
-                            hintText: S.of(context).search_logs,
-                            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 12),
-                            filled: true,
-                            fillColor: Colors.grey[700],
-                            contentPadding: EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(4),
-                              borderSide: BorderSide.none,
-                            ),
-                            prefixIcon: Icon(Icons.search, color: Colors.grey[400], size: 16),
-                          ),
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                              _resetPagination(); // 重置分页
-                              _filterLogs();
-                            });
-                          },
                         ),
-                      ),
-                      // 添加筛选带图片日志的开关
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Theme(
-                            data: Theme.of(context).copyWith(
-                              unselectedWidgetColor: Colors.white,
-                            ),
-                            child: Checkbox(
-                              value: _showOnlyImageLogs,
-                              onChanged: _onShowOnlyImageLogsChanged,
-                              activeColor: Colors.purple,
-                              checkColor: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            S.of(context).pic_only, 
-                            style: TextStyle(
-                              color: Colors.white, 
-                              fontSize: 12
-                            )
-                          ),
-                          SizedBox(width: 8),
-                        ],
-                      ),
-                    ],
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.refresh, color: Colors.white),
-                    onPressed: _refreshLogs,
-                    tooltip: S.of(context).refresh,
+                        IconButton(
+                          icon: Icon(Icons.refresh, color: Colors.white),
+                          onPressed: _refreshLogs,
+                          tooltip: S.of(context).refresh,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -522,7 +532,7 @@ class _LogPageState extends State<LogPage> {
       _resetPagination(); // 重置分页
     });
 
-    final websocketManager = context.read<WebSocketManager>();
+    final websocketManager = WebSocketHelper.getManager(); // 使用WebSocketHelper获取实例
     
     try {
       final response = await websocketManager.getLogAddress(folderName);
@@ -1186,7 +1196,7 @@ class _LogPageState extends State<LogPage> {
   void _exportLogFolder(String folderName) async {
     try {
       // 获取日志文件夹的源路径
-      final websocketManager = context.read<WebSocketManager>();
+      final websocketManager = WebSocketHelper.getManager(); // 使用WebSocketHelper获取实例
       final response = await websocketManager.getLogAddress(folderName);
       
       if (response == null || response['status'] != 'success' || response['type'] != 'log_address') {

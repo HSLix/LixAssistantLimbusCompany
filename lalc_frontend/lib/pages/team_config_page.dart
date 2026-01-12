@@ -461,7 +461,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
           // 左侧队伍列表（窄）
           // -------------------------
           Container(
-            width: 140,
+            width: 100,
             color: Colors.grey[900],
             child: ListView.builder(
               padding: const EdgeInsets.only(top: 20),
@@ -564,7 +564,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                             final double idealItemWidth = availableWidth / crossAxisCount;
                             
                             // 设置最小和最大尺寸
-                            final double minItemWidth = 80.0;
+                            final double minItemWidth = 60.0;
                             final double maxItemWidth = 150.0;
                             final double actualItemWidth = idealItemWidth.clamp(minItemWidth, maxItemWidth);
                             
@@ -1126,7 +1126,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
               const double maxDesiredHeight = 250;
               final double fixedHeight = math.min(
                 maxDesiredHeight,
-                cellWidth / 0.3,
+                cellWidth / 0.2,
               );
               
               return GridView.builder(
@@ -1411,7 +1411,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _getStarValue(index) == '$index+' ? msBlue : Colors.grey[600],
                                   padding: EdgeInsets.zero,
-                                  minimumSize: Size(40, 30),
+                                  minimumSize: Size(30, 30),
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: Text('+', style: TextStyle(fontSize: 16, color: Colors.white)),
@@ -1423,7 +1423,7 @@ class _TeamConfigPageState extends State<TeamConfigPage>
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _getStarValue(index) == '$index++' ? msBlue : Colors.grey[600],
                                   padding: EdgeInsets.zero,
-                                  minimumSize: Size(40, 30),
+                                  minimumSize: Size(30, 30),
                                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 ),
                                 child: Text('++', style: TextStyle(fontSize: 16, color: Colors.white)),

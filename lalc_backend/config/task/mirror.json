@@ -165,7 +165,7 @@
             "cfg_type":"mirror"
         },
         "next":[
-            "mirror_battle"
+            "mirror_circle_center"
         ]
     },
     "mirror_battle":{

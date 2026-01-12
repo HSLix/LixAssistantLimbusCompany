@@ -189,11 +189,9 @@ class _HomePageState extends State<HomePage>
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final releaseInfo = '''
-
   ${S.of(context).current_version}: $currentVersion
   ${S.of(context).latest_release}: ${data['tag_name']}
   ${S.of(context).published_at}: ${data['published_at']?.toString().split('T')[0] ?? 'Unknown'}
-
   ${data['body'] ?? 'No description provided'}
   ''';
         
@@ -548,7 +546,7 @@ class _HomePageState extends State<HomePage>
           // 左侧任务列表
           // -----------------------------
           Container(
-            width: 350,
+            width: 250,
             color: Theme.of(context).canvasColor,
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -2040,13 +2038,12 @@ class _HomePageState extends State<HomePage>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(S.of(context).statement,
-                    style: TextStyle(color: Colors.white, fontSize: 22)),
-                const SizedBox(height: 4),
+                    style: TextStyle(color: Colors.white, fontSize: 18)),
                 const Text(
                   '''
-                  LALC is a free open source software, if you paid for LALC from any channel, please refund for your rights.
-                  LALC 是一款免费开源软件，仅供学习交流使用，如果你在任何渠道付费购买了 LALC，请为您自身权益退款。
-                  Project repository 项目地址：https://github.com/HSLix/LixAssistantLimbusCompany
+LALC is a free open source software, if you paid for LALC from any channel, please refund for your rights.
+LALC 是一款免费开源软件，仅供学习交流使用，如果你在任何渠道付费购买了 LALC，请为您自身权益退款。
+Project repository 项目地址：https://github.com/HSLix/LixAssistantLimbusCompany
                   ''',
                   style: TextStyle(color: Colors.white, fontSize: 14),
                   textAlign: TextAlign.center,

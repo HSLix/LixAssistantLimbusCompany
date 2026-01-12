@@ -135,6 +135,7 @@ def background_press(hwnd, x, y):
 
         # 发送鼠标按下消息
         win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, 0, lparam)
+        time.sleep(0.05)
 
         # print(f"后台按下成功：客户端坐标=({click_x}, {click_y})")
 

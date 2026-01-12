@@ -15,8 +15,14 @@ class WebSocketManager with ChangeNotifier {
   factory WebSocketManager() => _instance;
   WebSocketManager._internal();
 
+  // 添加全局获取实例的静态方法
+  static WebSocketManager get instance => _instance;
+  
   /* ========== 互斥锁 ========== */
   static final _connectLock = Mutex();   // ② 全局锁
+  // 添加连接请求队列
+  static final List<VoidCallback> _pendingConnectRequests = [];
+  static bool _isConnectingInProgress = false;
   /* ============================ */
 
   WebSocketChannel? _channel;
@@ -33,8 +39,11 @@ class WebSocketManager with ChangeNotifier {
   final List<String> _logMessages = [];
   String? _lastErrorMessage;
 
-  // 新增：下载类响应的常驻回调
-  final Map<String, void Function(Map<String, dynamic>)> _downloadCallbacks = {};
+  // 添加调试日志输出
+  @override
+  String toString() {
+    return 'WebSocketManager#${identityHashCode(this)}';
+  }
 
   // 添加错误回调函数
   void Function(String)? _onError;
@@ -48,6 +57,9 @@ class WebSocketManager with ChangeNotifier {
   final Map<String, List<Map<String, dynamic>>> _logFolderContents = {};
   final Map<String, int> _logFolderLineCounts = {};
   List<String> _logFolders = [];
+
+  // 新增：下载类响应的常驻回调
+  final Map<String, void Function(Map<String, dynamic>)> _downloadCallbacks = {};
 
   // 新增getter方法
   List<String> get logFolders => List.unmodifiable(_logFolders);
@@ -78,6 +90,8 @@ class WebSocketManager with ChangeNotifier {
 
   // 初始化WebSocket连接
   void initialize() {
+    debugPrint('WebSocketManager: initialize() called, instance: ${identityHashCode(this)}');
+    debugPrint('WebSocketManager: current state - isConnected: $_isConnected, isConnecting: $_isConnecting');
     debugPrint('初始化WebSocket连接');
     _addLogMessage('初始化WebSocket连接');
     // 添加额外的调试信息
@@ -93,6 +107,16 @@ class WebSocketManager with ChangeNotifier {
 
   // 连接到WebSocket服务器
   Future<void> connect() async {
+    debugPrint('WebSocketManager: connect() called, instance: ${identityHashCode(this)}');
+    debugPrint('WebSocketManager: current state - isConnected: $_isConnected, isConnecting: $_isConnecting');
+    
+    // 如果已经在连接中，将请求加入队列
+    if (_isConnectingInProgress) {
+      debugPrint('WebSocketManager: Already connecting, queuing request');
+      _pendingConnectRequests.add(() => connect());
+      return;
+    }
+    
     // 所有调用者排队，拿到锁的人才能继续
     await _connectLock.protect(() async {   // ③ 临界区开始
       // 如果已经在连接或已连接，则直接返回
@@ -101,6 +125,7 @@ class WebSocketManager with ChangeNotifier {
         return;
       }
       
+      _isConnectingInProgress = true;
       _isConnecting = true;
       notifyListeners();
       
@@ -126,6 +151,7 @@ class WebSocketManager with ChangeNotifier {
         _startHeartbeat();
       } catch (e) {
         _isConnecting = false;
+        _isConnectingInProgress = false;
         notifyListeners();
         debugPrint('WebSocket连接失败: $e');
         _addLogMessage('WebSocket连接失败: $e');
@@ -135,6 +161,15 @@ class WebSocketManager with ChangeNotifier {
         _scheduleReconnect(const Duration(milliseconds: 500));
       }
     });                                       // ④ 临界区结束
+    
+    _isConnectingInProgress = false;
+    
+    // 处理队列中的其他连接请求
+    if (_pendingConnectRequests.isNotEmpty) {
+      debugPrint('Processing queued connection request');
+      final nextRequest = _pendingConnectRequests.removeAt(0);
+      nextRequest();
+    }
   }
 
   // 处理连接失败
@@ -142,6 +177,7 @@ class WebSocketManager with ChangeNotifier {
     // 确保连接状态正确
     _isConnected = false;
     _isConnecting = false;
+    _isConnectingInProgress = false;
     notifyListeners();
     
     _reconnectAttempts++;
@@ -173,6 +209,7 @@ class WebSocketManager with ChangeNotifier {
       // 确保在重连前状态正确
       _isConnected = false;
       _isConnecting = false;
+      _isConnectingInProgress = false;
       notifyListeners();
       connect();
     });
@@ -185,6 +222,7 @@ class WebSocketManager with ChangeNotifier {
     // 注意：这里不再重置_currentPortIndex，让它保持当前端口位置
     _isConnected = false;
     _isConnecting = false;
+    _isConnectingInProgress = false;
     notifyListeners();
     _addLogMessage('WebSocket连接已断开');
     
@@ -198,6 +236,7 @@ class WebSocketManager with ChangeNotifier {
     _heartbeatTimeoutTimer?.cancel();
     _reconnectTimer?.cancel();
     _pendingRequests.clear();
+    _downloadCallbacks.clear();
     _channel?.sink.close(normalClosure);
   }
 
@@ -220,6 +259,7 @@ class WebSocketManager with ChangeNotifier {
       if (!_isConnected) {
         _isConnected = true;
         _isConnecting = false; // 确保连接状态正确更新
+        _isConnectingInProgress = false;
         _reconnectAttempts = 0; // 真正连接成功时重置重连次数
         notifyListeners();
         debugPrint('WebSocket连接成功');
@@ -561,6 +601,7 @@ class WebSocketManager with ChangeNotifier {
     _addLogMessage('WebSocket错误: $error');
     _isConnected = false;
     _isConnecting = false;
+    _isConnectingInProgress = false;
     notifyListeners();
     
     // 出现错误时将任务状态设置为停止
@@ -575,6 +616,7 @@ class WebSocketManager with ChangeNotifier {
     // 清理当前连接状态
     _isConnected = false;
     _isConnecting = false;
+    _isConnectingInProgress = false;
     notifyListeners();
 
     // 记录断开类型
@@ -615,10 +657,10 @@ class WebSocketManager with ChangeNotifier {
       _addLogMessage('心跳超时，连接可能已断开');
       _isConnected = false;
       _isConnecting = false;
+      _isConnectingInProgress = false;
       notifyListeners();
       _handleDisconnect();
       
-      // 心跳超时时将任务状态设置为停止
       TaskStatusManager().stopTask();
     });
 
@@ -650,6 +692,7 @@ class WebSocketManager with ChangeNotifier {
         'taskConfigs': configManager.taskConfigs.map((key, value) => MapEntry(key, value.toJson())),
         'teamConfigs': configManager.teamConfigs.map((key, value) => MapEntry(key.toString(), value.toJson())),
         'themePackWeights': configManager.themePackWeights,
+        'version': String.fromEnvironment('CURRENT_VERSION', defaultValue: 'V0.0.0'),
       }
     };
 
@@ -1061,4 +1104,3 @@ class WebSocketManager with ChangeNotifier {
     };
   }
 }
-

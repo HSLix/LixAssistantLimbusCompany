@@ -10,7 +10,7 @@ import '../generated/l10n.dart';
 import 'package:provider/provider.dart';
 import '../utils/zip_helper.dart';
 import 'package:path_provider/path_provider.dart';
-import '../managers/websocket_manager.dart';
+import '../utils/websocket_helper.dart'; // 导入WebSocketHelper
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -109,7 +109,7 @@ class _SettingsPageState extends State<SettingsPage> {
         encryptedCDK = cdk;
       } else {
         // 如果CDK不包含冒号，认为它是明文，需要通过WebSocket发送到服务器进行加密
-        encryptedCDK = await WebSocketManager().encryptCDK(cdk) ?? cdk;
+        encryptedCDK = await WebSocketHelper.getManager().encryptCDK(cdk) ?? cdk; // 使用WebSocketHelper
       }
       _userConfig.mirrorChanCDK = encryptedCDK;
       debugPrint('MirrorChan CDK 已加密保存: $encryptedCDK');
@@ -369,7 +369,7 @@ class _SettingsPageState extends State<SettingsPage> {
   
   /// 检查WebSocket连接状态并显示下载进度弹窗
   void _checkWebSocketAndShowDownloadProgressDialog(String source) {
-    if (!WebSocketManager().isConnected) {
+    if (!WebSocketHelper.getManager().isConnected) { // 使用WebSocketHelper
       // 如果WebSocket未连接，显示错误提示
       if (mounted) {
         toastification.show(
@@ -422,7 +422,7 @@ class _SettingsPageState extends State<SettingsPage> {
             TextButton(
               onPressed: () {
                 // 取消下载
-                WebSocketManager().cancelDownload();
+                WebSocketHelper.getManager().cancelDownload(); // 使用WebSocketHelper
                 if (Navigator.of(context).canPop()) {
                   Navigator.of(context).pop();
                 }
@@ -572,7 +572,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }) async {
     try {
       final updateDir = await _getUpdateDir();
-      final ws = WebSocketManager();
+      final ws = WebSocketHelper.getManager(); // 使用WebSocketHelper
 
       ws.downloadUpdate(
         source: source,
@@ -1726,7 +1726,7 @@ class _SettingsPageState extends State<SettingsPage> {
           );
         }
         // 向服务器发送 quit_lalc 命令
-        WebSocketManager().quitLALC();
+        WebSocketHelper.getManager().quitLALC();
         
       } catch (e) {
         if (mounted) {

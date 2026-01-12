@@ -40,7 +40,7 @@ void main() async {
   await printAppDocPath();
 
   WindowOptions windowOptions = WindowOptions(
-    minimumSize: Size(800, 666),
+    minimumSize: Size(650, 600),
     // size: Size(800, 600),
     center: true,
     backgroundColor: Colors.transparent,
@@ -242,7 +242,9 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => TaskStatusManager()),
-        ChangeNotifierProvider(create: (_) => WebSocketManager()),
+        ChangeNotifierProvider.value(  // 使用 .value 确保使用单例
+          value: WebSocketManager.instance,
+        ),
         ChangeNotifierProvider(create: (context) {
           // 创建LanguageManager实例并根据配置设置初始语言
           final languageManager = LanguageManager();

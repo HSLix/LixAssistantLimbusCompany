@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/managers/websocket_manager.dart';
+import 'package:lalc_frontend/utils/websocket_helper.dart'; // 导入WebSocketHelper
 import 'package:lalc_frontend/managers/command_gateway.dart'; // 导入命令网关
 import 'package:toastification/toastification.dart';
 import '../generated/l10n.dart'; // 添加国际化支持
@@ -80,7 +81,7 @@ class _WorkPageState extends State<WorkPage> // 修复继承错误
   @override
   Widget build(BuildContext context) {
     final taskStatus = Provider.of<TaskStatusManager>(context);
-    final webSocketManager = Provider.of<WebSocketManager>(context, listen: false);
+    final webSocketManager = WebSocketHelper.getManager(); // 使用WebSocketHelper获取实例
 
     // 监听 WebSocket 更新
     if (_webSocketManager != webSocketManager) {
