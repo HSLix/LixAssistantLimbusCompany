@@ -219,7 +219,7 @@ class _Input:
             
             mouse_in_window, mouse_x, mouse_y = is_mouse_in_window(self._hwnd)
             if reset and mouse_in_window:
-                logger.debug("检测到鼠标在游戏窗口内，尝试暂时移开鼠标")
+                logger.debug("检测到鼠标在游戏窗口内, 尝试移开鼠标, 不归位")
                 wait_input_idle(idle_time=0.2)
                 ctypes.windll.user32.BlockInput(True)
                 try:
@@ -233,14 +233,7 @@ class _Input:
                 self.set_window_size()
                 
             self.screenshot = take_screenshot(self._hwnd, width=self.width, height=self.height, save_path=save_path)
-            # 复原
-            if reset and mouse_in_window:
-                logger.debug("之前检测到鼠标在游戏窗口内，暂时移开鼠标，现将鼠标归回原位")
-                ctypes.windll.user32.BlockInput(True)
-                try:   
-                    ctypes.windll.user32.SetCursorPos(mouse_x, mouse_y)
-                finally:
-                    ctypes.windll.user32.BlockInput(False)
+  
             return self.screenshot
         else:
             raise Exception("hwnd init Error")

@@ -107,6 +107,9 @@
   "Line 2": {
     "weight": 1
   },
+  "Line 3": {
+    "weight": 10
+  },
   "Line 4 Section#3": {
     "weight": 1
   },
@@ -197,6 +200,9 @@
   "The Outcast": {
     "weight": 5
   },
+  "The Surrendered Witnessing": {
+    "weight": 10
+  },
   "The Unchanging": {
     "weight": 10
   },
@@ -232,6 +238,9 @@
   },
   "Tyrannical Pride": {
     "weight": 5
+  },
+  "Unbound Wrath": {
+    "weight": 10
   },
   "Unrelenting Might": {
     "weight": 1
