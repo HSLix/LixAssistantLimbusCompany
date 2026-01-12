@@ -16,14 +16,29 @@
         "params":{
             "template":"inferno",
             "target":[510, 310],
-            "repeat": 2,
-            "repeat_interval": 1, 
+            "post_delay": 1
+        },
+        "next":[
+            "mirror_enter_dungeon",
+            "mirror_enter",
+            "mirror_entry"
+        ]
+    },
+    "mirror_enter_dungeon":{
+        "recognition":"template_match",
+        "action":"click",
+        "params":{
+            "template":"dungeon_enter",
+            "target":[510, 310],
             "post_delay": 1
         },
         "next":[
             "mirror_enter_resume",
             "mirror_enter_last_week",
-            "mirror_enter_confirm"
+            "mirror_enter_confirm",
+            "mirror_enter_dungeon",
+            "mirror_enter",
+            "mirror_entry"
         ]
     },
     "mirror_enter_resume":{
