@@ -1,5 +1,18 @@
 # Changelog
 
+## [4.8.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.7.1...v4.8.0) (2026-01-12)
+
+
+### Features
+
+* 增加对于网络不稳定的自动重启 | add the automatically reboot for the unstable network ([9ef9a7e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/9ef9a7e9eff8ba179168bb1449eaa8f9a7379dbd))
+
+
+### Bug Fixes
+
+* 尝试修复在个别设备点击效果不稳定的问题 | try making the click more stable by double the duration between press and release ([5122869](https://github.com/HSLix/LixAssistantLimbusCompany/commit/51228699d59c9350e67917821027a25baf4a0ec2))
+* 更改截图的鼠标移动不归位，提升效率并且避免因为鼠标多次移动导致实际坐标紊乱 | get rid of  the reset of mouse to make it more stable ([11be629](https://github.com/HSLix/LixAssistantLimbusCompany/commit/11be629bc5e4ba2f02bebab3965819ab0ad4f12a))
+
 ## [4.7.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.7.0...v4.7.1) (2026-01-11)
 
 
