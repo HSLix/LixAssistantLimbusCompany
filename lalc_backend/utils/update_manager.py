@@ -6,6 +6,18 @@ from typing import Awaitable
 from utils.logger import init_logger
 import time
 
+
+def _short_ssl_error(e: Exception) -> str:
+    """
+    把 requests 的 SSL 异常转成简短提示
+    """
+    if "CERTIFICATE_VERIFY_FAILED" in str(e):
+        return "网络证书校验失败，请检查系统时间、根证书或代理设置"
+    if "unable to get local issuer certificate" in str(e):
+        return "找不到本地根证书，请更新系统证书或安装 certifi"
+    return f"网络加密层异常：{e}"
+
+
 # 全局logger实例
 logger = init_logger()
 
@@ -78,10 +90,13 @@ def download_latest_release_asset(
     async def _do_download():
         loop = asyncio.get_running_loop()
         # ① 先在线程里把 asset 的 download_url 拿到（很轻，几乎瞬时）
-        resp = await loop.run_in_executor(None, lambda: requests.get(
-            f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest",
-            headers={"User-Agent": "LixAssistantDownloader"},
-        ))
+        try:
+            resp = await loop.run_in_executor(None, lambda: requests.get(
+                f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest",
+                headers={"User-Agent": "LixAssistantDownloader"},
+            ))
+        except requests.exceptions.SSLError as e:
+            raise RuntimeError(_short_ssl_error(e)) from None
         
         # 检查是否有速率限制错误
         if resp.status_code == 403 and "rate limit" in resp.text.lower():
