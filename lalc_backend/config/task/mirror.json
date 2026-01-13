@@ -124,11 +124,12 @@
             "mirror_select_floor_ego_gift",
             "mirror_victory",
             "mirror_defeat",
-            "mirror_entry",
             "mirror_choose_team",
             "mirror_choose_star",
             "mirror_select_initial_ego_gift",
-            "mirror_gift_search"
+            "mirror_gift_search",
+            "mirror_enter_dungeon",
+            "mirror_enter"
         ]
     },
     "mirror_ego_gift_get":{

@@ -15,7 +15,7 @@
     "weight": 5
   },
   "Burning Haze": {
-    "weight": 10
+    "weight": 5
   },
   "Crawling Abyss": {
     "weight": 5
@@ -102,15 +102,18 @@
     "weight": 1
   },
   "Line 1": {
-    "weight": 10
+    "weight": 5
   },
   "Line 2": {
     "weight": 1
   },
   "Line 3": {
-    "weight": 10
+    "weight": 5
   },
   "Line 4 Section#3": {
+    "weight": 1
+  },
+  "Line 4 Section#4": {
     "weight": 1
   },
   "Line 5": {
@@ -240,7 +243,7 @@
     "weight": 5
   },
   "Unbound Wrath": {
-    "weight": 10
+    "weight": 5
   },
   "Unrelenting Might": {
     "weight": 1
