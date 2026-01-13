@@ -472,8 +472,9 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
             time.sleep(1)
             loop_count += 1
     
+    is_replace_skill_sold_out = len(recognize_handler.template_match(tmp_screenshot, "shop_purchased", mask=[550, 200, 140, 50])) > 0
     name_of_who_can_replace = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[535, 320, 165, 50])
-    if len(name_of_who_can_replace) > 0 and len(need_to_replace_skill) > 0:
+    if not is_replace_skill_sold_out and len(name_of_who_can_replace) > 0 and len(need_to_replace_skill) > 0:
         # 没有实现技能替换且还没使用过的情况就看是否是免费普通刷新，是的话再点击普通刷新试试
         cfg_type = node.get_param("cfg_type")
         cfg = self._get_using_cfg(cfg_type)

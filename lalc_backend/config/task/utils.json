@@ -18,13 +18,21 @@
             "template":"main_window_no_text"
         },
         "next":[
-            "game_language_confirm",
+            "check_language"
+        ]
+    },
+    "check_language":{
+        "action":"game_language_confirm",
+        "next":[
             "check_enkephalin"
         ]
     },
     "check_enkephalin":{
+        "recognition":"template_match",
         "action":"click",
+        "inverse": true,
         "params":{
+            "template":"charge_enkephalin",
             "target":[
                 390,
                 650
@@ -32,6 +40,7 @@
             "post_delay":1
         },
         "next":[
+            "check_enkephalin",
             "recharge_enkephalin",
             "get_enkephalin_module"
         ]

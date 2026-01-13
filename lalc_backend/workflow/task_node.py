@@ -45,8 +45,8 @@ class TaskNode:
         self.interrupt = []
 
         self.set_param("recognize_result", [])
-        self.set_param("pre_delay", self.get_param("pre_delay", 0.3))
-        self.set_param("post_delay", self.get_param("post_delay", 0.3))
+        self.set_param("pre_delay", self.get_param("pre_delay", 0.1))
+        self.set_param("post_delay", self.get_param("post_delay", 0.1))
     
     def get_param(self, key:str, default=None):
         param = self.params.get(key, default)

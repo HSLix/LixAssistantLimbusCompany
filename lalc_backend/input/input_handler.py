@@ -220,7 +220,7 @@ class _Input:
             mouse_in_window, mouse_x, mouse_y = is_mouse_in_window(self._hwnd)
             if reset and mouse_in_window:
                 logger.debug("检测到鼠标在游戏窗口内, 尝试移开鼠标, 不归位")
-                wait_input_idle(idle_time=0.2)
+                wait_input_idle()
                 ctypes.windll.user32.BlockInput(True)
                 try:
                     move_mouse_to_top_right_corner(self._hwnd)

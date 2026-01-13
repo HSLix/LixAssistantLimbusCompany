@@ -157,10 +157,14 @@ class TaskExecution:
 
     def get_perf_summary(self) -> dict[str, dict[str, float | int]]:
         """
-        供 AsyncTaskPipeline 调用，返回性能统计副本
+        供 AsyncTaskPipeline 调用，返回性能统计副本，按总耗时降序排列
         """
-        return self._perf.copy()
-
+        # 先复制数据
+        perf_copy = self._perf.copy()
+        # 按总耗时降序排序
+        sorted_items = sorted(perf_copy.items(), key=lambda x: x[1]['total'], reverse=True)
+        # 构建排序后的字典
+        return dict(sorted_items)
 
     # --------- 执行入口 ---------
     def execute(self, pre_task_name, func):

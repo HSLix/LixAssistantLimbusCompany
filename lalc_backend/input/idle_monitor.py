@@ -108,7 +108,7 @@ class IdleMonitor:
         self.last_action = ""
 
 # 用法
-def wait_input_idle(idle_time=0.4, test_mode=False):
+def wait_input_idle(idle_time=0.2, test_mode=False):
     monitor = IdleMonitor(idle_time, test_mode)
     monitor.start_listening()
 

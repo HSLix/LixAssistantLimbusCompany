@@ -1,6 +1,9 @@
 import asyncio
 import traceback
 from typing import Dict, Any, Callable, Optional
+from PIL import Image
+import matplotlib.pyplot as plt
+import io
 
 # 添加上级目录到路径中，以便导入模块
 # sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -276,9 +279,75 @@ class AsyncTaskPipeline:
                         total = data["total"]
                         avg   = total / cnt if cnt else 0
                         parts.append(f"{name}:{cnt}次 {total:.3f}s {avg:.3f}s/次")
-                    self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts))
-            self.logger.debug("异步任务工作协程结束运行")
-            self._send_finish_notification()
+
+                    # 生成性能统计图表
+                    try:
+                        # 使用新函数生成图表
+                        chart_image = self._generate_performance_chart(perf)
+                    except Exception as e:
+                        self.logger.log(f"性能统计表格生成过程发生错误: {str(e)}", level="ERROR")
+
+                    self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts), chart_image)
+                    
+                    
+
+    def _generate_performance_chart(self, perf_data: dict) -> Image.Image:
+        """
+        生成性能统计图表，返回PIL Image对象
+        :param perf_data: 性能统计数据，格式为 {handler_name: {"count": int, "total": float}}
+        :return: PIL Image对象，包含上下两个图表
+        """
+        # 创建图表，设置合适的大小
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        
+        # 按总耗时排序，取前10
+        sorted_by_time = sorted(perf_data.items(), key=lambda x: x[1]['total'], reverse=True)[:10]
+        if sorted_by_time:
+            names_time = [item[0] for item in sorted_by_time]
+            times = [item[1]['total'] for item in sorted_by_time]
+            
+            ax1.bar(names_time, times)
+            ax1.set_title('Top 10 Tasks by Total Execution Time')
+            ax1.set_xlabel('Task Name')
+            ax1.set_ylabel('Total Time (s)')
+            plt.setp(ax1.get_xticklabels(), rotation=45, ha="right")
+
+        # 如果没有数据，显示提示信息
+        else:
+            ax1.text(0.5, 0.5, 'No data available', horizontalalignment='center', verticalalignment='center',
+                     transform=ax1.transAxes, fontsize=14)
+            ax1.set_title('Top 10 Tasks by Total Execution Time')
+
+        # 按调用次数排序，取前10
+        sorted_by_count = sorted(perf_data.items(), key=lambda x: x[1]['count'], reverse=True)[:10]
+        if sorted_by_count:
+            names_count = [item[0] for item in sorted_by_count]
+            counts = [item[1]['count'] for item in sorted_by_count]
+            
+            ax2.bar(names_count, counts)
+            ax2.set_title('Top 10 Tasks by Call Count')
+            ax2.set_xlabel('Task Name')
+            ax2.set_ylabel('Call Count')
+            plt.setp(ax2.get_xticklabels(), rotation=45, ha="right")
+        # 如果没有数据，显示提示信息
+        else:
+            ax2.text(0.5, 0.5, 'No data available', horizontalalignment='center', verticalalignment='center',
+                     transform=ax2.transAxes, fontsize=14)
+            ax2.set_title('Top 10 Tasks by Call Count')
+
+        # 调整布局，防止标签被截断
+        plt.tight_layout()
+        
+        # 将图表转换为PIL Image对象
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
+        buf.seek(0)
+        img = Image.open(buf)
+        
+        # 关闭图表以释放内存
+        plt.close(fig)
+        
+        return img
 
     async def pause(self):
         """
