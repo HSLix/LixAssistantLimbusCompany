@@ -1,13 +1,8 @@
 {
     "mirror_entry":{
-        "recognition":"template_match",
-        "action":"click",
-        "params":{
-            "template":"main_drive_no_text"
-        },
+        "action":"main_drive_confirm",
         "next":[
-            "mirror_enter",
-            "mirror_entry"
+            "mirror_enter"
         ]
     },
     "mirror_enter":{
@@ -20,8 +15,7 @@
         },
         "next":[
             "mirror_enter_dungeon",
-            "mirror_enter",
-            "mirror_entry"
+            "mirror_enter"
         ]
     },
     "mirror_enter_dungeon":{
@@ -37,8 +31,7 @@
             "mirror_enter_last_week",
             "mirror_enter_confirm",
             "mirror_enter_dungeon",
-            "mirror_enter",
-            "mirror_entry"
+            "mirror_enter"
         ]
     },
     "mirror_enter_resume":{
