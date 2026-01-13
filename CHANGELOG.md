@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.8.2](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.1...v4.8.2) (2026-01-13)
+
+
+### Bug Fixes
+
+* 为解决卡在饰品选择的情况，增加饰品选择标识物 | to avoid stuck when acquire ego gift, lalc add other sign to know time to acquire ego gift ([f52009f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f52009f0fae7f61a9b8779dc30b6efec9fd2b7e6))
+* 修复了可能卡在中途加入镜牢的bug | fix the bug that can stuck when enter the mirror ([dd7cf87](https://github.com/HSLix/LixAssistantLimbusCompany/commit/dd7cf8741955232aa851c09b39e6ecc560a35286))
+* 修复了有时镜牢只刷了一次就停止的错误 | fix the bug that mirror only run single turn and stop no matter what config is ([571834b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/571834b2773caabe31476d0f8519cb157e926bfb))
+* 补充奖励获取的带图日志 | add the log with image in get reward ([7144e64](https://github.com/HSLix/LixAssistantLimbusCompany/commit/7144e64290d34540187006552a545732a7012d47))
+
 ## [4.8.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.0...v4.8.1) (2026-01-13)
 
 
