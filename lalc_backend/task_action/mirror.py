@@ -351,16 +351,18 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
     prefer_gifts.difference_update(gift_block_list) # 黑名单优先,不过前端应该不会发生冲突
     all_gift_names = [x[0] for x in get_images_by_tag("ego_gifts")]
     max_ego_gifts_radio = get_max_radio_of_ego_gifts()
-    logger.debug(f"本次倾向购买饰品名单：{prefer_gifts}")
+    need_to_replace_skill = cfg["mirror_replace_skill"][cfg_index]
+    logger.debug(f"本次倾向购买饰品名单：{prefer_gifts};\n本次倾向替换技能人员：{need_to_replace_skill}")
 
     def exec_replace_skill() -> bool:
         replaced = False
+        if len(need_to_replace_skill) == 0:
+            return replaced
+        
         name_of_who_can_replace = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[535, 320, 165, 50])
         if len(name_of_who_can_replace) > 0:
             name_of_who_can_replace = name_of_who_can_replace[0]
-            # cfg_type = node.get_param("cfg_type")
-            # cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
-            need_to_replace_skill = cfg["mirror_replace_skill"][cfg_index]
+            
             skill_order = None
             for name in need_to_replace_skill.keys():
                 print(name)
@@ -469,6 +471,20 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
             self.exec_wait_disappear(get_task("wait_connecting_disappear"))
             time.sleep(1)
             loop_count += 1
+    
+    name_of_who_can_replace = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[535, 320, 165, 50])
+    if len(name_of_who_can_replace) > 0 and len(need_to_replace_skill) > 0:
+        # 没有实现技能替换且还没使用过的情况就看是否是免费普通刷新，是的话再点击普通刷新试试
+        cfg_type = node.get_param("cfg_type")
+        cfg = self._get_using_cfg(cfg_type)
+        cfg_index = self._get_using_cfg_index(cfg_type)
+        for star in cfg["mirror_team_stars"][cfg_index]:
+            if "0" in star:
+                logger.log("检测到有免费普通刷新和剩余技能替换次数，再尝试最后一次刷新和技能替换")
+                input_handler.click(1000, 120)
+                self.exec_wait_disappear(get_task("wait_connecting_disappear"))
+                exec_replace_skill()
+                break
 
 
 fuse_ego_gift_style_map = {

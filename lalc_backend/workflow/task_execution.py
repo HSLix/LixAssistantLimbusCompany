@@ -206,7 +206,7 @@ import task_action
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
-    
+    logger.log("正在尝试返回主页", tmp_screenshot)
     if recognize_handler.template_match(tmp_screenshot, "left_top_arrow"):
         # 对于左上角有箭头的，总之先点了
         pos = recognize_handler.template_match(tmp_screenshot, "left_top_arrow")
@@ -218,7 +218,7 @@ def exec_back_to_init_page(self, node:TaskNode, func):
         input_handler.click(640, 430)
     elif recognize_handler.template_match(tmp_screenshot, "right_top_setting") or recognize_handler.template_match(tmp_screenshot, "pack_search"):
         # 先处理主题页（这个的设置好像不同），或其它右上角有设置的，就当是镜牢内的情况
-        logger.log("检测到可能处于镜牢的其它情况，启动从设置返回")
+        logger.debug("检测到可能处于镜牢的其它情况，启动从设置返回")
         input_handler.click(1230, 45)
         time.sleep(2)
         input_handler.click(730, 435)
@@ -246,14 +246,16 @@ def exec_error_cannot_operate_the_game_window(self, node:TaskNode, func):
 
 @TaskExecution.register("confirm_all_coins")
 def exec_confirm_all_coins(self, node:TaskNode, func):
-    logger.log("开始收集日常的奖励")
-    for pos in recognize_handler.template_match(input_handler.capture_screenshot(), "reward_coin"):
+    tmp_sc = input_handler.capture_screenshot()
+    logger.log("开始收集日常的奖励", tmp_sc)
+    for pos in recognize_handler.template_match(tmp_sc, "reward_coin"):
         input_handler.click(pos[0], pos[1])
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
     
     input_handler.click(270, 400)
     time.sleep(1)
-    logger.log("开始收集周常的奖励")
-    for pos in recognize_handler.template_match(input_handler.capture_screenshot(), "reward_coin"):
+    tmp_sc = input_handler.capture_screenshot()
+    logger.log("开始收集周常的奖励", tmp_sc)
+    for pos in recognize_handler.template_match(tmp_sc, "reward_coin"):
         input_handler.click(pos[0], pos[1])
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
