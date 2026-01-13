@@ -1,5 +1,15 @@
 # Changelog
 
+## [4.8.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.0...v4.8.1) (2026-01-13)
+
+
+### Bug Fixes
+
+* 优化镜牢进入的流程 | make the enter mirror dungeon better ([b5bbeb8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b5bbeb81f72b41dcca892693d63645e65eace186))
+* 修缮流程，提高镜牢流程的稳定性 | make the mirror task running more stable ([0d93264](https://github.com/HSLix/LixAssistantLimbusCompany/commit/0d93264faa6df39194dcf5b8360e73b779890e31))
+* 增加对于 SSL 报错的提醒 | add the remind of the ssl error of github download ([c48aeb1](https://github.com/HSLix/LixAssistantLimbusCompany/commit/c48aeb12f8e6e0effc25c3669ff2c7becc2d9cf9))
+* 补上所有的困难主题包 | add the rest of themepacks of hard more ([47ca3e2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/47ca3e26bd28f89c224340e787c2ca683ee9ce23))
+
 ## [4.8.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.7.1...v4.8.0) (2026-01-12)
 
 
