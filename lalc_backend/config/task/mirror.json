@@ -122,6 +122,7 @@
             "mirror_super_shop_entry",
             "mirror_select_encounter_reward_card",
             "mirror_select_floor_ego_gift",
+            "mirror_select_floor_ego_gift2",
             "mirror_victory",
             "mirror_defeat",
             "mirror_choose_team",
@@ -326,6 +327,17 @@
         "action":"mirror_select_floor_ego_gift",
         "params":{
             "template":"acquire_ego_gift",
+            "cfg_type":"mirror"
+        },
+        "next":[
+            "mirror_circle_center"
+        ]
+    },
+    "mirror_select_floor_ego_gift2": {
+        "recognition":"template_match",
+        "action":"mirror_select_floor_ego_gift",
+        "params":{
+            "template":"refuse_gift",
             "cfg_type":"mirror"
         },
         "next":[
