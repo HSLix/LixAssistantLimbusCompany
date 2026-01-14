@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.8.3](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.2...v4.8.3) (2026-01-14)
+
+
+### Bug Fixes
+
+* 调整通用延迟实现加速 | make the common delay shorter ([c7e4e8c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/c7e4e8cba19d7a610ba6c5455e3e509d071c6c03))
+
 ## [4.8.2](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.1...v4.8.2) (2026-01-13)
 
 
