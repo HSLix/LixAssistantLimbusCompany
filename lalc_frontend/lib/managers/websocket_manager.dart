@@ -685,6 +685,10 @@ class WebSocketManager with ChangeNotifier {
     
     final configManager = ConfigManager();
 
+    // 获取版本号 - 确保在连接成功时获取，而不是在应用启动时
+    String currentVersion = const String.fromEnvironment('CURRENT_VERSION', defaultValue: 'V0.0.0');
+    logger.d("发送配置时获取到的当前版本：$currentVersion");
+
       // 构建包含所有配置的数据结构
     final configData = {
       'type': 'configurations',
@@ -692,13 +696,13 @@ class WebSocketManager with ChangeNotifier {
         'taskConfigs': configManager.taskConfigs.map((key, value) => MapEntry(key, value.toJson())),
         'teamConfigs': configManager.teamConfigs.map((key, value) => MapEntry(key.toString(), value.toJson())),
         'themePackWeights': configManager.themePackWeights,
-        'version': String.fromEnvironment('CURRENT_VERSION', defaultValue: 'V0.0.0'),
+        'version': currentVersion,
       }
     };
 
       // 发送配置数据
       _sendMessage(configData);
-      _addLogMessage('已发送配置数据');
+      _addLogMessage('已发送配置数据，版本号：$currentVersion');
       
       // 执行完成回调
       onComplete?.call();

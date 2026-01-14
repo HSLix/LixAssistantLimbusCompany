@@ -240,8 +240,7 @@ class ServerController:
             if "mirror_mode" in mirror_params:
                 backend_config["mirror_cfg"]["mirror_mode"] = mirror_params["mirror_mode"]
 
-            if "accept_reward" in mirror_params:
-                backend_config["mirror_cfg"]["accept_reward"] = mirror_params["accept_reward"]
+            backend_config["mirror_cfg"]["accept_reward"] = mirror_params.get("accept_reward", True)
         
         # 处理teamConfigs
         team_configs = frontend_config.get("teamConfigs", {})

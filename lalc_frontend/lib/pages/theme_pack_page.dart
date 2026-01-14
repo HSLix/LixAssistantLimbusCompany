@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lalc_frontend/main.dart';
 import 'package:lalc_frontend/managers/config_manager.dart';
-import 'package:lalc_frontend/managers/websocket_manager.dart';
 import 'package:lalc_frontend/utils/websocket_helper.dart'; // 导入WebSocketHelper
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
-import 'package:provider/provider.dart';
 import 'package:toastification/toastification.dart';
 import '../generated/l10n.dart';
 

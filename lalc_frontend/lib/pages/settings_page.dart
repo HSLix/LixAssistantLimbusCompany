@@ -389,15 +389,15 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 显示下载进度弹窗
   void _showDownloadProgressDialog(String source) {
     double progress = 0.0;
-    String _progressText = '${S.of(context).downloading_from} $source';
-    StateSetter? _dialogSetState;
+    String progressText = '${S.of(context).downloading_from} $source';
+    StateSetter? dialogSetState;
     
     // 创建进度对话框
     final dialog = StatefulBuilder(
       builder: (BuildContext context, StateSetter setDialogState) {
-        _dialogSetState = setDialogState;
+        dialogSetState = setDialogState;
         return AlertDialog(
-          title: Text(_progressText),
+          title: Text(progressText),
           content: SizedBox(
             height: 150,
             child: Column(
@@ -437,7 +437,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // 暴露给外部更新文字
     void updateProgressText(String txt) {
       if (mounted) {
-        _dialogSetState?.call(() => _progressText = txt);
+        dialogSetState?.call(() => progressText = txt);
       }
     }
 
@@ -459,7 +459,7 @@ class _SettingsPageState extends State<SettingsPage> {
               // 修复进度值处理：将百分比转换为0-1之间的值
               final double normalized = p / 100.0;
               if (mounted) {
-                _dialogSetState?.call(() => progress = normalized.clamp(0.0, 1.0));
+                dialogSetState?.call(() => progress = normalized.clamp(0.0, 1.0));
               }
             },
             onDone: () {

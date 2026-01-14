@@ -8,6 +8,8 @@
 
 - 项目整体的打包用根目录的 packup_release.bat 文件，打包环境为 windows
 
+- 任务流水线协议（任务节点 json）相关信息可以看这个 [文档](/doc/task_pipeline.md)
+
 - 强烈推荐看本项目的 [DeepWiki](https://deepwiki.com/HSLix/LixAssistantLimbusCompany)，等陆爻齐看完再补充
 
 # Git commit message 建议
