@@ -139,7 +139,7 @@ class _Input:
     def set_foreground_state(self):
         self._current_state = self._foreground_state
 
-    # 供 ServerController 调用
+    # 与任务流水线同步
     def pause(self):
         self._pause_flag.clear()
         logger.debug("InputHandler 已暂停")

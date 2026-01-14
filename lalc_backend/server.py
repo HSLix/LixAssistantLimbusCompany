@@ -466,12 +466,10 @@ class ServerController:
                     # 保存配置到文件
                     self.config_manager.save_configs()
                 
-                input_handler.reset() 
                 await self.pipeline.start("main")
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
                 self.lalc_logger.debug(f"收到 start 命令，已启动任务流水线")
             elif base_cmd == "semi_auto_start":
-                input_handler.reset() 
                 await self.pipeline.start("semi_auto_main")
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
                 self.lalc_logger.debug(f"收到 semi_auto_start 命令，已启动任务流水线")
@@ -726,17 +724,14 @@ class ServerController:
                     })
             elif base_cmd == "pause":
                 await self.pipeline.pause()
-                input_handler.pause()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "paused"}})
                 self.lalc_logger.debug(f"收到 pause 命令，已暂停任务流水线")
             elif base_cmd == "resume":
                 await self.pipeline.resume()
-                input_handler.resume()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "resumed"}})
                 self.lalc_logger.debug(f"收到 resume 命令，已恢复任务流水线")
             elif base_cmd == "stop":
                 await self.pipeline.stop()
-                input_handler.stop()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "stopped"}})
                 self.lalc_logger.debug(f"收到 stop 命令，已停止任务流水线")
             elif base_cmd == "shutdown_pc":

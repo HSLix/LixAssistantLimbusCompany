@@ -10,6 +10,7 @@ from .task_execution import TaskExecution, get_server_ref
 from utils.logger import init_logger
 from utils.config_manager import initialize_configs
 from .task_registry import init_tasks, get_task
+from input.input_handler import input_handler
 
 # 全局单例槽位
 _pipeline_instance: "AsyncTaskPipeline | None" = None
@@ -207,27 +208,28 @@ class AsyncTaskPipeline:
         async with _pipeline_lock:
             global _pipeline_instance
             _pipeline_instance = None
+        
 
     async def start(self, entry: str):
         """启动任务流水线"""
+        input_handler.reset()
         if self._state != STATE_STOPPED:
             self.logger.debug("任务线未处于 STOPPED，忽略本次 start")
             return
             
         self._state = STATE_RUNNING
-        self.entry_node = entry
-        self.reset_counts()
+        self.add_start_task(entry)
         
         if self._worker_task and not self._worker_task.done():
             self.logger.warning("Worker task still running, cancelling...")
             self._worker_task.cancel()
             try:
                 await self._worker_task
-            except asyncio.CancelledError:
-                pass
+            except asyncio.CancelledError as e:
+                raise e
         
         self._worker_task = asyncio.create_task(self._worker())
-        self.logger.info(f"任务流水线已启动，入口节点：{entry}")
+        self.logger.log(f"任务流水线已启动，入口节点：{entry}")
 
     async def _worker(self):
         """
@@ -377,6 +379,7 @@ class AsyncTaskPipeline:
         """
         暂停任务执行
         """
+        input_handler.pause()
         self._pause_event.clear()
         self._state = self.STATE_PAUSED
         self.logger.debug("异步任务流水线已暂停")
@@ -385,6 +388,7 @@ class AsyncTaskPipeline:
         """
         恢复任务执行
         """
+        input_handler.resume()
         self._pause_event.set()
         self._state = self.STATE_RUNNING
         self.logger.debug("异步任务流水线已恢复")
@@ -394,18 +398,21 @@ class AsyncTaskPipeline:
         if self._state == STATE_STOPPED:
             self.logger.debug("任务线已停止，无需重复 stop")
             return
+
+        input_handler.stop()
+        await self.resume()
             
         self._state = STATE_STOPPED
         if self._worker_task:
             if not self._worker_task.done():
-                self.logger.info("正在取消 worker 任务...")
+                self.logger.log("正在取消 worker 任务...")
                 self._worker_task.cancel()
                 try:
                     await self._worker_task
                 except asyncio.CancelledError:
-                    self.logger.info("Worker 任务已取消")
+                    self.logger.log("Worker 任务已取消")
             self._worker_task = None
-        self.logger.info("任务流水线已停止")
+        self.logger.log("任务流水线已停止")
 
     def get_shared_params(self)->None:
         """

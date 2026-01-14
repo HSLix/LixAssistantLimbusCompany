@@ -431,7 +431,7 @@ class ConfigManager {
         count: 1,
         params: {
           'luxcavationMode': 'Enter',
-          'expStage': '08',
+          'expStage': '09',
         },
         teams: [],
       ),
@@ -440,7 +440,7 @@ class ConfigManager {
         count: 1,
         params: {
           'luxcavationMode': 'Enter',
-          'threadStage': '50',
+          'threadStage': '60',
         },
         teams: [],
       ),

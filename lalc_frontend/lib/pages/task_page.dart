@@ -89,7 +89,7 @@ class _HomePageState extends State<HomePage>
     },
     'Thread': {
       'luxcavationMode': 'Enter',
-      'threadStage': '50',
+      'threadStage': '60',
     },
     'Mirror': {
       'stopPurchaseGiftMoney': 600,
@@ -1085,14 +1085,14 @@ class _HomePageState extends State<HomePage>
             ),
           ],
         ),
-        // Thread Stage下拉框 (50到20)
+        // Thread Stage下拉框 
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(S.of(context).thread_stage, style: const TextStyle(color: Colors.white, fontSize: 16)),
             DropdownButton<String>(
               value: threadConfig['threadStage'],
-              items: <String>['50', '40', '30', '20']
+              items: <String>['60', '50', '40', '30', '20']
                   .map<DropdownMenuItem<String>>((String value) {
                 return DropdownMenuItem<String>(
                   value: value,

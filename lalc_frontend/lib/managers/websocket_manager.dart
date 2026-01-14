@@ -31,7 +31,6 @@ class WebSocketManager with ChangeNotifier {
   Timer? _heartbeatTimer;
   Timer? _heartbeatTimeoutTimer;
   Timer? _reconnectTimer;
-  int _reconnectAttempts = 0;
   int _currentPortIndex = 0;
   final List<int> _portsToTry = List.generate(3, (index) => 8765 + index); // 8765到8767的端口
   final Uuid _uuid = const Uuid();
@@ -133,12 +132,11 @@ class WebSocketManager with ChangeNotifier {
       final currentUrl = _getNextServerUrl();
       
       try {
-        debugPrint('尝试连接到 $currentUrl (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
-        _addLogMessage('正在连接到 $currentUrl... (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
+        debugPrint('尝试连接到 $currentUrl ');
+        _addLogMessage('正在连接到 $currentUrl...');
         
         _channel = WebSocketChannel.connect(Uri.parse(currentUrl));
         // 注意：这里不再立即设置_isConnected为true，等待收到服务器消息后再确认连接成功
-        // _reconnectAttempts保持不变，直到真正连接成功才重置
         
         // 监听消息
         _channel!.stream.listen(
@@ -155,10 +153,9 @@ class WebSocketManager with ChangeNotifier {
         notifyListeners();
         debugPrint('WebSocket连接失败: $e');
         _addLogMessage('WebSocket连接失败: $e');
-        // 连接失败时增加端口索引并安排重新连接
-        _reconnectAttempts++;
+
         _currentPortIndex = (_currentPortIndex + 1) % _portsToTry.length;
-        _scheduleReconnect(const Duration(milliseconds: 500));
+        _scheduleReconnect(const Duration(milliseconds: 300));
       }
     });                                       // ④ 临界区结束
     
@@ -180,7 +177,6 @@ class WebSocketManager with ChangeNotifier {
     _isConnectingInProgress = false;
     notifyListeners();
     
-    _reconnectAttempts++;
     
     // 切换到下一个端口
     _currentPortIndex = (_currentPortIndex + 1) % _portsToTry.length;
@@ -188,24 +184,22 @@ class WebSocketManager with ChangeNotifier {
     // 如果已经尝试过所有端口，增加重试间隔并重置尝试次数
     if (_currentPortIndex == 0) {
       // 所有端口都尝试过了，增加延迟（指数退避）
-      final delaySeconds = 2 * (_reconnectAttempts ~/ _portsToTry.length).clamp(1, 30);
-      _addLogMessage('所有端口均连接失败，将在$delaySeconds秒后重试...');
+      _addLogMessage('所有端口均连接失败，将立即重试...');
       // 重置尝试次数，开始新的一轮
-      _reconnectAttempts = 0;
-      _scheduleReconnect(Duration(seconds: delaySeconds));
+      _scheduleReconnect(Duration(seconds: 0));
     } else {
       // 继续尝试下一个端口，使用更短的延迟以提高轮询速度
       _addLogMessage('连接失败，将在0.5秒后尝试重新连接到 ${_getNextServerUrl()}...');
-      _scheduleReconnect(const Duration(milliseconds: 500));
+      _scheduleReconnect(const Duration(milliseconds: 300));
     }
   }
 
   // 安排重连
   void _scheduleReconnect([Duration? delay]) {
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(delay ?? const Duration(milliseconds: 500), () {
-      debugPrint('尝试重新连接到 ${_getNextServerUrl()}... (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
-      _addLogMessage('尝试重新连接到 ${_getNextServerUrl()}... (当前端口尝试次数: ${(_reconnectAttempts % _portsToTry.length) + 1})');
+    _reconnectTimer = Timer(delay ?? const Duration(milliseconds: 300), () {
+      debugPrint('尝试重新连接到 ${_getNextServerUrl()}...');
+      _addLogMessage('尝试重新连接到 ${_getNextServerUrl()}...');
       // 确保在重连前状态正确
       _isConnected = false;
       _isConnecting = false;
@@ -218,8 +212,6 @@ class WebSocketManager with ChangeNotifier {
   // 断开连接
   void disconnect() {
     _cleanup();
-    _reconnectAttempts = 0;
-    // 注意：这里不再重置_currentPortIndex，让它保持当前端口位置
     _isConnected = false;
     _isConnecting = false;
     _isConnectingInProgress = false;
@@ -260,7 +252,6 @@ class WebSocketManager with ChangeNotifier {
         _isConnected = true;
         _isConnecting = false; // 确保连接状态正确更新
         _isConnectingInProgress = false;
-        _reconnectAttempts = 0; // 真正连接成功时重置重连次数
         notifyListeners();
         debugPrint('WebSocket连接成功');
         _addLogMessage('WebSocket连接成功');

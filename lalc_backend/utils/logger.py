@@ -20,7 +20,7 @@ _LEVEL_MAP = {
 }
 
 class LALCLogger:
-    def __init__(self, retain_folder_count: int = 5):
+    def __init__(self, retain_folder_count: int = 3):
         if logging.getLogger("lalc_logger").handlers:
             return
 
