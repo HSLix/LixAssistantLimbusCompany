@@ -1,7 +1,7 @@
 {
-  "check_node_target_count": 0,
+  "check_node_target_count": 1,
   "luxcavation_mode": "enter",
-  "thread_stage": "50",
+  "thread_stage": "60",
   "team_orders": [
     [
       "Sinclair",

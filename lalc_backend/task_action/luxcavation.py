@@ -48,11 +48,11 @@ def exec_thread_select_stage(self, node: TaskNode, func):
     time.sleep(1)
 
     target_stage = cfg["thread_stage"]
-    pos = recognize_handler.find_text_in_image(input_handler.capture_screenshot(), target_stage, mask=[560, 170, 90, 400])
+    pos = recognize_handler.find_text_in_image(input_handler.capture_screenshot(), target_stage, mask=[570, 170, 90, 400])
     while len(pos) == 0:
         input_handler.swipe(650, 325, 650, 430)
         time.sleep(0.6)
-        pos = recognize_handler.find_text_in_image(input_handler.capture_screenshot(), target_stage, mask=[560, 170, 90, 400])
+        pos = recognize_handler.find_text_in_image(input_handler.capture_screenshot(), target_stage, mask=[570, 170, 90, 400])
 
     input_handler.click(pos[0][1], pos[0][2])
 

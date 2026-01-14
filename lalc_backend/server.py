@@ -14,14 +14,39 @@ from input.input_handler import input_handler
 
 logger = init_logger()
 
+# 全局单例引用
+_server_controller_instance = None
+_server_controller_lock = asyncio.Lock()
+
+def _quick_ack(func):
+    """保证无论内部怎么抛，都在 200ms 内给前端 ack"""
+    async def _wrap(self, ws, cmd, msg_id, args_list=None):
+        try:
+            return await func(self, ws, cmd, msg_id, args_list)
+        except Exception as e:
+            self.lalc_logger.debug(f"命令{cmd}异常：{e}", level="ERROR")
+            await self.send_json(ws, {
+                "type": "response",
+                "id": msg_id,
+                "payload": {"status": "error", "message": str(e)}
+            })
+    return _wrap
+
 # -------------------- WebSocket 服务器 --------------------
 class ServerController:
     """
     接收的消息type 为 request 和 heartbeat
     回复的消息 type 为 response，error 和 heartbeat_ack
+    单例模式确保全局只有一个实例
     """
 
     def __init__(self):
+        global _server_controller_instance
+        if _server_controller_instance is not None:
+            raise RuntimeError("ServerController 是单例模式，不能创建多个实例")
+            
+        _server_controller_instance = self
+        
         from workflow.task_execution import set_server_ref   # 刚才写的注入函数
         set_server_ref(self)
         
@@ -366,7 +391,7 @@ class ServerController:
         """
         检查是否超时，如果超过一定的时间没有客户端连接则关闭服务器
         """
-        outdate_time = 10
+        outdate_time = 20
         while True:
             await asyncio.sleep(1)
             
@@ -1127,8 +1152,11 @@ class ServerController:
 
 # -------------------- 入口 --------------------
 async def amain():
-    srv = ServerController()
-    await srv.run_forever()
+    # 使用单例模式获取 ServerController 实例
+    global _server_controller_instance
+    if _server_controller_instance is None:
+        _server_controller_instance = ServerController()
+    await _server_controller_instance.run_forever()
 
 if __name__ == "__main__":
     asyncio.run(amain())

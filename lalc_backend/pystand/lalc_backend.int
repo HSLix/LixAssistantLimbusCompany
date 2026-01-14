@@ -3,6 +3,7 @@ import os
 import ctypes
 import re
 import asyncio
+import subprocess
 
 try:
     # 添加项目根目录和相关子目录到sys.path
@@ -72,17 +73,40 @@ try:
 
     async def launch_frontend_after(delay: int = 3):
         """延迟 delay 秒后再启动前端"""
-        await asyncio.sleep(delay)          # 像 Python 的 time.sleep，但不会阻塞事件循环
+        await asyncio.sleep(delay)
+
+        # 1. 重置 DLL 搜索路径，避免 PyStand 污染子进程环境
+        try:
+            ctypes.windll.kernel32.SetDllDirectoryW(None)
+            print("[launch_frontend_after] DLL 目录已重置为系统默认")
+        except Exception as e:
+            print(f"[launch_frontend_after] 警告：重置 DLL 目录失败: {e}")
+
         frontend_exe_path = os.path.join(script_dir, 'lalc_frontend', 'lalc_frontend.exe')
+
         if os.path.exists(frontend_exe_path):
             print(f"[launch_frontend_after] 启动前端程序（已延迟 {delay} 秒）...")
-            ret = ctypes.windll.shell32.ShellExecuteW(
-                None, "open", "explorer", str(frontend_exe_path), "", 1
-            )
-            if ret <= 32:
-                raise RuntimeError(f"启动前端失败，返回值: {ret}")
+
+            try:
+                # 2. 使用 subprocess 启动前端，避免 ShellExecute + explorer 黑科技
+                creationflags = 0
+                # 仅在 Windows 下定义这些标志，打包后环境即是 Windows
+                creationflags |= getattr(subprocess, 'DETACHED_PROCESS', 0)
+                creationflags |= getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+
+                proc = subprocess.Popen(
+                    [frontend_exe_path],
+                    shell=False,
+                    cwd=os.path.dirname(frontend_exe_path),  # 前端工作目录设为其所在目录
+                    start_new_session=True,
+                    creationflags=creationflags
+                )
+                print(f"[launch_frontend_after] 前端进程已启动, PID={proc.pid}")
+            except Exception as e:
+                # 出错时不要直接 kill 后端，用日志提示
+                print(f"[launch_frontend_after] 启动前端失败: {e}")
         else:
-            print("前端可执行文件不存在，跳过启动")
+            print("[launch_frontend_after] 前端可执行文件不存在，跳过启动")
 
     async def main_wrapper():
         """把原来的同步 main 包一层，实现延迟启动前端"""

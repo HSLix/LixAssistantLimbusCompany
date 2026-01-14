@@ -1,18 +1,24 @@
 import asyncio
+import logging
+from typing import Dict, Any, Callable, Awaitable, Optional
 import traceback
-from typing import Dict, Any, Callable, Optional
+from .task_node import TaskNode
 from PIL import Image
 import matplotlib.pyplot as plt
 import io
-
-# 添加上级目录到路径中，以便导入模块
-# sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from workflow.task_registry import get_task, init_tasks
-from workflow.task_execution import TaskExecution, get_server_ref
-from utils.config_manager import initialize_configs
+from .task_execution import TaskExecution, get_server_ref
 from utils.logger import init_logger
+from utils.config_manager import initialize_configs
+from .task_registry import init_tasks, get_task
 
+# 全局单例槽位
+_pipeline_instance: "AsyncTaskPipeline | None" = None
+_pipeline_lock = asyncio.Lock()
+
+# 状态常量移到类外
+STATE_STOPPED = "stopped"
+STATE_RUNNING = "running"
+STATE_PAUSED = "paused"
 
 class AsyncTaskPipeline:
     """
@@ -186,24 +192,42 @@ class AsyncTaskPipeline:
         self.refresh_execute_target_count()
         self.logger.debug(f"添加起始任务: {task_name}")
 
+    @classmethod
+    async def get(cls) -> "AsyncTaskPipeline":
+        """线程安全的全局单例获取"""
+        global _pipeline_instance
+        async with _pipeline_lock:
+            if _pipeline_instance is None:
+                _pipeline_instance = AsyncTaskPipeline()
+            return _pipeline_instance
+    
+    async def reset(self):
+        """彻底重置到初始状态（用于客户端重连后想重开）"""
+        await self.stop()  # 先停
+        async with _pipeline_lock:
+            global _pipeline_instance
+            _pipeline_instance = None
+
     async def start(self, entry: str):
-        """
-        启动异步任务流水线
-        """
-        # 允许在STOPPED状态下重新启动，即使_worker_task不为None也要重置
-        if self._state == self.STATE_RUNNING:
-            self.logger.debug("任务流水线已在运行中")
+        """启动任务流水线"""
+        if self._state != STATE_STOPPED:
+            self.logger.debug("任务线未处于 STOPPED，忽略本次 start")
             return
             
-        self._stop_event.clear()
-        self._state = self.STATE_RUNNING
+        self._state = STATE_RUNNING
+        self.entry_node = entry
+        self.reset_counts()
         
-        # 重置任务栈并添加起始任务
-        self.add_start_task(entry)
+        if self._worker_task and not self._worker_task.done():
+            self.logger.warning("Worker task still running, cancelling...")
+            self._worker_task.cancel()
+            try:
+                await self._worker_task
+            except asyncio.CancelledError:
+                pass
         
-        # 创建并启动工作协程（无论之前是否存在）
         self._worker_task = asyncio.create_task(self._worker())
-        self.logger.debug(f"启动异步任务流水线，入口任务: {entry}")
+        self.logger.info(f"任务流水线已启动，入口节点：{entry}")
 
     async def _worker(self):
         """
@@ -366,29 +390,22 @@ class AsyncTaskPipeline:
         self.logger.debug("异步任务流水线已恢复")
 
     async def stop(self):
-        """
-        停止任务执行
-        """
-        if self._state == self.STATE_STOPPED:
-            self.logger.debug("任务流水线未在运行")
+        """停止任务流水线"""
+        if self._state == STATE_STOPPED:
+            self.logger.debug("任务线已停止，无需重复 stop")
             return
             
-        self._stop_event.set()
-        self._pause_event.set()
-        self._state = self.STATE_STOPPED
-        
+        self._state = STATE_STOPPED
         if self._worker_task:
-            # 等待工作协程结束，但要处理可能的异常
-            try:
-                await self._worker_task
-            except Exception as e:
-                self.logger.log(f"工作协程结束时发生异常: {str(e)}", level="ERROR")
-            finally:
-                self._worker_task = None
-            
-        # 清空任务栈
-        self.task_stack.clear()
-        self.logger.debug("异步任务流水线已停止")
+            if not self._worker_task.done():
+                self.logger.info("正在取消 worker 任务...")
+                self._worker_task.cancel()
+                try:
+                    await self._worker_task
+                except asyncio.CancelledError:
+                    self.logger.info("Worker 任务已取消")
+            self._worker_task = None
+        self.logger.info("任务流水线已停止")
 
     def get_shared_params(self)->None:
         """

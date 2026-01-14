@@ -384,6 +384,7 @@ if __name__ == "__main__":
         # fill_mask_screenshot(input_handler.capture_screenshot(), 90, 175, 1090, 40), # 换层 ego 的名字
         # fill_mask_screenshot(input_handler.capture_screenshot(), 280, 150, 300, 130), # enhance ego 的名字
         # fill_mask_screenshot(input_handler.capture_screenshot(), 10, 580, 950, 60), # 事件判定
+        fill_mask_screenshot(input_handler.capture_screenshot(), 570, 170, 90, 400), # thread 检测
         # input_handler.capture_screenshot(),
         visualize=True,
         # merge_x=False,
