@@ -7,7 +7,8 @@
             "error_cannot_operate_the_game",
             "error_download_data",
             "error_new_download_added",
-            "error_network_is_unstable"
+            "error_network_is_unstable",
+            "error_client_is_not_up_to_date"
         ]
     },  
     "error_weekly_record_has_been_reset":{
@@ -109,6 +110,15 @@
         "action":"error_cannot_operate_the_game",
         "params":{
             "template":"network_is_unstable"
+        }
+    },
+    "error_client_is_not_up_to_date": {
+        "desc" : "这是周四更新后客户端没更新的报错",
+        "recognition":"template_match",
+        "action":"report_error",
+        "params":{
+            "template":"client_is_not_up_to_date",
+            "error_msg":"客户端需要你上 steam 手动更新，请稍后重启 | Client needs you to update it on Steam, restart later plz"
         }
     }
 }
