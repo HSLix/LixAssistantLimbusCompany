@@ -24,13 +24,16 @@
             "target_offset":[-10, 10]
         },
         "next":[
-            "claim_all_mails"
+            "claim_mail"
         ]
     },
-    "claim_all_mails":{
+    "claim_mail":{
+        "recognition":"template_match",
         "action":"click",
+        "inverse": true,
         "params":{
-            "target":[960, 550]
+            "template":"no_mail_in_storage",
+            "target":[950, 270]
         },
         "next":[
             "wait_mailbox_connecting_disappear"
@@ -39,20 +42,17 @@
     "wait_mailbox_connecting_disappear":{
         "action":"wait_connecting_disappear",
         "next":[
-            "confirm_all_reward",
+            "confirm_reward",
             "exit_mailbox"
         ]
     },
-    "confirm_all_reward":{
-        "recognition":"template_match",
+    "confirm_reward":{
         "action":"key",
-        "inverse":true,
         "params":{
-            "key":"esc",
-            "template":"no_mail_in_storage"
+            "key":"esc"
         },
         "next":[
-            "confirm_all_reward",
+            "claim_mail",
             "exit_mailbox"
         ]
     },

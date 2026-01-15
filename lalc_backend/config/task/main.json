@@ -13,8 +13,14 @@
         "params":{
             "template":"clear_all_caches",
             "target_offset":[400, -400],
-            "post_delay": 6
+            "post_delay": 3
         },
+        "next":[
+            "touch_to_start_check"
+        ]
+    },
+    "touch_to_start_check": {
+        "action":"error_handler",
         "next":[
             "main_circle_center",
             "touch_to_start"
