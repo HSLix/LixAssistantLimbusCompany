@@ -5,18 +5,18 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import os
 
-try:
-    from recognize.utils import pil_to_cv2, mask_screenshot
-    from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
-except ImportError:
-    # 添加项目根目录到Python路径
-    import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-    from recognize.utils import pil_to_cv2, mask_screenshot
-    from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
+# try:
+from recognize.utils import pil_to_cv2, mask_screenshot, cv2_to_pil
+from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
+# except ImportError:
+#     # 添加项目根目录到Python路径
+#     import sys
+#     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+#     from recognize.utils import pil_to_cv2, mask_screenshot
+#     from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
 
 
-def template_match(screenshot, template, threshold=0.8, visualize=False, grayscale=True, screenshot_scale=1):
+def template_match(screenshot, template, threshold=0.8, visualize=False, grayscale=True, screenshot_scale=1, debug_image=None):
     """
     模板匹配
     :param screenshot: PIL图像对象，来自game_input.screenshot
@@ -105,22 +105,22 @@ def template_match(screenshot, template, threshold=0.8, visualize=False, graysca
     matches = merged_matches
     
     # 如果需要可视化，则显示结果
+    vis = screenshot.copy()
+    th, tw = template.shape[:2]
+    for (cx_orig, cy_orig, score) in matches:
+
+        # 可视化需要 scale 后的坐标
+        cx = int(cx_orig * screenshot_scale)
+        cy = int(cy_orig * screenshot_scale)
+
+        tl = (int(cx - tw/2), int(cy - th/2))
+        br = (int(cx + tw/2), int(cy + th/2))
+
+        cv2.rectangle(vis, tl, br, (128, 128, 128), 2)
+        cv2.putText(vis, f"{score:.2f}", (tl[0], tl[1]-10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (128,128,128), 2)
+    
     if visualize:
-        vis = screenshot.copy()
-        th, tw = template.shape[:2]
-        for (cx_orig, cy_orig, score) in matches:
-
-            # 可视化需要 scale 后的坐标
-            cx = int(cx_orig * screenshot_scale)
-            cy = int(cy_orig * screenshot_scale)
-
-            tl = (int(cx - tw/2), int(cy - th/2))
-            br = (int(cx + tw/2), int(cy + th/2))
-
-            cv2.rectangle(vis, tl, br, (128, 128, 128), 2)
-            cv2.putText(vis, f"{score:.2f}", (tl[0], tl[1]-10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (128,128,128), 2)
-
         plt.figure(figsize=(12, 6))
         if grayscale:
             plt.imshow(vis, cmap="gray")
@@ -128,6 +128,9 @@ def template_match(screenshot, template, threshold=0.8, visualize=False, graysca
             plt.imshow(cv2.cvtColor(vis, cv2.COLOR_BGR2RGB))
         plt.axis("off")
         plt.show()
+    
+    if not debug_image is None:
+        debug_image.append(cv2_to_pil(vis, grayscale))
     
     # print(f"Template matching processed in {processing_time:.4f} seconds")
     # print("Template:" + str(matches))

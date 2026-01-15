@@ -81,12 +81,26 @@ class LALCLogger:
             if image is not None:
                 img_name = f"{datetime.now().strftime('%H%M%S_%f')[:-3]}.png"
                 img_path = self.log_dir / "images" / img_name
-                self._save_resized(image, img_path)
+                if level == "DEBUG":
+                    self._save_resized(image, img_path)
+                else:
+                    image.save(img_path, format="PNG")
+
                 if compress_image:
                     self.compress_image_with_pngquant(img_path)
                 msg += f" | IMAGE:images/{img_name}"
 
-            self.logger.info(level_no, f"[{task_name}] {msg}")
+            # 根据传入的level参数使用对应的日志级别
+            if level == "DEBUG":
+                self.logger.debug(f"[{task_name}] {msg}")
+            elif level == "INFO":
+                self.logger.info(f"[{task_name}] {msg}")
+            elif level == "WARNING":
+                self.logger.warning(f"[{task_name}] {msg}")
+            elif level == "ERROR":
+                self.logger.error(f"[{task_name}] {msg}")
+            else:
+                self.logger.info(f"[{task_name}] {msg}")  # 默认使用INFO级别
         except Exception as e:
             self.logger.error(f"[Logger] 记录日志时发生异常: {e}")
 
@@ -171,7 +185,6 @@ def init_logger() -> LALCLogger:
     return _instance
 
 
-
 if __name__ == "__main__":
     from input.input_handler import input_handler
     input_handler.refresh_window_state()
@@ -179,4 +192,6 @@ if __name__ == "__main__":
         logger = init_logger()
         logger.debug("开始战斗", input_handler.capture_screenshot())                       # task_name 自动 = "fight"
         logger.info("出现警告", image=input_handler.capture_screenshot())  # 手动指定 task_name 也可
+        logger.warning("出现警告", image=input_handler.capture_screenshot())  # 手动指定 task_name 也可
+        logger.error("出现警告", image=input_handler.capture_screenshot())  # 手动指定 task_name 也可
     test_log()

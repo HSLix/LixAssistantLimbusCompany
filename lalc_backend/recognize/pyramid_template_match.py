@@ -2,12 +2,12 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-try:
-    from recognize.utils import pil_to_cv2, mask_screenshot
-    from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
-except ImportError:
-    from utils import pil_to_cv2, mask_screenshot
-    from img_registry import get_image, register_images_from_directory, get_images_by_tag
+# try:
+from recognize.utils import pil_to_cv2, mask_screenshot, cv2_to_pil
+from recognize.img_registry import get_image, register_images_from_directory, get_images_by_tag
+# except ImportError:
+#     from utils import pil_to_cv2, mask_screenshot
+#     from img_registry import get_image, register_images_from_directory, get_images_by_tag
 
 
 def run_match(img, template, threshold):
@@ -38,9 +38,10 @@ def pyramid_template_match(
         threshold=0.7,
         visualize=False,
         grayscale=True,
+        debug_image=None
     ):
     """
-    金字塔快速缩放 → 固定尺度匹配（1.3, 1.0, 0.7）
+    金字塔快速缩放 → 固定尺度匹配
     """
     screenshot = pil_to_cv2(screenshot, grayscale)
     template = pil_to_cv2(template, grayscale)
@@ -97,76 +98,27 @@ def pyramid_template_match(
     # 去重与排序
     refined_matches = _merge_close_matches(all_matches)
 
-
-    # threshold_offset = 0.2
-    # if refined_matches[0][3] < threshold + threshold_offset:
-    #     # ===========================
-    #     #  第二阶段：动态细分查找
-    #     # ===========================
-    #     # 初始步长
-    #     step_size = 0.1
-
-    #     while step_size > 0.01:  # 步长小于0.02时结束
-
-    #         # 对所有匹配进行细化
-    #         for i in range(len(refined_matches)):
-    #             cx, cy, score, sc = refined_matches[i]
-
-    #             best_match = (cx, cy, score, sc)  # 初始化当前匹配为最优匹配
-
-    #             # 对每个匹配，尝试 `sc-0.1`, `sc`, `sc+0.1` 来细化
-    #             for delta in [-step_size, 0, step_size]:
-    #                 new_sc = sc + delta
-    #                 resized = cv2.resize(screenshot, 
-    #                                     (int(screenshot.shape[1] * new_sc), int(screenshot.shape[0] * new_sc)),
-    #                                     interpolation=cv2.INTER_LINEAR)
-    #                 matches = run_match(resized, template, threshold)
-
-    #                 if matches:
-    #                     # 比较当前匹配和新的匹配，取分数最好的
-    #                     for new_cx, new_cy, new_score in matches:
-    #                         if new_score > best_match[2]:
-    #                             best_match = (new_cx / new_sc, new_cy / new_sc, new_score, new_sc)
-
-    #             # 如果新的分数比阈值高偏差，则终止循环
-    #             if best_match[2] > threshold + threshold_offset:
-    #                 break  # 终止细化循环
-
-    #             # 更新原始匹配的得分和缩放倍率
-    #             refined_matches[i] = best_match
-
-    #         # 如果已经终止循环，跳出外部的 while 循环
-    #         if best_match[2] > threshold + threshold_offset:
-    #             break
-
-    #         # 步长减半，直到小于0.02
-    #         step_size = max(step_size / 2, 0.01)
-
-
-    #     # 按得分从高到低排序
-    #     refined_matches.sort(key=lambda x: x[2], reverse=True)
-
     # ===========================
     # 可视化结果
     # ===========================
-    if visualize and refined_matches:
-        vis = screenshot.copy()  # 创建一个副本，防止直接修改原图
+    
+    vis = screenshot.copy()  # 创建一个副本，防止直接修改原图
 
-        for (cx, cy, score, sc) in refined_matches:
-            # 计算矩形的左上角 (tl) 和右下角 (br)
-            tl = (int(cx - tw / 2), int(cy - th / 2))
-            br = (int(cx + tw / 2), int(cy + th / 2))
+    for (cx, cy, score, sc) in refined_matches:
+        # 计算矩形的左上角 (tl) 和右下角 (br)
+        tl = (int(cx - tw / 2), int(cy - th / 2))
+        br = (int(cx + tw / 2), int(cy + th / 2))
 
-            # 绘制矩形框
-            cv2.rectangle(vis, tl, br, (0, 255, 255), 2)
+        # 绘制矩形框
+        cv2.rectangle(vis, tl, br, (0, 255, 255), 2)
 
-            # 在矩形框上方绘制分数和缩放倍数
-            cv2.putText(vis, f"{score:.2f} (Scale: {sc:.2f})", (tl[0], tl[1] - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
+        # 在矩形框上方绘制分数和缩放倍数
+        cv2.putText(vis, f"{score:.2f} (Scale: {sc:.2f})", (tl[0], tl[1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
 
+    if visualize:
         # 使用 Matplotlib 显示结果，包括源图像和模板图像
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-        
         # 显示源图像
         if grayscale:
             axes[0].imshow(vis, cmap="gray")
@@ -185,28 +137,9 @@ def pyramid_template_match(
         
         plt.tight_layout()
         plt.show()
-    elif visualize and not refined_matches:
-        # 即使没有匹配结果也显示图像以便调试
-        fig, axes = plt.subplots(1, 2, figsize=(15, 6))
-        
-        # 显示源图像
-        if grayscale:
-            axes[0].imshow(screenshot, cmap="gray")
-        else:
-            axes[0].imshow(cv2.cvtColor(screenshot, cv2.COLOR_BGR2RGB))
-        axes[0].set_title("Source Image (No Matches Found)")
-        axes[0].axis("off")
-        
-        # 显示模板图像
-        if grayscale:
-            axes[1].imshow(template, cmap="gray")
-        else:
-            axes[1].imshow(cv2.cvtColor(template, cv2.COLOR_BGR2RGB))
-        axes[1].set_title("Template Image")
-        axes[1].axis("off")
-        
-        plt.tight_layout()
-        plt.show()
+    
+    if not debug_image is None:
+        debug_image.append(cv2_to_pil(vis, grayscale))
 
     # 返回按得分排序的匹配结果
     return refined_matches

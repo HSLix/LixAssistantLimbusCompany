@@ -16,166 +16,10 @@ from input.input_handler import input_handler
 import os
 base_dir = os.path.dirname(__file__)
 yaml_path = os.path.join(base_dir, "rapidocr.yaml")
-# print(yaml_path)
 img_ocr = RapidOCR(config_path=yaml_path)
 
 
-# def detect_text_in_image(image: Image.Image, visualize=False, threshold=0.3):
-#     """
-#     detect_text_in_image:
-#     使用 CLAHE
-#     特别适合粗体英文、间距小、笔画粘连的 OCR 场景
-#     :return: 匹配(包含目标字符串)的列表，每个元素为 (文字, center_x, center_y, 置信度)
-#     """
-#     # ----------- 统一转灰度 -----------
-#     image_cv = pil_to_cv2(image, grayscale=True)
-
-#     # image_cv = cv2.resize(image_cv, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
-
-#     # image_cv = cv2.convertScaleAbs(image_cv, alpha=1.3, beta=15)
-
-#     # ----------- CLAHE（增强局部对比）-----------
-#     clahe = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8))
-#     image_cv = clahe.apply(image_cv)
-
-#     # ----------- RapidOCR -----------
-#     result = img_ocr(image_cv)
-
-#     dt_boxes = result.boxes
-#     texts = result.txts
-#     scores = result.scores
-
-#     detected_texts = []
-#     if dt_boxes is None or len(dt_boxes) == 0:
-#         if visualize:
-#             cv2_to_pil(image_cv, True).show()
-#         return detected_texts
-
-#     for box, text, conf in zip(dt_boxes, texts, scores):
-#         box = np.array(box)
-#         center_x = int(box[:, 0].mean())
-#         center_y = int(box[:, 1].mean())
-#         detected_texts.append((text, center_x, center_y, float(conf)))
-
-#     detected_texts.sort(key=lambda x: x[3], reverse=True)
-
-#     # ----------- 可视化（此时才转回彩色）-----------
-#     if visualize:
-#         vis_img = cv2.cvtColor(image_cv, cv2.COLOR_GRAY2BGR)
-#         for box, text, conf in zip(dt_boxes, texts, scores):
-#             if conf >= threshold:
-#                 box = np.array(box, dtype=np.int32)
-#                 cv2.polylines(vis_img, [box], True, (255, 0, 0), 2)
-#         cv2_to_pil(vis_img).show()
-
-#     return detected_texts
-
-
-# def detect_text_in_image(image: Image.Image, visualize=False, threshold=0.3, y_merge_threshold=30, dx_threshold=80):
-#     """
-#     detect_text_in_image with non-consecutive line merging.
-#     Handles cases like:
-#         [('A', x, y1), ('B', x2, y2), ('C', x, y3)] → merge A & C if y3-y1 <= threshold and |x-x| small.
-#     """
-#     # ----------- 预处理 -----------
-#     image_cv = pil_to_cv2(image, grayscale=True)
-#     clahe = cv2.createCLAHE(clipLimit=2, tileGridSize=(16, 16))
-#     image_cv = clahe.apply(image_cv)
-
-#     result = img_ocr(image_cv)
-#     dt_boxes = result.boxes
-#     texts = result.txts
-#     scores = result.scores
-
-#     if dt_boxes is None or len(dt_boxes) == 0:
-#         if visualize:
-#             cv2_to_pil(image_cv, True).show()
-#         return []
-
-#     # 构建原始项
-#     raw_items = []
-#     for box, text, conf in zip(dt_boxes, texts, scores):
-#         box = np.array(box, dtype=np.float32)
-#         cx = int(box[:, 0].mean())
-#         cy = int(box[:, 1].mean())
-#         raw_items.append({
-#             'text': text,
-#             'cx': cx,
-#             'cy': cy,
-#             'conf': float(conf),
-#             'box': box.copy()
-#         })
-
-#     # 按 y 排序（从上到下）
-#     raw_items.sort(key=lambda x: x['cy'])
-
-#     n = len(raw_items)
-#     visited = [False] * n
-#     merged_items = []
-
-#     for i in range(n):
-#         if visited[i]:
-#             continue
-
-#         # 当前起始项
-#         base = raw_items[i]
-#         group = [i]  # 存储索引
-#         visited[i] = True
-
-#         # 向后查找所有可合并项（不要求连续！）
-#         for j in range(i + 1, n):
-#             if visited[j]:
-#                 continue
-#             other = raw_items[j]
-#             dy = other['cy'] - base['cy']
-#             dx = abs(other['cx'] - base['cx'])
-
-#             # 必须在下方，且垂直距离合理，且水平对齐
-#             if 0 < dy <= y_merge_threshold and dx <= dx_threshold:
-#                 group.append(j)
-#                 visited[j] = True
-
-#         # 合并 group 中所有项
-#         merged_text = ' '.join(raw_items[idx]['text'] for idx in sorted(group, key=lambda idx: raw_items[idx]['cy']))
-#         merged_boxes = [raw_items[idx]['box'] for idx in group]
-#         merged_conf = min(raw_items[idx]['conf'] for idx in group)
-
-#         # 计算合并后的 bounding box
-#         all_points = np.concatenate(merged_boxes, axis=0)
-#         min_x, min_y = all_points.min(axis=0)
-#         max_x, max_y = all_points.max(axis=0)
-#         merged_box = np.array([
-#             [min_x, min_y],
-#             [max_x, min_y],
-#             [max_x, max_y],
-#             [min_x, max_y]
-#         ], dtype=np.int32)
-
-#         cx = int((min_x + max_x) // 2)
-#         cy = int((min_y + max_y) // 2)
-#         merged_items.append((merged_text, cx, cy, merged_conf, merged_box))
-
-#     # 按置信度排序
-#     merged_items.sort(key=lambda x: x[3], reverse=True)
-
-#     detected_texts = [(text, cx, cy, conf) for text, cx, cy, conf, _ in merged_items]
-
-#     # ----------- 可视化 -----------
-#     if visualize:
-#         vis_img = cv2.cvtColor(image_cv, cv2.COLOR_GRAY2BGR)
-#         for text, cx, cy, conf, box in merged_items:
-#             if conf >= threshold:
-#                 cv2.polylines(vis_img, [box], True, (255, 0, 0), 2)
-#         cv2_to_pil(vis_img).show()
-
-#     return detected_texts
-
-
-import numpy as np
-from PIL import Image
-import cv2
-
-def detect_text_in_image(image: Image.Image, visualize=False, threshold=0.3, merge_x=True, merge_y=True):
+def detect_text_in_image(image: Image.Image, visualize=False, threshold=0.3, merge_x=True, merge_y=True, debug_image=None):
     """
     detect_text_in_image with horizontal and vertical merging.
     - Horizontal merge: x distance <= x_merge_threshold
@@ -332,15 +176,21 @@ def detect_text_in_image(image: Image.Image, visualize=False, threshold=0.3, mer
 
     detected_texts = [(text, cx, cy, conf) for text, cx, cy, conf, _ in final_merged_items]
 
+    
+    vis_img = cv2.cvtColor(image_cv, cv2.COLOR_GRAY2BGR)
+    for text, cx, cy, conf, box in final_merged_items:
+        if conf >= threshold:
+            # 确保box是正确的整数类型
+            box = np.array(box, dtype=np.int32)
+            cv2.polylines(vis_img, [box], True, (255, 0, 0), 2)
+    vis_img = cv2_to_pil(vis_img)
+    
     # ----------- 可视化 ----------- 
-    if visualize:
-        vis_img = cv2.cvtColor(image_cv, cv2.COLOR_GRAY2BGR)
-        for text, cx, cy, conf, box in final_merged_items:
-            if conf >= threshold:
-                # 确保box是正确的整数类型
-                box = np.array(box, dtype=np.int32)
-                cv2.polylines(vis_img, [box], True, (255, 0, 0), 2)
-        cv2_to_pil(vis_img).show()
+    if visualize:    
+        vis_img.show()
+    
+    if not debug_image is None:
+        debug_image.append(vis_img)
 
     return detected_texts
 

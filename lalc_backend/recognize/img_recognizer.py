@@ -54,11 +54,12 @@ class ImageRecognizer:
         if not mask_template is None:
             template = mask_screenshot(template, *mask_template)
         screenshot = mask_screenshot(screenshot, *mask)
-        tmp = template_match(screenshot, template, threshold, visualize, grayscale, screenshot_scale)
+        debug_image = []
+        tmp = template_match(screenshot, template, threshold, visualize, grayscale, screenshot_scale, debug_image=debug_image)
         res = []
         for i in tmp:
             res.append((i[0]+mask[0], i[1]+mask[1], i[2]))
-        log_pic = None if len(res) == 0 else screenshot
+        log_pic = None if len(res) == 0 else debug_image[0]
         logger.debug(f"执行模板匹配，模板{template_name}, 对目标图片做截取{mask}, 对模板图片做截取{mask_template}, 匹配结果: {res}", log_pic)
         return res
     
@@ -79,11 +80,12 @@ class ImageRecognizer:
         template_name = template
         template = get_image(template)
         screenshot = mask_screenshot(screenshot, *mask)
-        tmp = precise_template_match(screenshot, template, threshold, visualize, grayscale, screenshot_scale)
+        debug_image = []
+        tmp = precise_template_match(screenshot, template, threshold, visualize, grayscale, screenshot_scale, debug_image=debug_image)
         res = []
         for i in tmp:
             res.append((i[0]+mask[0], i[1]+mask[1], i[2]))
-        log_pic = None if len(res) == 0 else screenshot
+        log_pic = None if len(res) == 0 else debug_image[0]
         logger.debug(f"执行精确模板匹配，模板{template_name}, 对目标图片做截取{mask}，匹配结果：{res}", log_pic)
         return res
 
@@ -102,11 +104,12 @@ class ImageRecognizer:
         template_name = template
         template = get_image(template)
         screenshot = mask_screenshot(screenshot, *mask)
-        tmp = pyramid_template_match(screenshot, template, threshold, visualize, grayscale)
+        debug_image = []
+        tmp = pyramid_template_match(screenshot, template, threshold, visualize, grayscale, debug_image=debug_image)
         res = []
         for i in tmp:
             res.append((i[0]+mask[0], i[1]+mask[1], i[2]))
-        log_pic = None if len(res) == 0 else screenshot
+        log_pic = None if len(res) == 0 else debug_image[0]
         logger.debug(f"执行金字塔模板匹配，模板{template_name}, 对目标图片做截取{mask}，匹配结果：{res}", log_pic)
         return res
 
@@ -192,12 +195,9 @@ class ImageRecognizer:
             mask = [0, 0, input_handler.width, input_handler.height]
             
         _img = fill_mask_screenshot(screenshot , *mask)
-        # tmp = detect_text_in_image(_img, visualize, threshold)
-        # res = []
-        # for text in tmp:
-        #     res.append((text[0], text[1]+mask[0], text[2]+mask[1], text[3]))
-        res = detect_text_in_image(_img, visualize, threshold)
-        log_pic = None if len(res) == 0 else screenshot
+        debug_image = []
+        res = detect_text_in_image(_img, visualize, threshold, debug_image=debug_image)
+        log_pic = None if len(res) == 0 else debug_image[0]
         logger.debug(f"执行文字识别，对目标图片做截取{mask}，识别结果：{res}", log_pic)
         return res
 

@@ -383,6 +383,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                     pos = replace_skill_map[i]
                     input_handler.click(*pos)
                 logger.info(f"确认执行该罪人的技能替换", input_handler.capture_screenshot())
+                time.sleep(0.3)
                 input_handler.click(790, 535)
                 time.sleep(0.5)
                 input_handler.click(790, 535)
