@@ -520,12 +520,12 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
     # 确保 EGO 数量够了进合成
     input_handler.click(280, 390)
     time.sleep(1)
-    tmp_screenshot = input_handler.capture_screenshot()
-    if len(recognize_handler.template_match(tmp_screenshot, "fuse_ego_gift")) == 0:
+    if len(recognize_handler.template_match(input_handler.capture_screenshot(), "fuse_ego_gift")) == 0:
         return
     # 选择主体系对应的饰品合成
-    input_handler.click(850, 350)
-    time.sleep(1)
+    while len(recognize_handler.template_match(input_handler.capture_screenshot(), "fusion_keyword_selection")) == 0:
+        input_handler.click(850, 350)
+        time.sleep(1)
     cfg_type = node.get_param("cfg_type")
     cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
     mirror_team_styles = cfg["mirror_team_styles"][cfg_index]
