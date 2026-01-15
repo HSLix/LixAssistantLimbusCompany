@@ -4,7 +4,7 @@ from workflow.task_execution import *
 @TaskExecution.register("event_pass_check")
 def exec_event_pass_check(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.log("事件判定检查", tmp_screenshot)
+    logger.info("事件判定检查", tmp_screenshot)
     recognized = False
     for s in ["very_high", "high", "normal", "low", "very_low"]:
         res = recognize_handler.template_match(tmp_screenshot, "event_pass_"+s, mask=[20, 590, 950, 60])
@@ -28,7 +28,7 @@ def exec_event_make_choice(self, node:TaskNode, func):
         input_handler.click(scroll_strip_pos[0][0], scroll_strip_pos[0][1])
     time.sleep(1)
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.log("事件选项处理", tmp_screenshot)
+    logger.info("事件选项处理", tmp_screenshot)
     special_case = False
     
     # 优先选能拿 E.G.O 的
@@ -36,7 +36,7 @@ def exec_event_make_choice(self, node:TaskNode, func):
     special_phase = ["Select to gain", "Pass to level up", "Pass to gain", "check to gain", "depending on"]
     for res in results:
         if any(phase in res[0] for phase in special_phase):
-            logger.log(f"找到优先选项：{res[0]}")
+            logger.info(f"找到优先选项：{res[0]}")
             input_handler.click(res[1], res[2])
             special_case = True
     

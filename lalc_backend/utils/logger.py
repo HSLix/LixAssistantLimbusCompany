@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from PIL import Image
 import inspect
+import cv2 
 
 _instance = None
 
@@ -21,111 +22,79 @@ _LEVEL_MAP = {
 
 class LALCLogger:
     def __init__(self, retain_folder_count: int = 3):
-        if logging.getLogger("lalc_logger").handlers:
-            return
-
+        # 检查是否已经存在logger实例
+        self.logger = logging.getLogger("lalc_logger")
+        
         self.run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.log_dir = Path("./logs") / self.run_id
         self.log_dir.mkdir(parents=True, exist_ok=True)
         (self.log_dir / "images").mkdir(exist_ok=True)
         self._clean_old_folders(retain_folder_count)
+        
+        # 如果logger还没有被配置（没有处理器），则进行配置
+        if not self.logger.handlers:
+            self.log_file = self.log_dir / "run.log"
+            self.logger.setLevel(logging.DEBUG)
 
-        self.log_file = self.log_dir / "run.log"
-        self.logger = logging.getLogger("lalc_logger")
-        self.logger.setLevel(logging.DEBUG)
+            fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+            fh = logging.FileHandler(self.log_file, encoding="utf-8")
+            fh.setFormatter(fmt)
+            self.logger.addHandler(fh)
 
-        fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-        fh = logging.FileHandler(self.log_file, encoding="utf-8")
-        fh.setFormatter(fmt)
-        self.logger.addHandler(fh)
+            ch = logging.StreamHandler()
+            ch.setFormatter(fmt)
+            self.logger.addHandler(ch)
 
-        ch = logging.StreamHandler()
-        ch.setFormatter(fmt)
-        self.logger.addHandler(ch)
+        
 
-    def log(self,
-            msg: str = "",
-            image: Image.Image | None = None,
-            level: str = "INFO",
-            task_name: str | None = None,
-            compress_image: bool = True):
-        """
-        通用日志入口
-        task_name 为 None 时自动取调用处函数名；
-        级别 ≥ WARNING 时自动附加 文件:行号
-        """
+        # ========= 对外仅暴露 4 个级别 =========
+    def debug(self, msg: str = "", image: Image.Image | None = None,
+              task_name: str | None = None, compress_image: bool = True) -> None:
+        self._base_log(msg, image, "DEBUG", task_name, compress_image)
+
+    def info(self, msg: str = "", image: Image.Image | None = None,
+             task_name: str | None = None, compress_image: bool = True) -> None:
+        self._base_log(msg, image, "INFO", task_name, compress_image)
+
+    def warning(self, msg: str = "", image: Image.Image | None = None,
+                task_name: str | None = None, compress_image: bool = True) -> None:
+        self._base_log(msg, image, "WARNING", task_name, compress_image)
+
+    def error(self, msg: str = "", image: Image.Image | None = None,
+              task_name: str | None = None, compress_image: bool = True) -> None:
+        self._base_log(msg, image, "ERROR", task_name, compress_image)
+
+    # --------- 统一底层实现 ---------
+    def _base_log(self, msg, image, level, task_name, compress_image):
         try:
-            # ---- 自动 task_name ----
             if task_name is None:
-                frame = inspect.currentframe().f_back
+                frame = inspect.currentframe().f_back.f_back  # 跨一层封装
                 task_name = frame.f_code.co_name
 
-            # ---- 级别 ≥ WARNING 附加定位信息 ----
-            level_no = _LEVEL_MAP.get(level.upper(), logging.INFO)
+            level_no = _LEVEL_MAP[level]
             if level_no >= logging.WARNING:
-                frame = inspect.currentframe().f_back
+                frame = inspect.currentframe().f_back.f_back
                 filename = os.path.basename(frame.f_code.co_filename)
                 lineno = frame.f_lineno
                 msg += f"  ({filename}:{lineno})"
 
-            # ---- 图片逻辑（保持原样） ----
             if image is not None:
                 img_name = f"{datetime.now().strftime('%H%M%S_%f')[:-3]}.png"
                 img_path = self.log_dir / "images" / img_name
-                image.save(img_path, format="PNG")
-                
-                # 如果需要压缩图片
+                self._save_resized(image, img_path)
                 if compress_image:
                     self.compress_image_with_pngquant(img_path)
-                    
                 msg += f" | IMAGE:images/{img_name}"
 
-            self.logger.log(getattr(logging, level), f"[{task_name}] {msg}")
+            self.logger.info(level_no, f"[{task_name}] {msg}")
         except Exception as e:
-            self.log(f"日志记录 log 发生错误：{e}", level="ERROR")
-
-
-    def debug(self,
-              msg: str = "",
-              image: Image.Image | None = None,
-              level: str = "DEBUG",
-              task_name: str | None = None,
-              compress_image: bool = True):
-        try:
-            # ---- 自动 task_name ----
-            if task_name is None:
-                frame = inspect.currentframe().f_back
-                task_name = frame.f_code.co_name
-
-            # ---- 级别 ≥ WARNING 附加定位信息 ----
-            level_no = _LEVEL_MAP.get(level.upper(), logging.INFO)
-            if level_no >= logging.WARNING:
-                frame = inspect.currentframe().f_back
-                filename = os.path.basename(frame.f_code.co_filename)
-                lineno = frame.f_lineno
-                msg += f"  ({filename}:{lineno})"
-
-            # ---- 图片逻辑（保持原样） ----
-            if image is not None:
-                img_name = f"{datetime.now().strftime('%H%M%S_%f')[:-3]}.png"
-                img_path = self.log_dir / "images" / img_name
-                image.save(img_path, format="PNG")
-                # image.close()
-                
-                # 如果需要压缩图片
-                if compress_image:
-                    self.compress_image_with_pngquant(img_path)
-                    
-                msg += f" | IMAGE:images/{img_name}"
-
-            self.logger.log(getattr(logging, level), f"[{task_name}] {msg}")
-        except Exception as e:
-            self.log(f"日志记录 debug 发生错误：{e}", level="ERROR")
+            self.logger.error(f"[Logger] 记录日志时发生异常: {e}")
 
     # --------- 内部 ---------
     def _clean_old_folders(self, keep: int):
         root = Path("./logs")
         if not root.exists():
+            self.logger.warning(f"日志文件夹不存在，跳过日志清理")
             return
         dirs = sorted((d for d in root.iterdir() if d.is_dir()), key=lambda x: x.name)
         for d in dirs[:-keep]:
@@ -145,12 +114,12 @@ class LALCLogger:
             # 检查pngquant.exe是否存在
             pngquant_exe = Path(__file__).parent / "pngquant.exe"
             if not pngquant_exe.exists():
-                self.log(f"pngquant.exe未找到: {pngquant_exe}", level="WARNING")
+                self.warning(f"pngquant.exe未找到: {pngquant_exe}")
                 return False
                 
             # 检查图片文件是否存在
             if not image_path.exists():
-                self.log(f"图片文件不存在: {image_path}", level="WARNING")
+                self.warning(f"图片文件不存在: {image_path}")
                 return False
 
             # 构建命令，按照要求使用特定参数进行快速压缩
@@ -177,12 +146,23 @@ class LALCLogger:
                 self.debug(f"图片压缩成功: {image_path}")
                 return True
             else:
-                self.log(f"图片压缩失败: {image_path}, 错误: {result.stderr.strip()}", level="WARNING")
+                self.warning(f"图片压缩失败: {image_path}, 错误: {result.stderr.strip()}")
                 return False
                 
         except Exception as e:
-            self.log(f"图片压缩发生异常: {e}", level="ERROR")
+            self.error(f"图片压缩发生异常: {e}")
             return False
+        
+        # --------- 内部：统一写图+resize ---------
+    def _save_resized(self, image: Image.Image, save_path: Path) -> None:
+        """
+        将 PIL 图像宽高各缩小后保存为 PNG
+        """
+        w, h = image.size
+        new_size = (w // 2, h // 2)
+        image = image.resize(new_size, Image.LANCZOS)
+        image.save(save_path, format="PNG")
+
 
 def init_logger() -> LALCLogger:
     global _instance
@@ -198,5 +178,5 @@ if __name__ == "__main__":
     def test_log():
         logger = init_logger()
         logger.debug("开始战斗", input_handler.capture_screenshot())                       # task_name 自动 = "fight"
-        logger.log("出现警告", level="WARNING", image=input_handler.capture_screenshot())  # 手动指定 task_name 也可
+        logger.info("出现警告", image=input_handler.capture_screenshot())  # 手动指定 task_name 也可
     test_log()

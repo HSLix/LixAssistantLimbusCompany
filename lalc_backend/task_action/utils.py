@@ -6,7 +6,7 @@ from workflow.task_execution import *
 
 @TaskExecution.register("choose_team")
 def exec_choose_team(self, node: TaskNode, func):
-    logger.log("选择队伍")
+    logger.info("选择队伍")
     cfg_type = node.get_param("cfg_type")
     cfg = self._get_using_cfg(cfg_type)
     cfg_index = self._get_using_cfg_index(cfg_type)
@@ -31,7 +31,7 @@ def exec_choose_team(self, node: TaskNode, func):
 
     team_click = [(130, 315), (130, 355), (130, 390), (130, 430), (130, 465), (130, 500)]
     input_handler.click(*team_click[click_index])
-    logger.log("完成选择队伍", input_handler.capture_screenshot())
+    logger.info("完成选择队伍", input_handler.capture_screenshot())
     if cfg_type == "mirror":
         time.sleep(0.5)
         input_handler.click(1140, 590)
@@ -56,7 +56,7 @@ team_order_map = {
 
 @TaskExecution.register("ready_to_battle")
 def exec_ready_to_battle(self, node: TaskNode, func):
-    logger.log("准备战斗", input_handler.capture_screenshot())
+    logger.info("准备战斗", input_handler.capture_screenshot())
     res = recognize_handler.detect_text_in_image(
         input_handler.capture_screenshot(), mask=[1130, 500, 100, 50],
     )
@@ -79,7 +79,7 @@ def exec_ready_to_battle(self, node: TaskNode, func):
         selected_count = int(text[:index])
         all_count = int(text[index + 1:])
     except Exception as e:
-        logger.log(f"[警告] OCR 获取队伍人数信息时出现错误：{e}，已使用默认值 selected=0, all=1")
+        logger.info(f"[警告] OCR 获取队伍人数信息时出现错误：{e}，已使用默认值 selected=0, all=1")
 
     # 只要数字不等，就需要重置，毕竟也有可能会 11/5
     if selected_count != all_count:
@@ -118,7 +118,7 @@ def exec_ready_to_battle(self, node: TaskNode, func):
 
 @TaskExecution.register("get_enkephalin_module")
 def exec_get_enkephalin_module(self, node: TaskNode, func):
-    logger.log("获取脑啡肽模块", input_handler.capture_screenshot())
+    logger.info("获取脑啡肽模块", input_handler.capture_screenshot())
     input_handler.click(500, 230)
     time.sleep(1)
     input_handler.click(800, 330)
@@ -131,14 +131,14 @@ def exec_get_enkephalin_module(self, node: TaskNode, func):
 
 @TaskExecution.register("recharge_enkephalin")
 def exec_recharge_enkephalin(self, node: TaskNode, func):
-    logger.log("充值脑啡肽", input_handler.capture_screenshot())
+    logger.info("充值脑啡肽", input_handler.capture_screenshot())
     input_handler.click(630, 230)
     time.sleep(1)
     res = recognize_handler.detect_text_in_image(input_handler.capture_screenshot(), mask=[680, 300, 120, 45])
     try:
         index = str.find(res[0][0], "/")
     except IndexError:
-        logger.log("检测已购买次数失败，当作已购买十次", input_handler.capture_screenshot(), "WARNING")
+        logger.info("检测已购买次数失败，当作已购买十次", input_handler.capture_screenshot(), "WARNING")
         already_purchase_count = 10
     else:
         already_purchase_count = int(res[0][0][:index])
@@ -149,5 +149,5 @@ def exec_recharge_enkephalin(self, node: TaskNode, func):
         time.sleep(1)
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
         already_purchase_count += 1
-        logger.log(f"购买了一次狂气, 还剩{cfg['lunary_purchase_target'] - already_purchase_count}")
+        logger.info(f"购买了一次狂气, 还剩{cfg['lunary_purchase_target'] - already_purchase_count}")
     

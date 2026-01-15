@@ -4,16 +4,16 @@ from workflow.task_execution import *
 def exec_check_out_update(self, node:TaskNode, func):
     old = node.get_param("execute_count", 0)
     node.set_param("execute_count", old + 1)
-    logger.log(f"[check_out_update] 节点<{node.name}> 计数 + 1，当前：{old + 1}")
+    logger.info(f"[check_out_update] 节点<{node.name}> 计数 + 1，当前：{old + 1}")
 
 
 @TaskExecution.register("init_limbus_window")
 def exec_init_limbus_window(self, node:TaskNode, func):
-    logger.log("开始初始化Limbus窗口")
+    logger.info("开始初始化Limbus窗口")
     input_handler.open_limbus()
     input_handler.refresh_window_state()
     input_handler.set_window_size()
-    logger.log("结束初始化Limbus窗口", input_handler.capture_screenshot())
+    logger.info("结束初始化Limbus窗口", input_handler.capture_screenshot())
 
 
 @TaskExecution.register("click")
@@ -122,6 +122,6 @@ def exec_empty(self, node: TaskNode, func=None):
 
 @TaskExecution.register("report_error")
 def exec_report_error(self, node: TaskNode, func=None):
-    logger.log(f"报告错误: {node.name}", level="ERROR")
+    logger.error(f"报告错误: {node.name}")
     msg = node.get_param("error_msg")
     raise Exception("任务节点{%s} 报告错误：{%s}" % (node.name, msg))

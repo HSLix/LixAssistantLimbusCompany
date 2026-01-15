@@ -63,11 +63,11 @@ class ConfigManager:
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
             except json.JSONDecodeError:
-                logger.log(f"警告: 配置文件 {file_path} 格式错误，使用空配置", level="ERROR")
+                logger.error(f"警告: 配置文件 {file_path} 格式错误，使用空配置")
                 return {}
         else:
             # 文件不存在，创建空文件
-            logger.log(f"警告: 配置文件 {file_path} 不存在，使用空配置", level="WARNING")
+            logger.warning(f"警告: 配置文件 {file_path} 不存在，使用空配置")
             self._save_config_file(file_path, {})
             return {}
 

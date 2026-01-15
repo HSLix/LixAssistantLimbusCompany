@@ -98,7 +98,7 @@ class AsyncTaskPipeline:
 
             # 仅 Windows 弹窗；如以后想支持 mac/Linux，直接删掉下面判断即可
             if platform.system() != "Windows":
-                self.logger.log("暂时仅支持 Windows 平台的通知", level="WARNING")
+                self.logger.warning("暂时仅支持 Windows 平台的通知")
                 return
 
             exp_cnt = counts["exp"]
@@ -117,7 +117,7 @@ class AsyncTaskPipeline:
                 app_name="LALC"
             )
         except Exception as e:
-            self.logger.log(f"发送通知失败: {e}", level="WARNING")
+            self.logger.warning(f"发送通知失败: {e}")
 
     async def _broadcast_task_completion(self, counts: dict[str, int]):
         """
@@ -137,14 +137,14 @@ class AsyncTaskPipeline:
             self._server_ref = get_server_ref()
         
         if self._server_ref is None:
-            self.logger.log(f"远程服务器连接异常，广播任务完成次数失败", level="WARNING")
+            self.logger.warning(f"远程服务器连接异常，广播任务完成次数失败")
             return
         
         await self._server_ref.broadcast({
             "type": "task_completion",
             "payload": counts,
         })
-        self.logger.log(f"已发送本轮任务完成次数：{counts}")
+        self.logger.info(f"已发送本轮任务完成次数：{counts}")
 
     @property
     def state(self):
@@ -229,7 +229,7 @@ class AsyncTaskPipeline:
                 raise e
         
         self._worker_task = asyncio.create_task(self._worker())
-        self.logger.log(f"任务流水线已启动，入口节点：{entry}")
+        self.logger.info(f"任务流水线已启动，入口节点：{entry}")
 
     async def _worker(self):
         """
@@ -270,14 +270,14 @@ class AsyncTaskPipeline:
                     try:
                         self._completion_callback()
                     except Exception as callback_error:
-                        self.logger.log(f"完成回调执行失败: {str(callback_error)}", level="ERROR")
+                        self.logger.error(f"完成回调执行失败: {str(callback_error)}")
             else:
                 self._state = self.STATE_STOPPED
         except Exception as e:
             error_msg = f"任务执行过程中发生错误: {str(e)}"
             traceback_str = traceback.format_exc()
-            self.logger.log(error_msg, level="ERROR")
-            self.logger.log(traceback_str, level="ERROR")
+            self.logger.error(error_msg)
+            self.logger.error(traceback_str)
             # 清空任务栈并停止运行
             self.task_stack.clear()
             self._stop_event.set()
@@ -289,7 +289,7 @@ class AsyncTaskPipeline:
                 try:
                     self._error_callback(error_msg, traceback_str)
                 except Exception as callback_error:
-                    self.logger.log(f"错误回调执行失败: {str(callback_error)}", level="ERROR")
+                    self.logger.error(f"错误回调执行失败: {str(callback_error)}")
             
             raise  # 重新抛出异常，让调用者处理
         finally:
@@ -311,7 +311,7 @@ class AsyncTaskPipeline:
                         # 使用新函数生成图表
                         chart_image = self._generate_performance_chart(perf)
                     except Exception as e:
-                        self.logger.log(f"性能统计表格生成过程发生错误: {str(e)}", level="ERROR")
+                        self.logger.error(f"性能统计表格生成过程发生错误: {str(e)}")
 
                     self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts), chart_image)
                     
@@ -405,14 +405,14 @@ class AsyncTaskPipeline:
         self._state = STATE_STOPPED
         if self._worker_task:
             if not self._worker_task.done():
-                self.logger.log("正在取消 worker 任务...")
+                self.logger.info("正在取消 worker 任务...")
                 self._worker_task.cancel()
                 try:
                     await self._worker_task
                 except asyncio.CancelledError:
-                    self.logger.log("Worker 任务已取消")
+                    self.logger.info("Worker 任务已取消")
             self._worker_task = None
-        self.logger.log("任务流水线已停止")
+        self.logger.info("任务流水线已停止")
 
     def get_shared_params(self)->None:
         """

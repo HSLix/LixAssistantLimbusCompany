@@ -274,7 +274,7 @@ def close_limbus_window(window_title="LimbusCompany", window_class="UnityWndClas
     try:
         hwnd = win32gui.FindWindow(window_class, window_title)
         if hwnd and win32gui.IsWindow(hwnd):
-            logger.log("正在关闭LimbusCompany窗口")
+            logger.info("正在关闭LimbusCompany窗口")
             # 发送WM_CLOSE消息关闭窗口
             win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
             # 等待窗口关闭
@@ -284,16 +284,16 @@ def close_limbus_window(window_title="LimbusCompany", window_class="UnityWndClas
                 timeout -= 0.5
             
             if timeout <= 0:
-                logger.log("关闭LimbusCompany窗口超时", level="WARNING")
+                logger.warning("关闭LimbusCompany窗口超时")
                 return False
             else:
-                logger.log("LimbusCompany窗口已关闭")
+                logger.info("LimbusCompany窗口已关闭")
                 return True
         else:
-            logger.log("未找到LimbusCompany窗口")
+            logger.info("未找到LimbusCompany窗口")
             return True  # 没有窗口也算"关闭成功"
     except Exception as e:
-        logger.log(f"关闭LimbusCompany窗口时出错: {str(e)}", level="ERROR")
+        logger.error(f"关闭LimbusCompany窗口时出错: {str(e)}")
         return False
 
 

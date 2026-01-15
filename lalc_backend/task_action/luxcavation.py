@@ -4,7 +4,7 @@ from workflow.task_execution import *
 
 @TaskExecution.register("exp_select_stage")
 def exec_exp_select_stage(self, node: TaskNode, func):
-    logger.log("选择经验副本关卡", input_handler.capture_screenshot())
+    logger.info("选择经验副本关卡", input_handler.capture_screenshot())
     cfg = self._get_using_cfg("exp")
     target_stage = cfg["exp_stage"]
     pos = recognize_handler.find_text_in_image(input_handler.capture_screenshot(), target_stage, mask=[250, 180, 1000, 50])
@@ -20,10 +20,10 @@ def exec_exp_select_stage(self, node: TaskNode, func):
     select_mode = cfg["luxcavation_mode"]
 
     if select_mode == "enter":
-        logger.log(f"[exp_select_stage] 点击 enter: {enter_pos}")
+        logger.info(f"[exp_select_stage] 点击 enter: {enter_pos}")
         input_handler.click(*enter_pos)
     elif select_mode == "skip battle":
-        logger.log(f"[exp_select_stage] 点击 skip_battle: {skip_battle_pos}")
+        logger.info(f"[exp_select_stage] 点击 skip_battle: {skip_battle_pos}")
         input_handler.click(*skip_battle_pos)
     else:
         raise Exception(f"未知的 exp mode：{select_mode}")
@@ -33,7 +33,7 @@ def exec_exp_select_stage(self, node: TaskNode, func):
 
 @TaskExecution.register("thread_select_stage")
 def exec_thread_select_stage(self, node: TaskNode, func):
-    logger.log("选择Thread副本关卡", input_handler.capture_screenshot())
+    logger.info("选择Thread副本关卡", input_handler.capture_screenshot())
     input_handler.click(140, 330)
     time.sleep(1)
     cfg = self._get_using_cfg("thread")

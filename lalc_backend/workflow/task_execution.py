@@ -27,7 +27,7 @@ def set_server_ref(server):
 
 def get_server_ref():
     if _server_to_push is None:
-        logger.log("远程服务器为空", level="WARNING")
+        logger.error("远程服务器为空")
         return
     return _server_to_push
 
@@ -44,11 +44,11 @@ def _safe_broadcast(msg: str) -> None:
     # 获取保存的主循环
     main_loop = getattr(server, 'loop', None)
     if main_loop is None:
-        logger.log("服务器未保存主循环引用", level="WARNING")
+        logger.warning("服务器未保存主循环引用")
         return
 
     if main_loop.is_closed():
-        logger.log("主事件循环已关闭，无法广播消息", level="WARNING")
+        logger.warning("主事件循环已关闭，无法广播消息")
         return
 
     coro = server.broadcast_task_log(msg)
@@ -56,7 +56,7 @@ def _safe_broadcast(msg: str) -> None:
     try:
         asyncio.run_coroutine_threadsafe(coro, main_loop)
     except RuntimeError as e:
-        logger.log(f"广播消息失败: {str(e)}", level="WARNING")
+        logger.warning(f"广播消息失败: {str(e)}")
 
 
 
@@ -96,7 +96,7 @@ class TaskExecution:
         # ---------- 性能统计 ----------
         self._perf: dict[str, dict[str, float | int]] = {}   # handler_name -> {"count": int, "total": float}
         
-        logger.log("TaskExecution 初始化完成")
+        logger.info("TaskExecution 初始化完成")
 
 
     def _timed_handler(self, handler_name: str, handler: Callable) -> Callable:
@@ -182,7 +182,7 @@ class TaskExecution:
         
         # 修改为：先写本地日志，再推一条 task_log 给 Server
         log_msg = f"任务{{{cur_task.name}}}正在执行：{{{func.__name__}}}-{{{action_name}}}"
-        logger.log(log_msg)
+        logger.info(log_msg)
         _safe_broadcast(log_msg)
 
         if action_name in self.handlers:
@@ -196,7 +196,7 @@ class TaskExecution:
 
         # 修改为：先写本地日志，再推一条 task_log 给 Server
         log_msg = f"任务{{{cur_task.name}}}已执行：{{{func.__name__}}}-{{{action_name}}}"
-        logger.log(log_msg)
+        logger.info(log_msg)
         _safe_broadcast(log_msg)
             
         return res
@@ -210,7 +210,7 @@ import task_action
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.log("正在尝试返回主页", tmp_screenshot)
+    logger.info("正在尝试返回主页", tmp_screenshot)
     if recognize_handler.template_match(tmp_screenshot, "left_top_arrow"):
         # 对于左上角有箭头的，总之先点了
         pos = recognize_handler.template_match(tmp_screenshot, "left_top_arrow")
@@ -236,7 +236,7 @@ def exec_back_to_init_page(self, node:TaskNode, func):
 
 @TaskExecution.register("error_cannot_operate_the_game")
 def exec_error_cannot_operate_the_game_window(self, node:TaskNode, func):
-    logger.log("开始重启 Limbus")
+    logger.info("开始重启 Limbus")
     # 先尝试关闭现有的Limbus窗口
     input_handler.close_limbus_window()
     time.sleep(2)  # 等待窗口完全关闭
@@ -245,13 +245,13 @@ def exec_error_cannot_operate_the_game_window(self, node:TaskNode, func):
     input_handler.open_limbus()
     input_handler.refresh_window_state()
     input_handler.set_window_size()
-    logger.log("结束重启 Limbus", input_handler.capture_screenshot())
+    logger.info("结束重启 Limbus", input_handler.capture_screenshot())
     
 
 @TaskExecution.register("confirm_all_coins")
 def exec_confirm_all_coins(self, node:TaskNode, func):
     tmp_sc = input_handler.capture_screenshot()
-    logger.log("开始收集日常的奖励", tmp_sc)
+    logger.info("开始收集日常的奖励", tmp_sc)
     for pos in recognize_handler.template_match(tmp_sc, "reward_coin"):
         input_handler.click(pos[0], pos[1])
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -259,7 +259,7 @@ def exec_confirm_all_coins(self, node:TaskNode, func):
     input_handler.click(270, 400)
     time.sleep(1)
     tmp_sc = input_handler.capture_screenshot()
-    logger.log("开始收集周常的奖励", tmp_sc)
+    logger.info("开始收集周常的奖励", tmp_sc)
     for pos in recognize_handler.template_match(tmp_sc, "reward_coin"):
         input_handler.click(pos[0], pos[1])
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))

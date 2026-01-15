@@ -2,7 +2,7 @@ from workflow.task_execution import *
 
 @TaskExecution.register("mirror_defeat")
 def exec_mirror_defeat(self, node:TaskNode, func):
-    logger.log("镜牢刷取失败", input_handler.capture_screenshot())
+    logger.info("镜牢刷取失败", input_handler.capture_screenshot())
     input_handler.click(770, 450)
     input_handler.click(650, 525)
 
@@ -27,7 +27,7 @@ def exec_mirror_defeat(self, node:TaskNode, func):
 
 @TaskExecution.register("mirror_victory")
 def exec_mirror_victory(self, node:TaskNode, func):
-    logger.log("处理镜牢胜利结算", input_handler.capture_screenshot())
+    logger.info("处理镜牢胜利结算", input_handler.capture_screenshot())
     mirror_cfg = self._get_using_cfg("mirror")
     accept_reward = mirror_cfg["accept_reward"]
 
@@ -52,7 +52,7 @@ def exec_mirror_victory(self, node:TaskNode, func):
 
 @TaskExecution.register("mirror_select_floor_ego_gift")
 def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
-    logger.log("选择楼层EGO饰品", input_handler.capture_screenshot())
+    logger.info("选择楼层EGO饰品", input_handler.capture_screenshot())
     cfg_type = node.get_param("cfg_type")
     cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
     prefer_gift_styles = cfg["mirror_team_ego_gift_styles"][cfg_index]
@@ -75,11 +75,11 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
     for gift in cur_gifts:
         tmp = difflib.get_close_matches(gift[0], all_gift_names, cutoff=0.8)
         if len(tmp) == 0:
-            logger.log(f"识别异常：识别不出饰品文字{gift[0]}", level="WARNING")
+            logger.warning(f"识别异常：识别不出饰品文字{gift[0]}")
             continue
     
         if tmp[0] in prefer_gifts:
-            logger.log(f"检测到有倾向的饰品{tmp}")
+            logger.info(f"检测到有倾向的饰品{tmp}")
             prefer_cur_gifts.append((tmp, gift[1], gift[2]))
         
     acquire_and_owned = recognize_handler.detect_text_in_image(tmp_screenshot, mask=[110, 120, 1090, 60])
@@ -154,7 +154,7 @@ def exec_mirror_select_floor_ego_gift(self, node:TaskNode, func):
 
 @TaskExecution.register("mirror_select_encounter_reward_card")
 def exec_mirror_select_encounter_reward_card(self, node:TaskNode, func):
-    logger.log("选择奖励卡", input_handler.capture_screenshot())
+    logger.info("选择奖励卡", input_handler.capture_screenshot())
     reward_cards = [
         "cost_card",
         "starlight_card",
@@ -167,7 +167,7 @@ def exec_mirror_select_encounter_reward_card(self, node:TaskNode, func):
         res = recognize_handler.template_match(tmp_screenshot, card)
         if len(res) > 0:
             input_handler.click(res[0][0], res[0][1])
-            logger.log(f"Reward Card 选择了 {card}", input_handler.capture_screenshot())
+            logger.info(f"Reward Card 选择了 {card}", input_handler.capture_screenshot())
             break
     input_handler.key_press("enter")
     self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -188,7 +188,7 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
     # 检查是否启用增强EGO饰品功能
     enable_enhance = cfg.get("enable_enhance_ego_gifts", True)
     if not enable_enhance:
-        logger.log("根据配置跳过EGO饰品升级")
+        logger.info("根据配置跳过EGO饰品升级")
         # 点击 leave，为离开商店做准备
         input_handler.click(1120, 640)
         return
@@ -196,10 +196,10 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
     input_handler.click(160, 390)
     time.sleep(1)
     if len(recognize_handler.template_match(input_handler.capture_screenshot(), "enhance_ego_gift")) == 0:
-        logger.log("无法进入升级区域，放弃饰品升级", input_handler.capture_screenshot(), level="WARNING")
+        logger.warning("无法进入升级区域，放弃饰品升级", input_handler.capture_screenshot())
         return
 
-    logger.log("强化EGO饰品")
+    logger.info("强化EGO饰品")
     cfg_type = node.get_param("cfg_type")
     cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
     prefer_gift_styles = cfg["mirror_team_ego_gift_styles"][cfg_index]
@@ -224,12 +224,12 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
     def enhance_cur_gift():
         cur_gift = recognize_handler.detect_text_in_image(input_handler.capture_screenshot(), mask=[280, 150, 300, 130])
         if len(cur_gift) == 0:
-            logger.log(f"识别异常：饰品升级区域识别不出文字", input_handler.capture_screenshot(), "WARNING")
+            logger.warning(f"识别异常：饰品升级区域识别不出文字", input_handler.capture_screenshot())
             return
         cur_gift_name = cur_gift[0][0]
         tmp = difflib.get_close_matches(cur_gift_name, all_gift_names, cutoff=0.8)
         if len(tmp) == 0:
-            logger.log(f"识别异常：在已有饰品中找不到饰品文字{cur_gift_name}")
+            logger.info(f"识别异常：在已有饰品中找不到饰品文字{cur_gift_name}")
             return
         cur_gift_name = tmp[0]
         nonlocal need_more_money
@@ -239,12 +239,12 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
             time.sleep(1)
             tmp_screenshot = input_handler.capture_screenshot()
             if len(recognize_handler.template_match(tmp_screenshot, "more_cost_to_enhance_this_ego_gift")) > 0:
-                logger.log("缺钱不能升级，提前退出")
+                logger.info("缺钱不能升级，提前退出")
                 input_handler.click(500, 590)
                 need_more_money += 1
                 return
             if len(recognize_handler.template_match(tmp_screenshot, "cost_to_enhance_this_ego_gift")) == 0:
-                logger.log("总之不能升级，提前退出")
+                logger.info("总之不能升级，提前退出")
                 return
             input_handler.key_press("enter")
             self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -254,12 +254,12 @@ def exec_mirror_shop_enhance_ego_gifts(self, node:TaskNode, func):
             time.sleep(1)
             tmp_screenshot = input_handler.capture_screenshot()
             if len(recognize_handler.template_match(tmp_screenshot, "more_cost_to_enhance_this_ego_gift")) > 0:
-                logger.log("缺钱不能升级，提前退出")
+                logger.info("缺钱不能升级，提前退出")
                 input_handler.click(500, 590)
                 need_more_money += 1
                 return
             if len(recognize_handler.template_match(tmp_screenshot, "cost_to_enhance_this_ego_gift")) == 0:
-                logger.log("总之不能升级，提前退出")
+                logger.info("总之不能升级，提前退出")
                 return
             input_handler.key_press("enter")
             self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -329,10 +329,10 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
     # 检查是否启用替换技能和购买EGO饰品功能
     enable_replace_and_purchase = cfg.get("enable_replace_skill_purchase_ego_gifts", True)
     if not enable_replace_and_purchase:
-        logger.log("根据配置跳过技能替换和EGO饰品购买")
+        logger.info("根据配置跳过技能替换和EGO饰品购买")
         return
     
-    logger.log("替换技能并购买EGO饰品")
+    logger.info("替换技能并购买EGO饰品")
     cfg_type = node.get_param("cfg_type")
     cfg, cfg_index = self._get_using_cfg(cfg_type), self._get_using_cfg_index(cfg_type)
     
@@ -371,7 +371,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                 else:
                     check_name = name
                 if check_name in name_of_who_can_replace[0]:
-                    logger.log(f"检测到罪人{name}可以且应该做技能替换, 匹配值{check_name}")
+                    logger.info(f"检测到罪人{name}可以且应该做技能替换, 匹配值{check_name}")
                     input_handler.click(name_of_who_can_replace[1], name_of_who_can_replace[2]-80)
                     skill_order = need_to_replace_skill[name][::-1]
                     time.sleep(1)
@@ -382,14 +382,14 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                 for i in skill_order:
                     pos = replace_skill_map[i]
                     input_handler.click(*pos)
-                logger.log(f"确认执行该罪人的技能替换", input_handler.capture_screenshot())
+                logger.info(f"确认执行该罪人的技能替换", input_handler.capture_screenshot())
                 input_handler.click(790, 535)
                 time.sleep(0.5)
                 input_handler.click(790, 535)
                 replaced = True
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
         else:
-            logger.log("替换技能名字识别异常，跳过技能替换部分", level="WARNING")
+            logger.warning("替换技能名字识别异常，跳过技能替换部分")
         return replaced
     
     def exec_purchase_ego_gifts():
@@ -403,7 +403,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
 
         # 前两行能买的买完了
         if len(gifts) == len(purcased_list):
-            logger.log("买了全部饰品，结束回合", input_handler.capture_screenshot())
+            logger.info("买了全部饰品，结束回合", input_handler.capture_screenshot())
             return False
         
         while purcased_list:
@@ -412,20 +412,20 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                 if purchased[2] < gift[2] < purchased[2] + 150 and abs(purchased[1] - gift[1]) < 50:
                     gifts.remove(gift)
 
-        # logger.log(prefer_gifts)
+        # logger.info(prefer_gifts)
         for gift in gifts:
             tmp = difflib.get_close_matches(gift[0], all_gift_names, cutoff=0.8)
             if len(tmp) == 0:
                 if not ("Replace" in gift[0]) and not ("Skill" in gift[0]): # 排除技能替换的警告
-                    logger.log(f"识别异常：识别不出饰品文字{gift[0]},详情：{gift}", level="WARNING")
+                    logger.warning(f"识别异常：识别不出饰品文字{gift[0]},详情：{gift}")
                 continue
             gift_name = tmp[0]
             # name_radio = difflib.SequenceMatcher(None, gift[0], gift_name).ratio()
             # if name_radio < 1:
-            #     logger.log("检测到饰品 %s，经修复得 %s，相似度：%f" % (gift[0], gift_name, name_radio))
+            #     logger.info("检测到饰品 %s，经修复得 %s，相似度：%f" % (gift[0], gift_name, name_radio))
             if gift_name in prefer_gifts:
                 input_handler.click(gift[1], gift[2]-80)
-                logger.log(f"检测到可买并购买饰品 {gift_name}", input_handler.capture_screenshot())
+                logger.info(f"检测到可买并购买饰品 {gift_name}", input_handler.capture_screenshot())
                 time.sleep(1)
                 input_handler.click(740, 480)
                 time.sleep(0.5)
@@ -438,7 +438,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
     loop_count = 0
     while True:
         tmp_screenshot = input_handler.capture_screenshot()
-        logger.log("开始一轮技能替换&饰品购买", tmp_screenshot)
+        logger.info("开始一轮技能替换&饰品购买", tmp_screenshot)
         is_replace_skill_sold_out = len(recognize_handler.template_match(tmp_screenshot, "shop_purchased", mask=[550, 200, 140, 50])) > 0
         if not is_replace_skill_sold_out:
             if exec_replace_skill():
@@ -451,7 +451,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
             try:
                 cur_money = int(cur_money[0][0])
             except Exception as e:
-                logger.log(f"{node.name} 获取现钱发生错误[{e}]，就当现在没有钱", level="WARNING")
+                logger.warning(f"{node.name} 获取现钱发生错误[{e}]，就当现在没有钱")
                 cur_money = 0
         else:
             cur_money = 0
@@ -481,7 +481,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
         cfg_index = self._get_using_cfg_index(cfg_type)
         for star in cfg["mirror_team_stars"][cfg_index]:
             if "0" in star:
-                logger.log("检测到有免费普通刷新和剩余技能替换次数，再尝试最后一次刷新和技能替换")
+                logger.info("检测到有免费普通刷新和剩余技能替换次数，再尝试最后一次刷新和技能替换")
                 input_handler.click(1000, 120)
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
                 exec_replace_skill()
@@ -512,10 +512,10 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
     # 检查是否启用融合EGO饰品功能
     enable_fuse = cfg.get("enable_fuse_ego_gifts", True)
     if not enable_fuse:
-        logger.log("根据配置跳过EGO饰品融合")
+        logger.info("根据配置跳过EGO饰品融合")
         return
     
-    logger.log("融合EGO饰品")
+    logger.info("融合EGO饰品")
     # 确保 EGO 数量够了进合成
     input_handler.click(280, 390)
     time.sleep(1)
@@ -551,12 +551,12 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
     first_page = True
     while True:
         tmp_screenshot = input_handler.capture_screenshot()
-        logger.log("开始一轮饰品融合", tmp_screenshot)
+        logger.info("开始一轮饰品融合", tmp_screenshot)
         can_fuse = False
         for gift_name in useless_gifts:
             res = recognize_handler.template_match(tmp_screenshot, gift_name, mask=detect_places, screenshot_scale=1, threshold=0.88)
             if len(res) > 0:
-                logger.log("融合，检测到无用饰品：%s" % gift_name)
+                logger.info("融合，检测到无用饰品：%s" % gift_name)
                 input_handler.click(res[0][0], res[0][1])
                 time.sleep(1)
                 if len(recognize_handler.template_match(input_handler.capture_screenshot(), "empty_fuse_gift_place", mask=[140, 270, 150, 150])) == 0:
@@ -564,14 +564,14 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
                     break
 
         if can_fuse:
-            logger.log("凑齐三个可合成饰品", input_handler.capture_screenshot())
+            logger.info("凑齐三个可合成饰品", input_handler.capture_screenshot())
             input_handler.click(785, 590)
             time.sleep(1)
             input_handler.click(785, 590)
             time.sleep(0.5)
             self.exec_wait_disappear(get_task("wait_connecting_disappear"))
             time.sleep(1)
-            logger.log("饰品融合结果记录", input_handler.capture_screenshot())
+            logger.info("饰品融合结果记录", input_handler.capture_screenshot())
             input_handler.key_press("enter")
             continue
         
@@ -592,13 +592,13 @@ def exec_mirror_shop_fuse_ego_gifts(self, node:TaskNode, func):
 
 @TaskExecution.register("mirror_shop_heal_sinner")
 def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
-    logger.log("镜牢商店治疗罪人")
+    logger.info("镜牢商店治疗罪人")
     cur_money = recognize_handler.detect_text_in_image(input_handler.capture_screenshot(), mask=[568, 100, 100, 80])
     if len(cur_money) > 0:
         try:
             cur_money = int(cur_money[0][0])
         except Exception as e:
-            logger.log(f"{node.name} 获取现钱发生错误[{e}]，就当现在没有钱", level="WARNING")
+            logger.warning(f"{node.name} 获取现钱发生错误[{e}]，就当现在没有钱")
             cur_money = 0
     else:
         cur_money = 0
@@ -612,7 +612,7 @@ def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
     if cfg["mirror_shop_heal"][cfg_index]:
         input_handler.click(200, 470)
         time.sleep(1)
-        logger.log("镜牢商店尝试进行全体治疗", input_handler.capture_screenshot())
+        logger.info("镜牢商店尝试进行全体治疗", input_handler.capture_screenshot())
         input_handler.click(1020, 330)
         time.sleep(0.5)
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
@@ -620,7 +620,7 @@ def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
         input_handler.click(1120, 650)
         time.sleep(1)
     else:
-        logger.log("根据设置跳过镜牢商店治疗")
+        logger.info("根据设置跳过镜牢商店治疗")
     
 
 
@@ -637,7 +637,7 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
         "train_head",
     ]
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.log("选择下一个镜牢节点", tmp_screenshot)
+    logger.info("选择下一个镜牢节点", tmp_screenshot)
     train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
     if len(train_head) > 0 and train_head[0][1]<300:
         input_handler.swipe(460, 270, 460, 340)
@@ -660,7 +660,7 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
 
     if not next_node_exist:
         # 启动保底的三点寻位
-        logger.log("没能成功识别并点击路径图标，尝试固定点位", input_handler.capture_screenshot(), level="WARNING")
+        logger.warning("没能成功识别并点击路径图标，尝试固定点位", input_handler.capture_screenshot())
         for x, y in [(710, 330), (710, 110), (710, 540)]:
             input_handler.click(x, y)
             time.sleep(1)
@@ -671,7 +671,7 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
     
     if not next_node_exist:
         # 那么估计是当前的位置因为各种偏移不对
-        logger.log("镜牢寻路异常，尝试重启镜牢", input_handler.capture_screenshot(), level="WARNING")
+        logger.warning("镜牢寻路异常，尝试重启镜牢", input_handler.capture_screenshot())
         input_handler.click(1230, 50)
         time.sleep(1)
         input_handler.click(730, 440)
@@ -683,7 +683,7 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
 
 @TaskExecution.register("mirror_select_theme_pack")
 def exec_mirror_theme_pack(self, node: TaskNode, func):
-    logger.log("选择镜牢主题包", input_handler.capture_screenshot())
+    logger.info("选择镜牢主题包", input_handler.capture_screenshot())
 
     res_name = ""
     res_pos = None
@@ -706,19 +706,19 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
         if mirror_mode == "normal":
             if recognize_handler.template_match(tmp_screenshot, "hard_mode") or recognize_handler.template_match(tmp_screenshot, "hard_clear_bonus"):
                 input_handler.click(905, 50)
-                logger.log("现需要刷取普通镜牢，检测到镜牢开启困难模式，正在关闭")
+                logger.info("现需要刷取普通镜牢，检测到镜牢开启困难模式，正在关闭")
                 time.sleep(5)
                 continue
         else:
             if recognize_handler.template_match(tmp_screenshot, "normal_mode") or recognize_handler.template_match(tmp_screenshot, "normal_clear_bonus"):
                 input_handler.click(905, 50)
-                logger.log("现需要刷取困难镜牢，检测到镜牢开启普通模式，正在关闭")
+                logger.info("现需要刷取困难镜牢，检测到镜牢开启普通模式，正在关闭")
                 time.sleep(5)
                 continue
 
         theme_pack_new = recognize_handler.template_match(tmp_screenshot, "mirror_theme_pack_new")
         if len(theme_pack_new) > 0:
-            logger.log("检测到未探索的卡包，优先探索")
+            logger.info("检测到未探索的卡包，优先探索")
             res_pos = theme_pack_new
             res_name = "New Theme Pack's Name"
             break
@@ -727,7 +727,7 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
             cur_weight = val["weight"]
             tmp = recognize_handler.template_match(tmp_screenshot, theme_pack_name, mask_template=[20, 20, 130, 290])
             if len(tmp) > 0:
-                logger.log(f"检测到卡包 {theme_pack_name},权重：{cur_weight}")
+                logger.info(f"检测到卡包 {theme_pack_name},权重：{cur_weight}")
                 if not res_pos or cur_weight > theme_pack_cfg[res_name]["weight"]:
                     res_pos = tmp
                     res_name = theme_pack_name
@@ -738,7 +738,7 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
             stop = True
 
         if not stop and not refresh:
-            logger.log("没有找到权值大于基准值（10）的卡包，点击刷新")
+            logger.info("没有找到权值大于基准值（10）的卡包，点击刷新")
             refresh = True
             input_handler.click(1080, 50)
             time.sleep(0.5)
@@ -750,22 +750,22 @@ def exec_mirror_theme_pack(self, node: TaskNode, func):
 
     if not res_pos:
         res_pos = recognize_handler.template_match(input_handler.capture_screenshot(), "theme_pack_detail")
-        logger.log("没有检测到已知主题包，启动随机选择")
+        logger.warning("没有检测到已知主题包，尝试启动随机选择")
     if len(res_pos) == 0:
-        logger.log("主题包检测异常，已有模板匹配失败，且随机选择也失败了，这里跳过选择", level="ERROR")
+        logger.error("主题包检测异常，已有模板匹配失败，且随机选择也失败了，这里跳过选择")
         return
     
     if res_name in theme_pack_cfg:
-        logger.log(f"最后选择到了卡包：{res_name}, 对应权重：{theme_pack_cfg[res_name]['weight']}", input_handler.capture_screenshot())
+        logger.info(f"最后选择到了卡包：{res_name}, 对应权重：{theme_pack_cfg[res_name]['weight']}", input_handler.capture_screenshot())
     else:
-        logger.log(f"最后选择到了卡包：{res_name}, 但本次执行中未找到，临时赋予权重：-999, 下次执行将自动进入配置", input_handler.capture_screenshot())
+        logger.info(f"最后选择到了卡包：{res_name}, 但本次执行中未找到，临时赋予权重：-999, 下次执行将自动进入配置", input_handler.capture_screenshot())
     
     input_handler.swipe(res_pos[0][0], res_pos[0][1], res_pos[0][0], res_pos[0][1]+400)
 
 
 @TaskExecution.register("mirror_gift_search")
 def exec_mirror_gift_search(self, node: TaskNode, func):
-    logger.log("搜索镜牢礼物", input_handler.capture_screenshot())
+    logger.info("搜索镜牢礼物", input_handler.capture_screenshot())
     # TODO 完善 gift search
     # 现在暂时只是 refuse gift
     input_handler.click(900, 600)
@@ -808,7 +808,7 @@ def exec_mirror_select_initial_ego_gift(self, node:TaskNode, func):
             case _:
                 raise Exception(f"发现非法初始 ego 顺序选项：{i}")
         time.sleep(0.5)
-    logger.log("选择初始EGO饰品", input_handler.capture_screenshot())
+    logger.info("选择初始EGO饰品", input_handler.capture_screenshot())
     for _ in range(4):  
         input_handler.key_press("enter")
         time.sleep(0.5)
@@ -827,7 +827,7 @@ def exec_mirror_choose_star(self, node: TaskNode, func):
     cfg_index = self._get_using_cfg_index(cfg_type)
     for star_str in cfg["mirror_team_stars"][cfg_index]:
         star_index = int(star_str[0])
-        # logger.log(star_index)
+        # logger.info(star_index)
         origin_click_pos = star_pos[star_index]
         input_handler.click(*origin_click_pos)
         time.sleep(0.5)
@@ -843,7 +843,7 @@ def exec_mirror_choose_star(self, node: TaskNode, func):
             time.sleep(0.5)
         else:
             raise Exception("非法 star str：%s" % star_str)
-    logger.log("选择镜牢星光", input_handler.capture_screenshot())
+    logger.info("选择镜牢星光", input_handler.capture_screenshot())
     input_handler.click(1190, 670)
     time.sleep(2)
     input_handler.click(735, 535)

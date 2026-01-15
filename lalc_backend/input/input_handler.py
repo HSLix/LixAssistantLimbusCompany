@@ -201,7 +201,7 @@ class _Input:
         try:
             self.refresh_window_state()
         except Exception:
-            logger.log("未找到游戏窗口，将尝试自动打开游戏，随后等待 30 秒")
+            logger.info("未找到游戏窗口，将尝试自动打开游戏，随后等待 30 秒")
             webbrowser.open("steam://rungameid/1973530")
             time.sleep(30)
         
@@ -305,7 +305,7 @@ class _Input:
         """
         关闭LimbusCompany游戏窗口
         """
-        logger.log("尝试关闭LimbusCompany窗口")
+        logger.info("尝试关闭LimbusCompany窗口")
         result = close_limbus_window()
         if result:
             # 清空hwnd

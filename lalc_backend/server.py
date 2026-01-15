@@ -16,21 +16,6 @@ logger = init_logger()
 
 # 全局单例引用
 _server_controller_instance = None
-_server_controller_lock = asyncio.Lock()
-
-def _quick_ack(func):
-    """保证无论内部怎么抛，都在 200ms 内给前端 ack"""
-    async def _wrap(self, ws, cmd, msg_id, args_list=None):
-        try:
-            return await func(self, ws, cmd, msg_id, args_list)
-        except Exception as e:
-            self.lalc_logger.debug(f"命令{cmd}异常：{e}", level="ERROR")
-            await self.send_json(ws, {
-                "type": "response",
-                "id": msg_id,
-                "payload": {"status": "error", "message": str(e)}
-            })
-    return _wrap
 
 # -------------------- WebSocket 服务器 --------------------
 class ServerController:
@@ -59,7 +44,7 @@ class ServerController:
         self.pipeline.set_completion_callback(self._on_pipeline_completion)
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
         self._req_futures: Dict[str, asyncio.Future] = {}   # 用于 request/response 匹配
-        self.lalc_logger = init_logger()
+        self.logger = init_logger()
         self.received_configs = {}  # 存储接收到的配置
         self._timeout_task = None  # 超时检查任务
         self._last_client_disconnect_time = None  # 最后一个客户端断开连接的时间
@@ -135,7 +120,7 @@ class ServerController:
         真正执行踢人：关闭连接、清理资源、广播
         """
         addr = ws.remote_address
-        self.lalc_logger.debug(f"心跳超时，踢掉客户端 {addr}")
+        self.logger.debug(f"心跳超时，踢掉客户端 {addr}")
         # 1. 关闭 TCP 连接
         await ws.close(code=1000, reason="heartbeat timeout")
         # 2. 清理数据结构
@@ -168,7 +153,7 @@ class ServerController:
         except asyncio.CancelledError:
             raise                            # 允许取消
         except Exception as e:
-            self.lalc_logger.debug(f"心跳检查协程异常 {e}", level="ERROR")
+            self.logger.error(f"心跳检查协程异常 {e}")
 
     def _reset_heartbeat(self, ws: websockets.WebSocketServerProtocol):
         """
@@ -408,13 +393,13 @@ class ServerController:
             # 检查是否超时
             elapsed = datetime.now() - self._last_client_disconnect_time
             if elapsed.total_seconds() >= outdate_time:
-                self.lalc_logger.log(f"服务器超时自动关闭：超过{outdate_time}秒无客户端连接")
+                self.logger.info(f"服务器超时自动关闭：超过{outdate_time}秒无客户端连接")
                 await self._shutdown_server()
                 break
 
     async def _shutdown_server(self):
         """优雅关闭：只需 cancel 两个任务即可"""
-        self.lalc_logger.log("开始关闭服务器...")
+        self.logger.info("开始关闭服务器...")
         # 1. 通知客户端（可选）
         if self.clients:
             await asyncio.gather(
@@ -444,12 +429,12 @@ class ServerController:
         try:
             if base_cmd == "start":
                 # 打印接收到的配置
-                self.lalc_logger.debug(f"接收到的配置: {json.dumps(self.received_configs, ensure_ascii=False)}")
+                self.logger.debug(f"接收到的配置: {json.dumps(self.received_configs, ensure_ascii=False)}")
                 
                 # 转换配置格式并更新到ConfigManager
                 if self.received_configs:
                     converted_config = self.convert_frontend_config_to_backend_format(self.received_configs)
-                    self.lalc_logger.debug(f"转换后的配置: {json.dumps(converted_config, ensure_ascii=False)}")
+                    self.logger.debug(f"转换后的配置: {json.dumps(converted_config, ensure_ascii=False)}")
                     
                     # 使用实例化的config_manager更新配置
                     if "exp_cfg" in converted_config and converted_config["exp_cfg"]:
@@ -468,11 +453,11 @@ class ServerController:
                 
                 await self.pipeline.start("main")
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
-                self.lalc_logger.debug(f"收到 start 命令，已启动任务流水线")
+                self.logger.debug(f"收到 start 命令，已启动任务流水线")
             elif base_cmd == "semi_auto_start":
                 await self.pipeline.start("semi_auto_main")
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
-                self.lalc_logger.debug(f"收到 semi_auto_start 命令，已启动任务流水线")
+                self.logger.debug(f"收到 semi_auto_start 命令，已启动任务流水线")
             elif base_cmd == "get_latest_version":
                 from utils.update_manager import get_latest_version
                 version = get_latest_version()
@@ -485,7 +470,7 @@ class ServerController:
                         "version": version
                     }
                 })
-                self.lalc_logger.debug(f"获取最新版本号: {version}")
+                self.logger.debug(f"获取最新版本号: {version}")
             elif base_cmd == "download_from_github":
                 # 默认下载路径为当前目录
                 download_path = args[0] if args else "."
@@ -546,10 +531,10 @@ class ServerController:
                                 "file_path": result
                             }
                         })
-                        self.lalc_logger.debug(f"从GitHub下载完成: {result}")
+                        self.logger.debug(f"从GitHub下载完成: {result}")
                     except asyncio.CancelledError:
                         # 用户主动取消
-                        self.lalc_logger.debug("下载已被取消")
+                        self.logger.debug("下载已被取消")
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -559,7 +544,7 @@ class ServerController:
                             }
                         })
                     except Exception as e:
-                        self.lalc_logger.debug(f"下载失败: {e}", level="ERROR")
+                        self.logger.error(f"下载失败: {e}")
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -581,9 +566,9 @@ class ServerController:
                 print(f"decrypt_cdk:{cdk}")
                 
                 # 检查CDK是否为空
-                self.lalc_logger.debug(f"目标下载地址：{download_path}; cdk:{cdk}")
+                self.logger.debug(f"目标下载地址：{download_path}; cdk:{cdk}")
                 if not cdk:
-                    self.lalc_logger.debug("CDK为空，无法下载")
+                    self.logger.debug("CDK为空，无法下载")
                     await self.send_json(ws, {
                         "type": "response", 
                         "id": msg_id, 
@@ -652,10 +637,10 @@ class ServerController:
                                 "file_path": result
                             }
                         })
-                        self.lalc_logger.debug(f"从mirrorchan下载完成: {result}")
+                        self.logger.debug(f"从mirrorchan下载完成: {result}")
                     except asyncio.CancelledError:
                         # 用户主动取消
-                        self.lalc_logger.debug("下载已被取消")
+                        self.logger.debug("下载已被取消")
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -665,7 +650,7 @@ class ServerController:
                             }
                         })
                     except Exception as e:
-                        self.lalc_logger.debug(f"下载失败: {e}", level="ERROR")
+                        self.logger.error(f"下载失败: {e}")
                         await self.send_json(ws, {
                             "type": "response", 
                             "id": msg_id, 
@@ -692,7 +677,7 @@ class ServerController:
                     return
                 
                 cdk_to_encrypt = args[0]
-                self.lalc_logger.debug(f"收到加密请求，CDK: ***")
+                self.logger.debug(f"收到加密请求，CDK: ***")
                 
                 # 使用加密函数加密CDK
                 from utils.encrypt_decrypt import encrypt_cdk
@@ -707,7 +692,7 @@ class ServerController:
                         "encrypted_value": encrypted_cdk
                     }
                 })
-                self.lalc_logger.debug(f"CDK加密完成，结果: {encrypted_cdk}")
+                self.logger.debug(f"CDK加密完成，结果: {encrypted_cdk}")
             elif base_cmd == "cancel_download":
                 if self._download_task and not self._download_task.done():
                     self._download_task.cancel()
@@ -725,15 +710,15 @@ class ServerController:
             elif base_cmd == "pause":
                 await self.pipeline.pause()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "paused"}})
-                self.lalc_logger.debug(f"收到 pause 命令，已暂停任务流水线")
+                self.logger.debug(f"收到 pause 命令，已暂停任务流水线")
             elif base_cmd == "resume":
                 await self.pipeline.resume()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "resumed"}})
-                self.lalc_logger.debug(f"收到 resume 命令，已恢复任务流水线")
+                self.logger.debug(f"收到 resume 命令，已恢复任务流水线")
             elif base_cmd == "stop":
                 await self.pipeline.stop()
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "stopped"}})
-                self.lalc_logger.debug(f"收到 stop 命令，已停止任务流水线")
+                self.logger.debug(f"收到 stop 命令，已停止任务流水线")
             elif base_cmd == "shutdown_pc":
                 import subprocess
                 import sys
@@ -742,22 +727,22 @@ class ServerController:
                     result = subprocess.run(["shutdown", "/s", "/t", "60"], capture_output=True, text=True)
                     if result.returncode == 0:
                         await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "PC will shutdown in 1 minute"}})
-                        self.lalc_logger.debug("收到 shutdown_pc 命令，计算机将在1分钟后关闭")
+                        self.logger.info("收到 shutdown_pc 命令，计算机将在1分钟后关闭")
                     else:
                         await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"Failed to schedule shutdown: {result.stderr}"}})
-                        self.lalc_logger.debug(f"计划关机失败: {result.stderr}", level="ERROR")
+                        self.logger.error(f"计划关机失败: {result.stderr}")
                 else:
                     # 对于非Windows系统，暂时返回不支持
                     await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "Shutdown command only supported on Windows"}})
-                    self.lalc_logger.debug("收到 shutdown_pc 命令，但当前系统不支持", level="ERROR")
+                    self.logger.error("收到 shutdown_pc 命令，但当前系统不支持")
             elif base_cmd == "close_window":
                 result = input_handler.close_window()
                 if result:
                     await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "window closed"}})
-                    self.lalc_logger.debug("收到 close_window 命令，已关闭游戏窗口")
+                    self.logger.debug("收到 close_window 命令，已关闭游戏窗口")
                 else:
                     await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "no valid window handle"}})
-                    self.lalc_logger.debug("收到 close_window 命令，但没有有效的窗口句柄")
+                    self.logger.debug("收到 close_window 命令，但没有有效的窗口句柄")
             elif base_cmd == "cancel_shutdown_pc":
                 import subprocess
                 import sys
@@ -766,19 +751,19 @@ class ServerController:
                     result = subprocess.run(["shutdown", "/a"], capture_output=True, text=True)
                     if result.returncode == 0:
                         await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "PC shutdown canceled"}})
-                        self.lalc_logger.debug("收到 cancel_shutdown_pc 命令，已取消计划关机")
+                        self.logger.info("收到 cancel_shutdown_pc 命令，已取消计划关机")
                     else:
                         await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"Failed to cancel shutdown: {result.stderr}"}})
-                        self.lalc_logger.debug(f"取消关机失败: {result.stderr}", level="ERROR")
+                        self.logger.error(f"取消关机失败: {result.stderr}")
                 else:
                     # 对于非Windows系统，暂时返回不支持
                     await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "Cancel shutdown command only supported on Windows"}})
-                    self.lalc_logger.debug("收到 cancel_shutdown_pc 命令，但当前系统不支持", level="ERROR")
+                    self.logger.error("收到 cancel_shutdown_pc 命令，但当前系统不支持")
             elif base_cmd == "get_status":
                 # 返回当前任务流水线状态
                 status = self.pipeline.state
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "pipeline_state": status}})
-                self.lalc_logger.debug(f"收到 get_status 命令，当前任务流水线状态: {status}")
+                self.logger.info(f"收到 get_status 命令，当前任务流水线状态: {status}")
             elif base_cmd == "get_log_folders":
                 import os
                 from pathlib import Path
@@ -821,7 +806,7 @@ class ServerController:
                         "folders": folders
                     }
                 })
-                self.lalc_logger.debug(f"已发送日志文件夹列表，共 {len(folders)} 个")
+                self.logger.debug(f"已发送日志文件夹列表，共 {len(folders)} 个")
             elif base_cmd == "get_log_address":
                 if not args:
                     raise ValueError("缺少文件夹名称参数")
@@ -850,7 +835,7 @@ class ServerController:
                     }
                 })
                 
-                self.lalc_logger.debug(f"已发送日志文件夹地址：{folder_name} -> {absolute_path}")
+                self.logger.debug(f"已发送日志文件夹地址：{folder_name} -> {absolute_path}")
             elif base_cmd == "get_img_address":
                 import os
                 from pathlib import Path
@@ -874,7 +859,7 @@ class ServerController:
                     }
                 })
                 
-                self.lalc_logger.debug(f"已发送img文件夹地址: {absolute_path}")
+                self.logger.debug(f"已发送img文件夹地址: {absolute_path}")
             elif base_cmd == "get_log_content":
                 if not args:
                     raise ValueError("缺少文件夹名称参数")
@@ -913,7 +898,7 @@ class ServerController:
                     }
                 })
                 
-                self.lalc_logger.debug(f"已发送日志信息：文件夹 {folder_name} 共 {total_lines} 行")
+                self.logger.debug(f"已发送日志信息：文件夹 {folder_name} 共 {total_lines} 行")
             elif base_cmd == "get_log_line":
                 if len(args) < 2:
                     raise ValueError("缺少参数：文件夹名称、行号")
@@ -975,7 +960,7 @@ class ServerController:
                                     img.save(buffer, format='JPEG')
                                     image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
                         except Exception as e:
-                            self.lalc_logger.log(f"读取图片失败: {str(e)}", level="ERROR")
+                            self.logger.error(f"读取图片失败: {str(e)}")
                     
                     log_entry = {
                         "timestamp": timestamp,
@@ -1004,17 +989,17 @@ class ServerController:
                     }
                 })
             elif base_cmd == "quit_lalc":
-                self.lalc_logger.log("收到quit_lalc命令，正在关闭服务器...")
+                self.logger.info("收到quit_lalc命令，正在关闭服务器...")
                 await self._shutdown_server()
                 # 不再 send_json，避免对关闭的 ws 写数据
             else:
                 await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"unknown command: {base_cmd}"}})
-                self.lalc_logger.debug(f"收到未知命令: {base_cmd}", level="ERROR")
+                self.logger.error(f"收到未知命令: {base_cmd}")
         except Exception as e:
             error_msg = f"执行命令时发生错误: {str(e)}"
             traceback_str = traceback.format_exc()
-            self.lalc_logger.debug(error_msg, level="ERROR")
-            self.lalc_logger.debug(traceback_str, level="ERROR")
+            self.logger.error(error_msg)
+            self.logger.error(traceback_str)
             await self.send_json(ws, {
                 "type": "response", 
                 "id": msg_id, 
@@ -1027,7 +1012,7 @@ class ServerController:
     # ---------- 连接生命周期 ----------
     async def client_handler(self, ws):
         self.clients.add(ws)
-        self.lalc_logger.debug(f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}")
+        self.logger.debug(f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}")
         # 初始化心跳
         self._reset_heartbeat(ws)
         await self.send_json(ws, {"type": "response", "id": "12138", "payload": {"status": "success", "message": "connection confirm"}})
@@ -1039,7 +1024,7 @@ class ServerController:
                     data = json.loads(raw)
                 except json.JSONDecodeError:
                     await self.send_json(ws, {"type": "error", "payload": "invalid json"})
-                    self.lalc_logger.debug("收到无效JSON数据", level="WARNING")
+                    self.logger.warning("收到无效JSON数据")
                     continue
 
                 # 心跳
@@ -1062,11 +1047,11 @@ class ServerController:
                     await self.handle_command(ws, cmd, msg_id, args_list)
                 else:
                     await self.send_json(ws, {"type": "error", "payload": "unknown message type"})
-                    self.lalc_logger.debug("收到未知消息类型")
+                    self.logger.debug("收到未知消息类型")
         except websockets.exceptions.ConnectionClosed:
-            self.lalc_logger.debug(f"客户端断开 {ws.remote_address}")
+            self.logger.debug(f"客户端断开 {ws.remote_address}")
         except Exception as e:
-            self.lalc_logger.debug(f"client_handler 异常: {str(e)}", level="ERROR")
+            self.logger.error(f"client_handler 异常: {str(e)}")
             await self.send_json(ws, {"type": "error", "payload": str(e)})
         finally:
             self.clients.discard(ws)
@@ -1075,7 +1060,7 @@ class ServerController:
             task = self._ping_tasks.pop(ws, None)
             if task and not task.done():
                 task.cancel()
-            self.lalc_logger.debug(f"客户端移除 {ws.remote_address} 剩余 {len(self.clients)}")
+            self.logger.debug(f"客户端移除 {ws.remote_address} 剩余 {len(self.clients)}")
             
             # 如果没有客户端连接了，记录断开时间
             if not self.clients:
@@ -1097,32 +1082,32 @@ class ServerController:
 
     async def _server_coro(self):
         """WebSocket 服务器协程：只要有一个客户端就永远活着"""
-        self.lalc_logger.debug("_server_coro 启动")
+        self.logger.debug("_server_coro 启动")
         try:
             await self.server.wait_closed()          # 关键：挂在这里直到外部 close()
         except asyncio.CancelledError:
-            self.lalc_logger.debug("_server_coro 被取消")
+            self.logger.debug("_server_coro 被取消")
             raise
         finally:
-            self.lalc_logger.debug("_server_coro 结束")
+            self.logger.debug("_server_coro 结束")
 
     async def _timeout_coro(self):
         """超时检查协程"""
-        self.lalc_logger.debug("_timeout_coro 启动")
+        self.logger.debug("_timeout_coro 启动")
         try:
             await self._check_timeout()              # 你已有的 while True 逻辑
         except asyncio.CancelledError:
-            self.lalc_logger.debug("_timeout_coro 被取消")
+            self.logger.debug("_timeout_coro 被取消")
             raise
         finally:
-            self.lalc_logger.debug("_timeout_coro 结束")
+            self.logger.debug("_timeout_coro 结束")
 
     async def run_forever(self):
         # 1. 启动 WebSocket 服务器
         self.server = await self.run_server()
         port = self.server.sockets[0].getsockname()[1]
         self.loop = asyncio.get_running_loop()
-        self.lalc_logger.log(f"WebSocket 服务器启动，监听 ws://localhost:{port}")
+        self.logger.info(f"WebSocket 服务器启动，监听 ws://localhost:{port}")
 
         # 2. 创建两个长期任务
         self._server_task   = asyncio.create_task(self._server_coro())
@@ -1133,7 +1118,7 @@ class ServerController:
             await asyncio.gather(self._server_task, self._timeout_task)
         except asyncio.CancelledError:
             # 外部调用 _shutdown_server() 时会 cancel()，这里正常吃掉
-            self.lalc_logger.debug("run_forever 收到 CancelledError，准备退出")
+            self.logger.debug("run_forever 收到 CancelledError，准备退出")
         finally:
             # 4. 确保两个任务都被取消
             for t in (self._server_task, self._timeout_task):
@@ -1143,7 +1128,7 @@ class ServerController:
                         await t
                     except asyncio.CancelledError:
                         pass
-            self.lalc_logger.debug("run_forever 结束，进程将退出")
+            self.logger.debug("run_forever 结束，进程将退出")
 
 # -------------------- 入口 --------------------
 async def amain():

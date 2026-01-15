@@ -41,7 +41,7 @@ def detect_and_save_theme_pack(pil_img):
     :return [(主题包名, 主题包中心横坐标, 主题包中心纵坐标)]
     """
     get_new_theme_pack = False
-    logger.log("识别并保存未存储的主题包（非 new，new 的卡包不会显示真正包", pil_img)
+    logger.info("识别并保存未存储的主题包（非 new，new 的卡包不会显示真正包", pil_img)
 
     # ---- 1. 模板匹配检测 ----
     matches = recognize_handler.template_match(pil_img, "theme_pack_detail")
@@ -165,7 +165,7 @@ def detect_and_save_theme_pack(pil_img):
         cropped.save(filename)
 
         get_new_theme_pack = True
-        logger.log(f"已保存新主题包: {filename}")
+        logger.info(f"已保存新主题包: {filename}")
         
         # ⑥ 在原图画框
         # draw.rectangle((x1, y1, x2, y2), outline="red", width=3)
