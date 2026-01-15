@@ -8,6 +8,8 @@ import 'package:lalc_frontend/pages/team_config_page.dart';
 import 'package:lalc_frontend/pages/theme_pack_page.dart';
 import 'package:lalc_frontend/pages/about_page.dart';
 import 'package:lalc_frontend/pages/log_page.dart';
+import 'package:lalc_frontend/pages/discord_page.dart'; // 导入Discord页面
+import 'package:lalc_frontend/pages/star_page.dart'; // 导入Star页面
 import 'package:lalc_frontend/managers/config_manager.dart';
 import 'package:lalc_frontend/managers/task_status_manager.dart';
 import 'package:lalc_frontend/debug_path.dart';
@@ -21,7 +23,7 @@ import 'package:toastification/toastification.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'generated/l10n.dart';
 import 'package:lalc_frontend/managers/theme_manager.dart'; // 导入新的ThemeManager
-import 'package:url_launcher/url_launcher.dart'; // 添加url_launcher导入
+// 添加url_launcher导入
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -125,7 +127,6 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-  // 切换主题模式
 
   void _handleWebSocketUpdate() {
     // 处理 WebSocket 更新，如果有错误则显示长时间 Toast
@@ -361,17 +362,20 @@ class _MyAppState extends State<MyApp> {
                             //     ThemeManager().toggle();
                             //   },
                             // ),
-                            // 添加Discord图标
+                            // Discord图标项
                             SidebarXItem(
                               icon: Icons.discord, 
-                              label: "Discord",
-                              onTap: () async {
-                                final Uri url = Uri.parse('https://discord.gg/bVzCuBU4bC');
-                                if (await canLaunchUrl(url)) {
-                                  await launchUrl(url);
-                                } else {
-                                  throw 'Could not launch $url';
-                                }
+                              label: "Discord", 
+                              onTap: () {
+                                sidebarController.selectIndex(7); // Discord页面索引为7
+                              },
+                            ),
+                            // Star图标项
+                            SidebarXItem(
+                              icon: Icons.star, 
+                              label: "Star", 
+                              onTap: () {
+                                sidebarController.selectIndex(8); // Star页面索引为8
                               },
                             ),
                           ],
@@ -424,6 +428,10 @@ class _ScreensExample extends StatelessWidget {
             return AboutPage();
           case 6:
             return SettingsPage();
+          case 7:
+            return DiscordPage(); // Discord页面
+          case 8:
+            return StarPage(); // Star页面
           default:
             return Text("404 Not Found");
         }
