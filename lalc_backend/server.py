@@ -54,6 +54,7 @@ class ServerController:
         self.loop = None
         self._last_pong: Dict[websockets.WebSocketServerProtocol, float] = {}
         self._ping_tasks: Dict[websockets.WebSocketServerProtocol, asyncio.Task] = {}
+        self._background_tasks: list[asyncio.Task] = []  # 后台任务列表
 
     def _on_pipeline_error(self, error_msg: str, traceback_str: str):
         """
@@ -169,12 +170,18 @@ class ServerController:
         self._ping_tasks[ws] = asyncio.create_task(self._heartbeat_checker(ws))
 
     # ---------- 工具 ----------
-    async def send_json(self, ws, data: dict):
-        await ws.send(json.dumps(data))
+    async def send_json(self, ws, data, timeout=1.0):
+        try:
+            await asyncio.wait_for(ws.send(json.dumps(data)), timeout)
+        except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+            logger.warning(f"因超时丢弃信息：{data}")
 
     async def broadcast(self, data: dict):
         if self.clients:
-            await asyncio.gather(*(self.send_json(c, data) for c in self.clients), return_exceptions=True)
+            await asyncio.gather(
+                *(self.send_json(c, data) for c in list(self.clients)),
+                return_exceptions=True
+            )
 
     def convert_frontend_config_to_backend_format(self, frontend_config: dict) -> dict:
         """
@@ -398,25 +405,36 @@ class ServerController:
                 break
 
     async def _shutdown_server(self):
-        """优雅关闭：只需 cancel 两个任务即可"""
+        """优雅关闭：取消所有后台任务并关闭服务器"""
         self.logger.info("开始关闭服务器...")
-        # 1. 通知客户端（可选）
-        if self.clients:
-            await asyncio.gather(
-                *[self.send_json(c, {"type":"response","payload":{"message":"server is shutting down"}})
-                  for c in self.clients],
-                return_exceptions=True
-            )
-        # 2. 停止流水线
+        # 1. 取消所有后台任务
+        for task in self._background_tasks:
+            if not task.done():
+                task.cancel()
+        
+        # 2. 强行关闭所有连接
+        close_all = [c.close(code=1001, reason="server shutdown") for c in self.clients]
+        await asyncio.gather(*close_all, return_exceptions=True)
+        
+        # 3. 停止流水线
         await self.pipeline.stop()
-        # 3. 关闭服务器（让 wait_closed 返回）
+        
+        # 4. 关闭服务器（让 wait_closed 返回）
         if self.server:
             self.server.close()
-        # 4. 取消两个长期任务 → gather 立即返回
+            # 给已经断开的连接一个"快速丢弃"超时
+            try:
+                await asyncio.wait_for(self.server.wait_closed(), timeout=2.0)
+            except asyncio.TimeoutError:
+                self.logger.warning("等待服务器关闭超时，强制退出")
+        
+        # 5. 取消主要任务
         if self._server_task and not self._server_task.done():
             self._server_task.cancel()
         if self._timeout_task and not self._timeout_task.done():
             self._timeout_task.cancel()
+        if self._download_task and not self._download_task.done():
+            self._download_task.cancel()
         self._should_exit = True
 
     # ---------- 业务路由 ----------
@@ -556,7 +574,13 @@ class ServerController:
                     finally:
                         self._download_task = None
                 
-                asyncio.create_task(_wrap())
+                download_wrapped_task = asyncio.create_task(_wrap())
+                self._background_tasks.append(download_wrapped_task)
+                
+                # 创建清理任务的回调，以便从_background_tasks中移除已完成的任务
+                def remove_task(task):
+                    self._background_tasks.remove(task)
+                download_wrapped_task.add_done_callback(remove_task)
             elif base_cmd == "download_from_mirrorchan":
                 # 默认下载路径为当前目录，第二个参数是CDK
                 download_path = args[0] if args else "."
@@ -662,7 +686,13 @@ class ServerController:
                     finally:
                         self._download_task = None
                 
-                asyncio.create_task(_wrap())
+                download_wrapped_task = asyncio.create_task(_wrap())
+                self._background_tasks.append(download_wrapped_task)
+                
+                # 创建清理任务的回调，以便从_background_tasks中移除已完成的任务
+                def remove_task(task):
+                    self._background_tasks.remove(task)
+                download_wrapped_task.add_done_callback(remove_task)
             elif base_cmd == "encrypt_cdk":
                 # 加密CDK的命令
                 if not args or len(args) < 1:
@@ -990,6 +1020,7 @@ class ServerController:
                 })
             elif base_cmd == "quit_lalc":
                 self.logger.info("收到quit_lalc命令，正在关闭服务器...")
+                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": f"quit lalc ack"}})
                 await self._shutdown_server()
                 # 不再 send_json，避免对关闭的 ws 写数据
             else:
