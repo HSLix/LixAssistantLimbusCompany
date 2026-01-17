@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.9.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.9.0...v4.9.1) (2026-01-17)
+
+
+### Bug Fixes
+
+* 修复了任务结束的结束通知没有发出来的问题 | fix the missing of finish task notification ([083b47e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/083b47e382b673e575f04ff095e57feacaf8948d))
+
 ## [4.9.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.3...v4.9.0) (2026-01-15)
 
 
