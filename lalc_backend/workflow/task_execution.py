@@ -161,6 +161,12 @@ class TaskExecution:
         """
         # 先复制数据
         perf_copy = self._perf.copy()
+        # 为每一项添加平均用时计算
+        for _, stats in perf_copy.items():
+            if stats['count'] > 0:
+                stats['avg'] = stats['total'] / stats['count']
+            else:
+                stats['avg'] = 0
         # 按总耗时降序排序
         sorted_items = sorted(perf_copy.items(), key=lambda x: x[1]['total'], reverse=True)
         # 构建排序后的字典
@@ -212,8 +218,8 @@ from utils.get_battle_skill import get_and_save_skill_icons
 @TaskExecution.register("battle_winrate")
 def exec_battle_winrate(self, node:TaskNode, func):
     input_handler.key_press("p")
-    # time.sleep(0.5)
-    # get_and_save_skill_icons()
+    time.sleep(0.5)
+    get_and_save_skill_icons()
 
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node:TaskNode, func):

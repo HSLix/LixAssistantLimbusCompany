@@ -264,13 +264,14 @@ class AsyncTaskPipeline:
             # 检查是否是正常完成还是被停止
             if not self._stop_event.is_set():
                 # 正常完成
-                self._state = self.STATE_STOPPED
+                await self.stop()
                 # 通知任务正常完成
                 if self._completion_callback:
                     try:
                         self._completion_callback()
                     except Exception as callback_error:
                         self.logger.error(f"完成回调执行失败: {str(callback_error)}")
+                
             else:
                 self._state = self.STATE_STOPPED
         except Exception as e:
@@ -309,19 +310,20 @@ class AsyncTaskPipeline:
                         chart_image = self._generate_performance_chart(perf)
                     except Exception as e:
                         self.logger.error(f"性能统计表格生成过程发生错误: {str(e)}")
-
-                    self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts), chart_image)
-                    
-                    
+                        
+                    try:
+                        self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts), chart_image)
+                    except UnboundLocalError:
+                        self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts))
 
     def _generate_performance_chart(self, perf_data: dict) -> Image.Image:
         """
         生成性能统计图表，返回PIL Image对象
-        :param perf_data: 性能统计数据，格式为 {handler_name: {"count": int, "total": float}}
-        :return: PIL Image对象，包含上下两个图表
+        :param perf_data: 性能统计数据，格式为 {handler_name: {"count": int, "total": float, "avg": float}}
+        :return: PIL Image对象，包含三个图表
         """
-        # 创建图表，设置合适的大小
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+        # 创建图表，设置合适的大小，包含三个子图
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 15))
         
         # 按总耗时排序，取前10
         sorted_by_time = sorted(perf_data.items(), key=lambda x: x[1]['total'], reverse=True)[:10]
@@ -357,6 +359,23 @@ class AsyncTaskPipeline:
             ax2.text(0.5, 0.5, 'No data available', horizontalalignment='center', verticalalignment='center',
                      transform=ax2.transAxes, fontsize=14)
             ax2.set_title('Top 10 Tasks by Call Count')
+
+        # 按平均耗时排序，取前10，从高到低
+        sorted_by_avg = sorted(perf_data.items(), key=lambda x: x[1]['avg'], reverse=True)[:10]
+        if sorted_by_avg:
+            names_avg = [item[0] for item in sorted_by_avg]
+            avgs = [item[1]['avg'] for item in sorted_by_avg]
+            
+            ax3.bar(names_avg, avgs)
+            ax3.set_title('Top 10 Tasks by Average Execution Time (High to Low)')
+            ax3.set_xlabel('Task Name')
+            ax3.set_ylabel('Average Time (s)')
+            plt.setp(ax3.get_xticklabels(), rotation=45, ha="right")
+        # 如果没有数据，显示提示信息
+        else:
+            ax3.text(0.5, 0.5, 'No data available', horizontalalignment='center', verticalalignment='center',
+                     transform=ax3.transAxes, fontsize=14)
+            ax3.set_title('Top 10 Tasks by Average Execution Time')
 
         # 调整布局，防止标签被截断
         plt.tight_layout()
