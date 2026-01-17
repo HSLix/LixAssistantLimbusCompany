@@ -646,7 +646,7 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
     
-    # get_mirror_path_node()
+    get_mirror_path_node()
     
     next_node_exist = False
     for next_node in node_templates:

@@ -26,7 +26,7 @@ def exec_choose_team(self, node: TaskNode, func):
         click_index = team_no - 14  # 18→4，19→5
 
     for _ in range(scroll_count):
-        input_handler.swipe(130, 500, 130, 270)
+        input_handler.swipe(130, 500, 130, 280)
         time.sleep(0.5)
 
     team_click = [(130, 315), (130, 355), (130, 390), (130, 430), (130, 465), (130, 500)]

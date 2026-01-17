@@ -1,6 +1,12 @@
 {
     "exp_entry":{
+        "recognition":"template_match",
         "action":"main_drive_confirm",
+        "inverse":true, 
+        "params":{
+            "template":"inferno",
+            "post_delay": 1
+        },
         "next":[
             "exp_enter",
             "exp_entry"
@@ -28,7 +34,8 @@
         "action":"exp_select_stage",
         "params":{
             "template":"luxcavation",
-            "mode":"luxcavation_mode"
+            "mode":"luxcavation_mode",
+            "post_delay":1
         },
         "next":[
             "exp_choose_team",
@@ -127,7 +134,13 @@
         ]
     },
     "thread_entry":{
+        "recognition":"template_match",
         "action":"main_drive_confirm",
+        "inverse":true, 
+        "params":{
+            "template":"inferno",
+            "post_delay": 1
+        },
         "next":[
             "thread_enter",
             "thread_entry"
@@ -154,7 +167,8 @@
         "action":"thread_select_stage",
         "params":{
             "template":"luxcavation",
-            "mode": "luxcavation_mode"
+            "mode": "luxcavation_mode",
+            "post_delay":1
         },
         "next":[
             "thread_choose_team",

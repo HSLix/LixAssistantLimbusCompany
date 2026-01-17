@@ -1,5 +1,5 @@
 {
-  "check_node_target_count": 9,
+  "check_node_target_count": 0,
   "mirror_stop_purchase_gift_money": 800,
   "enable_fuse_ego_gifts": true,
   "enable_replace_skill_purchase_ego_gifts": true,
