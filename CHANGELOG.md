@@ -1,5 +1,24 @@
 # Changelog
 
+## [4.9.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.3...v4.9.0) (2026-01-15)
+
+
+### Features
+
+* 增加了对于客户端没有升级的提醒 | add the remind of client is not up to date ([89a573d](https://github.com/HSLix/LixAssistantLimbusCompany/commit/89a573daa8b45cd122e54c95042fbedb82d2f21c))
+
+
+### Bug Fixes
+
+* 修复了日志调用容易混淆 | make the log more easy to use in backend ([4c64dcb](https://github.com/HSLix/LixAssistantLimbusCompany/commit/4c64dcbd4ff4271a256d86e3f7f68d16f97b608d))
+* 修复了暂停接停止会导致下次开始不了的bug | fix the bug that pause ([afa9355](https://github.com/HSLix/LixAssistantLimbusCompany/commit/afa9355d31c9e79ab2c3e888465e0fa88dfc3057))
+* 修复了更新的时候前端和后端没有相继关闭的bug | fix the bug that frontend and backend can not close as expected ([f697c2e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f697c2e02c6a3e277ff95bd1dcc9126094a95e9f))
+* 修复了没有正确获取版本号的问题 | fix the bug that get wrong version number ([7e25ec2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/7e25ec2278d940691e077d557965a5c06d59ea37))
+* 减少日志图片占用，并将日志部分图片记录替换成识别结果 | reduce the size of log's images and replace some of them with the ressult of recognition ([9e76427](https://github.com/HSLix/LixAssistantLimbusCompany/commit/9e764278d847d235aa349d37515de7935d6beaac))
+* 后端识别兼容纽本 | make recognize can see the thread lv60 ([5b69138](https://github.com/HSLix/LixAssistantLimbusCompany/commit/5b6913860ccfa5cdf3ced0643e761cb15ccef3f3))
+* 增添并丰富 star 和 discord 界面 | add and enrich star page and discord page ([80492e2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/80492e2f03c7bb1109644c16626595733241d7b6))
+* 提升饰品合成的稳定性 | make the task of fuse gift more stable ([f36b7e9](https://github.com/HSLix/LixAssistantLimbusCompany/commit/f36b7e9e6d20f4d17a9f870e036e6100c13433f7))
+
 ## [4.8.3](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.8.2...v4.8.3) (2026-01-14)
 
 
