@@ -16,4 +16,6 @@ pystand/__pycache__
 pystand/script/*
 pystand/site-packages/*
 
+img/dataset/
+
 lalc.zip

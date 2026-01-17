@@ -207,6 +207,14 @@ import task_action
 
 # ====== 以下开始写所有 task，全部用装饰器注册 =======
 # 如果一个节点的 action 与节点同名，那么下面返回的时候就不要再返回这个 action func 的返回值，否则会无限递归执行该 action
+
+from utils.get_battle_skill import get_and_save_skill_icons
+@TaskExecution.register("battle_winrate")
+def exec_battle_winrate(self, node:TaskNode, func):
+    input_handler.key_press("p")
+    # time.sleep(0.5)
+    # get_and_save_skill_icons()
+
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node:TaskNode, func):
     tmp_screenshot = input_handler.capture_screenshot()

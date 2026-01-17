@@ -1,6 +1,9 @@
 @echo off
 echo \__pycache__> exclude_temp.txt
 echo *.pyc>> exclude_temp.txt
+echo torch>> exclude_temp.txt
+echo torchvision>> exclude_temp.txt
+echo torchgen>> exclude_temp.txt
 
 echo Cleaning pystand/script directory...
 if exist "pystand\script" (
@@ -30,7 +33,7 @@ xcopy "recognize" "pystand\script\recognize\" /E /I /Y /EXCLUDE:exclude_temp.txt
 xcopy "task_action" "pystand\script\task_action\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 
 echo Copying site-packages to pystand/site-packages...
-xcopy ".venv\Lib\site-packages\*" "pystand\site-packages\" /E /I /Y /Q
+xcopy ".venv\Lib\site-packages\*" "pystand\site-packages\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 
 echo Pystand Deployment completed!
 del exclude_temp.txt

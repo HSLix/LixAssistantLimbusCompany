@@ -141,7 +141,7 @@ class LALCLogger:
             cmd = [
                 str(pngquant_exe),
                 "--force",
-                "--skip-if-larger",
+                # "--skip-if-larger",
                 "--ext", ".png",
                 "--speed", "11",
                 str(image_path.resolve())

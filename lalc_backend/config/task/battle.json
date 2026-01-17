@@ -24,10 +24,9 @@
     },
     "battle_winrate":{
         "recognition": "template_match",
-        "action": "key",
+        "action": "battle_winrate",
         "params":{
-            "template":"win_rate",
-            "key":"p"
+            "template":"win_rate"
         },
         "next":[
             "battle_fight"

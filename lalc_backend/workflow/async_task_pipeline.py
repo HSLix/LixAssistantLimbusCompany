@@ -278,11 +278,6 @@ class AsyncTaskPipeline:
             traceback_str = traceback.format_exc()
             self.logger.error(error_msg)
             self.logger.error(traceback_str)
-            # 清空任务栈并停止运行
-            self.task_stack.clear()
-            self._stop_event.set()
-            self._pause_event.set()
-            self._state = self.STATE_STOPPED
             
             # 调用错误回调函数通知服务器
             if self._error_callback:
@@ -290,6 +285,8 @@ class AsyncTaskPipeline:
                     self._error_callback(error_msg, traceback_str)
                 except Exception as callback_error:
                     self.logger.error(f"错误回调执行失败: {str(callback_error)}")
+            
+            await self.stop()
             
             raise  # 重新抛出异常，让调用者处理
         finally:
@@ -401,6 +398,8 @@ class AsyncTaskPipeline:
 
         input_handler.stop()
         await self.resume()
+
+        self._send_finish_notification()
             
         self._state = STATE_STOPPED
         if self._worker_task:

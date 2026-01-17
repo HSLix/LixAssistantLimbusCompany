@@ -163,7 +163,8 @@ if __name__ == "__main__":
         #     background_swipe(hwnd, 815, 395, 815, 300, speed=1)
         #     time.sleep(0.5)
         # time.sleep(1)
-        background_swipe(hwnd, 130, 320, 130, 720)
+        # background_swipe(hwnd, 130, 320, 130, 720)
+        background_swipe(hwnd, 460, 270, 460, 340) # 镜牢选路复位
         
         # 测试前台拖拽
         # print("测试前台拖拽...")

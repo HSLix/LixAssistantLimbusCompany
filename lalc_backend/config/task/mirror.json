@@ -1,8 +1,15 @@
 {
     "mirror_entry":{
+        "recognition":"template_match",
         "action":"main_drive_confirm",
+        "inverse":true, 
+        "params":{
+            "template":"inferno",
+            "post_delay": 1
+        },
         "next":[
-            "mirror_enter"
+            "mirror_enter",
+            "mirror_entry"
         ]
     },
     "mirror_enter":{
@@ -42,6 +49,7 @@
             "key":"enter"
         },
         "next":[
+            "mirror_choose_team",
             "mirror_circle_center"
         ]
     },
@@ -125,7 +133,6 @@
             "mirror_select_floor_ego_gift2",
             "mirror_victory",
             "mirror_defeat",
-            "mirror_choose_team",
             "mirror_choose_star",
             "mirror_select_initial_ego_gift",
             "mirror_gift_search",

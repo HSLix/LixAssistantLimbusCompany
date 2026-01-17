@@ -96,7 +96,7 @@ class ImageRecognizer:
         :param template: 模板图像名字（无后缀）
         :param threshold: 匹配阈值
         :param visualize: 是否可视化匹配结果
-        :return: 匹配结果列表，每个元素包含(中心x坐标, 中心y坐标, 匹配分数)
+        :return: 匹配结果列表，每个元素包含(中心x坐标, 中心y坐标, 匹配分数, 对目标图像缩放倍率)
         """
         if mask is None:
             mask = [0, 0, input_handler.width, input_handler.height]
@@ -108,7 +108,7 @@ class ImageRecognizer:
         tmp = pyramid_template_match(screenshot, template, threshold, visualize, grayscale, debug_image=debug_image)
         res = []
         for i in tmp:
-            res.append((i[0]+mask[0], i[1]+mask[1], i[2]))
+            res.append((i[0]+mask[0], i[1]+mask[1], i[2], i[3]))
         log_pic = None if len(res) == 0 else debug_image[0]
         logger.debug(f"执行金字塔模板匹配，模板{template_name}, 对目标图片做截取{mask}，匹配结果：{res}", log_pic)
         return res

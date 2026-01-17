@@ -485,6 +485,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node:TaskNode, f
                 logger.info("检测到有免费普通刷新和剩余技能替换次数，再尝试最后一次刷新和技能替换")
                 input_handler.click(1000, 120)
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
+                tmp_screenshot = input_handler.capture_screenshot()
                 exec_replace_skill()
                 break
 
@@ -625,6 +626,7 @@ def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
     
 
 
+from utils.get_mirror_path_node import get_mirror_path_node
 @TaskExecution.register("mirror_select_next_node")
 def exec_mirror_select_next_node(self, node:TaskNode, func):
     # 默认事件，普通战斗优先，其它的节点差不多后
@@ -643,6 +645,8 @@ def exec_mirror_select_next_node(self, node:TaskNode, func):
     if len(train_head) > 0 and train_head[0][1]<300:
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
+    
+    # get_mirror_path_node()
     
     next_node_exist = False
     for next_node in node_templates:

@@ -153,11 +153,12 @@ if __name__ == "__main__":
     # 加载测试图像
     try:
         templates = []
-        # screenshot = input_handler.capture_screenshot()
+        screenshot = input_handler.capture_screenshot()
         # screenshot = mask_screenshot(screenshot, 140, 270, 150, 150)
+        # screenshot = mask_screenshot(screenshot, 380, 40, 420, 580) # 镜牢选路
         
         register_images_from_directory()
-        screenshot = get_image("TURMDS")
+        # screenshot = get_image("TURMDS")
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
       
         # templates.append(get_image("event_pass_very_low"))
@@ -175,7 +176,7 @@ if __name__ == "__main__":
         # templates.append(get_image("Perversion"))
         # templates.append(get_image("Charred Disk"))
 
-        templates.append(mask_screenshot(get_image("Spring Cultivation"), 20, 20, 130, 290))
+        # templates.append(mask_screenshot(get_image("Spring Cultivation"), 20, 20, 130, 290))
 
         # templates.append(get_image("mirror_theme_pack_new"))
         # templates.append(get_image("theme_pack_detail"))
@@ -184,6 +185,9 @@ if __name__ == "__main__":
         # templates.append(get_image("Faint Vestige"))
         
         # templates.append(get_image("right_top_setting"))
+
+        # templates.append(get_image("ego_details")) # ego 需要点两下才能点上
+        templates.append(get_image("skill_slash")) 
 
         # templates.append(get_image("node_regular_encounter"))
         # templates.append(get_image("node_event"))
@@ -204,7 +208,7 @@ if __name__ == "__main__":
         for template in templates:
             # matches = template_match(screenshot, template, visualize=True, threshold=0.2, grayscale=False)
             start = time.time()
-            matches = template_match(screenshot, template, visualize=True, threshold=0.8, screenshot_scale=1)
+            matches = template_match(screenshot, template, visualize=True, threshold=0.8, screenshot_scale=1.5)
             print(f"used time:{time.time()-start}")
             print(f"   找到 {len(matches)} 个匹配")
             input_handler.set_background_state()

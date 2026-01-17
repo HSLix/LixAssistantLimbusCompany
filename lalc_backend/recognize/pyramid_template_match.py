@@ -38,6 +38,8 @@ def pyramid_template_match(
         threshold=0.7,
         visualize=False,
         grayscale=True,
+        max_scale=1.6,
+        min_scale=0.5,
         debug_image=None
     ):
     """
@@ -66,7 +68,7 @@ def pyramid_template_match(
     th, tw = template.shape[:2]
 
     # --- 固定金字塔测试的scale ---  
-    pyramid_scales = list(np.arange(1.5, 0.5, -0.025))
+    pyramid_scales = list(np.arange(max_scale, min_scale, -0.025))
 
     all_matches = []  # 用于存储所有匹配
 
@@ -113,8 +115,8 @@ def pyramid_template_match(
         cv2.rectangle(vis, tl, br, (0, 255, 255), 2)
 
         # 在矩形框上方绘制分数和缩放倍数
-        cv2.putText(vis, f"{score:.2f} (Scale: {sc:.2f})", (tl[0], tl[1] - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (128, 128, 128), 2)
+        cv2.putText(vis, f"{score:.2f}({sc:.2f})", (tl[0]-10, tl[1] - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 2)
 
     if visualize:
         # 使用 Matplotlib 显示结果，包括源图像和模板图像
@@ -201,13 +203,11 @@ if __name__ == "__main__":
     #         print(res)
             
 
-    print(pyramid_template_match(get_image("TURAS"), get_image("Vain Pride"), threshold=0.7))
-
     # 加载测试图像
     try:
         templates = []
         screenshot = input_handler.capture_screenshot()
-        screenshot = mask_screenshot(screenshot, 590, 180, 560, 350)
+        screenshot = mask_screenshot(screenshot, 0, 470, 1280, 155)
         # templates.append(get_image("Wound Clerid"))
         # templates.append(get_image("Millarca"))
         # templates.append(get_image("Respite"))
@@ -216,7 +216,7 @@ if __name__ == "__main__":
         
 
         # templates.append(get_image("Bell of Truth"))
-        templates.append(get_image("Rest"))
+        # templates.append(get_image("Rest"))
         # templates.append(get_image("Millarca"))
         # templates.append(get_image("WB Flask"))
         # templates.append(get_image("Little and To-be-Naughty Plushie"))
@@ -228,8 +228,10 @@ if __name__ == "__main__":
         # templates.append(get_image("Entanglement Override Sequencer"))
         # templates.append(get_image("Bloodflame Sword"))
         # templates.append(get_image("Rusted Clock Hands"))
-        
 
+        # templates.append(get_image("skill_slash"))
+        templates.append(get_image("skill_pierce"))
+        # templates.append(get_image("skill_blunt"))
 
         # templates.append(get_image("node_regular_encounter"))
         # templates.append(get_image("node_event"))
@@ -252,12 +254,12 @@ if __name__ == "__main__":
             # start = time.time()
             # screenshot = mask_screenshot(screenshot, 600, 40, 200, 580)
             # screenshot = mask_screenshot(screenshot, 380, 40, 420, 580)
-            matches = pyramid_template_match(screenshot, template, visualize=True, threshold=0.7)
+            matches = pyramid_template_match(screenshot, template, visualize=True, threshold=0.8, max_scale=1.6)
             # print(f"使用了 {time.time()-start} 秒")
             print(f"   找到 {len(matches)} 个匹配")
             input_handler.set_background_state()
             for i, match in enumerate(matches):
-                print(f"   匹配 {i+1}: 中心坐标({match[0]}, {match[1]}), 匹配分数: {match[2]:.4f}")
+                print(f"   匹配 {i+1}: 中心坐标({match[0]}, {match[1]}), 匹配分数: {match[2]:.4f}, 缩放:{match[3]:.4f}")
                 print(match)
                 # con.click(match[0], match[1])
                 # time.sleep(3)
