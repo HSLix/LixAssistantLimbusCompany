@@ -190,7 +190,7 @@
         "action":"battle_entry",
         "params":{
             "template":"win_rate",
-            "mask": [930, 500, 350, 100]
+            "mask": [750, 500, 530, 100]
         },
         "next":[
             "mirror_circle_center"
