@@ -4,6 +4,7 @@ from workflow.task_execution import *
 def exec_mirror_defeat(self, node:TaskNode, func):
     logger.info("镜牢刷取失败", input_handler.capture_screenshot())
     input_handler.click(770, 450)
+    time.sleep(0.5)
     input_handler.click(650, 525)
 
     while len(recognize_handler.template_match(input_handler.capture_screenshot(), "defeat")) == 0:
@@ -158,8 +159,8 @@ def exec_mirror_select_encounter_reward_card(self, node:TaskNode, func):
     reward_cards = [
         "cost_card",
         "starlight_card",
-        "ego_gift_card",
         "cost_ego_gift_card",
+        "ego_gift_card",
         "ego_resource_card",
     ]
     tmp_screenshot = input_handler.capture_screenshot()
@@ -626,63 +627,100 @@ def exec_mirror_shop_heal_sinner(self, node:TaskNode, func):
     
 
 
-from utils.get_mirror_path_node import get_mirror_path_node
+
+from utils.get_save_mirror_legend import get_and_save_mirror_path_node
+from utils.get_save_mirror_path import get_and_save_mirror_path
 @TaskExecution.register("mirror_select_next_node")
 def exec_mirror_select_next_node(self, node:TaskNode, func):
     # 默认事件，普通战斗优先，其它的节点差不多后
-    node_templates = [
-        "node_event",
-        "node_regular_encounter",
-        "node_elite_encounter",
-        "node_focused_encounter",
-        "node_shop",
-        "node_boss_encounter",
-        "train_head",
-    ]
+    node_scores = {
+        "node_event":20, 
+        "node_regular_encounter":9, 
+        "node_elite_encounter":1, 
+        "node_focused_encounter":0, 
+        "node_abnormality_encounter": 0,
+        "node_shop":0,
+        "node_boss_encounter":0, 
+        "train_head":0, 
+        "node_empty":-100,
+    }
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.info("选择下一个镜牢节点", tmp_screenshot)
+    logger.info("选择下一个镜牢节点")
     train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
     if len(train_head) > 0 and train_head[0][1]<300:
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
-    
-    get_mirror_path_node()
-    
+
+    node_pics = get_and_save_mirror_path_node(
+        save=False
+    )
+    path_pics = get_and_save_mirror_path(
+        save=True
+    )
+
     next_node_exist = False
-    for next_node in node_templates:
-        choices = recognize_handler.pyramid_template_match(tmp_screenshot, next_node, mask=[380, 40, 420, 580])
-        for choice in choices:
-            input_handler.click(choice[0], choice[1])
-            time.sleep(1)
+    if node_pics and path_pics:
+        node_type = classify_mirror_legend(node_pics)
+        link_lines = classify_mirror_path(path_pics)[0]["connection_names"]
 
-            if len(recognize_handler.template_match(input_handler.capture_screenshot(), "node_enter")) > 0:
-                input_handler.key_press("enter")
-                next_node_exist = True 
-                break
+        # 每条路径(0,1,2)记录一个最大 weight
+        best_per_path = {
+            0: {"weight": -float("inf"), "line": None},
+            1: {"weight": -float("inf"), "line": None},
+            2: {"weight": -float("inf"), "line": None},
+        }
 
-        if next_node_exist:
-            break
+        for line in link_lines:
+            path_id = int(line[0])  # 0 / 1 / 2
 
-    if not next_node_exist:
-        # 启动保底的三点寻位
-        logger.warning("没能成功识别并点击路径图标，尝试固定点位", input_handler.capture_screenshot())
-        for x, y in [(710, 330), (710, 110), (710, 540)]:
-            input_handler.click(x, y)
+            cur_weight = 0
+            for i, c in enumerate(line):
+                cur_weight += node_scores[node_type[i * 3 + int(c)]]
+
+            # 更新该路径下的最大值
+            if cur_weight > best_per_path[path_id]["weight"]:
+                best_per_path[path_id]["weight"] = cur_weight
+                best_per_path[path_id]["line"] = line
+
+        # 按 weight 从高到低排序
+        sorted_paths = sorted(
+            best_per_path.items(),
+            key=lambda x: x[1]["weight"],
+            reverse=True,
+        )
+
+        # 结果示例输出
+        # for path_id, info in sorted_paths:
+        #     print(f"路径 {path_id}: weight={info['weight']}, line={info['line']}")
+        logger.info(f"ai 识别镜像迷宫路径，寻路结果：{sorted_paths}；节点识别:{node_type}；连接识别:{link_lines}", tmp_screenshot)
+        three_places = [(710, 110), (710, 330), (710, 540)]
+        for path in sorted_paths:
+            if node_type[path[0]] == "node_empty":
+                logger.debug(f"检测到从上往下第 {path[0]+1} 条路径为空，跳过")
+                continue
+            input_handler.click(*three_places[path[0]])
+            self.exec_wait_disappear(get_task("wait_connecting_disappear"))
             time.sleep(1)
             if len(recognize_handler.template_match(input_handler.capture_screenshot(), "node_enter")) > 0:
                 input_handler.key_press("enter")
                 next_node_exist = True
-                break   
+                break
+
+    train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
+    if not next_node_exist and len(train_head) > 0:
+        # 自身点
+        input_handler.click(train_head[0][0], train_head[0][1])
+
+        time.sleep(1)
+        if len(recognize_handler.template_match(input_handler.capture_screenshot(), "node_enter")) > 0:
+            input_handler.key_press("enter")
+            next_node_exist = True
+        
     
     if not next_node_exist:
         # 那么估计是当前的位置因为各种偏移不对
         logger.warning("镜牢寻路异常，尝试重启镜牢", input_handler.capture_screenshot())
-        input_handler.click(1230, 50)
-        time.sleep(1)
-        input_handler.click(730, 440)
-        time.sleep(1)
-        input_handler.click(760, 490)
-        return (node.name, None, get_task("mirror_entry").get_next)
+        return (node.name, None, get_task("back_to_init_page").get_next)
     
 
 
