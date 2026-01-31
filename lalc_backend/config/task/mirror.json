@@ -46,7 +46,8 @@
         "action":"key",
         "params":{
             "template":"resume",
-            "key":"enter"
+            "key":"enter",
+            "post_delay":2
         },
         "next":[
             "mirror_choose_team",
@@ -65,10 +66,13 @@
     "mirror_enter_confirm":{
         "action":"key",
         "params":{
-            "key":"enter"
+            "key":"enter",
+            "post_delay": 2
         },
         "next":[
-            "mirror_choose_team"
+            "mirror_choose_team",
+            "mirror_enter_dungeon",
+            "mirror_enter"
         ]
     },
     "mirror_choose_team":{
