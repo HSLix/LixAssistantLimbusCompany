@@ -44,11 +44,10 @@
     "event_wait_connecting_disappear":{
         "action":"wait_connecting_disappear",
         "params":{
-            "pre_delay":1,
             "post_delay":2
         },
         "next":[
-            "event_entry"
+
         ],
         "interrupt":[
 
