@@ -4,6 +4,7 @@ echo *.pyc>> exclude_temp.txt
 echo torch>> exclude_temp.txt
 echo torchvision>> exclude_temp.txt
 echo torchgen>> exclude_temp.txt
+echo img\dataset>> exclude_temp.txt
 
 echo Cleaning pystand/script directory...
 if exist "pystand\script" (
@@ -22,8 +23,9 @@ mkdir "pystand\site-packages"
 echo Copying files and directories to pystand/script...
 xcopy "config" "pystand\script\config\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 xcopy "doc" "pystand\script\doc\" /E /I /Y /Q
-xcopy "img" "pystand\script\img\" /E /I /Y /Q
+xcopy "img" "pystand\script\img\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
 xcopy "input" "pystand\script\input\" /E /I /Y /EXCLUDE:exclude_temp.txt /Q
+xcopy "ai\model" "pystand\script\ai\model\" /E /I /Y /Q
 copy "main.py" "pystand\script\"
 copy "server.py" "pystand\script\"
 copy "MagicAndWonder.ico" "pystand\script\"

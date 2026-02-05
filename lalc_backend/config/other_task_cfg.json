@@ -1,4 +1,5 @@
 {
   "lunary_purchase_target": 1,
+  "ego_enable": true,
   "test_mode": false
 }

@@ -17,6 +17,7 @@ logger = init_logger()
 # 全局单例引用
 _server_controller_instance = None
 
+
 # -------------------- WebSocket 服务器 --------------------
 class ServerController:
     """
@@ -29,27 +30,29 @@ class ServerController:
         global _server_controller_instance
         if _server_controller_instance is not None:
             raise RuntimeError("ServerController 是单例模式，不能创建多个实例")
-            
+
         _server_controller_instance = self
-        
-        from workflow.task_execution import set_server_ref   # 刚才写的注入函数
+
+        from workflow.task_execution import set_server_ref  # 刚才写的注入函数
+
         set_server_ref(self)
-        
+
         # 初始化配置管理器，使用相对于server.py的config目录
         from utils.config_manager import init_config_manager
+
         self.config_manager = init_config_manager("config")
-        
+
         self.pipeline = AsyncTaskPipeline()
         self.pipeline.set_error_callback(self._on_pipeline_error)
         self.pipeline.set_completion_callback(self._on_pipeline_completion)
         self.clients: Set[websockets.WebSocketServerProtocol] = set()
-        self._req_futures: Dict[str, asyncio.Future] = {}   # 用于 request/response 匹配
+        self._req_futures: Dict[str, asyncio.Future] = {}  # 用于 request/response 匹配
         self.logger = init_logger()
         self.received_configs = {}  # 存储接收到的配置
         self._timeout_task = None  # 超时检查任务
         self._last_client_disconnect_time = None  # 最后一个客户端断开连接的时间
         self._should_exit = False  # 退出标志
-        self._download_task: Optional[asyncio.Task] = None   # 当前下载任务
+        self._download_task: Optional[asyncio.Task] = None  # 当前下载任务
         self._download_future: Optional[asyncio.Future] = None  # 下载结果 future
         self.loop = None
         self._last_pong: Dict[websockets.WebSocketServerProtocol, float] = {}
@@ -87,8 +90,8 @@ class ServerController:
             "payload": {
                 "status": "error",
                 "message": error_msg,
-                "traceback": traceback_str
-            }
+                "traceback": traceback_str,
+            },
         }
         await self.broadcast(error_data)
 
@@ -98,22 +101,15 @@ class ServerController:
         """
         completion_data = {
             "type": "task_log",
-            "payload": {
-                "status": "completed",
-                "message": "任务已正常完成"
-            }
+            "payload": {"status": "completed", "message": "任务已正常完成"},
         }
         await self.broadcast(completion_data)
 
     # 新增广播函数
     async def broadcast_task_log(self, msg: str):
-        await self.broadcast({
-            "type": "task_log",
-            "payload": {
-                "level": "INFO",
-                "message": msg
-            }
-        })
+        await self.broadcast(
+            {"type": "task_log", "payload": {"level": "INFO", "message": msg}}
+        )
 
     # ---------- 心跳相关 ----------
     async def _kick_client(self, ws: websockets.WebSocketServerProtocol):
@@ -131,28 +127,30 @@ class ServerController:
         if task and not task.done():
             task.cancel()
         # 3. 广播断连信息
-        await self.broadcast({
-            "type": "client_timeout",
-            "payload": {
-                "address": str(addr),
-                "message": "client heartbeat timeout"
+        await self.broadcast(
+            {
+                "type": "client_timeout",
+                "payload": {
+                    "address": str(addr),
+                    "message": "client heartbeat timeout",
+                },
             }
-        })
+        )
 
     async def _heartbeat_checker(self, ws: websockets.WebSocketServerProtocol):
         """
         检查心跳间隔时间超过阈值就踢人
         """
         try:
-            while ws in self.clients:          # 只要还在集合里就持续检查
+            while ws in self.clients:  # 只要还在集合里就持续检查
                 now = asyncio.get_event_loop().time()
                 last = self._last_pong.get(ws, now)
                 if now - last > 10:
                     await self._kick_client(ws)
-                    break                      # 已经踢掉，结束协程
-                await asyncio.sleep(0.5)       # 每 0.5 秒扫描一次，精度足够
+                    break  # 已经踢掉，结束协程
+                await asyncio.sleep(0.5)  # 每 0.5 秒扫描一次，精度足够
         except asyncio.CancelledError:
-            raise                            # 允许取消
+            raise  # 允许取消
         except Exception as e:
             self.logger.error(f"心跳检查协程异常 {e}")
 
@@ -180,7 +178,7 @@ class ServerController:
         if self.clients:
             await asyncio.gather(
                 *(self.send_json(c, data) for c in list(self.clients)),
-                return_exceptions=True
+                return_exceptions=True,
             )
 
     def convert_frontend_config_to_backend_format(self, frontend_config: dict) -> dict:
@@ -194,81 +192,116 @@ class ServerController:
             "thread_cfg": {},
             "mirror_cfg": {},
             "other_task_cfg": {},
-            "theme_pack_cfg": {}
+            "theme_pack_cfg": {},
         }
-        
+
         # 处理taskConfigs
         task_configs = frontend_config.get("taskConfigs", {})
-        
+
         # EXP配置转换
         exp_config = task_configs.get("EXP", {})
         if exp_config:
             # enabled为false时，check_node_target_count设为0，否则使用count值
-            backend_config["exp_cfg"]["check_node_target_count"] = \
+            backend_config["exp_cfg"]["check_node_target_count"] = (
                 exp_config.get("count", 0) if exp_config.get("enabled", False) else 0
-            
+            )
+
             # 处理params中的参数
             exp_params = exp_config.get("params", {})
             # luxcavationMode映射到luxcavation_mode
             if "luxcavationMode" in exp_params:
-                backend_config["exp_cfg"]["luxcavation_mode"] = exp_params["luxcavationMode"].lower()
+                backend_config["exp_cfg"]["luxcavation_mode"] = exp_params[
+                    "luxcavationMode"
+                ].lower()
             # expStage映射到exp_stage
             if "expStage" in exp_params:
                 backend_config["exp_cfg"]["exp_stage"] = exp_params["expStage"]
-        
+
         # Thread配置转换
         thread_config = task_configs.get("Thread", {})
         if thread_config:
             # enabled为false时，check_node_target_count设为0，否则使用count值
-            backend_config["thread_cfg"]["check_node_target_count"] = \
-                thread_config.get("count", 0) if thread_config.get("enabled", False) else 0
-            
+            backend_config["thread_cfg"]["check_node_target_count"] = (
+                thread_config.get("count", 0)
+                if thread_config.get("enabled", False)
+                else 0
+            )
+
             # 处理params中的参数
             thread_params = thread_config.get("params", {})
             # luxcavationMode映射到luxcavation_mode
             if "luxcavationMode" in thread_params:
-                backend_config["thread_cfg"]["luxcavation_mode"] = thread_params["luxcavationMode"].lower()
+                backend_config["thread_cfg"]["luxcavation_mode"] = thread_params[
+                    "luxcavationMode"
+                ].lower()
             # threadStage映射到thread_stage
             if "threadStage" in thread_params:
-                backend_config["thread_cfg"]["thread_stage"] = thread_params["threadStage"]
-                
+                backend_config["thread_cfg"]["thread_stage"] = thread_params[
+                    "threadStage"
+                ]
+
         # Mirror配置转换
         mirror_config = task_configs.get("Mirror", {})
         if mirror_config:
             # enabled为false时，check_node_target_count设为0，否则使用count值
-            backend_config["mirror_cfg"]["check_node_target_count"] = \
-                mirror_config.get("count", 0) if mirror_config.get("enabled", False) else 0
-            
+            backend_config["mirror_cfg"]["check_node_target_count"] = (
+                mirror_config.get("count", 0)
+                if mirror_config.get("enabled", False)
+                else 0
+            )
+
             # 处理params中的参数
             mirror_params = mirror_config.get("params", {})
             # stopPurchaseGiftMoney映射到mirror_stop_purchase_gift_money
             if "stopPurchaseGiftMoney" in mirror_params:
-                backend_config["mirror_cfg"]["mirror_stop_purchase_gift_money"] = mirror_params["stopPurchaseGiftMoney"]
-            
+                backend_config["mirror_cfg"]["mirror_stop_purchase_gift_money"] = (
+                    mirror_params["stopPurchaseGiftMoney"]
+                )
+
             # 商店的融合，技能替换饰品购买，升级的自定义开关
             if "enable_fuse_ego_gifts" in mirror_params:
-                backend_config["mirror_cfg"]["enable_fuse_ego_gifts"] = mirror_params["enable_fuse_ego_gifts"]
+                backend_config["mirror_cfg"]["enable_fuse_ego_gifts"] = mirror_params[
+                    "enable_fuse_ego_gifts"
+                ]
             if "enable_replace_skill_purchase_ego_gifts" in mirror_params:
-                backend_config["mirror_cfg"]["enable_replace_skill_purchase_ego_gifts"] = mirror_params["enable_replace_skill_purchase_ego_gifts"]
+                backend_config["mirror_cfg"][
+                    "enable_replace_skill_purchase_ego_gifts"
+                ] = mirror_params["enable_replace_skill_purchase_ego_gifts"]
             if "enable_enhance_ego_gifts" in mirror_params:
-                backend_config["mirror_cfg"]["enable_enhance_ego_gifts"] = mirror_params["enable_enhance_ego_gifts"]
+                backend_config["mirror_cfg"]["enable_enhance_ego_gifts"] = (
+                    mirror_params["enable_enhance_ego_gifts"]
+                )
 
             # 难度
             if "mirror_mode" in mirror_params:
-                backend_config["mirror_cfg"]["mirror_mode"] = mirror_params["mirror_mode"]
+                backend_config["mirror_cfg"]["mirror_mode"] = mirror_params[
+                    "mirror_mode"
+                ]
 
-            backend_config["mirror_cfg"]["accept_reward"] = mirror_params.get("accept_reward", True)
-        
+            backend_config["mirror_cfg"]["accept_reward"] = mirror_params.get(
+                "accept_reward", True
+            )
+
+            # 节点权重设置
+            if "node_scores" in mirror_params:
+                backend_config["mirror_cfg"]["node_scores"] = mirror_params[
+                    "node_scores"
+                ]
+
         # 处理teamConfigs
         team_configs = frontend_config.get("teamConfigs", {})
-        
+
         # 为EXP、Thread、Mirror配置队伍信息
-        for task_type, config in [("EXP", exp_config), ("Thread", thread_config), ("Mirror", mirror_config)]:
+        for task_type, config in [
+            ("EXP", exp_config),
+            ("Thread", thread_config),
+            ("Mirror", mirror_config),
+        ]:
             if config and "teams" in config:
                 teams = config["teams"]
                 team_orders = []
                 team_indexes = []
-                
+
                 for team_index in teams:
                     team_key = str(team_index - 1)  # 前端队伍索引从1开始，后端从0开始
                     if team_key in team_configs:
@@ -277,48 +310,97 @@ class ServerController:
                         selected_members = team_config.get("selectedMembers", [])
                         team_orders.append(selected_members)
                         team_indexes.append(team_index)
-                        
+
                         # 特殊处理Mirror相关的队伍配置
                         if task_type == "Mirror":
                             # 队伍风格
                             if "selectedTeamStyleType" in team_config:
-                                if "mirror_team_styles" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_styles"] = []
-                                backend_config["mirror_cfg"]["mirror_team_styles"].append(team_config["selectedTeamStyleType"])
-                            
+                                if (
+                                    "mirror_team_styles"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_styles"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_styles"
+                                ].append(team_config["selectedTeamStyleType"])
+
                             # 偏好EGO饰品类型
                             if "selectedPreferEgoGiftTypes" in team_config:
-                                if "mirror_team_ego_gift_styles" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_ego_gift_styles"] = []
-                                backend_config["mirror_cfg"]["mirror_team_ego_gift_styles"].append(team_config["selectedPreferEgoGiftTypes"])
-                                
+                                if (
+                                    "mirror_team_ego_gift_styles"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_ego_gift_styles"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_ego_gift_styles"
+                                ].append(team_config["selectedPreferEgoGiftTypes"])
+
                             # EGO饰品白名单和黑名单
                             if "giftName2Status" in team_config:
                                 allow_list = []
                                 block_list = []
-                                for gift_name, status in team_config["giftName2Status"].items():
+                                for gift_name, status in team_config[
+                                    "giftName2Status"
+                                ].items():
                                     if status == "Allow List":
                                         allow_list.append(gift_name)
                                     elif status == "Block List":
                                         block_list.append(gift_name)
-                                        
-                                if "mirror_team_ego_allow_list" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_ego_allow_list"] = []
-                                backend_config["mirror_cfg"]["mirror_team_ego_allow_list"].append(allow_list)
-                                
-                                if "mirror_team_ego_block_list" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_ego_block_list"] = []
-                                backend_config["mirror_cfg"]["mirror_team_ego_block_list"].append(block_list)
-                                
+
+                                if (
+                                    "mirror_team_ego_allow_list"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_ego_allow_list"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_ego_allow_list"
+                                ].append(allow_list)
+
+                                if (
+                                    "mirror_team_ego_block_list"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_ego_block_list"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_ego_block_list"
+                                ].append(block_list)
+
                             # 技能替换配置
-                            if "skillReplacementEnabled" in team_config and "skillReplacementOrders" in team_config:
+                            if (
+                                "skillReplacementEnabled" in team_config
+                                and "skillReplacementOrders" in team_config
+                            ):
                                 replace_skill = {}
-                                sinners = ["Yi Sang", "Faust", "Don Quixote", "Ryoshu", "Meursault", 
-                                          "Hong Lu", "Heathcliff", "Ishmael", "Rodion", "Sinclair", "Outis", "Gregor"]
+                                sinners = [
+                                    "Yi Sang",
+                                    "Faust",
+                                    "Don Quixote",
+                                    "Ryoshu",
+                                    "Meursault",
+                                    "Hong Lu",
+                                    "Heathcliff",
+                                    "Ishmael",
+                                    "Rodion",
+                                    "Sinclair",
+                                    "Outis",
+                                    "Gregor",
+                                ]
                                 for sinner in sinners:
                                     # 只处理启用的罪人
-                                    if team_config["skillReplacementEnabled"].get(sinner, False):
-                                        orders = team_config["skillReplacementOrders"].get(sinner, [])
+                                    if team_config["skillReplacementEnabled"].get(
+                                        sinner, False
+                                    ):
+                                        orders = team_config[
+                                            "skillReplacementOrders"
+                                        ].get(sinner, [])
                                         if orders:
                                             # 根据技能替换顺序映射到数字
                                             # [1, 2] -> 1, [2, 3] -> 2, [1, 3] -> 3
@@ -330,53 +412,100 @@ class ServerController:
                                                     skill_order.append(2)
                                                 elif order == [1, 3]:
                                                     skill_order.append(3)
-                                            
+
                                             if skill_order:
                                                 replace_skill[sinner] = skill_order
-                                                
-                                if "mirror_replace_skill" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_replace_skill"] = []
-                                backend_config["mirror_cfg"]["mirror_replace_skill"].append(replace_skill)
-                                
+
+                                if (
+                                    "mirror_replace_skill"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_replace_skill"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_replace_skill"
+                                ].append(replace_skill)
+
                             # 商店治疗配置
                             if "shopHealAll" in team_config:
-                                if "mirror_shop_heal" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_shop_heal"] = []
-                                backend_config["mirror_cfg"]["mirror_shop_heal"].append(team_config["shopHealAll"])
-                                
+                                if (
+                                    "mirror_shop_heal"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_shop_heal"
+                                    ] = []
+                                backend_config["mirror_cfg"]["mirror_shop_heal"].append(
+                                    team_config["shopHealAll"]
+                                )
+
                             # 初始EGO饰品选择顺序
                             if "initialEgoGifts" in team_config:
-                                if "mirror_team_initial_ego_orders" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_initial_ego_orders"] = []
-                                backend_config["mirror_cfg"]["mirror_team_initial_ego_orders"].append(team_config["initialEgoGifts"])
-                                
+                                if (
+                                    "mirror_team_initial_ego_orders"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_initial_ego_orders"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_initial_ego_orders"
+                                ].append(team_config["initialEgoGifts"])
+
                             # 星光配置
-                            if "mirrorStarEnabled" in team_config and "mirrorStarValues" in team_config:
+                            if (
+                                "mirrorStarEnabled" in team_config
+                                and "mirrorStarValues" in team_config
+                            ):
                                 stars = []
-                                for star_index, enabled in team_config["mirrorStarEnabled"].items():
-                                    if enabled and star_index in team_config["mirrorStarValues"]:
-                                        stars.append(team_config["mirrorStarValues"][star_index])
-                                if "mirror_team_stars" not in backend_config["mirror_cfg"]:
-                                    backend_config["mirror_cfg"]["mirror_team_stars"] = []
-                                backend_config["mirror_cfg"]["mirror_team_stars"].append(stars)
-                
+                                for star_index, enabled in team_config[
+                                    "mirrorStarEnabled"
+                                ].items():
+                                    if (
+                                        enabled
+                                        and star_index
+                                        in team_config["mirrorStarValues"]
+                                    ):
+                                        stars.append(
+                                            team_config["mirrorStarValues"][star_index]
+                                        )
+                                if (
+                                    "mirror_team_stars"
+                                    not in backend_config["mirror_cfg"]
+                                ):
+                                    backend_config["mirror_cfg"][
+                                        "mirror_team_stars"
+                                    ] = []
+                                backend_config["mirror_cfg"][
+                                    "mirror_team_stars"
+                                ].append(stars)
+
                 # 将队伍信息添加到对应的任务配置中
                 cfg_key = task_type.lower() + "_cfg"
                 backend_config[cfg_key]["team_orders"] = team_orders
                 backend_config[cfg_key]["team_indexes"] = team_indexes
-                
+
         # 处理主题包权重配置
         theme_pack_weights = frontend_config.get("themePackWeights", {})
         for theme_pack_name, weight in theme_pack_weights.items():
             backend_config["theme_pack_cfg"][theme_pack_name] = {"weight": weight}
-            
+
         # 处理其他配置
         daily_lunacy_purchase = task_configs.get("Daily Lunacy Purchase", {})
         if daily_lunacy_purchase:
-            backend_config["other_task_cfg"]["lunary_purchase_target"] = \
-                daily_lunacy_purchase.get("count", 0) if daily_lunacy_purchase.get("enabled", False) else 0
+            backend_config["other_task_cfg"]["lunary_purchase_target"] = (
+                daily_lunacy_purchase.get("count", 0)
+                if daily_lunacy_purchase.get("enabled", False)
+                else 0
+            )
+
+        ego_config = task_configs.get("E.G.O", {})
+        backend_config["other_task_cfg"]["ego_enable"] = ego_config.get(
+            "enabled", False
+        )
         backend_config["other_task_cfg"]["test_mode"] = False
-        
+
         return backend_config
 
     async def _check_timeout(self):
@@ -386,21 +515,23 @@ class ServerController:
         outdate_time = 20
         while True:
             await asyncio.sleep(1)
-            
+
             # 如果还有客户端连接，则重置断开时间
             if self.clients:
                 self._last_client_disconnect_time = None
                 continue
-                
+
             # 如果没有客户端连接
             if not self._last_client_disconnect_time:
                 self._last_client_disconnect_time = datetime.now()
                 continue
-                
+
             # 检查是否超时
             elapsed = datetime.now() - self._last_client_disconnect_time
             if elapsed.total_seconds() >= outdate_time:
-                self.logger.info(f"服务器超时自动关闭：超过{outdate_time}秒无客户端连接")
+                self.logger.info(
+                    f"服务器超时自动关闭：超过{outdate_time}秒无客户端连接"
+                )
                 await self._shutdown_server()
                 break
 
@@ -411,14 +542,14 @@ class ServerController:
         for task in self._background_tasks:
             if not task.done():
                 task.cancel()
-        
+
         # 2. 强行关闭所有连接
         close_all = [c.close(code=1001, reason="server shutdown") for c in self.clients]
         await asyncio.gather(*close_all, return_exceptions=True)
-        
+
         # 3. 停止流水线
         await self.pipeline.stop()
-        
+
         # 4. 关闭服务器（让 wait_closed 返回）
         if self.server:
             self.server.close()
@@ -427,7 +558,7 @@ class ServerController:
                 await asyncio.wait_for(self.server.wait_closed(), timeout=2.0)
             except asyncio.TimeoutError:
                 self.logger.warning("等待服务器关闭超时，强制退出")
-        
+
         # 5. 取消主要任务
         if self._server_task and not self._server_task.done():
             self._server_task.cancel()
@@ -443,87 +574,139 @@ class ServerController:
         # 如果客户端已经拆好，就直接用
         if args_list is not None:
             args = args_list
-        
+
         try:
             if base_cmd == "start":
                 # 打印接收到的配置
-                self.logger.debug(f"接收到的配置: {json.dumps(self.received_configs, ensure_ascii=False)}")
-                
+                self.logger.debug(
+                    f"接收到的配置: {json.dumps(self.received_configs, ensure_ascii=False)}"
+                )
+
                 # 转换配置格式并更新到ConfigManager
                 if self.received_configs:
-                    converted_config = self.convert_frontend_config_to_backend_format(self.received_configs)
-                    self.logger.debug(f"转换后的配置: {json.dumps(converted_config, ensure_ascii=False)}")
-                    
+                    converted_config = self.convert_frontend_config_to_backend_format(
+                        self.received_configs
+                    )
+                    self.logger.debug(
+                        f"转换后的配置: {json.dumps(converted_config, ensure_ascii=False)}"
+                    )
+
                     # 使用实例化的config_manager更新配置
                     if "exp_cfg" in converted_config and converted_config["exp_cfg"]:
-                        self.config_manager.update_exp_config(converted_config["exp_cfg"])
-                    if "thread_cfg" in converted_config and converted_config["thread_cfg"]:
-                        self.config_manager.update_thread_config(converted_config["thread_cfg"])
-                    if "mirror_cfg" in converted_config and converted_config["mirror_cfg"]:
-                        self.config_manager.update_mirror_config(converted_config["mirror_cfg"])
-                    if "other_task_cfg" in converted_config and converted_config["other_task_cfg"]:
-                        self.config_manager.update_other_task_config(converted_config["other_task_cfg"])
-                    if "theme_pack_cfg" in converted_config and converted_config["theme_pack_cfg"]:
-                        self.config_manager.update_theme_pack_config(converted_config["theme_pack_cfg"])
-                    
+                        self.config_manager.update_exp_config(
+                            converted_config["exp_cfg"]
+                        )
+                    if (
+                        "thread_cfg" in converted_config
+                        and converted_config["thread_cfg"]
+                    ):
+                        self.config_manager.update_thread_config(
+                            converted_config["thread_cfg"]
+                        )
+                    if (
+                        "mirror_cfg" in converted_config
+                        and converted_config["mirror_cfg"]
+                    ):
+                        self.config_manager.update_mirror_config(
+                            converted_config["mirror_cfg"]
+                        )
+                    if (
+                        "other_task_cfg" in converted_config
+                        and converted_config["other_task_cfg"]
+                    ):
+                        self.config_manager.update_other_task_config(
+                            converted_config["other_task_cfg"]
+                        )
+                    if (
+                        "theme_pack_cfg" in converted_config
+                        and converted_config["theme_pack_cfg"]
+                    ):
+                        self.config_manager.update_theme_pack_config(
+                            converted_config["theme_pack_cfg"]
+                        )
+
                     # 保存配置到文件
                     self.config_manager.save_configs()
-                
+
                 await self.pipeline.start("main")
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": "started"},
+                    },
+                )
                 self.logger.debug(f"收到 start 命令，已启动任务流水线")
             elif base_cmd == "semi_auto_start":
                 await self.pipeline.start("semi_auto_main")
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "started"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": "started"},
+                    },
+                )
                 self.logger.debug(f"收到 semi_auto_start 命令，已启动任务流水线")
             elif base_cmd == "get_latest_version":
                 from utils.update_manager import get_latest_version
+
                 version = get_latest_version()
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "version_info",
-                        "version": version
-                    }
-                })
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "version_info",
+                            "version": version,
+                        },
+                    },
+                )
                 self.logger.debug(f"获取最新版本号: {version}")
             elif base_cmd == "download_from_github":
                 # 默认下载路径为当前目录
                 download_path = args[0] if args else "."
-                
+
                 # 如果前一条下载还没完，直接拒绝
                 if self._download_task and not self._download_task.done():
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {"status": "error", "message": "已有下载任务进行中，请先 cancel_download"}
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "已有下载任务进行中，请先 cancel_download",
+                            },
+                        },
+                    )
                     return
-                
+
                 from utils.update_manager import download_lalc_release_asset
-                
+
                 def _progress(p):
                     self.loop = asyncio.get_running_loop()
                     asyncio.run_coroutine_threadsafe(
-                        self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "progress", 
-                                "type": "download_progress",
-                                "progress": p
-                            }
-                        }),
-                        self.loop
+                        self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "progress",
+                                    "type": "download_progress",
+                                    "progress": p,
+                                },
+                            },
+                        ),
+                        self.loop,
                     )
-                
+
                 # 启动可取消任务
-                task, file_path = download_lalc_release_asset(
-                    download_path,
-                    _progress
-                )
+                task, file_path = download_lalc_release_asset(download_path, _progress)
                 self._download_task = task
 
                 # 用 asyncio.create_task 把「下载+完成广播」包在一起，
@@ -531,55 +714,67 @@ class ServerController:
                 async def _wrap():
                     try:
                         result = await task
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "progress", 
-                                "type": "download_progress",
-                                "progress": 100
-                            }
-                        }),
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "success", 
-                                "type": "download_complete",
-                                "file_path": result
-                            }
-                        })
+                        (
+                            await self.send_json(
+                                ws,
+                                {
+                                    "type": "response",
+                                    "id": msg_id,
+                                    "payload": {
+                                        "status": "progress",
+                                        "type": "download_progress",
+                                        "progress": 100,
+                                    },
+                                },
+                            ),
+                        )
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "success",
+                                    "type": "download_complete",
+                                    "file_path": result,
+                                },
+                            },
+                        )
                         self.logger.debug(f"从GitHub下载完成: {result}")
                     except asyncio.CancelledError:
                         # 用户主动取消
                         self.logger.debug("下载已被取消")
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "cancelled", 
-                                "type": "download_cancelled"
-                            }
-                        })
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "cancelled",
+                                    "type": "download_cancelled",
+                                },
+                            },
+                        )
                     except Exception as e:
                         self.logger.error(f"下载失败: {e}")
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "error", 
-                                "message": str(e)
-                            }
-                        })
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {"status": "error", "message": str(e)},
+                            },
+                        )
                     finally:
                         self._download_task = None
-                
+
                 download_wrapped_task = asyncio.create_task(_wrap())
                 self._background_tasks.append(download_wrapped_task)
-                
+
                 # 创建清理任务的回调，以便从_background_tasks中移除已完成的任务
                 def remove_task(task):
                     self._background_tasks.remove(task)
+
                 download_wrapped_task.add_done_callback(remove_task)
             elif base_cmd == "download_from_mirrorchan":
                 # 默认下载路径为当前目录，第二个参数是CDK
@@ -588,53 +783,65 @@ class ServerController:
                 print(f"cdk:{cdk}")
                 cdk = decrypt_cdk(cdk)
                 print(f"decrypt_cdk:{cdk}")
-                
+
                 # 检查CDK是否为空
                 self.logger.debug(f"目标下载地址：{download_path}; cdk:{cdk}")
                 if not cdk:
                     self.logger.debug("CDK为空，无法下载")
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {
-                            "status": "error", 
-                            "message": "CDK为空，无法下载"
-                        }
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "CDK为空，无法下载",
+                            },
+                        },
+                    )
                     return
-                
+
                 # 如果前一条下载还没完，直接拒绝
                 if self._download_task and not self._download_task.done():
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {"status": "error", "message": "已有下载任务进行中，请先 cancel_download"}
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "已有下载任务进行中，请先 cancel_download",
+                            },
+                        },
+                    )
                     return
-                
+
                 from utils.update_manager import download_lalc_from_mirrorchan
-                
+
                 def _progress(p):
                     self.loop = asyncio.get_running_loop()
                     asyncio.run_coroutine_threadsafe(
-                        self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "progress", 
-                                "type": "download_progress",
-                                "progress": p
-                            }
-                        }),
-                        self.loop
+                        self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "progress",
+                                    "type": "download_progress",
+                                    "progress": p,
+                                },
+                            },
+                        ),
+                        self.loop,
                     )
-                
+
                 # 启动可取消任务
                 task, file_path = download_lalc_from_mirrorchan(
                     download_path,
                     cdk,
                     None,  # current_version
-                    _progress
+                    _progress,
                 )
                 self._download_task = task
 
@@ -643,168 +850,313 @@ class ServerController:
                 async def _wrap():
                     try:
                         result = await task
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "progress", 
-                                "type": "download_progress",
-                                "progress": 100
-                            }
-                        }),
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "success", 
-                                "type": "download_complete",
-                                "file_path": result
-                            }
-                        })
+                        (
+                            await self.send_json(
+                                ws,
+                                {
+                                    "type": "response",
+                                    "id": msg_id,
+                                    "payload": {
+                                        "status": "progress",
+                                        "type": "download_progress",
+                                        "progress": 100,
+                                    },
+                                },
+                            ),
+                        )
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "success",
+                                    "type": "download_complete",
+                                    "file_path": result,
+                                },
+                            },
+                        )
                         self.logger.debug(f"从mirrorchan下载完成: {result}")
                     except asyncio.CancelledError:
                         # 用户主动取消
                         self.logger.debug("下载已被取消")
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "cancelled", 
-                                "type": "download_cancelled"
-                            }
-                        })
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "cancelled",
+                                    "type": "download_cancelled",
+                                },
+                            },
+                        )
                     except Exception as e:
                         self.logger.error(f"下载失败: {e}")
-                        await self.send_json(ws, {
-                            "type": "response", 
-                            "id": msg_id, 
-                            "payload": {
-                                "status": "error", 
-                                "message": str(e)
-                            }
-                        })
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {"status": "error", "message": str(e)},
+                            },
+                        )
                     finally:
                         self._download_task = None
-                
+
                 download_wrapped_task = asyncio.create_task(_wrap())
                 self._background_tasks.append(download_wrapped_task)
-                
+
                 # 创建清理任务的回调，以便从_background_tasks中移除已完成的任务
                 def remove_task(task):
                     self._background_tasks.remove(task)
+
                 download_wrapped_task.add_done_callback(remove_task)
             elif base_cmd == "encrypt_cdk":
                 # 加密CDK的命令
                 if not args or len(args) < 1:
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {
-                            "status": "error", 
-                            "message": "缺少要加密的CDK参数"
-                        }
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "缺少要加密的CDK参数",
+                            },
+                        },
+                    )
                     return
-                
+
                 cdk_to_encrypt = args[0]
                 self.logger.debug(f"收到加密请求，CDK: ***")
-                
+
                 # 使用加密函数加密CDK
                 from utils.encrypt_decrypt import encrypt_cdk
+
                 encrypted_cdk = encrypt_cdk(cdk_to_encrypt)
-                
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "encrypted_cdk",
-                        "encrypted_value": encrypted_cdk
-                    }
-                })
+
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "encrypted_cdk",
+                            "encrypted_value": encrypted_cdk,
+                        },
+                    },
+                )
                 self.logger.debug(f"CDK加密完成，结果: {encrypted_cdk}")
             elif base_cmd == "cancel_download":
                 if self._download_task and not self._download_task.done():
                     self._download_task.cancel()
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {"status": "success", "message": "已请求取消下载"}
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "success",
+                                "message": "已请求取消下载",
+                            },
+                        },
+                    )
                 else:
-                    await self.send_json(ws, {
-                        "type": "response", 
-                        "id": msg_id, 
-                        "payload": {"status": "error", "message": "当前没有进行中的下载任务"}
-                    })
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "当前没有进行中的下载任务",
+                            },
+                        },
+                    )
             elif base_cmd == "pause":
                 await self.pipeline.pause()
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "paused"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": "paused"},
+                    },
+                )
                 self.logger.debug(f"收到 pause 命令，已暂停任务流水线")
             elif base_cmd == "resume":
                 await self.pipeline.resume()
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "resumed"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": "resumed"},
+                    },
+                )
                 self.logger.debug(f"收到 resume 命令，已恢复任务流水线")
             elif base_cmd == "stop":
                 await self.pipeline.stop()
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "stopped"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": "stopped"},
+                    },
+                )
                 self.logger.debug(f"收到 stop 命令，已停止任务流水线")
             elif base_cmd == "shutdown_pc":
                 import subprocess
                 import sys
+
                 # 在Windows上使用shutdown命令设置1分钟后关机
                 if sys.platform == "win32":
-                    result = subprocess.run(["shutdown", "/s", "/t", "60"], capture_output=True, text=True)
+                    result = subprocess.run(
+                        ["shutdown", "/s", "/t", "60"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
-                        await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "PC will shutdown in 1 minute"}})
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "success",
+                                    "message": "PC will shutdown in 1 minute",
+                                },
+                            },
+                        )
                         self.logger.info("收到 shutdown_pc 命令，计算机将在1分钟后关闭")
                     else:
-                        await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"Failed to schedule shutdown: {result.stderr}"}})
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "error",
+                                    "message": f"Failed to schedule shutdown: {result.stderr}",
+                                },
+                            },
+                        )
                         self.logger.error(f"计划关机失败: {result.stderr}")
                 else:
                     # 对于非Windows系统，暂时返回不支持
-                    await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "Shutdown command only supported on Windows"}})
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "Shutdown command only supported on Windows",
+                            },
+                        },
+                    )
                     self.logger.error("收到 shutdown_pc 命令，但当前系统不支持")
             elif base_cmd == "close_window":
                 result = input_handler.close_window()
                 if result:
-                    await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "window closed"}})
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "success",
+                                "message": "window closed",
+                            },
+                        },
+                    )
                     self.logger.debug("收到 close_window 命令，已关闭游戏窗口")
                 else:
-                    await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "no valid window handle"}})
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "no valid window handle",
+                            },
+                        },
+                    )
                     self.logger.debug("收到 close_window 命令，但没有有效的窗口句柄")
             elif base_cmd == "cancel_shutdown_pc":
                 import subprocess
                 import sys
+
                 # 在Windows上使用shutdown命令取消计划关机
                 if sys.platform == "win32":
-                    result = subprocess.run(["shutdown", "/a"], capture_output=True, text=True)
+                    result = subprocess.run(
+                        ["shutdown", "/a"], capture_output=True, text=True
+                    )
                     if result.returncode == 0:
-                        await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": "PC shutdown canceled"}})
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "success",
+                                    "message": "PC shutdown canceled",
+                                },
+                            },
+                        )
                         self.logger.info("收到 cancel_shutdown_pc 命令，已取消计划关机")
                     else:
-                        await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"Failed to cancel shutdown: {result.stderr}"}})
+                        await self.send_json(
+                            ws,
+                            {
+                                "type": "response",
+                                "id": msg_id,
+                                "payload": {
+                                    "status": "error",
+                                    "message": f"Failed to cancel shutdown: {result.stderr}",
+                                },
+                            },
+                        )
                         self.logger.error(f"取消关机失败: {result.stderr}")
                 else:
                     # 对于非Windows系统，暂时返回不支持
-                    await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": "Cancel shutdown command only supported on Windows"}})
+                    await self.send_json(
+                        ws,
+                        {
+                            "type": "response",
+                            "id": msg_id,
+                            "payload": {
+                                "status": "error",
+                                "message": "Cancel shutdown command only supported on Windows",
+                            },
+                        },
+                    )
                     self.logger.error("收到 cancel_shutdown_pc 命令，但当前系统不支持")
             elif base_cmd == "get_status":
                 # 返回当前任务流水线状态
                 status = self.pipeline.state
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "pipeline_state": status}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "pipeline_state": status},
+                    },
+                )
                 self.logger.info(f"收到 get_status 命令，当前任务流水线状态: {status}")
             elif base_cmd == "get_log_folders":
                 import os
                 from pathlib import Path
                 import re
                 from datetime import datetime
-                
+
                 # 获取日志根目录
                 logs_root = Path("./logs")
                 if not logs_root.exists():
                     logs_root.mkdir(exist_ok=True)
-                
+
                 # 获取所有日志文件夹并解析时间戳
                 folders_with_time = []
                 for item in logs_root.iterdir():
@@ -822,135 +1174,151 @@ class ServerController:
                             except:
                                 # 最后备选方案：使用当前时间
                                 folders_with_time.append((datetime.now(), item.name))
-                
+
                 # 按时间倒序排列（最新的在前面）
                 folders_with_time.sort(key=lambda x: x[0], reverse=True)
                 folders = [name for dt, name in folders_with_time]
-                
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "log_folders",
-                        "folders": folders
-                    }
-                })
+
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "log_folders",
+                            "folders": folders,
+                        },
+                    },
+                )
                 self.logger.debug(f"已发送日志文件夹列表，共 {len(folders)} 个")
             elif base_cmd == "get_log_address":
                 if not args:
                     raise ValueError("缺少文件夹名称参数")
-                
+
                 folder_name = args[0]
                 import os
                 from pathlib import Path
-                
+
                 # 构造日志文件夹的绝对路径
                 log_dir = Path("./logs") / folder_name
                 if not log_dir.exists():
                     raise ValueError(f"日志文件夹不存在: {folder_name}")
-                
+
                 # 获取绝对路径
                 absolute_path = str(log_dir.resolve())
-                
+
                 # 发送日志文件夹的绝对路径
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "log_address",
-                        "folder": folder_name,
-                        "address": absolute_path
-                    }
-                })
-                
-                self.logger.debug(f"已发送日志文件夹地址：{folder_name} -> {absolute_path}")
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "log_address",
+                            "folder": folder_name,
+                            "address": absolute_path,
+                        },
+                    },
+                )
+
+                self.logger.debug(
+                    f"已发送日志文件夹地址：{folder_name} -> {absolute_path}"
+                )
             elif base_cmd == "get_img_address":
                 import os
                 from pathlib import Path
-                
+
                 # 构造项目根目录下img文件夹的绝对路径
                 img_dir = Path("./img")
                 if not img_dir.exists():
                     raise ValueError(f"项目根目录下img文件夹不存在: {img_dir}")
-                
+
                 # 获取绝对路径
                 absolute_path = str(img_dir.resolve())
-                
+
                 # 发送图片文件夹的绝对路径
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "img_address",
-                        "address": absolute_path
-                    }
-                })
-                
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "img_address",
+                            "address": absolute_path,
+                        },
+                    },
+                )
+
                 self.logger.debug(f"已发送img文件夹地址: {absolute_path}")
             elif base_cmd == "get_log_content":
                 if not args:
                     raise ValueError("缺少文件夹名称参数")
-                
+
                 folder_name = args[0]
                 import os
                 from pathlib import Path
                 import re
                 from datetime import datetime
-                
+
                 # 构造日志文件路径
                 log_dir = Path("./logs") / folder_name
                 if not log_dir.exists():
                     raise ValueError(f"日志文件夹不存在: {folder_name}")
-                
+
                 # 查找主日志文件（run.log）
                 log_file = log_dir / "run.log"
                 if not log_file.exists():
                     raise ValueError(f"在文件夹 {folder_name} 中未找到 run.log 文件")
-                
+
                 # 计算日志总行数
                 total_lines = 0
                 with open(log_file, "r", encoding="utf-8") as f:
                     for line in f:
                         total_lines += 1
-                
+
                 # 先发送日志总行数
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "log_content_info",
-                        "folder": folder_name,
-                        "total_lines": total_lines
-                    }
-                })
-                
-                self.logger.debug(f"已发送日志信息：文件夹 {folder_name} 共 {total_lines} 行")
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "log_content_info",
+                            "folder": folder_name,
+                            "total_lines": total_lines,
+                        },
+                    },
+                )
+
+                self.logger.debug(
+                    f"已发送日志信息：文件夹 {folder_name} 共 {total_lines} 行"
+                )
             elif base_cmd == "get_log_line":
                 if len(args) < 2:
                     raise ValueError("缺少参数：文件夹名称、行号")
-                
+
                 folder_name = args[0]
                 line_number = int(args[1])
-                
+
                 import os
                 from pathlib import Path
                 import re
                 from datetime import datetime
-                
+
                 # 构造日志文件路径
                 log_dir = Path("./logs") / folder_name
                 if not log_dir.exists():
                     raise ValueError(f"日志文件夹不存在: {folder_name}")
-                
+
                 # 查找主日志文件（run.log）
                 log_file = log_dir / "run.log"
                 if not log_file.exists():
                     raise ValueError(f"在文件夹 {folder_name} 中未找到 run.log 文件")
-                
+
                 # 读取指定行的日志
                 target_line = None
                 with open(log_file, "r", encoding="utf-8") as f:
@@ -958,13 +1326,16 @@ class ServerController:
                         if current_line_num == line_number:
                             target_line = line
                             break
-                
+
                 if target_line is None:
                     raise ValueError(f"日志文件中没有第 {line_number} 行")
-                
+
                 # 解析日志行，格式示例：
                 # 2023-06-15 14:30:25,123 | INFO | [task_name] 日志消息 | IMAGE:images/xxx.png
-                match = re.match(r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) \| (\w+) \| (.*?)(?:\s*\|\s*IMAGE:(.*?))?$', target_line)
+                match = re.match(
+                    r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) \| (\w+) \| (.*?)(?:\s*\|\s*IMAGE:(.*?))?$",
+                    target_line,
+                )
                 log_entry = None
                 if match:
                     timestamp, level, message, image_path = match.groups()
@@ -975,78 +1346,109 @@ class ServerController:
                             from PIL import Image
                             import io
                             import base64
-                            
+
                             # 构造完整图片路径
                             full_image_path = log_dir / "images" / image_path
                             if full_image_path.exists():
                                 # 读取图片并转换为base64编码
                                 with Image.open(full_image_path) as img:
                                     # 转换为RGB模式（如果是RGBA或其他模式）
-                                    if img.mode != 'RGB':
-                                        img = img.convert('RGB')
-                                    
+                                    if img.mode != "RGB":
+                                        img = img.convert("RGB")
+
                                     # 将图片保存到内存缓冲区
                                     buffer = io.BytesIO()
-                                    img.save(buffer, format='JPEG')
-                                    image_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+                                    img.save(buffer, format="JPEG")
+                                    image_data = base64.b64encode(
+                                        buffer.getvalue()
+                                    ).decode("utf-8")
                         except Exception as e:
                             self.logger.error(f"读取图片失败: {str(e)}")
-                    
+
                     log_entry = {
                         "timestamp": timestamp,
                         "level": level,
                         "message": message,
-                        "image_data": image_data
+                        "image_data": image_data,
                     }
                 else:
                     # 对于不匹配标准格式的行
                     log_entry = {
                         "timestamp": "",
                         "level": "INFO",
-                        "message": target_line.rstrip('\n'),
-                        "image_data": None
+                        "message": target_line.rstrip("\n"),
+                        "image_data": None,
                     }
-                
-                await self.send_json(ws, {
-                    "type": "response", 
-                    "id": msg_id, 
-                    "payload": {
-                        "status": "success", 
-                        "type": "log_line",
-                        "folder": folder_name,
-                        "line_number": line_number,
-                        "entry": log_entry
-                    }
-                })
+
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "success",
+                            "type": "log_line",
+                            "folder": folder_name,
+                            "line_number": line_number,
+                            "entry": log_entry,
+                        },
+                    },
+                )
             elif base_cmd == "quit_lalc":
                 self.logger.info("收到quit_lalc命令，正在关闭服务器...")
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "success", "message": f"quit lalc ack"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {"status": "success", "message": f"quit lalc ack"},
+                    },
+                )
                 await self._shutdown_server()
                 # 不再 send_json，避免对关闭的 ws 写数据
             else:
-                await self.send_json(ws, {"type": "response", "id": msg_id, "payload": {"status": "error", "message": f"unknown command: {base_cmd}"}})
+                await self.send_json(
+                    ws,
+                    {
+                        "type": "response",
+                        "id": msg_id,
+                        "payload": {
+                            "status": "error",
+                            "message": f"unknown command: {base_cmd}",
+                        },
+                    },
+                )
                 self.logger.error(f"收到未知命令: {base_cmd}")
         except Exception as e:
             error_msg = f"执行命令时发生错误: {str(e)}"
             traceback_str = traceback.format_exc()
             self.logger.error(error_msg)
             self.logger.error(traceback_str)
-            await self.send_json(ws, {
-                "type": "response", 
-                "id": msg_id, 
-                "payload": {
-                    "status": "error", 
-                    "message": error_msg
-                }
-            })
+            await self.send_json(
+                ws,
+                {
+                    "type": "response",
+                    "id": msg_id,
+                    "payload": {"status": "error", "message": error_msg},
+                },
+            )
 
     # ---------- 连接生命周期 ----------
     async def client_handler(self, ws):
         self.clients.add(ws)
-        self.logger.debug(f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}")
+        self.logger.debug(
+            f"客户端接入 {ws.remote_address} 当前连接数 {len(self.clients)}"
+        )
         # 初始化心跳
         self._reset_heartbeat(ws)
-        await self.send_json(ws, {"type": "response", "id": "12138", "payload": {"status": "success", "message": "connection confirm"}})
+        await self.send_json(
+            ws,
+            {
+                "type": "response",
+                "id": "12138",
+                "payload": {"status": "success", "message": "connection confirm"},
+            },
+        )
         # await self.send_json(ws, {"type": "error", "id": "12139", "payload": {"status": "fail", "message": "test error type"}})
 
         try:
@@ -1054,13 +1456,15 @@ class ServerController:
                 try:
                     data = json.loads(raw)
                 except json.JSONDecodeError:
-                    await self.send_json(ws, {"type": "error", "payload": "invalid json"})
+                    await self.send_json(
+                        ws, {"type": "error", "payload": "invalid json"}
+                    )
                     self.logger.warning("收到无效JSON数据")
                     continue
 
                 # 心跳
                 if data.get("type") == "heartbeat":
-                    self._reset_heartbeat(ws)     
+                    self._reset_heartbeat(ws)
                     await self.send_json(ws, {"type": "heartbeat_ack"})
                     continue
 
@@ -1077,7 +1481,9 @@ class ServerController:
                     args_list = data.get("payload", {}).get("args", None)
                     await self.handle_command(ws, cmd, msg_id, args_list)
                 else:
-                    await self.send_json(ws, {"type": "error", "payload": "unknown message type"})
+                    await self.send_json(
+                        ws, {"type": "error", "payload": "unknown message type"}
+                    )
                     self.logger.debug("收到未知消息类型")
         except websockets.exceptions.ConnectionClosed:
             self.logger.debug(f"客户端断开 {ws.remote_address}")
@@ -1091,8 +1497,10 @@ class ServerController:
             task = self._ping_tasks.pop(ws, None)
             if task and not task.done():
                 task.cancel()
-            self.logger.debug(f"客户端移除 {ws.remote_address} 剩余 {len(self.clients)}")
-            
+            self.logger.debug(
+                f"客户端移除 {ws.remote_address} 剩余 {len(self.clients)}"
+            )
+
             # 如果没有客户端连接了，记录断开时间
             if not self.clients:
                 self._last_client_disconnect_time = datetime.now()
@@ -1103,9 +1511,11 @@ class ServerController:
             try:
                 # 注意：这里不再 await，直接返回 server 对象
                 return await websockets.serve(
-                    self.client_handler, host, port,
+                    self.client_handler,
+                    host,
+                    port,
                     ping_interval=None,
-                    ping_timeout=None
+                    ping_timeout=None,
                 )
             except OSError:
                 continue
@@ -1115,7 +1525,7 @@ class ServerController:
         """WebSocket 服务器协程：只要有一个客户端就永远活着"""
         self.logger.debug("_server_coro 启动")
         try:
-            await self.server.wait_closed()          # 关键：挂在这里直到外部 close()
+            await self.server.wait_closed()  # 关键：挂在这里直到外部 close()
         except asyncio.CancelledError:
             self.logger.debug("_server_coro 被取消")
             raise
@@ -1126,7 +1536,7 @@ class ServerController:
         """超时检查协程"""
         self.logger.debug("_timeout_coro 启动")
         try:
-            await self._check_timeout()              # 你已有的 while True 逻辑
+            await self._check_timeout()  # 你已有的 while True 逻辑
         except asyncio.CancelledError:
             self.logger.debug("_timeout_coro 被取消")
             raise
@@ -1141,8 +1551,8 @@ class ServerController:
         self.logger.info(f"WebSocket 服务器启动，监听 ws://localhost:{port}")
 
         # 2. 创建两个长期任务
-        self._server_task   = asyncio.create_task(self._server_coro())
-        self._timeout_task  = asyncio.create_task(self._timeout_coro())
+        self._server_task = asyncio.create_task(self._server_coro())
+        self._timeout_task = asyncio.create_task(self._timeout_coro())
 
         # 3. 一并等待（任意一个崩溃都会触发 gather 返回）
         try:
@@ -1161,6 +1571,7 @@ class ServerController:
                         pass
             self.logger.debug("run_forever 结束，进程将退出")
 
+
 # -------------------- 入口 --------------------
 async def amain():
     # 使用单例模式获取 ServerController 实例
@@ -1168,6 +1579,7 @@ async def amain():
     if _server_controller_instance is None:
         _server_controller_instance = ServerController()
     await _server_controller_instance.run_forever()
+
 
 if __name__ == "__main__":
     asyncio.run(amain())

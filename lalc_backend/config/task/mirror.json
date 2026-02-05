@@ -355,6 +355,16 @@
             "mirror_circle_center"
         ]
     },
+    "mirror_select_event_effect":{
+        "recognition":"template_match",
+        "action":"mirror_select_event_effect",
+        "params":{
+            "template":"select_event_effect"
+        },
+        "next": [
+            "mirror_circle_center"
+        ]
+    },
     "mirror_victory":{
         "recognition":"template_match",
         "action":"mirror_victory",

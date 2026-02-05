@@ -1,23 +1,26 @@
 {
-  "check_node_target_count": 0,
-  "mirror_stop_purchase_gift_money": 800,
-  "enable_fuse_ego_gifts": true,
-  "enable_replace_skill_purchase_ego_gifts": true,
-  "enable_enhance_ego_gifts": true,
-  "mirror_mode": "hard",
+  "check_node_target_count": 12,
+  "mirror_stop_purchase_gift_money": 400,
+  "mirror_mode": "normal",
   "accept_reward": true,
+  "node_scores": {
+    "node_event": 20,
+    "node_regular_encounter": 9,
+    "node_elite_encounter": 1,
+    "node_focused_encounter": 0,
+    "node_abnormality_encounter": 0,
+    "node_shop": 0,
+    "node_boss_encounter": 0
+  },
   "mirror_team_styles": [
-    "Rupture",
     "Bleed",
-    "Poise",
-    "Burn",
-    "Charge",
-    "Sinking"
+    "Bleed",
+    "Bleed",
+    "Bleed",
+    "Bleed",
+    "Bleed"
   ],
   "mirror_team_ego_gift_styles": [
-    [
-      "Rupture"
-    ],
     [
       "Bleed"
     ],
@@ -32,6 +35,9 @@
     ],
     [
       "Sinking"
+    ],
+    [
+      "Rupture"
     ]
   ],
   "mirror_team_ego_allow_list": [
@@ -53,11 +59,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -77,11 +79,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -101,10 +99,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -124,11 +119,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -148,11 +139,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ],
     [
       "Lithograph",
@@ -172,11 +159,7 @@
       "Nebulizer",
       "Melted Eyeball",
       "Downpour",
-      "Eclipse of Scarlet Moths",
-      "Artistic Sense",
-      "Tomorrow's Fortune",
-      "Phantom Pain",
-      "Hardship"
+      "Eclipse of Scarlet Moths"
     ]
   ],
   "mirror_team_ego_block_list": [
@@ -189,49 +172,17 @@
   ],
   "mirror_replace_skill": [
     {
-      "Faust": [
-        3,
-        2,
-        1
-      ],
-      "Ryoshu": [
-        3,
-        2,
-        1
-      ],
-      "Hong Lu": [
-        3,
-        2,
-        1
-      ],
-      "Heathcliff": [
-        3,
-        2,
-        1
-      ],
-      "Ishmael": [
-        3,
-        2,
-        1
-      ],
-      "Rodion": [
-        3,
-        2,
-        1
-      ],
-      "Sinclair": [
-        3,
-        2,
-        1
-      ]
-    },
-    {
       "Yi Sang": [
         1,
         2,
         3
       ],
       "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
         1,
         2,
         3
@@ -258,6 +209,11 @@
       ]
     },
     {
+      "Yi Sang": [
+        3,
+        2,
+        1
+      ],
       "Don Quixote": [
         3,
         2,
@@ -287,23 +243,18 @@
         1,
         2,
         3
-      ],
-      "Gregor": [
-        3,
-        2,
-        1
       ]
     },
     {
       "Yi Sang": [
-        3,
+        1,
         2,
-        1
+        3
       ],
-      "Meursault": [
-        3,
+      "Don Quixote": [
+        1,
         2,
-        1
+        3
       ],
       "Ishmael": [
         3,
@@ -326,16 +277,16 @@
         1
       ],
       "Gregor": [
-        3,
+        1,
         2,
-        1
+        3
       ]
     },
     {
       "Yi Sang": [
-        3,
+        1,
         2,
-        1
+        3
       ],
       "Faust": [
         3,
@@ -343,36 +294,36 @@
         1
       ],
       "Don Quixote": [
-        3,
+        1,
         2,
-        1
+        3
       ],
       "Ryoshu": [
         3,
         2,
         1
       ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
       "Heathcliff": [
         3,
         2,
         1
       ],
-      "Rodion": [
-        3,
-        2,
-        1
-      ],
       "Outis": [
-        3,
+        1,
         2,
-        1
+        3
       ]
     },
     {
       "Yi Sang": [
-        3,
+        1,
         2,
-        1
+        3
       ],
       "Hong Lu": [
         3,
@@ -390,9 +341,9 @@
         1
       ],
       "Rodion": [
-        3,
+        1,
         2,
-        1
+        3
       ],
       "Outis": [
         3,
@@ -400,9 +351,46 @@
         1
       ],
       "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Faust": [
         3,
         2,
         1
+      ],
+      "Ryoshu": [
+        1,
+        2,
+        3
+      ],
+      "Hong Lu": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        3,
+        2,
+        1
+      ],
+      "Sinclair": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
       ]
     }
   ],
@@ -421,9 +409,9 @@
       3
     ],
     [
-      3,
       1,
-      2
+      2,
+      3
     ],
     [
       1,
@@ -448,48 +436,36 @@
   ],
   "mirror_team_stars": [
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
       "3"
     ],
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
       "3"
     ],
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
       "3"
     ],
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
       "3"
     ],
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
       "3"
     ],
     [
-      "4",
-      "1",
       "0",
       "6",
       "7",
@@ -498,72 +474,58 @@
   ],
   "team_orders": [
     [
-      "Hong Lu",
-      "Ryoshu",
-      "Faust",
+      "Don Quixote",
       "Rodion",
       "Ishmael",
-      "Sinclair",
-      "Heathcliff",
       "Yi Sang",
-      "Outis",
       "Gregor",
-      "Don Quixote",
-      "Meursault"
-    ],
-    [
-      "Don Quixote",
-      "Rodion",
+      "Heathcliff",
+      "Outis",
+      "Ryoshu",
       "Meursault",
-      "Gregor",
-      "Yi Sang",
-      "Ishmael",
-      "Heathcliff",
-      "Outis",
       "Hong Lu",
       "Faust",
-      "Ryoshu",
       "Sinclair"
     ],
     [
       "Ryoshu",
       "Heathcliff",
       "Hong Lu",
+      "Sinclair",
       "Meursault",
       "Don Quixote",
-      "Sinclair",
-      "Gregor",
       "Yi Sang",
       "Faust",
+      "Gregor",
       "Ishmael",
       "Rodion",
       "Outis"
     ],
     [
       "Sinclair",
+      "Outis",
       "Yi Sang",
       "Gregor",
-      "Meursault",
-      "Ishmael",
-      "Rodion",
-      "Outis",
-      "Faust",
       "Don Quixote",
+      "Rodion",
+      "Ishmael",
+      "Faust",
       "Ryoshu",
+      "Meursault",
       "Hong Lu",
       "Heathcliff"
     ],
     [
-      "Heathcliff",
-      "Rodion",
       "Don Quixote",
       "Ryoshu",
       "Faust",
       "Outis",
       "Yi Sang",
+      "Heathcliff",
+      "Hong Lu",
       "Ishmael",
       "Meursault",
-      "Hong Lu",
+      "Rodion",
       "Sinclair",
       "Gregor"
     ],
@@ -580,14 +542,28 @@
       "Don Quixote",
       "Meursault",
       "Sinclair"
+    ],
+    [
+      "Hong Lu",
+      "Faust",
+      "Ryoshu",
+      "Rodion",
+      "Outis",
+      "Gregor",
+      "Sinclair",
+      "Don Quixote",
+      "Yi Sang",
+      "Meursault",
+      "Heathcliff",
+      "Ishmael"
     ]
   ],
   "team_indexes": [
-    6,
     1,
     2,
     3,
     4,
-    5
+    5,
+    6
   ]
 }

@@ -180,6 +180,8 @@ if __name__ == "__main__":
 
         # templates.append(get_image("mirror_theme_pack_new"))
         # templates.append(get_image("theme_pack_detail"))
+        # templates.append(get_image("win_rate"))
+        templates.append(get_image("to_corrode_0%"))
 
         # templates.append(get_image("Dark Vestige"))
         # templates.append(get_image("Faint Vestige"))
@@ -187,7 +189,7 @@ if __name__ == "__main__":
         # templates.append(get_image("right_top_setting"))
 
         # templates.append(get_image("ego_details")) # ego 需要点两下才能点上
-        templates.append(get_image("skill_slash")) 
+        # templates.append(get_image("skill_slash")) 
 
         # templates.append(get_image("node_regular_encounter"))
         # templates.append(get_image("node_event"))
@@ -208,7 +210,7 @@ if __name__ == "__main__":
         for template in templates:
             # matches = template_match(screenshot, template, visualize=True, threshold=0.2, grayscale=False)
             start = time.time()
-            matches = template_match(screenshot, template, visualize=True, threshold=0.8, screenshot_scale=1.5)
+            matches = template_match(screenshot, template, visualize=True, threshold=0.8, screenshot_scale=1.0)
             print(f"used time:{time.time()-start}")
             print(f"   找到 {len(matches)} 个匹配")
             input_handler.set_background_state()

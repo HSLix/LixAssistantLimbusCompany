@@ -6,9 +6,22 @@ import time
 import webbrowser
 import threading
 
-from input.game_window import find_game_window, set_window_size, set_window_position, set_window_to_top, set_background_focus, set_foreground_focus, is_mouse_in_window, move_mouse_to_top_right_corner, get_cursor_pos, close_window, close_limbus_window
+from input.game_window import (
+    find_game_window,
+    set_window_size,
+    set_window_position,
+    set_window_to_top,
+    set_background_focus,
+    set_foreground_focus,
+    is_mouse_in_window,
+    move_mouse_to_top_right_corner,
+    get_cursor_pos,
+    close_window,
+    close_limbus_window,
+)
 from input.game_screenshot import take_screenshot, _get_logical_client_rect
 from input.game_click import background_click, foreground_click
+from input.game_long_press import background_long_press, foreground_long_press
 from input.game_keyboard import background_key_press, foreground_key_press
 from input.game_swipe import background_swipe, foreground_swipe
 from input.idle_monitor import wait_input_idle
@@ -21,23 +34,26 @@ logger = init_logger()
 # 状态接口定义各类操作的行为
 class InputState:
     """输入状态抽象类"""
-    
+
     def click(self, hwnd, x, y):
         raise NotImplementedError
-    
+
+    def long_press(self, hwnd, x, y, duration):
+        raise NotImplementedError
+
     def key_press(self, hwnd, key):
         raise NotImplementedError
-    
+
     def swipe(self, hwnd, start_x, start_y, end_x, end_y):
         raise NotImplementedError
-    
+
     def set_focus(self, hwnd):
         raise NotImplementedError
 
 
 class ForegroundInputState(InputState):
     """前台输入状态"""
-    
+
     def click(self, hwnd, x, y):
         # 在执行点击前阻止用户输入
         ctypes.windll.user32.BlockInput(True)
@@ -46,10 +62,19 @@ class ForegroundInputState(InputState):
         finally:
             # 确保无论如何都会解除阻止
             ctypes.windll.user32.BlockInput(False)
-    
+
+    def long_press(self, hwnd, x, y, duration=3):
+        # 在执行长按前阻止用户输入
+        ctypes.windll.user32.BlockInput(True)
+        try:
+            return foreground_long_press(hwnd, x, y, duration)
+        finally:
+            # 确保无论如何都会解除阻止
+            ctypes.windll.user32.BlockInput(False)
+
     def key_press(self, hwnd, key):
         return foreground_key_press(hwnd, key)
-    
+
     def swipe(self, hwnd, start_x, start_y, end_x, end_y):
         # 在执行拖拽前阻止用户输入
         ctypes.windll.user32.BlockInput(True)
@@ -58,14 +83,14 @@ class ForegroundInputState(InputState):
         finally:
             # 确保无论如何都会解除阻止
             ctypes.windll.user32.BlockInput(False)
-    
+
     def set_focus(self, hwnd):
         return set_foreground_focus(hwnd)
 
 
 class BackgroundInputState(InputState):
     """后台输入状态"""
-    
+
     def click(self, hwnd, x, y):
         # 在执行点击前阻止用户输入
         ctypes.windll.user32.BlockInput(True)
@@ -74,10 +99,19 @@ class BackgroundInputState(InputState):
         finally:
             # 确保无论如何都会解除阻止
             ctypes.windll.user32.BlockInput(False)
-    
+
+    def long_press(self, hwnd, x, y, duration=3):
+        # 在执行长按前阻止用户输入
+        ctypes.windll.user32.BlockInput(True)
+        try:
+            return background_long_press(hwnd, x, y, duration)
+        finally:
+            # 确保无论如何都会解除阻止
+            ctypes.windll.user32.BlockInput(False)
+
     def key_press(self, hwnd, key):
         return background_key_press(hwnd, key)
-    
+
     def swipe(self, hwnd, start_x, start_y, end_x, end_y):
         # 在执行拖拽前阻止用户输入
         ctypes.windll.user32.BlockInput(True)
@@ -86,7 +120,7 @@ class BackgroundInputState(InputState):
         finally:
             # 确保无论如何都会解除阻止
             ctypes.windll.user32.BlockInput(False)
-    
+
     def set_focus(self, hwnd):
         return set_background_focus(hwnd)
 
@@ -108,25 +142,25 @@ class _Input:
             _Input._singleton = self
 
         self._hwnd = None
-        
+
         # 初始化状态对象
         self._foreground_state = ForegroundInputState()
         self._background_state = BackgroundInputState()
         self._current_state = self._background_state  # 默认状态为后台
-        
+
         self._screenshot = None
         self._width = 0
         self._height = 0
         # self.refresh_handle()
 
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
-        
+
         screen_width = win32api.GetSystemMetrics(win32con.SM_CXSCREEN)
         self._mouse_reset_position = (screen_width - 1, 0)
 
         # ======== 新增：暂停/停止标志 ========
         self._pause_flag = threading.Event()
-        self._stop_flag  = threading.Event()
+        self._stop_flag = threading.Event()
         self._pause_flag.set()  # 初始非暂停
         # ====================================
 
@@ -135,7 +169,7 @@ class _Input:
 
     def set_background_state(self):
         self._current_state = self._background_state
-    
+
     def set_foreground_state(self):
         self._current_state = self._foreground_state
 
@@ -152,7 +186,7 @@ class _Input:
         self._stop_flag.set()
         self.resume()  # 若正在暂停，先解开
         logger.debug("InputHandler 已停止")
-    
+
     def reset(self):
         """
         重置InputHandler到初始状态，包括恢复暂停标志、清除停止标志、重新查找窗口句柄、重置任务执行次数
@@ -166,7 +200,7 @@ class _Input:
         # 确保默认为后台模式
         self._current_state = self._background_state
         logger.debug("InputHandler 已重置到初始状态")
-    
+
     def refresh_window_state(self):
         """
         刷新窗口句柄并更新相关属性。
@@ -180,23 +214,23 @@ class _Input:
         """
         if self._hwnd:
             self._width, self._height = _get_logical_client_rect(self._hwnd)
-    
+
     @property
     def screenshot(self):
         return copy.copy(self._screenshot)  # 获取时返回副本
-    
+
     @screenshot.setter
     def screenshot(self, value):
         self._screenshot = value  # 修改时直接设置
-    
+
     @property
     def width(self):
         return self._width
-    
+
     @property
     def height(self):
         return self._height
-    
+
     def open_limbus(self):
         try:
             self.refresh_window_state()
@@ -204,8 +238,7 @@ class _Input:
             logger.info("未找到游戏窗口，将尝试自动打开游戏，随后等待 30 秒")
             webbrowser.open("steam://rungameid/1973530")
             time.sleep(30)
-        
-    
+
     def capture_screenshot(self, reset=True, save_path=None):
         """
         截取游戏窗口屏幕并存储在screenshot属性中。
@@ -214,9 +247,12 @@ class _Input:
             if self.set_focus():
                 self.refresh_window_state()
                 # 只在当前窗口大小与默认大小不同时才设置窗口大小
-                if self._width != DEFAULT_WINDOW_WIDTH or self._height != DEFAULT_WINDOW_HEIGHT:
+                if (
+                    self._width != DEFAULT_WINDOW_WIDTH
+                    or self._height != DEFAULT_WINDOW_HEIGHT
+                ):
                     self.set_window_size()
-            
+
             mouse_in_window, mouse_x, mouse_y = is_mouse_in_window(self._hwnd)
             if reset and mouse_in_window:
                 logger.debug("检测到鼠标在游戏窗口内, 尝试移开鼠标, 不归位")
@@ -226,18 +262,23 @@ class _Input:
                     move_mouse_to_top_right_corner(self._hwnd)
                 finally:
                     ctypes.windll.user32.BlockInput(False)
-                time.sleep(0.5)# 让鼠标移走后的动画加载完
-            
+                time.sleep(0.5)  # 让鼠标移走后的动画加载完
+
             # 只在当前窗口大小与默认大小不同时才设置窗口大小
-            if self._width != DEFAULT_WINDOW_WIDTH or self._height != DEFAULT_WINDOW_HEIGHT:
+            if (
+                self._width != DEFAULT_WINDOW_WIDTH
+                or self._height != DEFAULT_WINDOW_HEIGHT
+            ):
                 self.set_window_size()
-                
-            self.screenshot = take_screenshot(self._hwnd, width=self.width, height=self.height, save_path=save_path)
-  
+
+            self.screenshot = take_screenshot(
+                self._hwnd, width=self.width, height=self.height, save_path=save_path
+            )
+
             return self.screenshot
         else:
             raise Exception("hwnd init Error")
-    
+
     def set_window_size(self, width=DEFAULT_WINDOW_WIDTH, height=DEFAULT_WINDOW_HEIGHT):
         """
         设置窗口尺寸为指定大小。
@@ -247,7 +288,7 @@ class _Input:
         if self._width == width and self._height == height:
             logger.debug(f"窗口大小已经是 {width}x{height}，跳过设置")
             return
-        
+
         # 占位符用于实际窗口大小调整的实现
         # 通常会调用game_window模块中的函数
         self._width = width
@@ -257,7 +298,7 @@ class _Input:
             self.refresh_window_state()
         else:
             raise Exception("hwnd init Error")
-    
+
     def set_window_position(self, x, y):
         """
         设置窗口位置为指定坐标。
@@ -268,7 +309,7 @@ class _Input:
             set_window_position(self._hwnd, x, y)
         else:
             raise Exception("hwnd init Error")
-            
+
     def set_window_to_top(self, client_width=1302, client_height=776):
         """
         将窗口客户区调整到屏幕顶部，并设置客户区大小
@@ -281,7 +322,7 @@ class _Input:
             self._update_window_size()
         else:
             raise Exception("hwnd init Error")
-    
+
     def close_window(self):
         """
         关闭当前窗口并清空hwnd
@@ -320,20 +361,20 @@ class _Input:
         在指定位置执行点击操作，根据当前模式决定前台或后台点击。
         支持暂停/恢复/停止
         """
-        if self._stop_flag.is_set(): 
+        if self._stop_flag.is_set():
             return
         self._pause_flag.wait()
         if self._hwnd:
             logger.debug(f"输入适配器执行:点击(click), 坐标: ({x}, {y})")
             wait_input_idle()
-            if self._stop_flag.is_set(): 
+            if self._stop_flag.is_set():
                 return
             self._pause_flag.wait()
             self.set_focus()
             return self._current_state.click(self._hwnd, x, y)
         else:
             raise Exception("hwnd init Error")
-    
+
     # 使用状态模式执行键盘按键操作
     def key_press(self, key):
         """
@@ -341,7 +382,7 @@ class _Input:
         key 最常用："p", "enter", "esc"
         支持暂停/恢复/停止
         """
-        if self._stop_flag.is_set(): 
+        if self._stop_flag.is_set():
             return
         self._pause_flag.wait()
         if self._hwnd:
@@ -350,29 +391,56 @@ class _Input:
             return self._current_state.key_press(self._hwnd, key)
         else:
             raise Exception("hwnd init Error")
-    
+
     # 使用状态模式执行拖拽操作
     def swipe(self, start_x, start_y, end_x, end_y):
         """
         执行鼠标拖拽操作，根据当前模式决定前台或后台拖拽。
         支持暂停/恢复/停止
         """
-        if self._stop_flag.is_set(): 
+        if self._stop_flag.is_set():
             return
         self._pause_flag.wait()
         if self._hwnd:
             wait_input_idle()
-            if self._stop_flag.is_set(): 
+            if self._stop_flag.is_set():
                 return
             self._pause_flag.wait()
-            logger.debug(f"输入适配器执行:拖拽(swipe), 起点和终点: ({start_x}, {start_y}), ({end_x}, {end_y})")
+            logger.debug(
+                f"输入适配器执行:拖拽(swipe), 起点和终点: ({start_x}, {start_y}), ({end_x}, {end_y})"
+            )
             self.set_focus()
             return self._current_state.swipe(self._hwnd, start_x, start_y, end_x, end_y)
         else:
             raise Exception("hwnd init Error")
-    
+
+    # 使用状态模式执行长按操作
+    def long_press(self, x, y, duration=3):
+        """
+        在指定位置执行长按操作，根据当前模式决定前台或后台长按。
+        :param x: x坐标（客户端坐标）
+        :param y: y坐标（客户端坐标）
+        :param duration: 按下后到释放前的间隔时间（秒），默认3秒
+        支持暂停/恢复/停止
+        """
+        if self._stop_flag.is_set():
+            return
+        self._pause_flag.wait()
+        if self._hwnd:
+            logger.debug(
+                f"输入适配器执行:长按(long_press), 坐标: ({x}, {y}), 时长: {duration}秒"
+            )
+            wait_input_idle()
+            if self._stop_flag.is_set():
+                return
+            self._pause_flag.wait()
+            self.set_focus()
+            return self._current_state.long_press(self._hwnd, x, y, duration)
+        else:
+            raise Exception("hwnd init Error")
+
     # 使用状态模式设置焦点
-    def set_focus(self)->bool:
+    def set_focus(self) -> bool:
         """
         设置窗口焦点，根据当前模式决定前台或后台焦点设置。
         :reutrn: 返回是否显示最小化窗口
@@ -382,20 +450,22 @@ class _Input:
         else:
             raise Exception("hwnd init Error")
 
+
 input_handler = _Input()
 
 if __name__ == "__main__":
     import time
     from game_window import find_game_window
+
     # 创建Input实例
     game_input = input_handler
     game_input.refresh_window_state()
     game_input.set_window_size()
-    
+
     print(f"找到游戏窗口，句柄: {game_input._hwnd}")
     print(f"窗口尺寸: {game_input.width}x{game_input.height}")
     print(f"初始模式: {game_input.mode.value}")
-    
+
     # 测试截图功能
     print("\n--- 测试截图功能 ---")
     try:
@@ -403,12 +473,12 @@ if __name__ == "__main__":
         print(f"截图成功，尺寸: {screenshot.size}")
     except Exception as e:
         raise e
-    
+
     # 测试前台模式切换
     print("\n--- 测试模式切换 ---")
     # game_input.mode = Mode.FOREGROUND
     # print(f"切换到前台模式: {game_input.mode.value}")
-    
+
     # 测试后台模式切换
     print(f"切换到后台模式:")
     game_input.set_background_state()
@@ -420,18 +490,30 @@ if __name__ == "__main__":
         print(f"设置焦点操作完成")
     except Exception as e:
         raise e
-        
+
     # 测试点击功能（在窗口左上角点击）
     print("\n--- 测试点击功能 ---")
     try:
         game_input.set_focus()
-        for x, y in {"Yi Sang":[375,340], "Faust":[540,340], "Don Quixote":[700,340], "Ryoshu":[880,340], "Meursault":[1030,340], "Hong Lu":[1210,340],
-    "Heathcliff":[375, 590], "Ishmael":[540, 590], "Rodion":[700, 590], "Sinclair":[880, 590], "Outis":[1030, 590], "Gregor":[1210, 590]}:
+        for x, y in {
+            "Yi Sang": [375, 340],
+            "Faust": [540, 340],
+            "Don Quixote": [700, 340],
+            "Ryoshu": [880, 340],
+            "Meursault": [1030, 340],
+            "Hong Lu": [1210, 340],
+            "Heathcliff": [375, 590],
+            "Ishmael": [540, 590],
+            "Rodion": [700, 590],
+            "Sinclair": [880, 590],
+            "Outis": [1030, 590],
+            "Gregor": [1210, 590],
+        }:
             result = game_input.click(x, y)
         print(f"点击操作完成")
     except Exception as e:
         raise e
-    
+
     # # 测试键盘输入功能
     # print("\n--- 测试键盘输入功能 ---")
     # try:
@@ -439,7 +521,7 @@ if __name__ == "__main__":
     #     print(f"键盘输入操作完成")
     # except Exception as e:
     #     print(f"键盘输入操作失败: {e}")
-    
+
     # # 测试拖拽功能
     # print("\n--- 测试拖拽功能 ---")
     # try:
@@ -447,8 +529,5 @@ if __name__ == "__main__":
     #     print(f"拖拽操作完成")
     # except Exception as e:
     #     print(f"拖拽操作失败: {e}")
-        
-    
-        
-    print("\n--- 所有测试完成 ---")
 
+    print("\n--- 所有测试完成 ---")

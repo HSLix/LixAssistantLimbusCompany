@@ -9,13 +9,13 @@
     "weight": 10
   },
   "ASEA": {
-    "weight": 20
+    "weight": 10
   },
   "Automated Factory": {
-    "weight": 5
+    "weight": 1
   },
   "Burning Haze": {
-    "weight": 5
+    "weight": 10
   },
   "Crawling Abyss": {
     "weight": 5
@@ -30,10 +30,10 @@
     "weight": 10
   },
   "Degraded Gloom": {
-    "weight": 20
+    "weight": 10
   },
   "Devoured Gluttony": {
-    "weight": 20
+    "weight": 10
   },
   "Dizzying Waves": {
     "weight": 10
@@ -42,7 +42,7 @@
     "weight": 10
   },
   "Emotional Craving": {
-    "weight": 20
+    "weight": 10
   },
   "Emotional Flood": {
     "weight": 5
@@ -60,10 +60,10 @@
     "weight": 10
   },
   "Emotional Subservience": {
-    "weight": 20
+    "weight": 10
   },
   "Excessive Gluttong": {
-    "weight": 1
+    "weight": 10
   },
   "Faith & Erosion": {
     "weight": 1
@@ -75,19 +75,19 @@
     "weight": 20
   },
   "Four Houses and Greed": {
-    "weight": 1
+    "weight": 10
   },
   "Full-Stopped by a Bullet": {
     "weight": 10
   },
   "Hatred and Despair": {
-    "weight": 5
+    "weight": 10
   },
   "Hell's Chicken": {
     "weight": 100
   },
   "Inert Sloth": {
-    "weight": 1
+    "weight": 10
   },
   "Insignificant Envy": {
     "weight": 10
@@ -102,25 +102,25 @@
     "weight": 1
   },
   "Line 1": {
-    "weight": 5
+    "weight": 10
   },
   "Line 2": {
-    "weight": 1
+    "weight": 10
   },
   "Line 3": {
-    "weight": 5
+    "weight": 10
   },
   "Line 4 Section#3": {
-    "weight": 1
+    "weight": 10
   },
   "Line 4 Section#4": {
-    "weight": 1
+    "weight": 10
   },
   "Line 5": {
-    "weight": 1
+    "weight": 10
   },
   "Marder on.the WARP Express BokGak": {
-    "weight": 5
+    "weight": 10
   },
   "Miracle in District 20 BokGak": {
     "weight": 10
@@ -129,7 +129,7 @@
     "weight": 10
   },
   "Mountain of Corpses, Sea of Blood": {
-    "weight": 5
+    "weight": 10
   },
   "Murder on the WARP Express": {
     "weight": 1
@@ -150,19 +150,19 @@
     "weight": 10
   },
   "Poised Breathing": {
-    "weight": 5
+    "weight": 10
   },
   "Repressed Wrath": {
-    "weight": 5
+    "weight": 10
   },
   "Rising Power Supply": {
     "weight": 10
   },
   "Season of the Flame": {
-    "weight": 5
+    "weight": 10
   },
   "Sinking Deluge": {
-    "weight": 1
+    "weight": 10
   },
   "Sinking Pang": {
     "weight": 10
@@ -183,7 +183,7 @@
     "weight": 10
   },
   "The Dream Ending": {
-    "weight": 1
+    "weight": 10
   },
   "The Evil Defining": {
     "weight": 10
@@ -219,16 +219,16 @@
     "weight": 10
   },
   "Timekilling Time BokGak": {
-    "weight": 1
+    "weight": 10
   },
   "Timekilling Time": {
     "weight": 1
   },
   "To be Cleaved": {
-    "weight": 20
+    "weight": 10
   },
   "To be Crushed": {
-    "weight": 5
+    "weight": 10
   },
   "To be Pierced": {
     "weight": 10
@@ -240,19 +240,19 @@
     "weight": 10
   },
   "Tyrannical Pride": {
-    "weight": 5
+    "weight": 10
   },
   "Unbound Wrath": {
-    "weight": 5
+    "weight": 10
   },
   "Unrelenting Might": {
-    "weight": 1
+    "weight": 10
   },
   "Vain Pride": {
     "weight": 5
   },
   "Vield My Flesh to Claim Their Bones BokGak": {
-    "weight": 5
+    "weight": 10
   },
   "Yield My Flesh to Claim Their Bones": {
     "weight": 5

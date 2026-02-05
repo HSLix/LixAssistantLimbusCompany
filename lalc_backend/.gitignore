@@ -9,6 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+.ruff_cache
+
 tmp_theme_packs
 logs
 
@@ -17,5 +19,6 @@ pystand/script/*
 pystand/site-packages/*
 
 img/dataset/
+ai/*.py
 
 lalc.zip

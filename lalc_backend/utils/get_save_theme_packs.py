@@ -143,10 +143,10 @@ def detect_and_save_theme_pack(pil_img):
         existing_names = [name for name, _ in existing_theme_packs]
         
         # 如果processed_name已经存在于现有图像名称中，则跳过保存
-        # tmp = difflib.get_close_matches(processed_name, existing_names, cutoff=0.9)
-        # if len(tmp) > 0:
-        #     logger.debug(f"图片名字 {processed_name}.png 已存在({tmp[0]})，跳过保存")
-        #     continue
+        tmp = difflib.get_close_matches(processed_name, existing_names, cutoff=0.9)
+        if len(tmp) > 0:
+            logger.debug(f"图片名字 {processed_name}.png 已存在({tmp[0]})，跳过保存")
+            continue
 
         # 从图片上检查是否有重合的
         existed_flag = False

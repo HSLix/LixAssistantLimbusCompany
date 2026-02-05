@@ -19,7 +19,7 @@ def _register_tag(tag: str, image_name: str, image: Image.Image):
 def register_images_from_directory():
     """
     遍历img目录下的所有PNG图片，读取为PIL Image格式并存放到IMG_REGISTRY中
-    
+
     Raises:
         Exception: 当遇到非PNG格式图片时抛出异常并输出图片名称
     """
@@ -39,6 +39,10 @@ def register_images_from_directory():
 
     # 遍历
     for root, dirs, files in os.walk(img_root):
+        # 跳过 dataset 文件夹
+        if "dataset" in dirs:
+            dirs.remove("dataset")
+            
         for file in files:
             if file.lower().endswith(".png"):
                 file_path = os.path.join(root, file)
@@ -75,23 +79,22 @@ def register_images_from_directory():
                 raise Exception(f"发现非PNG格式图片: {os.path.join(root, file)}")
 
 
-
 def get_image(name) -> Image.Image:
     """
     根据名称返回注册图像文件的副本
-    
+
     Args:
         name (str): 图像名称（不包含扩展名）
-        
+
     Returns:
         PIL.Image: 图像副本
-        
+
     Raises:
         KeyError: 当指定名称的图像不存在时抛出异常
     """
     if name not in IMG_REGISTRY:
         raise KeyError(f"未找到名称为 '{name}' 的图像")
-    
+
     # 返回图像的副本
     return IMG_REGISTRY[name].copy()
 
@@ -133,22 +136,23 @@ def check_image_confusion(width=1302, height=776, threshold=0.7):
         from recognize.color_template_match import color_template_match
         from recognize.feature_match import feature_match
         from recognize.pyramid_template_match import pyramid_template_match
-        
+
     except ImportError:
         import sys, os
-        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
         from recognize.template_match import template_match
         from recognize.color_template_match import color_template_match
         from recognize.feature_match import feature_match
         from recognize.pyramid_template_match import pyramid_template_match
-      
+
     # === 新增：存储所有混淆结果 ===
     confusion_results = {
         "template_match": [],
         "color_template_match": [],
         "feature_match": [],
-        "pyramid_template_match":[],
-        "edge_template_match":[],
+        "pyramid_template_match": [],
+        "edge_template_match": [],
     }
 
     # === 遍历匹配 ===
@@ -176,8 +180,7 @@ def check_image_confusion(width=1302, height=776, threshold=0.7):
             # 4) 金字塔模板匹配
             # if pyramid_template_match(target_img, template_img, threshold, grayscale=True):
             #     confusion_results["pyramid_template_match"].append((template_name, target_name))
-            
-    
+
     print("TemplateMatch:")
     for key, item in confusion_results["template_match"]:
         print(f"{key} : {item}")
@@ -188,9 +191,7 @@ def check_image_confusion(width=1302, height=776, threshold=0.7):
     for key, item in confusion_results["pyramid_template_match"]:
         print(f"{key} : {item}")
 
-
     return confusion_results
-
 
 
 def print_tag_tree():
@@ -217,10 +218,10 @@ def test_register_images():
         print(f"注册图片时发生错误: {e}")
 
 
-def get_max_similarity_pair(strings)->tuple[float, tuple[str, str]]:
+def get_max_similarity_pair(strings) -> tuple[float, tuple[str, str]]:
     """
     计算字符串列表中任意两个字符串之间的最大相似度，并返回这两个最相似的字符串。
-    
+
     :param strings: 字符串列表
     :return: 最大相似度值, 最相似的两个字符串组成的元组
     """
@@ -236,29 +237,32 @@ def get_max_similarity_pair(strings)->tuple[float, tuple[str, str]]:
             if similarity > max_similarity:
                 max_similarity = similarity
                 max_pair = (strings[i], strings[j])
-    
+
     return max_similarity, max_pair
 
 
-def get_max_radio_of_ego_gifts()->float:
+def get_max_radio_of_ego_gifts() -> float:
     """
     :return: ego gifts 名字的最大相似度
     """
-    ans, str_pair = get_max_similarity_pair([x[0] for x in get_images_by_tag("ego_gifts")])
+    ans, str_pair = get_max_similarity_pair(
+        [x[0] for x in get_images_by_tag("ego_gifts")]
+    )
     if ans >= 0.97:
         print(f"相似度过高：ego gifts 中 {str_pair} 之间的相似度高达 {ans}")
     return ans
 
 
-def get_max_radio_of_theme_packs()->float:
+def get_max_radio_of_theme_packs() -> float:
     """
     :return: theme packs 名字的最大相似度
     """
-    ans, str_pair = get_max_similarity_pair([x[0] for x in get_images_by_tag("theme_packs")])
+    ans, str_pair = get_max_similarity_pair(
+        [x[0] for x in get_images_by_tag("theme_packs")]
+    )
     if ans >= 0.9:
         print(f"相似度过高：theme packs 中 {str_pair} 之间的相似度高达 {ans}")
     return ans
-
 
 
 if __name__ == "__main__":
@@ -277,5 +281,9 @@ if __name__ == "__main__":
     # print(get_max_similarity_pair([x[0] for x in get_images_by_tag("ego_gifts")]))
     # print(get_max_similarity_pair([x[0] for x in get_images_by_tag("theme_packs")]))
     get_max_radio_of_theme_packs()
-    s = difflib.get_close_matches("GE Regular Check-ne", [x[0] for x in get_images_by_tag("theme_packs")], cutoff=0.7)
+    s = difflib.get_close_matches(
+        "GE Regular Check-ne",
+        [x[0] for x in get_images_by_tag("theme_packs")],
+        cutoff=0.7,
+    )
     print(s)
