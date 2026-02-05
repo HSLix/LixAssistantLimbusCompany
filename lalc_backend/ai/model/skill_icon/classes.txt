@@ -1,0 +1,7 @@
+0 dominating
+1 favored
+2 hopeless
+3 neutral
+4 struggling
+5 unopposed
+6 unselected

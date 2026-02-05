@@ -1,0 +1,23 @@
+{
+  "config": {
+    "input_height": 80,
+    "input_width": 80,
+    "batch_size": 32,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 0.05,
+    "label_smoothing": 0.1,
+    "num_workers": 4,
+    "model_architecture": "mobilenet_v3_small"
+  },
+  "class_names": [
+    "dominating",
+    "favored",
+    "hopeless",
+    "neutral",
+    "struggling",
+    "unopposed",
+    "unselected"
+  ],
+  "num_classes": 7
+}
