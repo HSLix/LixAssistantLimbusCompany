@@ -1,0 +1,26 @@
+{
+  "config": {
+    "input_height": 224,
+    "input_width": 224,
+    "batch_size": 4,
+    "epochs": 80,
+    "learning_rate": 0.001,
+    "weight_decay": 0.05,
+    "label_smoothing": 0.0,
+    "num_workers": 0,
+    "model_architecture": "mobilenet_v3_small",
+    "num_connections": 9
+  },
+  "connection_names": [
+    "00",
+    "01",
+    "02",
+    "10",
+    "11",
+    "12",
+    "20",
+    "21",
+    "22"
+  ],
+  "num_connections": 9
+}
