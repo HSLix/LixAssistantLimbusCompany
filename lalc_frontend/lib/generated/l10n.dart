@@ -1214,6 +1214,16 @@ class S {
     );
   }
 
+  /// `Once enabled, during combat, for situations where the clash is not in a dominant or favored, the sinner will attempt to use EGO from the highest level to the lowest level.`
+  String get no_other_configs_ego {
+    return Intl.message(
+      'Once enabled, during combat, for situations where the clash is not in a dominant or favored, the sinner will attempt to use EGO from the highest level to the lowest level.',
+      name: 'no_other_configs_ego',
+      desc: '',
+      args: [],
+    );
+  }
+
   /// `No other configs\nJust claim all the coins on the task board`
   String get no_other_configs_reward {
     return Intl.message(
@@ -1869,10 +1879,10 @@ class S {
     );
   }
 
-  /// `Settle rewards and let next team continue`
+  /// `Settle rewards and continue`
   String get mirror_battle_fail_option_continue_next_team {
     return Intl.message(
-      'Settle rewards and let next team continue',
+      'Settle rewards and continue',
       name: 'mirror_battle_fail_option_continue_next_team',
       desc: '',
       args: [],
@@ -1884,6 +1894,86 @@ class S {
     return Intl.message(
       'Download completed, unzipping...',
       name: 'unzipping_after_download',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Node Weight Configuration`
+  String get node_weight_title {
+    return Intl.message(
+      'Node Weight Configuration',
+      name: 'node_weight_title',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Event Node Weight`
+  String get node_event_weight {
+    return Intl.message(
+      'Event Node Weight',
+      name: 'node_event_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Regular Encounter Weight`
+  String get node_regular_encounter_weight {
+    return Intl.message(
+      'Regular Encounter Weight',
+      name: 'node_regular_encounter_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Elite Encounter Weight`
+  String get node_elite_encounter_weight {
+    return Intl.message(
+      'Elite Encounter Weight',
+      name: 'node_elite_encounter_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Focused Encounter Weight`
+  String get node_focused_encounter_weight {
+    return Intl.message(
+      'Focused Encounter Weight',
+      name: 'node_focused_encounter_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Abnormality Encounter Weight`
+  String get node_abnormality_encounter_weight {
+    return Intl.message(
+      'Abnormality Encounter Weight',
+      name: 'node_abnormality_encounter_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Shop Weight`
+  String get node_shop_weight {
+    return Intl.message(
+      'Shop Weight',
+      name: 'node_shop_weight',
+      desc: '',
+      args: [],
+    );
+  }
+
+  /// `Boss Encounter Weight`
+  String get node_boss_encounter_weight {
+    return Intl.message(
+      'Boss Encounter Weight',
+      name: 'node_boss_encounter_weight',
       desc: '',
       args: [],
     );

@@ -201,6 +201,9 @@ class MessageLookup extends MessageLookupByLibrary {
       "当前筛选条件下没有符合条件的日志",
     ),
     "no_manual_update": MessageLookupByLibrary.simpleMessage("否，让我自行更新"),
+    "no_other_configs_ego": MessageLookupByLibrary.simpleMessage(
+      "启用后，会在战斗拼点时，对非优势（dominate，favored）的情况，让罪人从级别高到低尝试使用 EGO 拼点",
+    ),
     "no_other_configs_mail": MessageLookupByLibrary.simpleMessage(
       "没有其他配置\n只是领取邮箱中的所有内容",
     ),
@@ -215,6 +218,24 @@ class MessageLookup extends MessageLookupByLibrary {
     ),
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("暂无队伍"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage("暂无主题包数据"),
+    "node_abnormality_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "特殊BOSS权重",
+    ),
+    "node_boss_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Boss战斗权重",
+    ),
+    "node_elite_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "精英连战权重",
+    ),
+    "node_event_weight": MessageLookupByLibrary.simpleMessage("事件节点权重"),
+    "node_focused_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "异想体连战权重",
+    ),
+    "node_regular_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "普通连战权重",
+    ),
+    "node_shop_weight": MessageLookupByLibrary.simpleMessage("商店权重"),
+    "node_weight_title": MessageLookupByLibrary.simpleMessage("节点权重设置"),
     "none": MessageLookupByLibrary.simpleMessage("无"),
     "not_set": MessageLookupByLibrary.simpleMessage("未设置"),
     "path": MessageLookupByLibrary.simpleMessage("路径"),

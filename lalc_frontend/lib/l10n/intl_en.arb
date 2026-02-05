@@ -144,6 +144,7 @@
   "check_how_to_use_app": "Check how to use LALC, which even Don Quixote can read easily.",
   "click_to_see_full_declaration": "Click to see full declaration",
   "no_other_configs_mail": "No other configs\nJust claim all the things in the mailbox",
+  "no_other_configs_ego": "Once enabled, during combat, for situations where the clash is not in a dominant or favored, the sinner will attempt to use EGO from the highest level to the lowest level.",
   "no_other_configs_reward": "No other configs\nJust claim all the coins on the task board",
   "daily_lunacy_purchase_hint": "Hint: This is the count lalc will purchase enkephalin with lunary today.",
   "at_last_do_nothing": "Do Nothing",
@@ -217,6 +218,14 @@
   "just_p": "Just P",
   "semi_auto_started": "Semi-auto task started",
   "mirror_battle_fail_handle": "Mirror Dungeon Battle Fail Handle",
-  "mirror_battle_fail_option_continue_next_team": "Settle rewards and let next team continue",
-  "unzipping_after_download": "Download completed, unzipping..."
+  "mirror_battle_fail_option_continue_next_team": "Settle rewards and continue",
+  "unzipping_after_download": "Download completed, unzipping...",
+  "node_weight_title": "Node Weight Configuration",
+  "node_event_weight": "Event Node Weight",
+  "node_regular_encounter_weight": "Regular Encounter Weight",
+  "node_elite_encounter_weight": "Elite Encounter Weight",
+  "node_focused_encounter_weight": "Focused Encounter Weight",
+  "node_abnormality_encounter_weight": "Abnormality Encounter Weight",
+  "node_shop_weight": "Shop Weight",
+  "node_boss_encounter_weight": "Boss Encounter Weight"
 }

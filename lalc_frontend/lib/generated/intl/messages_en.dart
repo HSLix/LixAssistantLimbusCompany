@@ -233,9 +233,7 @@ class MessageLookup extends MessageLookupByLibrary {
       "Mirror Dungeon Battle Fail Handle",
     ),
     "mirror_battle_fail_option_continue_next_team":
-        MessageLookupByLibrary.simpleMessage(
-          "Settle rewards and let next team continue",
-        ),
+        MessageLookupByLibrary.simpleMessage("Settle rewards and continue"),
     "mirror_difficulty": MessageLookupByLibrary.simpleMessage(
       "Mirror Difficulty",
     ),
@@ -283,6 +281,9 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_manual_update": MessageLookupByLibrary.simpleMessage(
       "No, Let me update manually",
     ),
+    "no_other_configs_ego": MessageLookupByLibrary.simpleMessage(
+      "Once enabled, during combat, for situations where the clash is not in a dominant or favored, the sinner will attempt to use EGO from the highest level to the lowest level.",
+    ),
     "no_other_configs_mail": MessageLookupByLibrary.simpleMessage(
       "No other configs\nJust claim all the things in the mailbox",
     ),
@@ -298,6 +299,28 @@ class MessageLookup extends MessageLookupByLibrary {
     "no_team_for_now": MessageLookupByLibrary.simpleMessage("No Team for now"),
     "no_theme_packs": MessageLookupByLibrary.simpleMessage(
       "No theme packs available",
+    ),
+    "node_abnormality_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Abnormality Encounter Weight",
+    ),
+    "node_boss_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Boss Encounter Weight",
+    ),
+    "node_elite_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Elite Encounter Weight",
+    ),
+    "node_event_weight": MessageLookupByLibrary.simpleMessage(
+      "Event Node Weight",
+    ),
+    "node_focused_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Focused Encounter Weight",
+    ),
+    "node_regular_encounter_weight": MessageLookupByLibrary.simpleMessage(
+      "Regular Encounter Weight",
+    ),
+    "node_shop_weight": MessageLookupByLibrary.simpleMessage("Shop Weight"),
+    "node_weight_title": MessageLookupByLibrary.simpleMessage(
+      "Node Weight Configuration",
     ),
     "none": MessageLookupByLibrary.simpleMessage("None"),
     "not_set": MessageLookupByLibrary.simpleMessage("Not Set"),

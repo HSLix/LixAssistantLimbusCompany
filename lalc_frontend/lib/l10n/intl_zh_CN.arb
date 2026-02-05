@@ -144,6 +144,7 @@
   "check_how_to_use_app": "查看如何使用 LALC，即使是堂吉诃德也能轻易读懂",
   "click_to_see_full_declaration": "点击查看完整声明",
   "no_other_configs_mail": "没有其他配置\n只是领取邮箱中的所有内容",
+  "no_other_configs_ego": "启用后，会在战斗拼点时，对非优势（dominate，favored）的情况，让罪人从级别高到低尝试使用 EGO 拼点",
   "no_other_configs_reward": "没有其他配置\n只是领取任务面板上的所有积分",
   "daily_lunacy_purchase_hint": "提示: 这是今日将用狂气购买脑啡肽的次数。",
   "at_last_do_nothing": "什么都不做",
@@ -218,5 +219,13 @@
   "semi_auto_started": "半自动任务已开始",
   "mirror_battle_fail_handle": "镜像迷宫战斗失败处理",
   "mirror_battle_fail_option_continue_next_team": "结算奖励并让下一队继续",
-  "unzipping_after_download": "下载完成，正在解压中..."
+  "unzipping_after_download": "下载完成，正在解压中...",
+  "node_weight_title": "节点权重设置",
+  "node_event_weight": "事件节点权重",
+  "node_regular_encounter_weight": "普通连战权重",
+  "node_elite_encounter_weight": "精英连战权重",
+  "node_focused_encounter_weight": "异想体连战权重",
+  "node_abnormality_encounter_weight": "特殊BOSS权重",
+  "node_shop_weight": "商店权重",
+  "node_boss_encounter_weight": "Boss战斗权重"
 }

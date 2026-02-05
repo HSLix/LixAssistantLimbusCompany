@@ -1,12 +1,13 @@
 [English Version(translated by google)](https://github-com.translate.goog/HSLix/LixAssistantLimbusCompany/blob/master/doc/tutorial.md?_x_tr_sl=zh-CN&_x_tr_tl=en&_x_tr_hl=zh-CN&_x_tr_pto=wapp)
 # 必看 | Key Point
-1. 关闭 Windows 的 [阻止可能不需要的应用](https://jingyan.baidu.com/article/5d368d1ee397de7e60c057e1.html) 和关闭 [内存完整性](https://www.php.cn/faq/1516334.html)，以及关闭所有杀毒软件，这些安全措施可能会导致 LALC 无法正常启动；
+1. 关闭 [Windows Defender](https://www.cnblogs.com/Dearmyh/p/17034925.html), Windows 的 [阻止可能不需要的应用](https://jingyan.baidu.com/article/5d368d1ee397de7e60c057e1.html) 和关闭 [内存完整性](https://www.php.cn/faq/1516334.html)，以及关闭所有杀毒软件，这些安全措施可能会导致 LALC 无法正常启动；
 2. LALC 正常启动后，有两个窗口，一个是黑框，另一个是图像交互界面，如果出现如 “无法连接” “服务器超时”，就是因为其中有一个没有启动，这种异常很可能是因为上面的安全措施没有关闭；
 ![教程](/img/tutorial_two_windows.png)
 
 3. 游戏语言必须为“英语”，否则会自动停下
 4. 每周四，上周如果有地牢没打完，请手动清了再启动程序，程序不知道你是否要接受这个记录
-5. 如果你有任何疑问，可以先看 [常见问题](/doc/FAQ.md)，如果没能解决，就将日志导出（如果有的话，具体操作看下面日志页）点击 [反馈问题](https://github.com/HSLix/LixAssistantLimbusCompany/issues/new?template=bug-report.yaml)
+5. 根据 [#253 反馈](https://github.com/HSLix/LixAssistantLimbusCompany/issues/253#issuecomment-3767984944)，如果程序发生了莫名的卡住在某个地方，可以参照链接评论进行操作，重启，再尝试启动程序。
+6. 如果你有任何疑问，可以先看 [常见问题](/doc/FAQ.md)，如果没能解决，就将日志导出（如果有的话，具体操作看下面日志页）点击 [反馈问题](https://github.com/HSLix/LixAssistantLimbusCompany/issues/new?template=bug-report.yaml)
 
 # 快速上手 | Quick Start
 ![教程](/img/tutorial_0_01.png)
