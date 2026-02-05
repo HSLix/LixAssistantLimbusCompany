@@ -1,5 +1,29 @@
 # Changelog
 
+## [4.10.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.9.1...v4.10.0) (2026-02-05)
+
+
+### Features
+
+* 增加前端对于节点权重和 ego 启用开关的设置 | add the config for legend weight and the switch of E.G.O ([042c7f3](https://github.com/HSLix/LixAssistantLimbusCompany/commit/042c7f30980124a3dcf625db6016ef8a382bd7f9))
+* 增加流程对 ai 模型的适配 ([13c299b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/13c299b08f03042836c677b329baa34e31bac0a3))
+* 增加识别拼点状态的 ai 模型 | add the ai model for skill icon ([8e93c48](https://github.com/HSLix/LixAssistantLimbusCompany/commit/8e93c481a046c9089bbd060825ebcabe7d903b06))
+* 增加识别镜牢寻路的 ai 模型 | add the ai model for mirror path ([63c0d4e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/63c0d4e9187e77f4bb07f6abdb6b30364a821793))
+* 增加识别镜牢节点的 ai 模型 | add the ai model for mirror legend ([5e90504](https://github.com/HSLix/LixAssistantLimbusCompany/commit/5e9050442d837a23762ab7b46e26ace57e6d506d))
+
+
+### Bug Fixes
+
+* 修复了人数过少会卡在战斗的问题 | fix the stuck when the number of sinner in battle is too low ([6bc1ee8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6bc1ee8c93cb7053f407933891e8a6b77d887aeb))
+* 修复了在处理事件过程中，由于弹窗透明度过高，卡在无法识别和处理错误的时候 | fix the stuck when network error occur and the skip still be seen by program ([eaefdcd](https://github.com/HSLix/LixAssistantLimbusCompany/commit/eaefdcde3a955414d58f88e44b6f039a5263d867))
+* 修复了金额设置过低导致卡在商店的问题 | fix the low stopPurchaseGiftMoney Fixed [#254](https://github.com/HSLix/LixAssistantLimbusCompany/issues/254) ([b7713d0](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b7713d0be2fc250d392cef9cb32bb293b1fde978))
+* 修复了镜牢返回主页不稳定可能卡住的问题 | fix the bug that may stuck when lalc wants to go back the home page ([52a52e8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/52a52e8e39487a2cf34f750f0628580b23f73781))
+* 修复技能选择错位和卡在技能选择的问题 | fix the problem when choosing ego ([8db1a9f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/8db1a9f01784703d4cde05ed9ac5c807160e0516))
+* 提升队伍选择的稳定性 | make the team choose more stable ([322cd99](https://github.com/HSLix/LixAssistantLimbusCompany/commit/322cd99e7392e875771c050f038ec0fe447f5f5f))
+* 提高了镜牢进入的稳定性 | make the mirror enter more stable ([aa98004](https://github.com/HSLix/LixAssistantLimbusCompany/commit/aa980042da079170bc437c519d469ccbe51d8ea0))
+* 添加对事件 buff 的互动处理 | deal with the select event effect [#253](https://github.com/HSLix/LixAssistantLimbusCompany/issues/253) ([8cf6fd2](https://github.com/HSLix/LixAssistantLimbusCompany/commit/8cf6fd28ab225df2b1c11d81464dc8e254392235))
+* 补充性能分析的平均模块 | add the avg of performace analyse ([9280fba](https://github.com/HSLix/LixAssistantLimbusCompany/commit/9280fbac6f355fc1f44fef48b86576a7886a2190))
+
 ## [4.9.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.9.0...v4.9.1) (2026-01-17)
 
 
