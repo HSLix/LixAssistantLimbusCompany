@@ -1,0 +1,8 @@
+0 node_abnormality_encounter
+1 node_boss_encounter
+2 node_elite_encounter
+3 node_empty
+4 node_event
+5 node_focused_encounter
+6 node_regular_encounter
+7 node_shop

@@ -1,0 +1,24 @@
+{
+  "config": {
+    "input_height": 110,
+    "input_width": 130,
+    "batch_size": 32,
+    "epochs": 50,
+    "learning_rate": 0.001,
+    "weight_decay": 0.05,
+    "label_smoothing": 0.1,
+    "num_workers": 4,
+    "model_architecture": "mobilenet_v3_small"
+  },
+  "class_names": [
+    "node_abnormality_encounter",
+    "node_boss_encounter",
+    "node_elite_encounter",
+    "node_empty",
+    "node_event",
+    "node_focused_encounter",
+    "node_regular_encounter",
+    "node_shop"
+  ],
+  "num_classes": 8
+}
