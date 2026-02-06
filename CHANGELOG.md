@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.10.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.10.0...v4.10.1) (2026-02-06)
+
+
+### Bug Fixes
+
+* 修复了开发环境和生产环境没有彻底同步导致的启动异常 | fix the problem of the release environment is not complete Fixed [#258](https://github.com/HSLix/LixAssistantLimbusCompany/issues/258) ([fa2837c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/fa2837ca8257acc03127eda1c017b2191e44c0dc))
+
 ## [4.10.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.9.1...v4.10.0) (2026-02-05)
 
 
