@@ -227,5 +227,6 @@
   "node_focused_encounter_weight": "Focused Encounter Weight",
   "node_abnormality_encounter_weight": "Abnormality Encounter Weight",
   "node_shop_weight": "Shop Weight",
-  "node_boss_encounter_weight": "Boss Encounter Weight"
+  "node_boss_encounter_weight": "Boss Encounter Weight",
+  "font_setting": "Font Setting"
 }

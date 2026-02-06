@@ -227,5 +227,6 @@
   "node_focused_encounter_weight": "异想体连战权重",
   "node_abnormality_encounter_weight": "特殊BOSS权重",
   "node_shop_weight": "商店权重",
-  "node_boss_encounter_weight": "Boss战斗权重"
+  "node_boss_encounter_weight": "Boss战斗权重",
+  "font_setting": "字体设置"
 }

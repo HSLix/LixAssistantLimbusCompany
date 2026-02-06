@@ -28,16 +28,19 @@ import 'package:lalc_frontend/managers/theme_manager.dart'; // 导入新的Theme
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await windowManager.ensureInitialized();
-  
+
   // 初始化hotkey_manager
   await hotKeyManager.unregisterAll();
 
   // 初始化配置管理器
   await ConfigManager().init();
-  
+
   // 初始化主题管理器
   ThemeManager().initMode(ConfigManager().userConfig.themeMode);
-  
+
+  // 初始化字体管理器
+  FontManager.instance.setFont(ConfigManager().fontFamily);
+
   // 打印调试信息
   await printAppDocPath();
 
@@ -48,14 +51,14 @@ void main() async {
     backgroundColor: Colors.transparent,
     skipTaskbar: false,
     // titleBarStyle: TitleBarStyle.hidden,
-    title: "LixAssistantLimbusCompany"
+    title: "LixAssistantLimbusCompany",
   );
 
   windowManager.waitUntilReadyToShow(windowOptions, () async {
     await windowManager.show();
     await windowManager.focus();
   });
-  
+
   runApp(MyApp());
 }
 
@@ -63,7 +66,9 @@ void main() async {
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 全局的SidebarX控制器
-final SidebarXController sidebarController = SidebarXController(selectedIndex: 0);
+final SidebarXController sidebarController = SidebarXController(
+  selectedIndex: 0,
+);
 
 // 全局变量，用于存储TeamConfigPage要显示的队伍索引
 int selectedTeamIndexForNavigation = 0;
@@ -103,7 +108,7 @@ class _MyAppState extends State<MyApp> {
         if (ConfigManager().userConfig.autoStart) {
           // 等待一段时间确保所有服务初始化完成
           await Future.delayed(Duration(seconds: 3));
-          
+
           // 检查navigatorKey是否已经初始化并且组件仍处于活动状态
           if (navigatorKey.currentState != null) {
             final context = navigatorKey.currentContext!;
@@ -111,10 +116,10 @@ class _MyAppState extends State<MyApp> {
             if (context.mounted) {
               // 使用CommandGateway发送开始命令
               CommandGateway().sendTaskCommand(context, TaskCommand.start);
-              
+
               // 切换到工作页面
               sidebarController.selectIndex(1);
-              
+
               debugPrint('Auto-start enabled, task started automatically');
             }
           } else {
@@ -127,11 +132,9 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
-
   void _handleWebSocketUpdate() {
     // 处理 WebSocket 更新，如果有错误则显示长时间 Toast
   }
-
 
   Future<void> _registerHotKeys() async {
     // 注册全局快捷键
@@ -210,7 +213,7 @@ class _MyAppState extends State<MyApp> {
           if (context.mounted) {
             // 获取CommandGateway实例
             final commandGateway = CommandGateway();
-            
+
             // 将命令字符串映射到TaskCommand枚举
             final cmd = {
               'start': TaskCommand.start,
@@ -218,12 +221,17 @@ class _MyAppState extends State<MyApp> {
               'resume': TaskCommand.resume,
               'stop': TaskCommand.stop,
             }[command]!;
-            
+
             commandGateway.sendTaskCommand(context, cmd, (success, msg) {
               if (!success && navigatorKey.currentContext != null) {
                 toastification.show(
                   context: navigatorKey.currentContext!,
-                  title: Text(msg ?? S.of(navigatorKey.currentContext!).task_operation_failed),
+                  title: Text(
+                    msg ??
+                        S
+                            .of(navigatorKey.currentContext!)
+                            .task_operation_failed,
+                  ),
                   type: ToastificationType.error,
                 );
               }
@@ -243,37 +251,51 @@ class _MyAppState extends State<MyApp> {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => TaskStatusManager()),
-        ChangeNotifierProvider.value(  // 使用 .value 确保使用单例
+        ChangeNotifierProvider.value(
+          // 使用 .value 确保使用单例
           value: WebSocketManager.instance,
         ),
-        ChangeNotifierProvider(create: (context) {
-          // 创建LanguageManager实例并根据配置设置初始语言
-          final languageManager = LanguageManager();
-          final userLanguage = ConfigManager().userConfig.language;
-          if (userLanguage != null) {
-            languageManager.setLocale(Locale(userLanguage));
-          }
-          return languageManager;
-        }),
+        ChangeNotifierProvider(
+          create: (context) {
+            // 创建LanguageManager实例并根据配置设置初始语言
+            final languageManager = LanguageManager();
+            final userLanguage = ConfigManager().userConfig.language;
+            if (userLanguage != null) {
+              languageManager.setLocale(Locale(userLanguage));
+            }
+            return languageManager;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => ThemeManager()), // 添加ThemeManager
+        ChangeNotifierProvider.value(value: FontManager.instance),
       ],
-      child: Consumer2<LanguageManager, ThemeManager>( // 监听语言和主题
-        builder: (context, languageManager, themeManager, child) {
-          // 获取当前主题模式
-          
+      child: Consumer3<LanguageManager, ThemeManager, FontManager>(
+        // 监听语言和主题
+        builder: (context, languageManager, themeManager, fontManager, child) {
+          // 获取当前字体
+          final String currentFont = fontManager.currentFont;
+          final String fontFamily = currentFont == 'SmileySans-Oblique'
+              ? 'SmileySans'
+              : 'LXGWWenKai';
+
           return ToastificationWrapper(
             child: MaterialApp(
               navigatorKey: navigatorKey, // 确保navigatorKey被MaterialApp使用
               debugShowCheckedModeBanner: false,
-              // 应用Microsoft主题，替换原有的自定义主题设置
-              theme: themeManager.currentTheme, // 关键：动态读取
+              // 应用Microsoft主题和字体，替换原有的自定义主题设置
+              theme: themeManager.currentTheme.copyWith(
+                textTheme: themeManager.currentTheme.textTheme.apply(
+                  fontFamily: fontFamily,
+                ),
+              ), // 关键：动态读取主题和字体
               localizationsDelegates: const [
                 S.delegate, // 确保S.delegate在localizationsDelegates中
                 GlobalMaterialLocalizations.delegate,
                 GlobalCupertinoLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate
+                GlobalWidgetsLocalizations.delegate,
               ],
-              supportedLocales: S.delegate.supportedLocales, // 使用S.delegate的supportedLocales
+              supportedLocales:
+                  S.delegate.supportedLocales, // 使用S.delegate的supportedLocales
               locale: languageManager.locale, // 使用LanguageManager中的locale
               home: Scaffold(
                 body: Builder(
@@ -287,9 +309,7 @@ class _MyAppState extends State<MyApp> {
                           theme: SidebarXTheme(
                             margin: EdgeInsets.zero,
                             width: 60,
-                            decoration: const BoxDecoration(
-                              color: sidebarBg,
-                            ),
+                            decoration: const BoxDecoration(color: sidebarBg),
                             iconTheme: const IconThemeData(
                               color: white,
                               size: 22,
@@ -321,9 +341,7 @@ class _MyAppState extends State<MyApp> {
                           ),
                           extendedTheme: const SidebarXTheme(
                             width: 150,
-                            decoration: BoxDecoration(
-                              color: sidebarBg,
-                            ),
+                            decoration: BoxDecoration(color: sidebarBg),
                           ),
                           items: [
                             SidebarXItem(
@@ -364,16 +382,18 @@ class _MyAppState extends State<MyApp> {
                             // ),
                             // Discord图标项
                             SidebarXItem(
-                              icon: Icons.discord, 
-                              label: "Discord", 
+                              icon: Icons.discord,
+                              label: "Discord",
                               onTap: () {
-                                sidebarController.selectIndex(7); // Discord页面索引为7
+                                sidebarController.selectIndex(
+                                  7,
+                                ); // Discord页面索引为7
                               },
                             ),
                             // Star图标项
                             SidebarXItem(
-                              icon: Icons.star, 
-                              label: "Star", 
+                              icon: Icons.star,
+                              label: "Star",
                               onTap: () {
                                 sidebarController.selectIndex(8); // Star页面索引为8
                               },
@@ -384,27 +404,27 @@ class _MyAppState extends State<MyApp> {
                           child: Container(
                             color: pageBg,
                             child: Center(
-                              child: _ScreensExample(controller: sidebarController),
+                              child: _ScreensExample(
+                                controller: sidebarController,
+                              ),
                             ),
                           ),
                         ),
                       ],
                     );
-                  }
+                  },
                 ),
               ),
             ),
           );
-        }
+        },
       ),
     );
   }
 }
 
 class _ScreensExample extends StatelessWidget {
-  const _ScreensExample({
-    required this.controller,
-  });
+  const _ScreensExample({required this.controller});
 
   final SidebarXController controller;
 
@@ -419,7 +439,9 @@ class _ScreensExample extends StatelessWidget {
           case 1:
             return WorkPage();
           case 2:
-            return TeamConfigPage(initialTeamIndex: selectedTeamIndexForNavigation);
+            return TeamConfigPage(
+              initialTeamIndex: selectedTeamIndexForNavigation,
+            );
           case 3:
             return ThemePackPage();
           case 4:

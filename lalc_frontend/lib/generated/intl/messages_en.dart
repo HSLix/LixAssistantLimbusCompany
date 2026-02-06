@@ -151,6 +151,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "exporting_logs": MessageLookupByLibrary.simpleMessage("Exporting logs..."),
     "file_not_found": MessageLookupByLibrary.simpleMessage("No File"),
     "follow_system": MessageLookupByLibrary.simpleMessage("Follow System"),
+    "font_setting": MessageLookupByLibrary.simpleMessage("Font Setting"),
     "image_load_failed": MessageLookupByLibrary.simpleMessage(
       "Image load failed",
     ),

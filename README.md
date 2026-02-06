@@ -134,7 +134,8 @@
 | [opencv-python](https://github.com/opencv/opencv-python) | 开源图像相关算法库，尽管 LALC 只是使用其中一点功能，但这一点功能构成了整个项目的基础——识图 |
 | [flutter](https://github.com/flutter/flutter) | 跨平台UI开发框架，个人开发者客户端技能的终点以及顶点（希望以后不会打脸） |
 | [PyStand](https://github.com/skywind3000/PyStand) | 特别感谢 [cztBlue](https://github.com/cztBlue) 的 pr 推荐，很好的打包方案，比起 pyinstaller 的黑盒导致各种 bug，更多的个性化设置打包真的好得多 |
-| [得意黑](https://github.com/atelier-anchor/smiley-sans) | 很不错的字体 |
+| [得意黑](https://github.com/atelier-anchor/smiley-sans) | 很不错的艺术字体，想让更多人看见 |
+| [霞鹜文楷 GB 轻便版](https://github.com/lxgw/LxgwWenkaiGB-Lite) | 也是不错的字体，想让更多人看见 |
 | [~~pynput~~](https://github.com/moses-palmer/pynput) | 开源的鼠标和键盘相关库，模拟鼠标点击和键盘输入 |
 | [~~python-mss~~](https://github.com/BoboTiG/python-mss) | 开源的截屏库，截图又好又快 |
 | [~~pyqt~~](https://pypi.org/project/PyQt5/) | 经典的跨平台 GUI 库，老牌劲旅，不用多说，要是体积能小点就更好了 |

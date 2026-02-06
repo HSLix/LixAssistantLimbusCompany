@@ -115,6 +115,7 @@ class MessageLookup extends MessageLookupByLibrary {
     "exporting_logs": MessageLookupByLibrary.simpleMessage("日志导出中..."),
     "file_not_found": MessageLookupByLibrary.simpleMessage("没有找到必要的文件"),
     "follow_system": MessageLookupByLibrary.simpleMessage("跟随系统"),
+    "font_setting": MessageLookupByLibrary.simpleMessage("字体设置"),
     "image_load_failed": MessageLookupByLibrary.simpleMessage("图片加载失败"),
     "import_config_warning": MessageLookupByLibrary.simpleMessage(
       "导入操作将会覆盖当前配置，确定要导入吗？",

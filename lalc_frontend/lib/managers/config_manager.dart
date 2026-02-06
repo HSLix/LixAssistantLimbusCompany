@@ -30,6 +30,37 @@ class LanguageManager with ChangeNotifier {
   static LanguageManager get instance => _instance;
 }
 
+/// 字体状态管理类
+class FontManager with ChangeNotifier {
+  static final FontManager _instance = FontManager._internal();
+
+  factory FontManager() => _instance;
+
+  FontManager._internal();
+
+  String _currentFont = 'SmileySans-Oblique';
+  String get currentFont => _currentFont;
+
+  void setFont(String fontFamily) {
+    _currentFont = fontFamily;
+    notifyListeners();
+  }
+
+  // 字体显示名称映射
+  static const Map<String, String> fontDisplayNames = {
+    'SmileySans-Oblique': 'SmileySans-Oblique (得意黑)',
+    'LXGWWenKaiGBLite-Medium': 'LXGWWenKaiGBLite-Medium (霞鹜文楷)',
+  };
+
+  // 可用字体列表
+  static const List<String> availableFonts = [
+    'SmileySans-Oblique',
+    'LXGWWenKaiGBLite-Medium',
+  ];
+
+  static FontManager get instance => _instance;
+}
+
 /// 自定义文件日志输出类
 class FileLogOutput extends LogOutput {
   Directory? _logDirectory;
@@ -144,12 +175,15 @@ class UserConfig {
   bool autoStart;
   String? mirrorChanCDK;
   String? themeMode; // 添加主题模式配置，'light' 或 'dark'
+  String?
+  fontFamily; // 字体设置，'SmileySans-Oblique' (得意黑) 或 'LXGWWenKaiGBLite-Medium' (霞鹜文楷)
 
   UserConfig({
     this.language, // 默认值改为null，表示跟随系统
     this.autoStart = false,
     this.mirrorChanCDK,
     this.themeMode = "dark", // 默认值为null，表示使用暗色主题
+    this.fontFamily = "SmileySans-Oblique", // 默认字体为得意黑
   });
 
   factory UserConfig.fromJson(Map<String, dynamic> json) {
@@ -158,6 +192,8 @@ class UserConfig {
       autoStart: json['autoStart'] as bool? ?? false,
       mirrorChanCDK: json['mirrorChanCDK'] as String?,
       themeMode: json['themeMode'] as String?, // 添加主题模式
+      fontFamily:
+          json['fontFamily'] as String? ?? "SmileySans-Oblique", // 从JSON加载字体设置
     );
   }
 
@@ -166,6 +202,7 @@ class UserConfig {
     'autoStart': autoStart,
     'mirrorChanCDK': mirrorChanCDK,
     'themeMode': themeMode,
+    'fontFamily': fontFamily,
   };
 }
 
@@ -305,6 +342,14 @@ class ConfigManager {
 
   /// 获取已加密的 CDK，与磁盘保持一致，网络层直接调用
   String? get encryptedMirrorChanCDK => userConfig.mirrorChanCDK;
+
+  /// 字体设置
+  String get fontFamily => userConfig.fontFamily ?? 'SmileySans-Oblique';
+  set fontFamily(String value) {
+    userConfig.fontFamily = value;
+    FontManager.instance.setFont(value);
+    saveUserConfig();
+  }
 
   /// 公共加密方法，供外部调用加密CDK
   Future<String> encryptCDK(String cdk) async {
@@ -628,6 +673,9 @@ class ConfigManager {
         final jsonMap = json.decode(content) as Map<String, dynamic>;
         userConfig = UserConfig.fromJson(jsonMap);
 
+        // 初始化字体管理器
+        FontManager.instance.setFont(fontFamily);
+
         // 保持CDK为加密状态，不自动解密
         // 如果有加密的CDK，保留原样
         // if (userConfig.mirrorChanCDK != null && userConfig.mirrorChanCDK!.isNotEmpty) {
@@ -648,6 +696,8 @@ class ConfigManager {
       }
     } else {
       userConfig = UserConfig();
+      // 初始化字体管理器为默认字体
+      FontManager.instance.setFont('SmileySans-Oblique');
       saveUserConfig();
     }
   }
@@ -663,6 +713,8 @@ class ConfigManager {
         language: userConfig.language,
         autoStart: userConfig.autoStart,
         mirrorChanCDK: finalCDK, // 直接使用内存中的值，因为已经是加密的
+        themeMode: userConfig.themeMode,
+        fontFamily: userConfig.fontFamily,
       );
 
       await _userConfigFile.writeAsString(

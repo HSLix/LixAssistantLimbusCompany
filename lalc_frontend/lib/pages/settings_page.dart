@@ -38,16 +38,15 @@ class _SettingsPageState extends State<SettingsPage> {
       _userConfig = ConfigManager().userConfig;
       _isLoading = false;
     });
-    
+
     // 加载可用的配置集
     _loadAvailableConfigSets();
   }
-  
+
   Future<void> _loadAvailableConfigSets() async {
     try {
       await ConfigManager().getAvailableConfigSets();
-      setState(() {
-      });
+      setState(() {});
     } catch (e) {
       debugPrint('加载配置集列表失败: $e');
     }
@@ -56,17 +55,20 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveLanguage(BuildContext context, String? language) async {
     _userConfig.language = language; // 允许为null表示跟随系统
     await ConfigManager().saveUserConfig();
-    
+
     // 更新语言管理器中的语言设置
-    final languageManager = Provider.of<LanguageManager>(context, listen: false);
+    final languageManager = Provider.of<LanguageManager>(
+      context,
+      listen: false,
+    );
     if (language != null) {
       languageManager.setLocale(Locale(language));
     } else {
       languageManager.setLocale(null); // 跟随系统
     }
-    
+
     setState(() {});
-    
+
     // 显示成功提示
     if (mounted) {
       toastification.show(
@@ -83,7 +85,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _userConfig.autoStart = autoStart;
     await ConfigManager().saveUserConfig();
     setState(() {});
-    
+
     // 显示成功提示
     if (mounted) {
       toastification.show(
@@ -109,14 +111,16 @@ class _SettingsPageState extends State<SettingsPage> {
         encryptedCDK = cdk;
       } else {
         // 如果CDK不包含冒号，认为它是明文，需要通过WebSocket发送到服务器进行加密
-        encryptedCDK = await WebSocketHelper.getManager().encryptCDK(cdk) ?? cdk; // 使用WebSocketHelper
+        encryptedCDK =
+            await WebSocketHelper.getManager().encryptCDK(cdk) ??
+            cdk; // 使用WebSocketHelper
       }
       _userConfig.mirrorChanCDK = encryptedCDK;
       debugPrint('MirrorChan CDK 已加密保存: $encryptedCDK');
     }
-    
+
     await ConfigManager().saveUserConfig();
-    
+
     // 保存后自动读取并调试打印
     // final savedCDK = _userConfig.mirrorChanCDK;
     // if (savedCDK != null) {
@@ -124,14 +128,35 @@ class _SettingsPageState extends State<SettingsPage> {
     // } else {
     //   debugPrint('UserConfig中MirrorChan CDK为空');
     // }
-    
+
     setState(() {});
-    
+
     // 显示成功提示
     if (mounted) {
       toastification.show(
         context: context,
         title: Text(S.of(context).cdk_saved),
+        style: ToastificationStyle.flatColored,
+        type: ToastificationType.success,
+        autoCloseDuration: const Duration(seconds: 3),
+      );
+    }
+  }
+
+  Future<void> _saveFont(String fontFamily) async {
+    _userConfig.fontFamily = fontFamily;
+    await ConfigManager().saveUserConfig();
+
+    // 更新字体管理器中的字体设置
+    FontManager.instance.setFont(fontFamily);
+
+    setState(() {});
+
+    // 显示成功提示
+    if (mounted) {
+      toastification.show(
+        context: context,
+        title: Text('字体已切换为 ${FontManager.fontDisplayNames[fontFamily]}'),
         style: ToastificationStyle.flatColored,
         type: ToastificationType.success,
         autoCloseDuration: const Duration(seconds: 3),
@@ -179,6 +204,12 @@ class _SettingsPageState extends State<SettingsPage> {
               title: S.of(context).autostart,
               child: _buildAutoStartToggle(),
             ),
+            const SizedBox(height: 16),
+            _buildSettingCard(
+              icon: Icons.font_download,
+              title: S.of(context).font_setting,
+              child: _buildFontSelector(),
+            ),
           ],
         ),
       ),
@@ -192,9 +223,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -264,6 +293,30 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Widget _buildFontSelector() {
+    return Column(
+      children: FontManager.availableFonts.map((font) {
+        return RadioListTile<String>(
+          title: Text(
+            FontManager.fontDisplayNames[font] ?? font,
+            style: TextStyle(
+              fontFamily: font.contains('SmileySans')
+                  ? 'SmileySans'
+                  : 'LXGWWenKai',
+            ),
+          ),
+          value: font,
+          groupValue: _userConfig.fontFamily ?? 'SmileySans-Oblique',
+          onChanged: (value) {
+            if (value != null) {
+              _saveFont(value);
+            }
+          },
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildMirrorChanCDKInput() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -272,11 +325,14 @@ class _SettingsPageState extends State<SettingsPage> {
         ListTile(
           title: Text(S.of(context).cdk_status),
           trailing: Text(
-            _userConfig.mirrorChanCDK != null && _userConfig.mirrorChanCDK!.isNotEmpty
+            _userConfig.mirrorChanCDK != null &&
+                    _userConfig.mirrorChanCDK!.isNotEmpty
                 ? S.of(context).set
                 : S.of(context).not_set,
             style: TextStyle(
-              color: _userConfig.mirrorChanCDK != null && _userConfig.mirrorChanCDK!.isNotEmpty
+              color:
+                  _userConfig.mirrorChanCDK != null &&
+                      _userConfig.mirrorChanCDK!.isNotEmpty
                   ? Colors.green
                   : Colors.red,
               fontWeight: FontWeight.bold,
@@ -294,7 +350,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
-  
+
   Widget _buildConfigSetManagement() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -334,7 +390,7 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
-  
+
   Widget _buildAutoUpdate() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -366,10 +422,11 @@ class _SettingsPageState extends State<SettingsPage> {
       ],
     );
   }
-  
+
   /// 检查WebSocket连接状态并显示下载进度弹窗
   void _checkWebSocketAndShowDownloadProgressDialog(String source) {
-    if (!WebSocketHelper.getManager().isConnected) { // 使用WebSocketHelper
+    if (!WebSocketHelper.getManager().isConnected) {
+      // 使用WebSocketHelper
       // 如果WebSocket未连接，显示错误提示
       if (mounted) {
         toastification.show(
@@ -382,16 +439,16 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       return;
     }
-    
+
     _showDownloadProgressDialog(source);
   }
-  
+
   /// 显示下载进度弹窗
   void _showDownloadProgressDialog(String source) {
     double progress = 0.0;
     String progressText = '${S.of(context).downloading_from} $source';
     StateSetter? dialogSetState;
-    
+
     // 创建进度对话框
     final dialog = StatefulBuilder(
       builder: (BuildContext context, StateSetter setDialogState) {
@@ -407,7 +464,10 @@ class _SettingsPageState extends State<SettingsPage> {
                 const SizedBox(height: 20),
                 Text(
                   '${(progress * 100).round()}%',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 10),
                 LinearProgressIndicator(
@@ -422,7 +482,8 @@ class _SettingsPageState extends State<SettingsPage> {
             TextButton(
               onPressed: () {
                 // 取消下载
-                WebSocketHelper.getManager().cancelDownload(); // 使用WebSocketHelper
+                WebSocketHelper.getManager()
+                    .cancelDownload(); // 使用WebSocketHelper
                 if (Navigator.of(context).canPop()) {
                   Navigator.of(context).pop();
                 }
@@ -449,7 +510,9 @@ class _SettingsPageState extends State<SettingsPage> {
         // 在这里启动下载，确保dialogContext已初始化
         WidgetsBinding.instance.addPostFrameCallback((_) {
           // 添加debugPrint输出CDK值
-          final cdkToSend = source == 'MirrorChan' ? ConfigManager().encryptedMirrorChanCDK : null;
+          final cdkToSend = source == 'MirrorChan'
+              ? ConfigManager().encryptedMirrorChanCDK
+              : null;
           debugPrint('发送的CDK值: $cdkToSend');
           _realDownload(
             dialogContext: context, // 使用页面context而非dialogContext
@@ -459,13 +522,15 @@ class _SettingsPageState extends State<SettingsPage> {
               // 修复进度值处理：将百分比转换为0-1之间的值
               final double normalized = p / 100.0;
               if (mounted) {
-                dialogSetState?.call(() => progress = normalized.clamp(0.0, 1.0));
+                dialogSetState?.call(
+                  () => progress = normalized.clamp(0.0, 1.0),
+                );
               }
             },
             onDone: () {
               // 1. 先关弹窗，再弹 toast，顺序不能反
               if (mounted && Navigator.canPop(context)) {
-                Navigator.pop(context);          // 使用页面context
+                Navigator.pop(context); // 使用页面context
               }
 
               // 显示下载完成的toast
@@ -494,12 +559,11 @@ class _SettingsPageState extends State<SettingsPage> {
             updateProgressText: updateProgressText, // 传递更新文字的函数
           );
         });
-        
+
         return dialog;
       },
     );
   }
-  
 
   /// 获取更新目录
   Future<Directory> _getUpdateDir() async {
@@ -532,10 +596,12 @@ class _SettingsPageState extends State<SettingsPage> {
       final result = await Process.run(
         'powershell',
         [
-          'Expand-Archive', 
-          '-Path', zipPath, 
-          '-DestinationPath', updateDir.path,
-          '-Force'
+          'Expand-Archive',
+          '-Path',
+          zipPath,
+          '-DestinationPath',
+          updateDir.path,
+          '-Force',
         ],
         runInShell: true, // Windows 上建议开启
       );
@@ -548,7 +614,7 @@ class _SettingsPageState extends State<SettingsPage> {
         logger.e('错误输出: ${result.stderr}');
         throw Exception('解压失败: ${result.stderr}');
       }
-      
+
       logger.d('更新包已通过 PowerShell 解压到: ${targetLalc.path}');
     } catch (e) {
       logger.e('解压过程出错: $e');
@@ -557,8 +623,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
     return targetLalc;
   }
-
-
 
   /// 真实下载实现
   Future<void> _realDownload({
@@ -589,20 +653,20 @@ class _SettingsPageState extends State<SettingsPage> {
         onComplete: (zipPath) async {
           // 检查上下文是否仍然有效
           if (!mounted) return;
-          
+
           // 下载完成，先更新文字
           updateProgressText(S.of(context).unzipping_after_download);
-          
+
           try {
             await _unzipToLalcFolder(zipPath);
             // 可以顺手把 zip 删掉
             await File(zipPath).delete();
-            
+
             // 关闭进度弹窗后显示确认弹窗
             if (mounted && Navigator.canPop(context)) {
               Navigator.pop(context);
             }
-            
+
             // 显示确认弹窗
             final confirm = await showDialog<bool>(
               context: context,
@@ -621,7 +685,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ],
               ),
             );
-            
+
             if (confirm == true) {
               // 启动更新脚本
               _executeUpdateScript();
@@ -632,7 +696,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 await Process.run('explorer', [updateDir.path]);
               }
             }
-            
+
             onDone();
           } catch (e) {
             // 检查上下文是否仍然有效
@@ -685,7 +749,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-
   void _showSaveConfigSetDialog() {
     final controller = TextEditingController();
 
@@ -736,7 +799,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _showManageConfigSetsDialog() {
     late BuildContext dialogContext; // 定义dialogContext在整个方法中可用
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -751,13 +814,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 } else if (snapshot.hasError) {
-                  return Text('${S.of(context).load_failed}: ${snapshot.error}');
+                  return Text(
+                    '${S.of(context).load_failed}: ${snapshot.error}',
+                  );
                 } else if (snapshot.hasData) {
                   final configSets = snapshot.data!;
                   if (configSets.isEmpty) {
                     return Text(S.of(context).no_local_configs);
                   }
-                  
+
                   return ListView.builder(
                     shrinkWrap: true,
                     itemCount: configSets.length,
@@ -771,149 +836,232 @@ class _SettingsPageState extends State<SettingsPage> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.download, color: Colors.blue),
+                                icon: const Icon(
+                                  Icons.download,
+                                  color: Colors.blue,
+                                ),
                                 onPressed: () async {
                                   bool importTasks = true;
                                   bool importTeams = true;
                                   bool importThemePacks = true;
                                   bool importUserConfig = false;
-                                  
+
                                   // 显示选择对话框，让用户选择要导入的部分
-                                  final selectedOptions = await showDialog<Map<String, bool>?>(
-                                    context: context,
-                                    builder: (context) {
-                                      return StatefulBuilder(
-                                        builder: (context, setState) {
-                                          return AlertDialog(
-                                            title: Text(S.of(context).load_config),
-                                            content: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(S.of(context).load_config_warning),
-                                                const SizedBox(height: 16),
-                                                CheckboxListTile(
-                                                  title: Text(S.of(context).task_config),
-                                                  value: importTasks,
-                                                  onChanged: (bool? value) {
-                                                    setState(() {
-                                                      importTasks = value ?? false;
-                                                    });
-                                                  },
+                                  final selectedOptions =
+                                      await showDialog<Map<String, bool>?>(
+                                        context: context,
+                                        builder: (context) {
+                                          return StatefulBuilder(
+                                            builder: (context, setState) {
+                                              return AlertDialog(
+                                                title: Text(
+                                                  S.of(context).load_config,
                                                 ),
-                                                CheckboxListTile(
-                                                  title: Text(S.of(context).team_config),
-                                                  value: importTeams,
-                                                  onChanged: (bool? value) {
-                                                    setState(() {
-                                                      importTeams = value ?? false;
-                                                    });
-                                                  },
+                                                content: Column(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      S
+                                                          .of(context)
+                                                          .load_config_warning,
+                                                    ),
+                                                    const SizedBox(height: 16),
+                                                    CheckboxListTile(
+                                                      title: Text(
+                                                        S
+                                                            .of(context)
+                                                            .task_config,
+                                                      ),
+                                                      value: importTasks,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          importTasks =
+                                                              value ?? false;
+                                                        });
+                                                      },
+                                                    ),
+                                                    CheckboxListTile(
+                                                      title: Text(
+                                                        S
+                                                            .of(context)
+                                                            .team_config,
+                                                      ),
+                                                      value: importTeams,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          importTeams =
+                                                              value ?? false;
+                                                        });
+                                                      },
+                                                    ),
+                                                    CheckboxListTile(
+                                                      title: Text(
+                                                        S
+                                                            .of(context)
+                                                            .theme_pack_config,
+                                                      ),
+                                                      value: importThemePacks,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          importThemePacks =
+                                                              value ?? false;
+                                                        });
+                                                      },
+                                                    ),
+                                                    CheckboxListTile(
+                                                      title: Text(
+                                                        S
+                                                            .of(context)
+                                                            .user_config,
+                                                      ),
+                                                      value: importUserConfig,
+                                                      onChanged: (bool? value) {
+                                                        setState(() {
+                                                          importUserConfig =
+                                                              value ?? false;
+                                                        });
+                                                      },
+                                                    ),
+                                                  ],
                                                 ),
-                                                CheckboxListTile(
-                                                  title: Text(S.of(context).theme_pack_config),
-                                                  value: importThemePacks,
-                                                  onChanged: (bool? value) {
-                                                    setState(() {
-                                                      importThemePacks = value ?? false;
-                                                    });
-                                                  },
-                                                ),
-                                                CheckboxListTile(
-                                                  title: Text(S.of(context).user_config),
-                                                  value: importUserConfig,
-                                                  onChanged: (bool? value) {
-                                                    setState(() {
-                                                      importUserConfig = value ?? false;
-                                                    });
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop(null);
-                                                },
-                                                child: Text(S.of(context).cancel),
-                                              ),
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.of(context).pop({
-                                                    'importTasks': importTasks,
-                                                    'importTeams': importTeams,
-                                                    'importThemePacks': importThemePacks,
-                                                    'importUserConfig': importUserConfig,
-                                                  });
-                                                },
-                                                child: Text(S.of(context).confirm),
-                                              ),
-                                            ],
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop(null);
+                                                    },
+                                                    child: Text(
+                                                      S.of(context).cancel,
+                                                    ),
+                                                  ),
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.of(
+                                                        context,
+                                                      ).pop({
+                                                        'importTasks':
+                                                            importTasks,
+                                                        'importTeams':
+                                                            importTeams,
+                                                        'importThemePacks':
+                                                            importThemePacks,
+                                                        'importUserConfig':
+                                                            importUserConfig,
+                                                      });
+                                                    },
+                                                    child: Text(
+                                                      S.of(context).confirm,
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
                                           );
                                         },
                                       );
-                                    },
-                                  );
-                                  
+
                                   // 用户确认后再执行读取操作
                                   if (selectedOptions != null) {
                                     // 读取配置逻辑，复用导入逻辑
-                                    final configSetPath = path.join(ConfigManager().getConfigsDirectory().path, setName);
-                                    
+                                    final configSetPath = path.join(
+                                      ConfigManager()
+                                          .getConfigsDirectory()
+                                          .path,
+                                      setName,
+                                    );
+
                                     // 检查配置集是否为ZIP文件
                                     final zipFile = File('$configSetPath.zip');
                                     if (await zipFile.exists()) {
                                       // 如果是ZIP文件，先解压到临时目录
-                                      final tempDir = await getTemporaryDirectory();
-                                      final tempUnzipDir = Directory('${tempDir.path}/unzipped_${setName}_${DateTime.now().millisecondsSinceEpoch}');
-                                      await tempUnzipDir.create(recursive: true);
-                                      
+                                      final tempDir =
+                                          await getTemporaryDirectory();
+                                      final tempUnzipDir = Directory(
+                                        '${tempDir.path}/unzipped_${setName}_${DateTime.now().millisecondsSinceEpoch}',
+                                      );
+                                      await tempUnzipDir.create(
+                                        recursive: true,
+                                      );
+
                                       try {
-                                        await ZipHelper.unzipTo(zipFile: zipFile.path, dstDir: tempUnzipDir.path);
-                                        
+                                        await ZipHelper.unzipTo(
+                                          zipFile: zipFile.path,
+                                          dstDir: tempUnzipDir.path,
+                                        );
+
                                         // 执行选择性导入
                                         await _selectiveImportConfigFromDirectory(
                                           tempUnzipDir.path,
-                                          importTasks: selectedOptions['importTasks'] ?? true,
-                                          importTeams: selectedOptions['importTeams'] ?? true,
-                                          importThemePacks: selectedOptions['importThemePacks'] ?? true,
-                                          importUserConfig: selectedOptions['importUserConfig'] ?? false,
+                                          importTasks:
+                                              selectedOptions['importTasks'] ??
+                                              true,
+                                          importTeams:
+                                              selectedOptions['importTeams'] ??
+                                              true,
+                                          importThemePacks:
+                                              selectedOptions['importThemePacks'] ??
+                                              true,
+                                          importUserConfig:
+                                              selectedOptions['importUserConfig'] ??
+                                              false,
                                         );
-                                        
+
                                         // 删除临时解压目录
-                                        await tempUnzipDir.delete(recursive: true);
+                                        await tempUnzipDir.delete(
+                                          recursive: true,
+                                        );
                                       } catch (e) {
                                         // 如果解压失败，清理临时目录
-                                        await tempUnzipDir.delete(recursive: true);
+                                        await tempUnzipDir.delete(
+                                          recursive: true,
+                                        );
                                         rethrow;
                                       }
                                     } else {
                                       // 如果是目录格式，直接导入
                                       await _selectiveImportConfigFromDirectory(
                                         configSetPath,
-                                        importTasks: selectedOptions['importTasks'] ?? true,
-                                        importTeams: selectedOptions['importTeams'] ?? true,
-                                        importThemePacks: selectedOptions['importThemePacks'] ?? true,
-                                        importUserConfig: selectedOptions['importUserConfig'] ?? false,
+                                        importTasks:
+                                            selectedOptions['importTasks'] ??
+                                            true,
+                                        importTeams:
+                                            selectedOptions['importTeams'] ??
+                                            true,
+                                        importThemePacks:
+                                            selectedOptions['importThemePacks'] ??
+                                            true,
+                                        importUserConfig:
+                                            selectedOptions['importUserConfig'] ??
+                                            false,
                                       );
                                     }
-                                    
+
                                     await _loadConfig();
-                                    
+
                                     if (context.mounted) {
                                       Navigator.of(context).pop();
                                       toastification.show(
                                         context: context,
-                                        title: Text(S.of(context).config_loaded),
+                                        title: Text(
+                                          S.of(context).config_loaded,
+                                        ),
                                         style: ToastificationStyle.flatColored,
                                         type: ToastificationType.success,
-                                        autoCloseDuration: const Duration(seconds: 3),
+                                        autoCloseDuration: const Duration(
+                                          seconds: 3,
+                                        ),
                                       );
                                     }
                                   }
                                 },
                               ),
                               IconButton(
-                                icon: const Icon(Icons.lock, color: Colors.grey),
+                                icon: const Icon(
+                                  Icons.lock,
+                                  color: Colors.grey,
+                                ),
                                 onPressed: null,
                               ),
                             ],
@@ -928,134 +1076,197 @@ class _SettingsPageState extends State<SettingsPage> {
                           children: [
                             // 读取配置按钮
                             IconButton(
-                              icon: const Icon(Icons.download, color: Colors.blue),
+                              icon: const Icon(
+                                Icons.download,
+                                color: Colors.blue,
+                              ),
                               onPressed: () async {
                                 bool importTasks = true;
                                 bool importTeams = true;
                                 bool importThemePacks = true;
                                 bool importUserConfig = false;
-                                
+
                                 // 显示选择对话框，让用户选择要导入的部分
-                                final selectedOptions = await showDialog<Map<String, bool>?>(
-                                  context: context,
-                                  builder: (context) {
-                                    return StatefulBuilder(
-                                      builder: (context, setState) {
-                                        return AlertDialog(
-                                          title: Text(S.of(context).load_config),
-                                          content: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(S.of(context).load_config_warning),
-                                              const SizedBox(height: 16),
-                                              CheckboxListTile(
-                                                title: Text(S.of(context).task_config),
-                                                value: importTasks,
-                                                onChanged: (bool? value) {
-                                                  setState(() {
-                                                    importTasks = value ?? false;
-                                                  });
-                                                },
+                                final selectedOptions =
+                                    await showDialog<Map<String, bool>?>(
+                                      context: context,
+                                      builder: (context) {
+                                        return StatefulBuilder(
+                                          builder: (context, setState) {
+                                            return AlertDialog(
+                                              title: Text(
+                                                S.of(context).load_config,
                                               ),
-                                              CheckboxListTile(
-                                                title: Text(S.of(context).team_config),
-                                                value: importTeams,
-                                                onChanged: (bool? value) {
-                                                  setState(() {
-                                                    importTeams = value ?? false;
-                                                  });
-                                                },
+                                              content: Column(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    S
+                                                        .of(context)
+                                                        .load_config_warning,
+                                                  ),
+                                                  const SizedBox(height: 16),
+                                                  CheckboxListTile(
+                                                    title: Text(
+                                                      S.of(context).task_config,
+                                                    ),
+                                                    value: importTasks,
+                                                    onChanged: (bool? value) {
+                                                      setState(() {
+                                                        importTasks =
+                                                            value ?? false;
+                                                      });
+                                                    },
+                                                  ),
+                                                  CheckboxListTile(
+                                                    title: Text(
+                                                      S.of(context).team_config,
+                                                    ),
+                                                    value: importTeams,
+                                                    onChanged: (bool? value) {
+                                                      setState(() {
+                                                        importTeams =
+                                                            value ?? false;
+                                                      });
+                                                    },
+                                                  ),
+                                                  CheckboxListTile(
+                                                    title: Text(
+                                                      S
+                                                          .of(context)
+                                                          .theme_pack_config,
+                                                    ),
+                                                    value: importThemePacks,
+                                                    onChanged: (bool? value) {
+                                                      setState(() {
+                                                        importThemePacks =
+                                                            value ?? false;
+                                                      });
+                                                    },
+                                                  ),
+                                                  CheckboxListTile(
+                                                    title: Text(
+                                                      S.of(context).user_config,
+                                                    ),
+                                                    value: importUserConfig,
+                                                    onChanged: (bool? value) {
+                                                      setState(() {
+                                                        importUserConfig =
+                                                            value ?? false;
+                                                      });
+                                                    },
+                                                  ),
+                                                ],
                                               ),
-                                              CheckboxListTile(
-                                                title: Text(S.of(context).theme_pack_config),
-                                                value: importThemePacks,
-                                                onChanged: (bool? value) {
-                                                  setState(() {
-                                                    importThemePacks = value ?? false;
-                                                  });
-                                                },
-                                              ),
-                                              CheckboxListTile(
-                                                title: Text(S.of(context).user_config),
-                                                value: importUserConfig,
-                                                onChanged: (bool? value) {
-                                                  setState(() {
-                                                    importUserConfig = value ?? false;
-                                                  });
-                                                },
-                                              ),
-                                            ],
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.of(context).pop(null);
-                                              },
-                                              child: Text(S.of(context).cancel),
-                                            ),
-                                            TextButton(
-                                              onPressed: () {
-                                                Navigator.of(context).pop({
-                                                  'importTasks': importTasks,
-                                                  'importTeams': importTeams,
-                                                  'importThemePacks': importThemePacks,
-                                                  'importUserConfig': importUserConfig,
-                                                });
-                                              },
-                                              child: Text(S.of(context).confirm),
-                                            ),
-                                          ],
+                                              actions: [
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(
+                                                      context,
+                                                    ).pop(null);
+                                                  },
+                                                  child: Text(
+                                                    S.of(context).cancel,
+                                                  ),
+                                                ),
+                                                TextButton(
+                                                  onPressed: () {
+                                                    Navigator.of(context).pop({
+                                                      'importTasks':
+                                                          importTasks,
+                                                      'importTeams':
+                                                          importTeams,
+                                                      'importThemePacks':
+                                                          importThemePacks,
+                                                      'importUserConfig':
+                                                          importUserConfig,
+                                                    });
+                                                  },
+                                                  child: Text(
+                                                    S.of(context).confirm,
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
                                         );
                                       },
                                     );
-                                  },
-                                );
-                                
+
                                 // 用户确认后再执行读取操作
                                 if (selectedOptions != null) {
                                   // 读取配置逻辑，复用导入逻辑
-                                  final configSetPath = path.join(ConfigManager().getConfigsDirectory().path, setName);
-                                  
+                                  final configSetPath = path.join(
+                                    ConfigManager().getConfigsDirectory().path,
+                                    setName,
+                                  );
+
                                   // 检查配置集是否为ZIP文件
                                   final zipFile = File('$configSetPath.zip');
                                   if (await zipFile.exists()) {
                                     // 如果是ZIP文件，先解压到临时目录
-                                    final tempDir = await getTemporaryDirectory();
-                                    final tempUnzipDir = Directory('${tempDir.path}/unzipped_${setName}_${DateTime.now().millisecondsSinceEpoch}');
+                                    final tempDir =
+                                        await getTemporaryDirectory();
+                                    final tempUnzipDir = Directory(
+                                      '${tempDir.path}/unzipped_${setName}_${DateTime.now().millisecondsSinceEpoch}',
+                                    );
                                     await tempUnzipDir.create(recursive: true);
-                                    
+
                                     try {
-                                      await ZipHelper.unzipTo(zipFile: zipFile.path, dstDir: tempUnzipDir.path);
-                                      
+                                      await ZipHelper.unzipTo(
+                                        zipFile: zipFile.path,
+                                        dstDir: tempUnzipDir.path,
+                                      );
+
                                       // 执行选择性导入
                                       await _selectiveImportConfigFromDirectory(
                                         tempUnzipDir.path,
-                                        importTasks: selectedOptions['importTasks'] ?? true,
-                                        importTeams: selectedOptions['importTeams'] ?? true,
-                                        importThemePacks: selectedOptions['importThemePacks'] ?? true,
-                                        importUserConfig: selectedOptions['importUserConfig'] ?? false,
+                                        importTasks:
+                                            selectedOptions['importTasks'] ??
+                                            true,
+                                        importTeams:
+                                            selectedOptions['importTeams'] ??
+                                            true,
+                                        importThemePacks:
+                                            selectedOptions['importThemePacks'] ??
+                                            true,
+                                        importUserConfig:
+                                            selectedOptions['importUserConfig'] ??
+                                            false,
                                       );
-                                      
+
                                       // 删除临时解压目录
-                                      await tempUnzipDir.delete(recursive: true);
+                                      await tempUnzipDir.delete(
+                                        recursive: true,
+                                      );
                                     } catch (e) {
                                       // 如果解压失败，清理临时目录
-                                      await tempUnzipDir.delete(recursive: true);
+                                      await tempUnzipDir.delete(
+                                        recursive: true,
+                                      );
                                       rethrow;
                                     }
                                   } else {
                                     // 如果是目录格式，直接导入
                                     await _selectiveImportConfigFromDirectory(
                                       configSetPath,
-                                      importTasks: selectedOptions['importTasks'] ?? true,
-                                      importTeams: selectedOptions['importTeams'] ?? true,
-                                      importThemePacks: selectedOptions['importThemePacks'] ?? true,
-                                      importUserConfig: selectedOptions['importUserConfig'] ?? false,
+                                      importTasks:
+                                          selectedOptions['importTasks'] ??
+                                          true,
+                                      importTeams:
+                                          selectedOptions['importTeams'] ??
+                                          true,
+                                      importThemePacks:
+                                          selectedOptions['importThemePacks'] ??
+                                          true,
+                                      importUserConfig:
+                                          selectedOptions['importUserConfig'] ??
+                                          false,
                                     );
                                   }
-                                  
+
                                   await _loadConfig();
-                                  
+
                                   if (context.mounted) {
                                     Navigator.of(context).pop();
                                     toastification.show(
@@ -1063,7 +1274,9 @@ class _SettingsPageState extends State<SettingsPage> {
                                       title: Text(S.of(context).config_loaded),
                                       style: ToastificationStyle.flatColored,
                                       type: ToastificationType.success,
-                                      autoCloseDuration: const Duration(seconds: 3),
+                                      autoCloseDuration: const Duration(
+                                        seconds: 3,
+                                      ),
                                     );
                                   }
                                 }
@@ -1077,34 +1290,44 @@ class _SettingsPageState extends State<SettingsPage> {
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: Text(S.of(context).confirm_delete),
-                                    content: Text('${S.of(context).confirm_delete_message} "$setName" ${S.of(context).irreversible}'),
+                                    content: Text(
+                                      '${S.of(context).confirm_delete_message} "$setName" ${S.of(context).irreversible}',
+                                    ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(false),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(false),
                                         child: Text(S.of(context).cancel),
                                       ),
                                       TextButton(
-                                        onPressed: () => Navigator.of(context).pop(true),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(true),
                                         child: Text(S.of(context).delete),
                                       ),
                                     ],
                                   ),
                                 );
-                                
+
                                 if (confirm == true) {
                                   try {
                                     // 尝试删除目录格式的配置集
-                                    final configSetDir = Directory('${ConfigManager().getConfigsDirectory().path}/$setName');
+                                    final configSetDir = Directory(
+                                      '${ConfigManager().getConfigsDirectory().path}/$setName',
+                                    );
                                     if (await configSetDir.exists()) {
-                                      await configSetDir.delete(recursive: true);
+                                      await configSetDir.delete(
+                                        recursive: true,
+                                      );
                                     }
-                                    
+
                                     // 尝试删除ZIP格式的配置集
-                                    final configSetZip = File('${ConfigManager().getConfigsDirectory().path}/$setName.zip');
+                                    final configSetZip = File(
+                                      '${ConfigManager().getConfigsDirectory().path}/$setName.zip',
+                                    );
                                     if (await configSetZip.exists()) {
                                       await configSetZip.delete();
                                     }
-                                    
+
                                     // 重新加载配置集列表
                                     await _loadAvailableConfigSets();
                                     // 更新UI
@@ -1112,23 +1335,33 @@ class _SettingsPageState extends State<SettingsPage> {
                                       (context as Element).markNeedsBuild();
                                     }
                                     if (mounted) {
-                                      Navigator.of(dialogContext).pop(); // 使用定义的dialogContext
+                                      Navigator.of(
+                                        dialogContext,
+                                      ).pop(); // 使用定义的dialogContext
                                       toastification.show(
                                         context: context,
-                                        title: Text(S.of(context).delete_success),
+                                        title: Text(
+                                          S.of(context).delete_success,
+                                        ),
                                         style: ToastificationStyle.flatColored,
                                         type: ToastificationType.success,
-                                        autoCloseDuration: const Duration(seconds: 3),
+                                        autoCloseDuration: const Duration(
+                                          seconds: 3,
+                                        ),
                                       );
                                     }
                                   } catch (e) {
                                     if (mounted) {
                                       toastification.show(
                                         context: context,
-                                        title: Text(S.of(context).delete_failed),
+                                        title: Text(
+                                          S.of(context).delete_failed,
+                                        ),
                                         style: ToastificationStyle.flatColored,
                                         type: ToastificationType.error,
-                                        autoCloseDuration: const Duration(seconds: 3),
+                                        autoCloseDuration: const Duration(
+                                          seconds: 3,
+                                        ),
                                       );
                                     }
                                   }
@@ -1192,7 +1425,7 @@ class _SettingsPageState extends State<SettingsPage> {
     bool importTeams = true;
     bool importThemePacks = true;
     bool importUserConfig = false;
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -1254,10 +1487,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   onPressed: () async {
                     Navigator.of(context).pop();
                     // 执行导入操作
-                    await _importToCurrentConfig(importTasks: importTasks, 
-                                                importTeams: importTeams, 
-                                                importThemePacks: importThemePacks, 
-                                                importUserConfig: importUserConfig);
+                    await _importToCurrentConfig(
+                      importTasks: importTasks,
+                      importTeams: importTeams,
+                      importThemePacks: importThemePacks,
+                      importUserConfig: importUserConfig,
+                    );
                   },
                   child: Text(S.of(context).confirm),
                 ),
@@ -1278,7 +1513,7 @@ class _SettingsPageState extends State<SettingsPage> {
         type: FileType.custom,
         allowedExtensions: ['zip'],
       );
-      
+
       if (selectedPath != null) {
         // 显示导出中弹窗
         late BuildContext dialogContext;
@@ -1301,26 +1536,31 @@ class _SettingsPageState extends State<SettingsPage> {
             return dialog;
           },
         );
-        
+
         // 创建临时目录用于准备导出的文件
         final tempDir = await getTemporaryDirectory();
-        final exportTempDir = Directory('${tempDir.path}/export_${DateTime.now().millisecondsSinceEpoch}');
+        final exportTempDir = Directory(
+          '${tempDir.path}/export_${DateTime.now().millisecondsSinceEpoch}',
+        );
         await exportTempDir.create(recursive: true);
-        
+
         // 导出各个配置文件到临时目录
         await ConfigManager().exportConfigToDirectory(exportTempDir.path);
-        
+
         // 创建ZIP文件（现在在后台线程执行）
-        await ZipHelper.zipDir(srcDir: exportTempDir.path, dstZip: selectedPath);
-        
+        await ZipHelper.zipDir(
+          srcDir: exportTempDir.path,
+          dstZip: selectedPath,
+        );
+
         // 清理临时目录
         await exportTempDir.delete(recursive: true);
-        
+
         // 关闭导出中弹窗
         if (mounted && Navigator.canPop(dialogContext)) {
           Navigator.pop(dialogContext);
         }
-        
+
         if (mounted) {
           toastification.show(
             context: context,
@@ -1341,7 +1581,7 @@ class _SettingsPageState extends State<SettingsPage> {
       } catch (e) {
         // 忽略导航错误
       }
-      
+
       if (mounted) {
         toastification.show(
           context: context,
@@ -1356,8 +1596,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 执行导入到当前配置的核心逻辑。
   /// 此方法会尝试从ZIP文件导入配置文件，并覆盖当前配置。
-  Future<void> _importToCurrentConfig({bool importTasks = true, bool importTeams = true, 
-                                     bool importThemePacks = true, bool importUserConfig = false}) async {
+  Future<void> _importToCurrentConfig({
+    bool importTasks = true,
+    bool importTeams = true,
+    bool importThemePacks = true,
+    bool importUserConfig = false,
+  }) async {
     try {
       // 使用文件选择器选择导入ZIP文件
       final FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -1365,10 +1609,10 @@ class _SettingsPageState extends State<SettingsPage> {
         type: FileType.custom,
         allowedExtensions: ['zip'],
       );
-      
+
       if (result != null) {
         final selectedFile = File(result.files.single.path!);
-        
+
         // 显示导入中弹窗
         late BuildContext dialogContext;
         final dialog = AlertDialog(
@@ -1390,20 +1634,25 @@ class _SettingsPageState extends State<SettingsPage> {
             return dialog;
           },
         );
-        
+
         // 解压ZIP文件到临时目录
         final tempDir = await getTemporaryDirectory();
-        final tempUnzipDir = Directory('${tempDir.path}/unzipped_${DateTime.now().millisecondsSinceEpoch}');
+        final tempUnzipDir = Directory(
+          '${tempDir.path}/unzipped_${DateTime.now().millisecondsSinceEpoch}',
+        );
         await tempUnzipDir.create(recursive: true);
-        
+
         try {
-          await ZipHelper.unzipTo(zipFile: selectedFile.path, dstDir: tempUnzipDir.path);
+          await ZipHelper.unzipTo(
+            zipFile: selectedFile.path,
+            dstDir: tempUnzipDir.path,
+          );
         } catch (e) {
           // 关闭导入中弹窗
           if (mounted && Navigator.canPop(dialogContext)) {
             Navigator.pop(dialogContext);
           }
-          
+
           if (mounted) {
             toastification.show(
               context: context,
@@ -1413,20 +1662,20 @@ class _SettingsPageState extends State<SettingsPage> {
               autoCloseDuration: const Duration(days: 1),
             );
           }
-          
+
           // 清理临时目录
           await tempUnzipDir.delete(recursive: true);
           return;
         }
-        
+
         // 检查所选目录是否包含必要的配置文件
         final requiredFiles = [
           if (importTasks) 'task_config.json',
           if (importTeams) 'team_config.json',
           if (importThemePacks) 'theme_pack_config.json',
-          if (importUserConfig) 'user_config.json'
+          if (importUserConfig) 'user_config.json',
         ];
-        
+
         bool hasAllFiles = true;
         for (final fileName in requiredFiles) {
           final file = File('${tempUnzipDir.path}/$fileName');
@@ -1439,20 +1688,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 break;
               }
             }
-            
+
             if (!foundInSubDirs) {
               hasAllFiles = false;
               break;
             }
           }
         }
-        
+
         if (!hasAllFiles) {
           // 关闭导入中弹窗
           if (mounted && Navigator.canPop(dialogContext)) {
             Navigator.pop(dialogContext);
           }
-          
+
           if (mounted) {
             toastification.show(
               context: context,
@@ -1462,97 +1711,111 @@ class _SettingsPageState extends State<SettingsPage> {
               autoCloseDuration: const Duration(seconds: 3),
             );
           }
-          
+
           // 清理临时目录
           await tempUnzipDir.delete(recursive: true);
           return;
         }
-        
+
         // 导入配置文件
         if (importTasks) {
           final directFile = File('${tempUnzipDir.path}/task_config.json');
           File sourceTaskConfigFile = directFile;
-          
+
           // 如果直接文件不存在，查找子目录中的文件
           if (!await directFile.exists()) {
             await for (final entity in tempUnzipDir.list(recursive: true)) {
-              if (entity is File && path.basename(entity.path) == 'task_config.json') {
+              if (entity is File &&
+                  path.basename(entity.path) == 'task_config.json') {
                 sourceTaskConfigFile = entity;
                 break;
               }
             }
           }
-          
+
           if (await sourceTaskConfigFile.exists()) {
-            await ConfigManager().setTaskConfigRaw(await sourceTaskConfigFile.readAsString());
+            await ConfigManager().setTaskConfigRaw(
+              await sourceTaskConfigFile.readAsString(),
+            );
           }
         }
-        
+
         if (importTeams) {
           final directFile = File('${tempUnzipDir.path}/team_config.json');
           File sourceTeamConfigFile = directFile;
-          
+
           // 如果直接文件不存在，查找子目录中的文件
           if (!await directFile.exists()) {
             await for (final entity in tempUnzipDir.list(recursive: true)) {
-              if (entity is File && path.basename(entity.path) == 'team_config.json') {
+              if (entity is File &&
+                  path.basename(entity.path) == 'team_config.json') {
                 sourceTeamConfigFile = entity;
                 break;
               }
             }
           }
-          
+
           if (await sourceTeamConfigFile.exists()) {
-            await ConfigManager().setTeamConfigRaw(await sourceTeamConfigFile.readAsString());
+            await ConfigManager().setTeamConfigRaw(
+              await sourceTeamConfigFile.readAsString(),
+            );
           }
         }
-        
+
         if (importThemePacks) {
-          final directFile = File('${tempUnzipDir.path}/theme_pack_config.json');
+          final directFile = File(
+            '${tempUnzipDir.path}/theme_pack_config.json',
+          );
           File sourceThemePackConfigFile = directFile;
-          
+
           // 如果直接文件不存在，查找子目录中的文件
           if (!await directFile.exists()) {
             await for (final entity in tempUnzipDir.list(recursive: true)) {
-              if (entity is File && path.basename(entity.path) == 'theme_pack_config.json') {
+              if (entity is File &&
+                  path.basename(entity.path) == 'theme_pack_config.json') {
                 sourceThemePackConfigFile = entity;
                 break;
               }
             }
           }
-          
+
           if (await sourceThemePackConfigFile.exists()) {
-            await ConfigManager().setThemePackConfigRaw(await sourceThemePackConfigFile.readAsString());
+            await ConfigManager().setThemePackConfigRaw(
+              await sourceThemePackConfigFile.readAsString(),
+            );
           }
         }
-        
+
         if (importUserConfig) {
           final directFile = File('${tempUnzipDir.path}/user_config.json');
           File sourceUserConfigFile = directFile;
-          
+
           // 如果直接文件不存在，查找子目录中的文件
           if (!await directFile.exists()) {
             await for (final entity in tempUnzipDir.list(recursive: true)) {
-              if (entity is File && path.basename(entity.path) == 'user_config.json') {
+              if (entity is File &&
+                  path.basename(entity.path) == 'user_config.json') {
                 sourceUserConfigFile = entity;
                 break;
               }
             }
           }
-          
+
           if (await sourceUserConfigFile.exists()) {
-            await ConfigManager().setUserConfigRaw(await sourceUserConfigFile.readAsString());
+            await ConfigManager().setUserConfigRaw(
+              await sourceUserConfigFile.readAsString(),
+            );
           }
         }
-        
+
         // 清理临时目录
         await tempUnzipDir.delete(recursive: true);
-        
+
         // 关闭导入中弹窗
         if (mounted && Navigator.canPop(dialogContext)) {
           Navigator.pop(dialogContext);
         }
-        
+
         if (mounted) {
           toastification.show(
             context: context,
@@ -1562,7 +1825,7 @@ class _SettingsPageState extends State<SettingsPage> {
             autoCloseDuration: const Duration(seconds: 3),
           );
         }
-        
+
         // 重新加载配置
         await ConfigManager().loadAllConfigs();
         if (mounted) {
@@ -1579,7 +1842,7 @@ class _SettingsPageState extends State<SettingsPage> {
       } catch (e) {
         // 忽略导航错误
       }
-      
+
       if (mounted) {
         toastification.show(
           context: context,
@@ -1593,57 +1856,83 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   /// 选择性导入配置
-  Future<void> _selectiveImportConfigFromDirectory(String directoryPath, 
-                                                  {bool importTasks = true, 
-                                                   bool importTeams = true, 
-                                                   bool importThemePacks = true, 
-                                                   bool importUserConfig = false}) async {
+  Future<void> _selectiveImportConfigFromDirectory(
+    String directoryPath, {
+    bool importTasks = true,
+    bool importTeams = true,
+    bool importThemePacks = true,
+    bool importUserConfig = false,
+  }) async {
     try {
       final importDirectory = Directory(directoryPath);
       if (!await importDirectory.exists()) {
         logger.e('导入目录 $directoryPath 不存在');
         return;
       }
-      
+
       final configManager = ConfigManager();
-      
+
       // 根据选项导入配置文件
       if (importTasks) {
-        final sourceTaskConfigFile = File('${importDirectory.path}/task_config.json');
+        final sourceTaskConfigFile = File(
+          '${importDirectory.path}/task_config.json',
+        );
         if (await sourceTaskConfigFile.exists()) {
-          final taskConfigFile = File('${configManager.getConfigsDirectory().parent.path}/task_config.json');
-          await taskConfigFile.writeAsString(await sourceTaskConfigFile.readAsString());
+          final taskConfigFile = File(
+            '${configManager.getConfigsDirectory().parent.path}/task_config.json',
+          );
+          await taskConfigFile.writeAsString(
+            await sourceTaskConfigFile.readAsString(),
+          );
           await configManager.loadTaskConfig(); // 重新加载
         }
       }
-      
+
       if (importTeams) {
-        final sourceTeamConfigFile = File('${importDirectory.path}/team_config.json');
+        final sourceTeamConfigFile = File(
+          '${importDirectory.path}/team_config.json',
+        );
         if (await sourceTeamConfigFile.exists()) {
-          final teamConfigFile = File('${configManager.getConfigsDirectory().parent.path}/team_config.json');
-          await teamConfigFile.writeAsString(await sourceTeamConfigFile.readAsString());
+          final teamConfigFile = File(
+            '${configManager.getConfigsDirectory().parent.path}/team_config.json',
+          );
+          await teamConfigFile.writeAsString(
+            await sourceTeamConfigFile.readAsString(),
+          );
           await configManager.loadTeamConfig(); // 重新加载
         }
       }
-      
+
       if (importThemePacks) {
-        final sourceThemePackConfigFile = File('${importDirectory.path}/theme_pack_config.json');
+        final sourceThemePackConfigFile = File(
+          '${importDirectory.path}/theme_pack_config.json',
+        );
         if (await sourceThemePackConfigFile.exists()) {
-          final themePackConfigFile = File('${configManager.getConfigsDirectory().parent.path}/theme_pack_config.json');
-          await themePackConfigFile.writeAsString(await sourceThemePackConfigFile.readAsString());
+          final themePackConfigFile = File(
+            '${configManager.getConfigsDirectory().parent.path}/theme_pack_config.json',
+          );
+          await themePackConfigFile.writeAsString(
+            await sourceThemePackConfigFile.readAsString(),
+          );
           await configManager.loadThemePackConfig(); // 重新加载
         }
       }
-      
+
       if (importUserConfig) {
-        final sourceUserConfigFile = File('${importDirectory.path}/user_config.json');
+        final sourceUserConfigFile = File(
+          '${importDirectory.path}/user_config.json',
+        );
         if (await sourceUserConfigFile.exists()) {
-          final userConfigFile = File('${configManager.getConfigsDirectory().parent.path}/user_config.json');
-          await userConfigFile.writeAsString(await sourceUserConfigFile.readAsString());
+          final userConfigFile = File(
+            '${configManager.getConfigsDirectory().parent.path}/user_config.json',
+          );
+          await userConfigFile.writeAsString(
+            await sourceUserConfigFile.readAsString(),
+          );
           await configManager.loadUserConfig(); // 重新加载
         }
       }
-      
+
       logger.d('从目录 $directoryPath 选择性导入配置成功');
     } catch (e) {
       logger.e('从目录 $directoryPath 选择性导入配置失败: $e');
@@ -1655,7 +1944,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // 检查update文件夹下是否存在lalc文件夹
     final updateDir = await _getUpdateDir();
     final lalcDir = Directory('${updateDir.path}/lalc');
-    
+
     if (!await lalcDir.exists()) {
       // 如果不存在lalc文件夹，显示错误提示
       if (mounted) {
@@ -1669,7 +1958,7 @@ class _SettingsPageState extends State<SettingsPage> {
       }
       return;
     }
-    
+
     // 显示确认弹窗
     final confirm = await showDialog<bool>(
       context: context,
@@ -1688,7 +1977,7 @@ class _SettingsPageState extends State<SettingsPage> {
         ],
       ),
     );
-    
+
     if (confirm == true) {
       // 用户选择自动更新，执行更新脚本
       _executeUpdateScript();
@@ -1701,21 +1990,29 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
   }
-  
+
   /// 执行更新脚本
   void _executeUpdateScript() async {
     final updateDir = await _getUpdateDir();
     final lalcDir = Directory('${updateDir.path}/lalc');
     final batFile = File('${lalcDir.path}/update_to.bat');
-    
+
     // 获取项目自身的绝对路径
     String executablePath = Platform.resolvedExecutable;
     String projectDir = path.dirname(path.dirname(executablePath));
-    
+
     if (await batFile.exists()) {
       try {
         // 使用start命令在新窗口中执行bat脚本，这样用户可以看到执行过程
-        Process.start('cmd', ['/c', 'start', 'cmd', '/k', batFile.path, lalcDir.path, projectDir]);
+        Process.start('cmd', [
+          '/c',
+          'start',
+          'cmd',
+          '/k',
+          batFile.path,
+          lalcDir.path,
+          projectDir,
+        ]);
         if (mounted) {
           toastification.show(
             context: context,
@@ -1727,7 +2024,6 @@ class _SettingsPageState extends State<SettingsPage> {
         }
         // 向服务器发送 quit_lalc 命令
         WebSocketHelper.getManager().quitLALC();
-        
       } catch (e) {
         if (mounted) {
           toastification.show(
@@ -1751,5 +2047,4 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     }
   }
-  
 }

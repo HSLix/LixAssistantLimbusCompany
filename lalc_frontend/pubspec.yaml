@@ -98,5 +98,8 @@ flutter:
     - family: SmileySans
       fonts:
         - asset: assets/fonts/SmileySans-Oblique.ttf
+    - family: LXGWWenKai
+      fonts:
+        - asset: assets/fonts/LXGWWenKaiGBLite-Medium.ttf
 flutter_intl:
   enabled: true

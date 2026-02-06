@@ -1978,6 +1978,16 @@ class S {
       args: [],
     );
   }
+
+  /// `Font Setting`
+  String get font_setting {
+    return Intl.message(
+      'Font Setting',
+      name: 'font_setting',
+      desc: '',
+      args: [],
+    );
+  }
 }
 
 class AppLocalizationDelegate extends LocalizationsDelegate<S> {
