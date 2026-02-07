@@ -915,7 +915,6 @@ class WebSocketManager with ChangeNotifier {
     notifyListeners();
   }
   
-  // 执行待处理命令
 
   /// 下载最新版本
   Future<void> downloadUpdate({

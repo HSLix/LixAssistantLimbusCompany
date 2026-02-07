@@ -33,7 +33,6 @@
         ]
     },
     "battle_fight":{
-        "recognition": "direct",
         "action": "key",
         "params":{
             "key":"enter"
@@ -42,6 +41,9 @@
             "battle_winrate_click",
             "battle_wait",
             "wait_loading_tips_disappear"
+        ],
+        "interrupt": [
+            
         ]
     },
     "battle_winrate_click":{
