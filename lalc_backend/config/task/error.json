@@ -80,7 +80,7 @@
             "template":"popup_try"
         },
         "next":[
-            "wait_connecting_disappear"
+            "main"
         ]
     },
     "error_new_download_added":{
