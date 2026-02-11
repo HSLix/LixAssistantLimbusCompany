@@ -38,3 +38,6 @@
 ### 12. 程序启动报错 Dll load Failed，就像 [Issue #240](https://github.com/HSLix/LixAssistantLimbusCompany/issues/240) 一样
 这是由于你的计算机上缺乏一些必要的运行组件，可以通过从 [微软的官网](https://learn.microsoft.com/zh-cn/cpp/windows/latest-supported-vc-redist?view=msvc-170) 按照自己的平台，下载对应的包进行安装。
 > https://github.com/HSLix/LixAssistantLimbusCompany/issues/240#issuecomment-3733556365
+
+### 13. 运行主程序时发生错误（An error occurred）: All ufuncs must have type numpy.ufunc. Received (<ufunc 'sph_legendre_p'>, <ufunc 'sph_legendre_p'>, <ufunc 'sph_legendre_p'>)，和 [Issue #260](https://github.com/HSLix/LixAssistantLimbusCompany/issues/260#issuecomment-3881635730) 一样
+根据反馈，删除旧的文件重装就行，但根据全量删除并覆盖的更新机制，理论上不应该发生，等待进一步排查处理。
