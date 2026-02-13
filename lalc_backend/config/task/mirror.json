@@ -133,12 +133,12 @@
             "mirror_shop_entry",
             "mirror_super_shop_entry",
             "mirror_select_encounter_reward_card",
+            "mirror_select_initial_ego_gift",
             "mirror_select_floor_ego_gift",
             "mirror_select_floor_ego_gift2",
             "mirror_victory",
             "mirror_defeat",
             "mirror_choose_star",
-            "mirror_select_initial_ego_gift",
             "mirror_gift_search",
             "mirror_enter_dungeon",
             "mirror_enter"
