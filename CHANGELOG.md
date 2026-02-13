@@ -1,5 +1,20 @@
 # Changelog
 
+## [4.11.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.10.1...v4.11.0) (2026-02-13)
+
+
+### Features
+
+* 增加字体切换功能，兼容霞鹭文楷 | add font setting Fixed [#256](https://github.com/HSLix/LixAssistantLimbusCompany/issues/256) ([99eb8cb](https://github.com/HSLix/LixAssistantLimbusCompany/commit/99eb8cb0330c925ab81c071888b930178cfd8528))
+
+
+### Bug Fixes
+
+* 修复了导入默认配置导致队伍风格倾向失效 | fix the default config make the error of team style ([e0dd741](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e0dd741a634b76f098bdce1f067b3c67b1e615bc))
+* 修复了战斗过程中可能卡在事件的问题 | fix the bug that battle may stuck at the event ([22211c1](https://github.com/HSLix/LixAssistantLimbusCompany/commit/22211c1e19867306bfc8cebee4083db0e361d174))
+* 更新默认配置 | update default config ([e371b43](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e371b431732e94f5bb3d929339ef41d18dc11faf))
+* 通过处理重试后，返回主界面，避免因各种情况下错误导致流程中断无法推进的 bug | fix the bug that lalc will stuck after deal with the retry popup by going back to the main page ([bc60201](https://github.com/HSLix/LixAssistantLimbusCompany/commit/bc6020126e97b7b2d6a140c6d4dbfe9a4eb66ead))
+
 ## [4.10.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.10.0...v4.10.1) (2026-02-06)
 
 
