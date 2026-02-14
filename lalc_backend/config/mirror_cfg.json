@@ -13,20 +13,14 @@
     "node_boss_encounter": 0
   },
   "mirror_team_styles": [
+    "Sinking",
+    "Rupture",
     "Bleed",
-    "Bleed",
-    "Bleed",
-    "Bleed",
-    "Bleed",
-    "Bleed"
+    "Poise",
+    "Burn",
+    "Charge"
   ],
   "mirror_team_ego_gift_styles": [
-    [
-      "Burn"
-    ],
-    [
-      "Charge"
-    ],
     [
       "Sinking"
     ],
@@ -38,6 +32,12 @@
     ],
     [
       "Poise"
+    ],
+    [
+      "Burn"
+    ],
+    [
+      "Charge"
     ]
   ],
   "mirror_team_ego_allow_list": [
@@ -171,80 +171,6 @@
     []
   ],
   "mirror_replace_skill": [
-    {
-      "Yi Sang": [
-        1,
-        2,
-        3
-      ],
-      "Don Quixote": [
-        1,
-        2,
-        3
-      ],
-      "Ishmael": [
-        3,
-        2,
-        1
-      ],
-      "Rodion": [
-        3,
-        2,
-        1
-      ],
-      "Sinclair": [
-        1,
-        2,
-        3
-      ],
-      "Outis": [
-        3,
-        2,
-        1
-      ],
-      "Gregor": [
-        1,
-        2,
-        3
-      ]
-    },
-    {
-      "Yi Sang": [
-        1,
-        2,
-        3
-      ],
-      "Faust": [
-        3,
-        2,
-        1
-      ],
-      "Don Quixote": [
-        1,
-        2,
-        3
-      ],
-      "Ryoshu": [
-        3,
-        2,
-        1
-      ],
-      "Hong Lu": [
-        1,
-        2,
-        3
-      ],
-      "Heathcliff": [
-        3,
-        2,
-        1
-      ],
-      "Outis": [
-        1,
-        2,
-        3
-      ]
-    },
     {
       "Yi Sang": [
         1,
@@ -392,6 +318,80 @@
         2,
         3
       ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Ishmael": [
+        3,
+        2,
+        1
+      ],
+      "Rodion": [
+        3,
+        2,
+        1
+      ],
+      "Sinclair": [
+        1,
+        2,
+        3
+      ],
+      "Outis": [
+        3,
+        2,
+        1
+      ],
+      "Gregor": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "Yi Sang": [
+        1,
+        2,
+        3
+      ],
+      "Faust": [
+        3,
+        2,
+        1
+      ],
+      "Don Quixote": [
+        1,
+        2,
+        3
+      ],
+      "Ryoshu": [
+        3,
+        2,
+        1
+      ],
+      "Hong Lu": [
+        1,
+        2,
+        3
+      ],
+      "Heathcliff": [
+        3,
+        2,
+        1
+      ],
+      "Outis": [
+        1,
+        2,
+        3
+      ]
     }
   ],
   "mirror_shop_heal": [
@@ -474,34 +474,6 @@
   ],
   "team_orders": [
     [
-      "Sinclair",
-      "Outis",
-      "Yi Sang",
-      "Gregor",
-      "Don Quixote",
-      "Rodion",
-      "Ishmael",
-      "Faust",
-      "Ryoshu",
-      "Meursault",
-      "Hong Lu",
-      "Heathcliff"
-    ],
-    [
-      "Don Quixote",
-      "Ryoshu",
-      "Faust",
-      "Outis",
-      "Yi Sang",
-      "Heathcliff",
-      "Hong Lu",
-      "Ishmael",
-      "Meursault",
-      "Rodion",
-      "Sinclair",
-      "Gregor"
-    ],
-    [
       "Rodion",
       "Heathcliff",
       "Yi Sang",
@@ -517,17 +489,15 @@
     ],
     [
       "Hong Lu",
-      "Faust",
       "Ryoshu",
-      "Rodion",
-      "Outis",
-      "Gregor",
+      "Faust",
       "Sinclair",
-      "Don Quixote",
-      "Yi Sang",
-      "Meursault",
       "Heathcliff",
-      "Ishmael"
+      "Ishmael",
+      "Rodion",
+      "Yi Sang",
+      "Outis",
+      "Gregor"
     ],
     [
       "Don Quixote",
@@ -553,16 +523,41 @@
       "Faust",
       "Gregor",
       "Ishmael",
+      "Rodion"
+    ],
+    [
+      "Sinclair",
+      "Meursault",
+      "Yi Sang",
+      "Outis",
+      "Gregor",
+      "Ishmael",
       "Rodion",
-      "Outis"
+      "Faust",
+      "Don Quixote",
+      "Ryoshu",
+      "Hong Lu"
+    ],
+    [
+      "Heathcliff",
+      "Don Quixote",
+      "Rodion",
+      "Ryoshu",
+      "Faust",
+      "Outis",
+      "Yi Sang",
+      "Ishmael",
+      "Meursault",
+      "Gregor",
+      "Hong Lu"
     ]
   ],
   "team_indexes": [
-    3,
-    4,
     5,
     6,
     1,
-    2
+    2,
+    3,
+    4
   ]
 }
