@@ -81,7 +81,7 @@ def background_click(hwnd, x, y):
         
         # 发送鼠标按下消息
         win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, 0, lparam)
-        time.sleep(0.08 + random.random() * 0.05)
+        time.sleep(0.15 + random.random() * 0.05)
         
         # 发送鼠标释放消息
         win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, lparam)

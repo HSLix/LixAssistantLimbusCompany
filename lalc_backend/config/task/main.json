@@ -2,9 +2,7 @@
     "main":{
         "action":"init_limbus_window",
         "next":[
-            "touch_to_start",
-            "main_circle_center",
-            "back_to_init_page"
+            "main_circle_center"
         ]
     },
     "touch_to_start":{
@@ -16,30 +14,30 @@
             "post_delay": 3
         },
         "next":[
-            "touch_to_start_check"
-        ]
-    },
-    "touch_to_start_check": {
-        "action":"error_handler",
-        "next":[
-            "main_circle_center",
-            "touch_to_start"
+            "main_circle_center"
         ]
     },
     "back_to_init_page":{
-        "action":"back_to_init_page",
-        "next":[
-            "main_circle_center",
-            "touch_to_start",
-            "back_to_init_page"
-        ]
-    },
-    "main_circle_center":{
         "recognition":"template_match",
-        "action":"enter_enkephalin",
+        "action":"back_to_init_page",
+        "inverse": true,
         "params":{
             "template":"main_drive_no_text"
         },
+        "next":[
+            "touch_to_start",
+            "main_circle_center"
+        ]
+    },
+    "main_circle_center":{
+        "action":"error_handler",
+        "next":[
+            "back_to_init_page",
+            "task_center"
+        ]
+    },
+    "task_center":{
+        "action":"enter_enkephalin",
         "next":[
             "check_and_get_mails",
             "exp_entry",

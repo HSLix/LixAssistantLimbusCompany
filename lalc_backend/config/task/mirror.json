@@ -90,7 +90,7 @@
         "recognition":"template_match",
         "action":"mirror_choose_star",
         "params":{
-            "template":"grace_of_the_immortal_star",
+            "template":"grace_of_the_star_of_names_and_spiders",
             "cfg_type":"mirror"
         },
         "next":[
