@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.11.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.0...v4.11.1) (2026-02-19)
+
+
+### Bug Fixes
+
+* 优化任务流程，避免局部死循环 | make the task progress better to avoid loop ([00d2467](https://github.com/HSLix/LixAssistantLimbusCompany/commit/00d246769779d8defe025e553d3b1327ffe1392c))
+* 修复了镜牢7素材更换卡在选星光上 | fix the stuck in md7 due to the change of image ([888699f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/888699fae4978502382ce235f5233cc955fac67c))
+* 更新默认配置 | update default config ([b169368](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b169368b52438b79b31d0571c57f5339a6c07b47))
+* 更新默认配置 | update default config ([6c9b7d6](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6c9b7d6edc8a769a47264baf0936493e2fe6a193))
+* 针对镜牢7的商品后移调整了购买的逻辑，避免买错饰品 | fix the bug that purchasing the wrong gift due to the moving of the gift after puchasing it ([6b9a084](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6b9a08473df4ebbc41e8e5b8a1127cf19d4f1699))
+
 ## [4.11.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.10.1...v4.11.0) (2026-02-13)
 
 
