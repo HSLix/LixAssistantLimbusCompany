@@ -408,8 +408,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             taskConfigs[taskName]['node_scores'] = {
               'node_event': 20,
               'node_regular_encounter': 9,
-              'node_elite_encounter': 1,
-              'node_focused_encounter': 0,
+              'node_elite_encounter': 2,
+              'node_focused_encounter': 1,
               'node_abnormality_encounter': 0,
               'node_shop': 0,
               'node_boss_encounter': 0,

@@ -492,15 +492,44 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
         else:
             logger.warning("替换技能名字识别异常，跳过技能替换部分")
         return replaced
+    
+    """
+    左键点击 - 客户区坐标: (619, 272)
+    左键点击 - 客户区坐标: (778, 266)
+    左键点击 - 客户区坐标: (931, 267)
+    左键点击 - 客户区坐标: (1084, 264)
+    左键点击 - 客户区坐标: (618, 422)
+    左键点击 - 客户区坐标: (779, 423)
+    左键点击 - 客户区坐标: (931, 430)
+    左键点击 - 客户区坐标: (1079, 423)
+    for i in range(2):
+        for j in range(4):
+            print(f"{[620 + j*160, 270 + i*150]},")
+    """
+    shop_purchase_places = [
+        [620, 270],
+        [780, 270],
+        [940, 270],
+        [1100, 270],
+        [620, 420],
+        [780, 420],
+        [940, 420],
+        [1100, 420],
+    ]
 
     def exec_purchase_ego_gifts():
         gifts = recognize_handler.detect_text_in_image(
             tmp_screenshot, mask=[535, 325, 650, 50]
         )
+        gifts.sort(key=lambda x : x[1])
         other_line_gifts = recognize_handler.detect_text_in_image(
             tmp_screenshot, mask=[535, 480, 650, 50]
         )
+        other_line_gifts.sort(key=lambda x : x[1])
         gifts.extend(other_line_gifts)
+        # 由于 MD7 开始，商店购买的商品会自动后移，而不是原地不动，所以需要建立映射进行位置的变化。另一种方法是购买一次后检测，效率更低，故废弃。
+        for i in range(len(gifts)):
+            gifts[i] = (*gifts[i], i)
 
         purcased_list = recognize_handler.detect_text_in_image(
             tmp_screenshot, mask=[535, 200, 650, 40]
@@ -525,6 +554,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
                     gifts.remove(gift)
 
         # logger.info(prefer_gifts)
+        purchased_count_in_this_turn = 0
         for gift in gifts:
             tmp = difflib.get_close_matches(gift[0], all_gift_names, cutoff=0.8)
             if len(tmp) == 0:
@@ -538,7 +568,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
             # if name_radio < 1:
             #     logger.info("检测到饰品 %s，经修复得 %s，相似度：%f" % (gift[0], gift_name, name_radio))
             if gift_name in prefer_gifts:
-                input_handler.click(gift[1], gift[2] - 80)
+                input_handler.click(*shop_purchase_places[gift[-1]-purchased_count_in_this_turn])
                 logger.info(
                     f"检测到可买并购买饰品 {gift_name}",
                     input_handler.capture_screenshot(),
@@ -550,6 +580,7 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
                 time.sleep(0.5)
                 input_handler.click(650, 535)
                 time.sleep(1)
+                purchased_count_in_this_turn += 1
         return True
 
     loop_count = 0
@@ -811,8 +842,8 @@ from utils.get_save_mirror_path import get_and_save_mirror_path
 default_node_scores = {
         "node_event": 20,
         "node_regular_encounter": 9,
-        "node_elite_encounter": 1,
-        "node_focused_encounter": 0,
+        "node_elite_encounter": 2,
+        "node_focused_encounter": 1,
         "node_abnormality_encounter": 0,
         "node_shop": 0,
         "node_boss_encounter": 0,
