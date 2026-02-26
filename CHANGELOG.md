@@ -1,5 +1,14 @@
 # Changelog
 
+## [4.11.2](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.1...v4.11.2) (2026-02-26)
+
+
+### Bug Fixes
+
+* 修复 skip 素材更换导致事件无法推进 | fix the stuck in event due to the replaced skip ([b3c04d8](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b3c04d8b480715608a2a671e70a05a24904400be))
+* 修复了新版本可能卡在队伍无法战斗的问题 | fix the bug that stuck in the ready to battle ([e35ccb1](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e35ccb1fed15c9985e5fc8dbdb26c0baa3d85b8d))
+* 适配新版本邮件位置变动 | suit the new place for the mail ([3dfd38c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/3dfd38c11de04d39fb971bd540510bc68fa14aa0))
+
 ## [4.11.1](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.0...v4.11.1) (2026-02-19)
 
 
