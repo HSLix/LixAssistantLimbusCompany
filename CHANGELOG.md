@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.11.3](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.2...v4.11.3) (2026-03-07)
+
+
+### Bug Fixes
+
+* **luxcavation:** issue 270 将Lv60识别为LvG0的bug ([812d768](https://github.com/HSLix/LixAssistantLimbusCompany/commit/812d7680e8d79309035579869fc235901fa14fbb))
+* 修复了会卡在日常登录奖励的 bug | suit to the daily login ([c28dd4e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/c28dd4eabc86768b3f636760e05a9c3189d473df))
+
 ## [4.11.2](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.1...v4.11.2) (2026-02-26)
 
 
