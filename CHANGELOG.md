@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.11.4](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.3...v4.11.4) (2026-03-27)
+
+
+### Bug Fixes
+
+* 修复了升级 EGO 可能卡住的问题 | fix the enhance EGO ([6d87752](https://github.com/HSLix/LixAssistantLimbusCompany/commit/6d877522d8d35592f767a3f03625698152d06ab0))
+* 修复了在升级金额不够时卡住的问题 | fix the stuck when need more cost to enhance ego gift ([fe1703f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/fe1703f47574722ab28a8c8fa09d4511f10ee380))
+* 修复了退出升级 EGO 的坐标错误 | fix the error coordinate of quit the enhance of EGO ([2fac787](https://github.com/HSLix/LixAssistantLimbusCompany/commit/2fac7872e3e1d6c30a80580977063dfafa754f9b))
+* 修复了镜牢难度调整错误 | fix the error of suit the difficulty of mirror ([75084fd](https://github.com/HSLix/LixAssistantLimbusCompany/commit/75084fd2e7733f2afe2957eb2c4405ed0f20b38b))
+* 增加按键和结算处理的返回 | add the esc and victory to the back to init page ([61133a0](https://github.com/HSLix/LixAssistantLimbusCompany/commit/61133a0438f46eec27eb81535279319eb9690c09))
+
 ## [4.11.3](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.2...v4.11.3) (2026-03-07)
 
 
