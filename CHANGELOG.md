@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.11.5](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.4...v4.11.5) (2026-04-02)
+
+
+### Bug Fixes
+
+* 修复了 gift search 卡住的问题 | fix the error in gift search [#281](https://github.com/HSLix/LixAssistantLimbusCompany/issues/281) ([e2947c9](https://github.com/HSLix/LixAssistantLimbusCompany/commit/e2947c9a1d163ad7eef3078c4fdd8240f0342f4f))
+* 修复了因事件 skip 逻辑更新导致的错误 | fix the stuck due to the update of skip Fix [#282](https://github.com/HSLix/LixAssistantLimbusCompany/issues/282), fix [#283](https://github.com/HSLix/LixAssistantLimbusCompany/issues/283) ([4859d4b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/4859d4b7406f7b0c1428429a82e294397fb5fc8e))
+
 ## [4.11.4](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.3...v4.11.4) (2026-03-27)
 
 
