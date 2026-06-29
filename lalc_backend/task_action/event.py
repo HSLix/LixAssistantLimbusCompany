@@ -15,9 +15,9 @@ def exec_event_make_choice(self, node: TaskNode, func):
 
 # ── 固定坐标（1280x720，所有事件UI元素位置不变） ──
 
-_SKIP_POS     = (1170, 20)       # Skip 按钮（右上角）
-_BLANK_POS    = (1100, 380)      # 右下空白 —— 推进对话 / 判定过渡
-_COMMENCE_POS = (1120, 650)      # Commence 按钮
+_SKIP_POS     = (1130, 644)      # Skip 按钮（右下角）
+_BLANK_POS    = (640, 360)       # 中央空白 —— 推进对话，远离底部按钮区
+_COMMENCE_POS = (1120, 650)      # Commence 按钮（已验证）
 _CONFIRM_POS  = (640, 530)       # 饰品/奖励确认
 
 # 右上选项固定位（最多4个，从上到下）
@@ -25,13 +25,11 @@ _OPTION_POS = [
     (950, 200), (950, 290), (950, 380), (950, 450),
 ]
 
-# 左下角色判定槽位（固定网格，x 从左到右，y 从上到下）
-# 实际位置需运行时微调；暂时每格 150×50
-_CHAR_SLOT_COLS = 4
-_CHAR_SLOTS = []
-for row in range(2):
-    for col in range(_CHAR_SLOT_COLS):
-        _CHAR_SLOTS.append((200 + col * 160, 605 + row * 50))
+# 左下角色判定槽位（固定网格，x 从左到右，y=618 统一高度）
+# 从日志实际匹配到的概率徽章 x: [147, 285, 424, 493, 631, 769, 838]
+# 推断完整 6 列网格（列距 ~138px）
+_CHAR_SLOT_X = [147, 285, 424, 561, 700, 838]  # 6列
+_CHAR_SLOT_Y = 618   # 所有概率徽章在同一高度
 
 
 # ── 连点参数 ──
