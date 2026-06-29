@@ -125,6 +125,40 @@ class BackgroundInputState(InputState):
         return set_background_focus(hwnd)
 
 
+class SimulationInputState(InputState):
+    """模拟输入状态 — 不依赖 win32，用于 WSL 模拟器/中介系统。
+    
+    所有操作仅记录日志并推送到 action_queue，不执行真实 UI 操作。
+    capture_screenshot 由 ScreenshotProvider 外部注入。
+    """
+
+    def __init__(self, action_queue: list = None):
+        self.action_queue = action_queue if action_queue is not None else []
+
+    def click(self, hwnd, x, y):
+        self.action_queue.append(("click", x, y))
+        logger.debug(f"[SIM] click({x}, {y})")
+        return True
+
+    def long_press(self, hwnd, x, y, duration=3):
+        self.action_queue.append(("long_press", x, y, duration))
+        logger.debug(f"[SIM] long_press({x}, {y}, {duration}s)")
+        return True
+
+    def key_press(self, hwnd, key):
+        self.action_queue.append(("key_press", key))
+        logger.debug(f"[SIM] key_press({key})")
+        return True
+
+    def swipe(self, hwnd, start_x, start_y, end_x, end_y):
+        self.action_queue.append(("swipe", start_x, start_y, end_x, end_y))
+        logger.debug(f"[SIM] swipe({start_x},{start_y}→{end_x},{end_y})")
+        return True
+
+    def set_focus(self, hwnd):
+        return True
+
+
 DEFAULT_WINDOW_WIDTH = 1302
 DEFAULT_WINDOW_HEIGHT = 776
 
@@ -172,6 +206,23 @@ class _Input:
 
     def set_foreground_state(self):
         self._current_state = self._foreground_state
+
+    def set_simulation_state(self, action_queue: list = None):
+        """切换到模拟模式，所有操作仅记录日志。"""
+        self._simulation_state = SimulationInputState(action_queue)
+        self._current_state = self._simulation_state
+        self._hwnd = 99999  # 非 None 魔数，绕过 hwnd 检查
+        logger.info("[SIM] 已切换到模拟输入状态")
+
+    @property
+    def simulation_screenshot_source(self):
+        return getattr(self, '_sim_screenshot_source', None)
+
+    @simulation_screenshot_source.setter
+    def simulation_screenshot_source(self, provider):
+        """设置外部截图提供器（callable, 无参返回 PIL.Image）。"""
+        self._sim_screenshot_source = provider
+
 
     # 与任务流水线同步
     def pause(self):
@@ -240,9 +291,17 @@ class _Input:
             time.sleep(30)
 
     def capture_screenshot(self, reset=True, save_path=None):
-        """
-        截取游戏窗口屏幕并存储在screenshot属性中。
-        """
+        """截取游戏窗口屏幕并存储在screenshot属性中。
+        
+        模拟模式（hwnd=99999）：从外部截图提供器获取。"""
+        if self._hwnd == 99999:
+            provider = getattr(self, '_sim_screenshot_source', None)
+            if provider:
+                img = provider()
+                if img:
+                    self._screenshot = img
+                    return img
+        # --- 以下为原有逻辑 ---
         if self._hwnd:
             if self.set_focus():
                 self.refresh_window_state()
