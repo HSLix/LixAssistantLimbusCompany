@@ -55,6 +55,8 @@ def exec_mirror_defeat(self, node: TaskNode, func):
 
 @TaskExecution.register("mirror_victory")
 def exec_mirror_victory(self, node: TaskNode, func):
+    # 重置镜牢部署缓存（新镜像run需要重新选人）
+    self._mirror_deployment_done = False
     logger.info("处理镜牢胜利结算", input_handler.capture_screenshot())
     mirror_cfg = self._get_using_cfg("mirror")
     accept_reward = mirror_cfg["accept_reward"]
