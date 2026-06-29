@@ -887,10 +887,13 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
     
-    # 2. 转为 numpy 灰度图
-    ss = np.array(tmp_screenshot.convert('L')).astype(np.float32)
+    # 2. 转为 numpy RGB（保留彩色信息，不用 convert('L')）
+    ss = np.array(tmp_screenshot).astype(np.float32)
+    if len(ss.shape) == 2:
+        # 兼容单通道（日志存盘截图等调试场景）
+        ss = np.stack([ss, ss, ss], axis=-1)
     
-    # 3. 高斯平滑背景模型（大尺度纹理）
+    # 3. 高斯平滑背景模型（三通道独立平滑）
     bg = cv2.GaussianBlur(ss, (31, 31), 0)
     
     # 4. 3 条行路径的候选区域（对应 3 条可选方向）
@@ -905,14 +908,16 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
     col_x = [660, 920]
     col_w = 140  # 裁剪宽度
     
-    # 5. 检测每行是否有节点
+    # 5. 检测每行是否有节点（三通道取最大偏差）
     row_scores = []
     for row in rows:
         devs = []
         for cx in col_x:
-            crop = ss[row["y"]:row["y"]+row["h"], cx:cx+col_w]
-            crop_bg = bg[row["y"]:row["y"]+row["h"], cx:cx+col_w]
-            diff = np.mean(np.abs(crop - crop_bg))
+            crop = ss[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
+            crop_bg = bg[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
+            # 每个通道各自算均值绝对差
+            ch_devs = np.mean(np.abs(crop - crop_bg), axis=(0, 1))
+            diff = np.max(ch_devs)  # 取响应最强的通道
             devs.append(diff)
         
         # 左右列任一超过阈值 → 该行有节点
