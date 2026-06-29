@@ -15,28 +15,26 @@ def exec_event_make_choice(self, node: TaskNode, func):
 
 # ── 固定坐标（1280x720，所有事件UI元素位置不变） ──
 
-_SKIP_POS     = (1130, 644)      # Skip 按钮（右下角）
+_SKIP_POS     = (1130, 644)      # Skip 按钮（右下角，已验证）
 _BLANK_POS    = (640, 360)       # 中央空白 —— 推进对话，远离底部按钮区
 _COMMENCE_POS = (1120, 650)      # Commence 按钮（已验证）
 _CONFIRM_POS  = (640, 530)       # 饰品/奖励确认
 
-# 右上选项固定位（最多4个，从上到下）
+# 右上选项固定位（最多4个，从上到下，默认选第一个）
 _OPTION_POS = [
     (950, 200), (950, 290), (950, 380), (950, 450),
 ]
 
-# 左下角色判定槽位（固定网格，x 从左到右，y=618 统一高度）
-# 从日志实际匹配到的概率徽章 x: [147, 285, 424, 493, 631, 769, 838]
-# 推断完整 6 列网格（列距 ~138px）
-_CHAR_SLOT_X = [147, 285, 424, 561, 700, 838]  # 6列
-_CHAR_SLOT_Y = 618   # 所有概率徽章在同一高度
+# 概率徽章搜索区域
+# 旧 mask=[20, 590, 950, 60] 只覆盖 x=20~970，可能切掉右侧角色
+# 扩宽到 x=20~1080，避开右下角的 SKIP(1130,644)/Commence(1120,650)
+_PASS_MASK = [20, 585, 1060, 80]
 
 
 # ── 连点参数 ──
 
 _BLANK_CHUNK   = 8     # 一组连点次数
 _MAX_BLANK_RD  = 8     # 最多连续几组空白才截图
-_CHAR_BLANK_RD = 3     # 选项→判定过渡期空白组数
 
 
 # ══════════════════════════════════════════════════════════════
@@ -94,39 +92,23 @@ def exec_event_loop(self, node: TaskNode, func):
             time.sleep(0.3)
             continue
 
-        # ---- 2. 选项（右上固定位 + OCR 择优） ----
+        # ---- 2. 选项（固定位，默认选第一个） ----
         if recognize_handler.template_match(screenshot, "event_choices"):
-            logger.debug("选项出现")
-            ocr = recognize_handler.detect_text_in_image(
-                screenshot, mask=[670, 140, 620, 500],
-            )
-            special_phrases = [
-                "Select to gain", "Pass to level up",
-                "Pass to gain", "check to gain", "depending on",
-            ]
-            clicked = False
-            for txt, x, y, *_ in ocr:
-                if any(p in txt for p in special_phrases):
-                    logger.info(f"优先选项: {txt}")
-                    input_handler.click(x, y)
-                    clicked = True
-                    break
-            if not clicked:
-                input_handler.click(*_OPTION_POS[0])
+            logger.debug("选项出现 → 选第一个")
+            input_handler.click(*_OPTION_POS[0])
             time.sleep(0.3)
             continue
 
-        # ---- 3. 角色判定（左下概率模板匹配 → 固定位点击） ----
+        # ---- 3. 角色判定（概率色块模板匹配） ----
         found_prob = False
         for prob_key in ["very_high", "high", "normal", "low", "very_low"]:
             res = recognize_handler.template_match(
                 screenshot,
                 "event_pass_" + prob_key,
-                mask=[20, 590, 950, 60],
+                mask=_PASS_MASK,
             )
             if res:
-                logger.debug(f"判定 → {prob_key}")
-                # 直接点固定概率色块位置（无需模板坐标）
+                logger.debug(f"判定 → {prob_key} @({res[0][0]},{res[0][1]})")
                 input_handler.click(res[0][0], res[0][1])
                 found_prob = True
                 break
