@@ -363,6 +363,8 @@ def exec_battle_winrate(self, node: TaskNode, func):
 
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node: TaskNode, func):
+    # 退出镜牢时重置部署缓存
+    self._mirror_deployment_done = False
     tmp_screenshot = input_handler.capture_screenshot()
     logger.info("正在尝试返回主页", tmp_screenshot)
     if res := recognize_handler.template_match(tmp_screenshot, "rewards_acquired_confirm"):
