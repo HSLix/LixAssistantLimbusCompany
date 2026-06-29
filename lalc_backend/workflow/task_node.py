@@ -162,6 +162,25 @@ class TaskNode:
         elif self.recognition == "template_match":
             template, threshold, mask = self.get_recognition_params()
             self.params["recognize_result"] = recognize_handler.template_match(tmp_screenshot, template, threshold, mask=mask)
+        elif self.recognition == "template_match_row":
+            # 行扫描模式：只在指定 Y 行区域做模板匹配
+            # 参数: row_y (行中心Y), row_height (行高度, 默认60)
+            # 用于 win_rate / start 等按钮（Y固定，只有X向右移动）
+            template, threshold, _ = self.get_recognition_params()
+            row_y = self.get_param("row_y", 500)
+            row_h = self.get_param("row_height", 60)
+            w, h = tmp_screenshot.size
+            crop_top = max(0, row_y - row_h // 2)
+            crop_bot = min(h, row_y + row_h // 2)
+            cropped = tmp_screenshot.crop((0, crop_top, w, crop_bot))
+            results = recognize_handler.template_match(cropped, template, threshold)
+            if results is None:
+                results = []
+            # 还原坐标到全屏，只保留匹配结果在检测行内的
+            self.params["recognize_result"] = [
+                (x, y + crop_top, score) for x, y, score in results
+                if crop_top <= y + crop_top < crop_bot
+            ]
         elif self.recognition == "color_template_match":
             template, threshold, mask = self.get_recognition_params()
             self.params["recognize_result"] = recognize_handler.color_template_match(tmp_screenshot, template, threshold, mask=mask)
