@@ -936,9 +936,28 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         has_node_strs.append(f'{r["name"]}={r["dev"]:.1f}({tag})')
     logger.info(f"节点检测: {has_node_strs}")
     
-    # 6. 筛选有节点的行，按偏差从高到低排序
+    # 6. 筛选有节点的行
     available = [r for r in row_scores if r["has_node"]]
-    available.sort(key=lambda r: -r["dev"])
+    
+    # 6a. 优先事件节点（问号图标走得更快）
+    mirror_cfg = self._get_using_cfg("mirror")
+    priority_event = mirror_cfg.get("priority_event_nodes", True)
+    if priority_event and available:
+        for row in available:
+            cx, cy = row["click"]
+            # 图标裁剪区域（方法同高斯偏差）：[左上x, 左上y, 宽, 高]
+            icon_mask = [cx - 35, cy - 25, 85, 75]
+            event_matches = recognize_handler.template_match(
+                tmp_screenshot, "node_event", mask=icon_mask, threshold=0.65
+            )
+            row["is_event"] = len(event_matches) > 0
+        # 事件节点优先，同类型内按偏差从高到低
+        available.sort(key=lambda r: (-(1 if r.get("is_event") else 0), -r["dev"]))
+        event_rows = [r for r in available if r.get("is_event")]
+        if event_rows:
+            logger.info(f"检测到事件节点（问号）: {[r['name'] for r in event_rows]}")
+    else:
+        available.sort(key=lambda r: -r["dev"])
     
     # 兜底：如果没有检测到任何节点，按偏差从高到低尝试所有行
     if not available:
