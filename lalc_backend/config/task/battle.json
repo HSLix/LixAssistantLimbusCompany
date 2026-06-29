@@ -27,7 +27,7 @@
         "action": "battle_winrate",
         "params":{
             "template":"win_rate",
-            "row_y": 514,
+            "row_y": 554,
             "row_height": 60
         },
         "next":[
@@ -53,7 +53,7 @@
         "action": "click",
         "params":{
             "template":"win_rate",
-            "row_y": 514,
+            "row_y": 554,
             "row_height": 60
         },
         "next":[
