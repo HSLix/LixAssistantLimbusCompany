@@ -76,5 +76,13 @@
         "interrupt":[
 
         ]
+    },
+    "event_loop":{
+        "action":"event_loop",
+        "params":{
+        },
+        "next":[
+            "mirror_circle_center"
+        ]
     }
 }
