@@ -940,6 +940,12 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
     available = [r for r in row_scores if r["has_node"]]
     available.sort(key=lambda r: -r["dev"])
     
+    # 兜底：如果没有检测到任何节点，按偏差从高到低尝试所有行
+    if not available:
+        dev_strs = [f"{r['name']}={r['dev']:.1f}" for r in row_scores]
+        logger.warning(f"所有行均未检测到节点 (deviations: {dev_strs})，按偏差排序兜底尝试")
+        available = sorted(row_scores, key=lambda r: -r["dev"])
+    
     next_node_exist = False
     
     # 7. 尝试点击可用路径
