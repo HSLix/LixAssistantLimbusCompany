@@ -1,4 +1,6 @@
 from workflow.task_execution import *
+import cv2
+import numpy as np
 
 @TaskExecution.register("mirror_select_event_effect")
 def exec_mirror_select_event_effect(self, node: TaskNode, func):
@@ -867,84 +869,86 @@ default_node_scores = {
     }
 @TaskExecution.register("mirror_select_next_node")
 def exec_mirror_select_next_node(self, node: TaskNode, func):
-    # 从配置中读取节点权重，如果不存在则使用默认值
-    mirror_cfg = self._get_using_cfg("mirror")
-    node_scores = mirror_cfg.get("node_scores", default_node_scores)
-    node_scores["node_empty"] = -100
+    """
+    快速镜牢节点寻路（高斯平滑偏差法）
+    
+    原理: 对候选区域做 31x31 高斯模糊抹掉小物体(节点图标)，
+    原图与模糊图的像素差在节点区域显著大于纯背景区域。
+    """
+    import random
+    import time
+    
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.info("选择下一个镜牢节点")
+    logger.info("选择下一个镜牢节点（快速模式）")
+    
+    # 1. train_head 偏移校准（保持原有逻辑）
     train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
     if len(train_head) > 0 and train_head[0][1] < 300:
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
-
-    node_pics = get_and_save_mirror_path_node(save=False)
-    path_pics = get_and_save_mirror_path()
-
+    
+    # 2. 转为 numpy 灰度图
+    ss = np.array(tmp_screenshot.convert('L')).astype(np.float32)
+    
+    # 3. 高斯平滑背景模型（大尺度纹理）
+    bg = cv2.GaussianBlur(ss, (31, 31), 0)
+    
+    # 4. 3 条行路径的候选区域（对应 3 条可选方向）
+    #    每个区域覆盖左列（x=660）和右列（x=920）的节点位置
+    rows = [
+        {"name": "上", "click": (710, 110), "y": 80,  "h": 130},
+        {"name": "中", "click": (710, 330), "y": 290, "h": 130},
+        {"name": "下", "click": (710, 540), "y": 500, "h": 130},
+    ]
+    
+    # 左右列 x 偏移
+    col_x = [660, 920]
+    col_w = 140  # 裁剪宽度
+    
+    # 5. 检测每行是否有节点
+    row_scores = []
+    for row in rows:
+        devs = []
+        for cx in col_x:
+            crop = ss[row["y"]:row["y"]+row["h"], cx:cx+col_w]
+            crop_bg = bg[row["y"]:row["y"]+row["h"], cx:cx+col_w]
+            diff = np.mean(np.abs(crop - crop_bg))
+            devs.append(diff)
+        
+        # 左右列任一超过阈值 → 该行有节点
+        max_dev = max(devs)
+        has_node = max_dev > 12.0
+        row_scores.append({
+            "name": row["name"],
+            "click": row["click"],
+            "dev": max_dev,
+            "has_node": has_node,
+        })
+    
+    has_node_strs = []
+    for r in row_scores:
+        tag = "有" if r["has_node"] else "空"
+        has_node_strs.append(f'{r["name"]}={r["dev"]:.1f}({tag})')
+    logger.info(f"节点检测: {has_node_strs}")
+    
+    # 6. 筛选有节点的行，按偏差从高到低排序
+    available = [r for r in row_scores if r["has_node"]]
+    available.sort(key=lambda r: -r["dev"])
+    
     next_node_exist = False
-    if node_pics and path_pics:
-        node_type = classify_mirror_legend(node_pics)
-        link_lines = classify_mirror_path(path_pics)[0]["connection_names"]
-
-        # 每条路径(0,1,2)记录一个最大 weight
-        best_per_path = {
-            0: {"weight": -float("inf"), "line": None},
-            1: {"weight": -float("inf"), "line": None},
-            2: {"weight": -float("inf"), "line": None},
-        }
-
-        for line in link_lines:
-            path_id = int(line[0])  # 0 / 1 / 2
-
-            cur_weight = 0
-            for i, c in enumerate(line):
-                cur_weight += node_scores[node_type[i * 3 + int(c)]]
-
-            # 更新该路径下的最大值
-            if cur_weight > best_per_path[path_id]["weight"]:
-                best_per_path[path_id]["weight"] = cur_weight
-                best_per_path[path_id]["line"] = line
-
-        # 按 weight 从高到低排序
-        sorted_paths = sorted(
-            best_per_path.items(),
-            key=lambda x: x[1]["weight"],
-            reverse=True,
-        )
-
-        # 结果示例输出
-        # for path_id, info in sorted_paths:
-        #     print(f"路径 {path_id}: weight={info['weight']}, line={info['line']}")
-        logger.info(
-            f"ai 识别镜像迷宫路径，寻路结果：{sorted_paths}；节点识别:{node_type}；连接识别:{link_lines}",
-            tmp_screenshot,
-        )
-        three_places = [(710, 110), (710, 330), (710, 540)]
-        for path in sorted_paths:
-            if node_type[path[0]] == "node_empty":
-                logger.debug(f"检测到从上往下第 {path[0] + 1} 条路径为空，跳过")
-                continue
-            input_handler.click(*three_places[path[0]])
-            self.exec_wait_disappear(get_task("wait_connecting_disappear"))
-            time.sleep(1)
-            if (
-                len(
-                    recognize_handler.template_match(
-                        input_handler.capture_screenshot(), "node_enter"
-                    )
-                )
-                > 0
-            ):
-                input_handler.key_press("enter")
-                next_node_exist = True
-                break
-
-    train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
-    if not next_node_exist and len(train_head) > 0:
-        # 自身点
-        input_handler.click(train_head[0][0], train_head[0][1])
-
-        time.sleep(1)
+    
+    # 7. 尝试点击可用路径
+    for row in available:
+        cx, cy = row["click"]
+        # 随机偏移 5~15px（防检测）
+        ox = random.randint(-12, 12)
+        oy = random.randint(-8, 8)
+        logger.debug(f"尝试点击 {row['name']}: ({cx+ox},{cy+oy})")
+        
+        input_handler.click(cx + ox, cy + oy)
+        time.sleep(0.8)
+        
+        # 验证是否点中（node_enter 出现 → 进入节点）
         if (
             len(
                 recognize_handler.template_match(
@@ -955,10 +959,38 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         ):
             input_handler.key_press("enter")
             next_node_exist = True
-
+            logger.info(f"成功进入节点: {row['name']}")
+            break
+        else:
+            logger.debug(f"路径 {row['name']} 不可达，尝试下一条")
+    
+    # 8. 回退：点击当前 train_head 自身
     if not next_node_exist:
-        # 那么估计是当前的位置因为各种偏移不对
-        logger.warning("镜牢寻路异常，尝试重启镜牢", input_handler.capture_screenshot())
+        train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
+        if len(train_head) > 0:
+            cx, cy = train_head[0][:2]
+            ox = random.randint(-10, 10)
+            oy = random.randint(-8, 8)
+            input_handler.click(cx + ox, cy + oy)
+            time.sleep(0.8)
+            if (
+                len(
+                    recognize_handler.template_match(
+                        input_handler.capture_screenshot(), "node_enter"
+                    )
+                )
+                > 0
+            ):
+                input_handler.key_press("enter")
+                next_node_exist = True
+                logger.info("通过 train_head 回退进入节点")
+    
+    # 9. 寻路异常处理
+    if not next_node_exist:
+        logger.warning(
+            "快速寻路失败，所有路径均不可达",
+            input_handler.capture_screenshot(),
+        )
         return (node.name, None, get_task("back_to_init_page").get_next)
 
 
