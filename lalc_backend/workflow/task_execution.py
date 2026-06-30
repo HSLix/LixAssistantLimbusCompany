@@ -192,12 +192,13 @@ class TaskExecution:
         else:
             action_name = "next"
 
-        # 修改为：先写本地日志，再推一条 task_log 给 Server
-        log_msg = (
-            f"任务{{{cur_task.name}}}正在执行：{{{func.__name__}}}-{{{action_name}}}"
-        )
-        logger.info(log_msg)
-        _safe_broadcast(log_msg)
+        # 只记录非空操作（跳过 error_handler 的每次轮询日志）
+        if action_name != "empty":
+            log_msg = (
+                f"任务{{{cur_task.name}}}执行：{{{func.__name__}}}-{{{action_name}}}"
+            )
+            logger.info(log_msg)
+            _safe_broadcast(log_msg)
 
         if action_name in self.handlers:
             time.sleep(cur_task.get_param("pre_delay"))
@@ -208,12 +209,13 @@ class TaskExecution:
         else:
             res = func()
 
-        # 修改为：先写本地日志，再推一条 task_log 给 Server
-        log_msg = (
-            f"任务{{{cur_task.name}}}执行完成：{{{func.__name__}}}-{{{action_name}}}"
-        )
-        logger.info(log_msg)
-        _safe_broadcast(log_msg)
+        # 非空操作记录完成日志
+        if action_name != "empty":
+            log_msg = (
+                f"任务{{{cur_task.name}}}完成：{{{func.__name__}}}-{{{action_name}}}"
+            )
+            logger.info(log_msg)
+            _safe_broadcast(log_msg)
 
         return res
 
