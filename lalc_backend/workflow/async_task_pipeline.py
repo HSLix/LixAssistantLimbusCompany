@@ -48,6 +48,9 @@ class AsyncTaskPipeline:
         self._state = self.STATE_STOPPED
         # 添加server引用
         self._server_ref = None
+        
+        # ── 状态机模式 ──
+        self._use_state_machine = False  # 由 config 控制开关
 
     def set_server_ref(self, server):
         """
@@ -234,7 +237,16 @@ class AsyncTaskPipeline:
     async def _worker(self):
         """
         异步工作协程，不断处理任务栈中的函数
+        
+        支持两种模式：
+        - 旧模式（默认）：基于任务栈的轮询循环
+        - 状态机模式：基于转换表的确定性驱动
         """
+        # ── 状态机模式 ──
+        if self._use_state_machine:
+            await self._run_state_machine()
+            return
+        
         self.logger.debug("异步任务工作协程开始运行")
         try:
             while self.task_stack and not self._stop_event.is_set():
@@ -315,6 +327,55 @@ class AsyncTaskPipeline:
                         self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts), chart_image)
                     except UnboundLocalError:
                         self.logger.debug("TaskExecution 性能统计 | " + " | ".join(parts))
+
+    async def _run_state_machine(self):
+        """状态机模式：构建转换表，用 GameStateMachine 驱动。
+        
+        只跑一次流水线，完成后 stop。
+        """
+        try:
+            self.logger.info("状态机模式启动")
+            
+            # 1. 从现有 shared_params 提取配置
+            from state_machine.transitions import build_daily_flow
+            from state_machine.engine import GameStateMachine, MachineContext
+            
+            # 根据执行次数构建转换表
+            check_config = {
+                "exp_count": get_task("exp_check").get_param("execute_count"),
+                "thread_count": get_task("thread_check").get_param("execute_count"),
+                "mirror_count": get_task("mirror_check").get_param("execute_count"),
+            }
+            transitions = build_daily_flow(check_config)
+            
+            if not transitions:
+                self.logger.info("无任务需要执行（所有 count 为 0）")
+                return
+            
+            self.logger.info(f"构建转换表：{len(transitions)} 个状态转换")
+            
+            # 2. 创建上下文和引擎
+            context = MachineContext(self.task_execution, self.shared_params)
+            machine = GameStateMachine(context)
+            
+            # 3. 运行
+            error = machine.run(transitions)
+            
+            if error:
+                self.logger.error(f"状态机运行错误: {error}")
+            else:
+                self.logger.info("状态机运行完成")
+                
+        except Exception as e:
+            self.logger.error(f"状态机运行异常: {e}")
+            self.logger.error(traceback.format_exc())
+        finally:
+            await self.stop()
+            if self._completion_callback:
+                try:
+                    self._completion_callback()
+                except Exception as cb_err:
+                    self.logger.error(f"完成回调失败: {cb_err}")
 
     def _generate_performance_chart(self, perf_data: dict) -> Image.Image:
         """
