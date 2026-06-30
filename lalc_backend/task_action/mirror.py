@@ -869,110 +869,281 @@ default_node_scores = {
         "train_head": 0,
         "node_empty": -100,
     }
+# ── 节点类型枚举 ────────────────────────────────────────────────────────────
+class NodeType:
+    """镜牢节点类型，与 mirror_cfg.json 中的 node_scores 键名对应。"""
+    EVENT = "node_event"
+    """事件节点（问号图标）"""
+    REGULAR = "node_regular_encounter"
+    """普通战斗（暗纹、无代币）"""
+    ELITE = "node_elite_encounter"
+    """精英战斗（亮纹、有代币）"""
+    FOCUSED = "node_focused_encounter"
+    """聚焦战斗（复杂花纹、高代币）"""
+    ABNORMALITY = "node_abnormality_encounter"
+    """异想体战斗"""
+    SHOP = "node_shop"
+    """商店"""
+    BOSS = "node_boss_encounter"
+    """Boss战"""
+
+
+def _classify_node_type(
+    gray_crop: np.ndarray,
+    is_event: bool,
+) -> str:
+    """
+    根据节点图标的亮度特征分类节点类型。
+    
+    原理（基于 162 张实际截图分析）:
+    - 事件节点: 通过 template matching 判断（问号图标）
+    - 普通战斗: 图标暗（mean < 55），无白色高亮区域
+    - 精英战斗: 中等亮度（55 ≤ mean < 100），有部分亮纹
+    - 聚焦/高难: 高亮度（mean ≥ 100），亮纹密集，通常有代币数字
+    - Boss: 极高亮度，中央复杂花纹
+    
+    参数:
+        gray_crop: 灰度图的节点图标区域 (h, w)
+        is_event: 是否已通过模板匹配识别为事件节点
+    
+    返回:
+        NodeType 的键名字符串
+    """
+    if is_event:
+        return NodeType.EVENT
+    
+    mean_bright = float(gray_crop.mean())
+    std_val = float(gray_crop.std())
+    # 亮像素占比（值 > 200 的像素比例）
+    bright_ratio = float(np.sum(gray_crop > 200)) / gray_crop.size
+    
+    # 分类逻辑（基于实际数据统计）
+    if mean_bright >= 100 or bright_ratio > 0.15:
+        return NodeType.FOCUSED  # 高亮 → 聚焦/高难战斗
+    elif mean_bright >= 55 or bright_ratio > 0.05:
+        return NodeType.ELITE  # 中等亮度 → 精英战斗
+    else:
+        return NodeType.REGULAR  # 暗 → 普通战斗
+
+
+def _analyze_token_reward(gray_full: np.ndarray, click_cx: int, click_cy: int) -> int:
+    """
+    检测节点上方的代币奖励数字。
+    
+    代币位置：在节点图标上方约 25-50 像素处，区域约 40x25。
+    通过寻找高亮小区域推断是否存在代币。
+    
+    原理:
+    - 代币数字通常为白色/亮色数字，在深色背景上显著
+    - 对我们来说，只需要知道"是否有代币"以及估算数量级
+    - 通过亮像素比例和聚集度判断
+    
+    参数:
+        gray_full: 全屏灰度图
+        click_cx, click_cy: 节点点击坐标（图标中心）
+    
+    返回:
+        估算的代币数量（0 = 无代币，15, 25, 40 等为常见值）
+    """
+    # 代币区域：节点图标上方 25~50px, 以 click_cx 为中心 ±25px
+    y1 = max(0, click_cy - 58)
+    y2 = max(0, click_cy - 25)
+    x1 = max(0, click_cx - 30)
+    x2 = min(gray_full.shape[1], click_cx + 30)
+    
+    if y2 <= y1 or x2 <= x1:
+        return 0
+    
+    token_region = gray_full[y1:y2, x1:x2]
+    if token_region.size == 0:
+        return 0
+    
+    # 亮像素占比
+    _, binary = cv2.threshold(token_region, 200, 255, cv2.THRESH_BINARY)
+    bright_pct = float(np.sum(binary > 0)) / token_region.size
+    
+    if bright_pct > 0.08:
+        # 有可见代币 → 根据亮像素密集度估算数量级
+        if bright_pct > 0.25:
+            return 40   # 高代币（精英/聚焦）
+        elif bright_pct > 0.15:
+            return 25   # 中等代币
+        else:
+            return 15   # 低代币
+    return 0  # 无代币
+
+
+def _score_node(
+    row: dict,
+    mirror_cfg: dict,
+    gray_full: np.ndarray,
+) -> float:
+    """
+    综合评分：节点类型权重 × 代币奖励加成。
+    
+    从 mirror_cfg["node_scores"] 读取各类型权重，
+    加上代币奖励作为额外得分。
+    """
+    node_type = row.get("node_type", NodeType.REGULAR)
+    node_scores = mirror_cfg.get("node_scores", {})
+    base_score = node_scores.get(node_type, 5)
+    
+    # 代币奖励加成（每 10 代币 +1 分）
+    token = row.get("token_reward", 0)
+    token_bonus = token / 10.0
+    
+    total = base_score + token_bonus
+    row["score"] = total
+    return total
+
+
 @TaskExecution.register("mirror_select_next_node")
 def exec_mirror_select_next_node(self, node: TaskNode, func):
     """
-    快速镜牢节点寻路（高斯平滑偏差法）
+    快速镜牢节点寻路（高斯平滑偏差法 + 亮度分类 + 代币权重）
     
-    原理: 对候选区域做 31x31 高斯模糊抹掉小物体(节点图标)，
-    原图与模糊图的像素差在节点区域显著大于纯背景区域。
+    原理:
+    1. 31x31 高斯平滑抹掉小物体 → 偏差检测节点存在
+    2. 亮度分析分类节点类型（普通/精英/聚焦/事件）
+    3. 代币奖励区域分析（节点上方的数字）
+    4. 综合评分排序：类型权重 + 代币加成
     """
     import random
     import time
     
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.info("选择下一个镜牢节点（快速模式）")
+    logger.info("选择下一个镜牢节点（增强模式：亮度+代币评分）")
     
-    # 1. train_head 偏移校准（保持原有逻辑）
+    # 1. train_head 偏移校准
     train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
     if len(train_head) > 0 and train_head[0][1] < 300:
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
     
-    # 2. 转为 numpy RGB（保留彩色信息，不用 convert('L')）
-    ss = np.array(tmp_screenshot).astype(np.float32)
-    if len(ss.shape) == 2:
-        # 兼容单通道（日志存盘截图等调试场景）
-        ss = np.stack([ss, ss, ss], axis=-1)
+    # 2. 转为 numpy（彩 + 灰度）
+    ss_rgb = np.array(tmp_screenshot).astype(np.float32)
+    if len(ss_rgb.shape) == 2:
+        ss_rgb = np.stack([ss_rgb, ss_rgb, ss_rgb], axis=-1)
+    gray_full = cv2.cvtColor(tmp_screenshot, cv2.COLOR_RGB2GRAY) if hasattr(cv2, 'COLOR_RGB2GRAY') else \
+                np.array(tmp_screenshot.convert('L')).astype(np.uint8)
     
-    # 3. 高斯平滑背景模型（三通道独立平滑）
-    bg = cv2.GaussianBlur(ss, (31, 31), 0)
+    # 3. 高斯平滑
+    bg = cv2.GaussianBlur(ss_rgb, (31, 31), 0)
     
-    # 4. 3 条行路径的候选区域（对应 3 条可选方向）
-    #    每个区域覆盖左列（x=660）和右列（x=920）的节点位置
+    # 4. 3 条路径的候选区域
     rows = [
         {"name": "上", "click": (710, 110), "y": 80,  "h": 130},
         {"name": "中", "click": (710, 330), "y": 290, "h": 130},
         {"name": "下", "click": (710, 540), "y": 500, "h": 130},
     ]
-    
-    # 左右列 x 偏移
     col_x = [660, 920]
-    col_w = 140  # 裁剪宽度
+    col_w = 140
     
-    # 5. 检测每行是否有节点（三通道取最大偏差）
+    mirror_cfg = self._get_using_cfg("mirror")
+    
+    # 5. 检测+分类+评分
     row_scores = []
     for row in rows:
+        # 5a. 高斯偏差检测（确定是否有节点）
         devs = []
+        gray_devs = []
         for cx in col_x:
-            crop = ss[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
+            crop = ss_rgb[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
             crop_bg = bg[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
-            # 每个通道各自算均值绝对差
             ch_devs = np.mean(np.abs(crop - crop_bg), axis=(0, 1))
-            diff = np.max(ch_devs)  # 取响应最强的通道
+            diff = np.max(ch_devs)  # 取响应最强通道
             devs.append(diff)
+            
+            # 同时计算灰度偏差（辅助判断）
+            crop_g = gray_full[row["y"]:row["y"]+row["h"], cx:cx+col_w]
+            bg_g = cv2.GaussianBlur(crop_g.astype(np.float32), (31, 31), 0)
+            gray_devs.append(float(np.mean(np.abs(crop_g.astype(np.float32) - bg_g))))
         
-        # 左右列任一超过阈值 → 该行有节点
         max_dev = max(devs)
         has_node = max_dev > 12.0
-        row_scores.append({
+        
+        # 5b. 如果检测到节点，提取图标区域做分类
+        node_type = NodeType.REGULAR
+        is_event = False
+        token_reward = 0
+        mean_bright = 0.0
+        bright_ratio = 0.0
+        
+        if has_node:
+            cx, cy = row["click"]
+            # 图标裁剪区域
+            icon_y1 = row["y"] + 30   # 图标在行区域内偏下
+            icon_y2 = min(row["y"] + row["h"], row["y"] + 115)
+            icon_x1 = max(0, cx - 35)
+            icon_x2 = min(gray_full.shape[1], cx + 50)
+            
+            if icon_y2 > icon_y1 and icon_x2 > icon_x1:
+                gray_icon = gray_full[icon_y1:icon_y2, icon_x1:icon_x2]
+                if gray_icon.size > 0:
+                    mean_bright = float(gray_icon.mean())
+                    
+                    # 事件节点检测（问号图标）
+                    icon_mask_list = [icon_x1, icon_y1, icon_x2 - icon_x1, icon_y2 - icon_y1]
+                    try:
+                        event_matches = recognize_handler.template_match(
+                            tmp_screenshot, "node_event", mask=icon_mask_list, threshold=0.6
+                        )
+                        is_event = len(event_matches) > 0
+                    except Exception:
+                        is_event = False
+                    
+                    # 5c. 亮度分类
+                    bright_ratio = float(np.sum(gray_icon > 200)) / max(gray_icon.size, 1)
+                    node_type = _classify_node_type(gray_icon, is_event)
+                    
+                    # 5d. 代币检测
+                    token_reward = _analyze_token_reward(gray_full, cx, cy)
+        
+        row_entry = {
             "name": row["name"],
             "click": row["click"],
             "dev": max_dev,
             "has_node": has_node,
-        })
+            "node_type": node_type,
+            "is_event": is_event,
+            "token_reward": token_reward,
+            "mean_bright": mean_bright,
+            "bright_ratio": bright_ratio,
+        }
+        if has_node:
+            _score_node(row_entry, mirror_cfg, gray_full)
+        row_scores.append(row_entry)
     
-    has_node_strs = []
+    # 日志输出
+    detail_strs = []
     for r in row_scores:
-        tag = "有" if r["has_node"] else "空"
-        has_node_strs.append(f'{r["name"]}={r["dev"]:.1f}({tag})')
-    logger.info(f"节点检测: {has_node_strs}")
-    
-    # 6. 筛选有节点的行
-    available = [r for r in row_scores if r["has_node"]]
-    
-    # 6a. 优先事件节点（问号图标走得更快）
-    mirror_cfg = self._get_using_cfg("mirror")
-    priority_event = mirror_cfg.get("priority_event_nodes", True)
-    if priority_event and available:
-        for row in available:
-            cx, cy = row["click"]
-            # 图标裁剪区域（方法同高斯偏差）：[左上x, 左上y, 宽, 高]
-            icon_mask = [cx - 35, cy - 25, 85, 75]
-            event_matches = recognize_handler.template_match(
-                tmp_screenshot, "node_event", mask=icon_mask, threshold=0.65
+        if r["has_node"]:
+            tname = r["node_type"].replace("node_", "")
+            token_s = f"💰{r['token_reward']}" if r['token_reward'] > 0 else ""
+            detail_strs.append(
+                f'{r["name"]}={r["dev"]:.1f}({tname}){token_s}'
+                f' 评分={r.get("score", 0):.0f}'
             )
-            row["is_event"] = len(event_matches) > 0
-        # 事件节点优先，同类型内按偏差从高到低
-        available.sort(key=lambda r: (-(1 if r.get("is_event") else 0), -r["dev"]))
-        event_rows = [r for r in available if r.get("is_event")]
-        if event_rows:
-            logger.info(f"检测到事件节点（问号）: {[r['name'] for r in event_rows]}")
-    else:
-        available.sort(key=lambda r: -r["dev"])
+        else:
+            detail_strs.append(f'{r["name"]}=空')
+    logger.info(f"节点检测+评分: {detail_strs}")
     
-    # 兜底：如果没有检测到任何节点，按偏差从高到低尝试所有行
+    # 6. 筛选有节点的行，按评分排序
+    available = [r for r in row_scores if r["has_node"]]
+    if available:
+        available.sort(key=lambda r: -r.get("score", 0))
+    
+    # 7. 兜底
     if not available:
         dev_strs = [f"{r['name']}={r['dev']:.1f}" for r in row_scores]
-        logger.warning(f"所有行均未检测到节点 (deviations: {dev_strs})，按偏差排序兜底尝试")
+        logger.warning(f"所有行均未检测到节点 (deviations: {dev_strs})，按偏差排序兜底")
         available = sorted(row_scores, key=lambda r: -r["dev"])
     
     next_node_exist = False
     
-    # 7. 尝试点击可用路径
+    # 8. 点击尝试
     for row in available:
         cx, cy = row["click"]
-        # 随机偏移 5~15px（防检测）
         ox = random.randint(-12, 12)
         oy = random.randint(-8, 8)
         logger.debug(f"尝试点击 {row['name']}: ({cx+ox},{cy+oy})")
@@ -980,7 +1151,6 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         input_handler.click(cx + ox, cy + oy)
         time.sleep(0.8)
         
-        # 验证是否点中（node_enter 出现 → 进入节点）
         if (
             len(
                 recognize_handler.template_match(
@@ -991,12 +1161,16 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         ):
             input_handler.key_press("enter")
             next_node_exist = True
-            logger.info(f"成功进入节点: {row['name']}")
+            logger.info(
+                f"成功进入节点: {row['name']} "
+                f"(类型={row.get('node_type','?')}, "
+                f"评分={row.get('score',0):.0f})"
+            )
             break
         else:
             logger.debug(f"路径 {row['name']} 不可达，尝试下一条")
     
-    # 8. 回退：点击当前 train_head 自身
+    # 9. 回退 train_head
     if not next_node_exist:
         train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
         if len(train_head) > 0:
@@ -1017,7 +1191,7 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
                 next_node_exist = True
                 logger.info("通过 train_head 回退进入节点")
     
-    # 9. 寻路异常处理
+    # 10. 寻路异常
     if not next_node_exist:
         logger.warning(
             "快速寻路失败，所有路径均不可达",
