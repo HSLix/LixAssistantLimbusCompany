@@ -1027,7 +1027,7 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
     ss_rgb = np.array(tmp_screenshot).astype(np.float32)
     if len(ss_rgb.shape) == 2:
         ss_rgb = np.stack([ss_rgb, ss_rgb, ss_rgb], axis=-1)
-    gray_full = cv2.cvtColor(tmp_screenshot, cv2.COLOR_RGB2GRAY) if hasattr(cv2, 'COLOR_RGB2GRAY') else \
+    gray_full = cv2.cvtColor(np.array(tmp_screenshot), cv2.COLOR_RGB2GRAY) if hasattr(cv2, 'COLOR_RGB2GRAY') else \
                 np.array(tmp_screenshot.convert('L')).astype(np.uint8)
     
     # 3. 高斯平滑
