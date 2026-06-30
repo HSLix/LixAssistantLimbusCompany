@@ -187,6 +187,9 @@ class TaskNode:
         elif self.recognition == "feature_match":
             template, threshold, mask = self.get_recognition_params()
             self.params["recognize_result"] = recognize_handler.feature_match(tmp_screenshot, template, threshold, mask=mask)
+        elif self.recognition == "ocr_popup":
+            # OCR 弹窗检测 — 用 RapidOCR 识别屏幕文字，匹配错误模式
+            self.params["recognize_result"] = self._do_ocr_popup(tmp_screenshot)
         else:
             raise ValueError("未知 recognition{%s}，无法完成检测动作" % self.recognition)
         res = (res or len(self.get_param("recognize_result")) > 0)
@@ -224,3 +227,28 @@ class TaskNode:
         :return: 任务节点详细信息字符串
         """
         return self.__str__()
+
+    def _do_ocr_popup(self, tmp_screenshot) -> list:
+        """
+        OCR 弹窗检测 — 用 RapidOCR 识别屏幕文字，匹配已知错误模式。
+        
+        返回格式（与 template_match 一致以便兼容）:
+          [(x, y, confidence, popup_type, text)]
+        未匹配到弹窗时返回空列表。
+        """
+        try:
+            from task_action.popup_handler import analyze_screenshot
+            result = analyze_screenshot(tmp_screenshot)
+            if result is None or result.popup_type.value == "unknown":
+                return []
+            # 存到 params 供动作函数使用
+            self.params["ocr_result"] = result
+            cx, cy = result.click_target
+            return [(cx, cy, result.confidence, result.popup_type.value, result.matched_text)]
+        except ImportError:
+            # 无 popup_handler 时静默跳过
+            return []
+        except Exception as e:
+            import logging
+            logging.getLogger().warning(f"OCR popup detection failed: {e}")
+            return []

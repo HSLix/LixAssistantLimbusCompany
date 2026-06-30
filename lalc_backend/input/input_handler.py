@@ -414,6 +414,49 @@ class _Input:
             self._height = 0
         return result
 
+    def move_window_offscreen(self, x: int = -2000, y: int = 0):
+        """
+        将游戏窗口移至屏幕外，防止用户鼠标误入导致脚本操作被干扰。
+        
+        原理:
+            LALC 的点击使用 PostMessage(WM_LBUTTONDOWN/UP) 后台点击，
+            不依赖窗口在屏幕上的实际位置。窗口在屏幕外时：
+            - 后台点击（PostMessage）正常工作 ✅
+            - win32ui.CreateDCFromHandle 截图正常工作 ✅
+            - 前台点击（SetCursorPos + mouse_event）会打到错误位置 ❌
+        
+        因此此方法适用于后台模式（background state）。
+        
+        参数:
+            x: 目标 X 坐标（默认 -2000，屏幕左侧）
+            y: 目标 Y 坐标（默认 0，屏幕顶部）
+        
+        返回:
+            bool: 是否成功移动
+        """
+        import ctypes
+        from ctypes import wintypes
+        
+        if not self._hwnd:
+            logger.warning("无有效窗口句柄，无法移动窗口")
+            return False
+        
+        SWP_NOACTIVATE = 0x0010
+        SWP_NOZORDER = 0x0004
+        
+        try:
+            ctypes.windll.user32.SetWindowPos(
+                self._hwnd, 0,
+                x, y,
+                0, 0,  # 不改变大小
+                SWP_NOACTIVATE | SWP_NOZORDER
+            )
+            logger.info(f"窗口已移至屏幕外 ({x}, {y})")
+            return True
+        except Exception as e:
+            logger.warning(f"移动窗口失败: {e}")
+            return False
+
     # 使用状态模式执行点击操作
     def click(self, x, y):
         """
