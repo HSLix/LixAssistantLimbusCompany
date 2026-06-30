@@ -157,6 +157,9 @@ class GameStateMachine:
                         return False
                     self.logger.info(f"Click ({x}, {y}) | {action.desc}")
                     input_handler.click(x, y)
+                    # 真人点击后短等待
+                    from workflow.async_task_pipeline import HumanTiming
+                    time.sleep(HumanTiming.delay("click"))
                     
                 case ActionType.KEY:
                     key = action.params["key"]

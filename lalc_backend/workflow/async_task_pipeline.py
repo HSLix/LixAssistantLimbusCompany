@@ -2,6 +2,10 @@ import asyncio
 import logging
 from typing import Dict, Any, Callable, Awaitable, Optional
 import traceback
+import random
+import time
+import hashlib
+import numpy as np
 from .task_node import TaskNode
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -20,6 +24,98 @@ _pipeline_lock = asyncio.Lock()
 STATE_STOPPED = "stopped"
 STATE_RUNNING = "running"
 STATE_PAUSED = "paused"
+
+
+# ── 屏幕变化检测 ──────────────────────────────────────
+class ScreenChangeDetector:
+    """轻量屏变化检测：用中心区域像素 hash 判断画面是否推进。
+    
+    debug 级模板匹配 (≈50ms) 比实际游戏资源加载 (≈3-5s) 快得多。
+    屏幕未变时跳过全部模板匹配，避免浪费。
+    """
+    # 检测区域：取画面中央 300×200 区域（避开边缘装饰、固定UI）
+    CROP_X = 490
+    CROP_Y = 260
+    CROP_W = 300
+    CROP_H = 200
+
+    def __init__(self):
+        self._last_hash: str | None = None
+        self._unchanged_ticks = 0
+
+    def check(self, screenshot: Image.Image) -> bool:
+        """检查画面是否变化。返回 True = 变了 / 首次检测。"""
+        w, h = screenshot.size
+        cx, cy = w // 2, h // 2
+        left = max(0, cx - self.CROP_W // 2)
+        top = max(0, cy - self.CROP_H // 2)
+        crop = screenshot.crop((left, top, left + self.CROP_W, top + self.CROP_H))
+
+        # 转灰度后感知 hash（尺寸固定到 32×32 消除缩放噪声）
+        gray = crop.convert("L").resize((32, 32), Image.LANCZOS)
+        h = hashlib.md5(gray.tobytes()).hexdigest()
+
+        if self._last_hash is None:
+            self._last_hash = h
+            self._unchanged_ticks = 0
+            return True  # 首次检测视为变化
+
+        if h == self._last_hash:
+            self._unchanged_ticks += 1
+            return False
+        else:
+            self._last_hash = h
+            self._unchanged_ticks = 0
+            return True
+
+    @property
+    def stale_ticks(self) -> int:
+        """连续未变化的 tick 数。"""
+        return self._unchanged_ticks
+
+
+# ── 真人节奏模拟 ──────────────────────────────────────
+class HumanTiming:
+    """模拟真人操作节奏。
+    
+    核心原则：
+    - debug 模板匹配的耗时 (≈50ms) ≠ 游戏实际加载资源的耗时 (≈3-5s)
+    - 脚本不应比真人反应更快——快过人类的频率不能提升效率，只会浪费 CPU
+    - 真人操作间隔呈正态分布，不是均匀随机
+    """
+
+    # 不同操作类型的基准延迟（秒），行动前等待
+    ACTION_DELAYS = {
+        "click":        (0.25, 0.8),    # 点击后等待画面响应
+        "key":          (0.20, 0.6),    # 按键后等待
+        "swipe":        (0.40, 1.0),    # 滑动后等待
+        "wait_check":   (1.50, 3.0),    # 等待资源加载后的确认检查
+        "idle_poll":    (2.50, 5.0),    # 纯轮询（error_handler 等无事可做时）
+    }
+
+    @staticmethod
+    def delay(action_type: str = "click") -> float:
+        """生成真人节奏延迟。
+        
+        使用截断正态分布（clamp 在 [min*0.5, max*2]）。
+        """
+        if action_type not in HumanTiming.ACTION_DELAYS:
+            action_type = "click"
+        mu, sigma = HumanTiming.ACTION_DELAYS[action_type]
+        # 用 Box-Muller 近似正态，截断到合理范围
+        d = random.gauss(mu, sigma * 0.35)
+        lower = mu * 0.5
+        upper = mu + sigma * 3.0
+        return max(lower, min(upper, d))
+
+    @staticmethod
+    def action_jitter(base: int = 5) -> int:
+        """坐标/偏移抖动：模拟人手点击的物理不精确性。
+        
+        返回 ±base 范围内的随机偏移（正态分布集中在中心附近）。
+        """
+        return int(round(random.gauss(0, base * 0.5)))
+
 
 class AsyncTaskPipeline:
     """
@@ -51,6 +147,10 @@ class AsyncTaskPipeline:
         
         # ── 状态机模式 ──
         self._use_state_machine = False  # 由 config 控制开关
+        
+        # ── 轮询优化组件 ──
+        self._screen_detector = ScreenChangeDetector()
+        self._last_action_time = time.time()
 
     def set_server_ref(self, server):
         """
@@ -252,7 +352,28 @@ class AsyncTaskPipeline:
             while self.task_stack and not self._stop_event.is_set():
                 # 检查是否处于暂停状态
                 await self._pause_event.wait()
-
+                
+                # ── 轮询节流：屏幕未变时放慢速度 ──
+                # debug 模板匹配 ≈50ms, 游戏资源加载 ≈3-5s
+                # 屏幕没变说明游戏尚未响应，不应高速轮询
+                elapsed = time.time() - self._last_action_time
+                try:
+                    shot = input_handler.capture_screenshot()
+                    screen_changed = self._screen_detector.check(shot)
+                except Exception:
+                    screen_changed = True  # 截图失败时保守假定有变化
+                
+                if not screen_changed and elapsed < 2.0:
+                    # 屏幕没变且刚操作过 → 极可能游戏在加载中
+                    # 用人类观察间隔等待，不做模板匹配
+                    idle_wait = HumanTiming.delay("idle_poll")
+                    self.logger.debug(
+                        f"画面未变化 ({self._screen_detector.stale_ticks} ticks), "
+                        f"等待 {idle_wait:.1f}s"
+                    )
+                    await asyncio.sleep(idle_wait)
+                    continue  # 跳过本轮 execute，不进模板匹配
+                
                 # print(self.task_stack)
                 
                 # 弹出栈顶的函数
@@ -263,15 +384,20 @@ class AsyncTaskPipeline:
                     None, self.task_execution.execute, pre_task_name, func
                 )
                 
+                # 记录本次操作时间（供屏幕变化检测节流用）
+                self._last_action_time = time.time()
+                
                 # 压栈规则：先压 get_next_func，再压 do_action_func
                 for next_func in reversed(get_next_funcs):
                     if next_func is not None:
                         self.task_stack.append((cur_task_name, next_func))
                 if do_action_func is not None:
                     self.task_stack.append((cur_task_name, do_action_func))
-                    
-                # 短暂让出控制权，避免阻塞事件循环
-                await asyncio.sleep(0.01)
+                
+                # ── 真人节奏延迟 ──
+                # 执行完一次操作后，按人类反应速度等待再继续
+                # 缩短 sleep 时间（检测到动作推进画面后很快就 Check）
+                await asyncio.sleep(0.05)
             
             # 检查是否是正常完成还是被停止
             if not self._stop_event.is_set():
