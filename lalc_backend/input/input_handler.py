@@ -125,6 +125,40 @@ class BackgroundInputState(InputState):
         return set_background_focus(hwnd)
 
 
+class SimulationInputState(InputState):
+    """模拟输入状态 — 不依赖 win32，用于 WSL 模拟器/中介系统。
+    
+    所有操作仅记录日志并推送到 action_queue，不执行真实 UI 操作。
+    capture_screenshot 由 ScreenshotProvider 外部注入。
+    """
+
+    def __init__(self, action_queue: list = None):
+        self.action_queue = action_queue if action_queue is not None else []
+
+    def click(self, hwnd, x, y):
+        self.action_queue.append(("click", x, y))
+        logger.debug(f"[SIM] click({x}, {y})")
+        return True
+
+    def long_press(self, hwnd, x, y, duration=3):
+        self.action_queue.append(("long_press", x, y, duration))
+        logger.debug(f"[SIM] long_press({x}, {y}, {duration}s)")
+        return True
+
+    def key_press(self, hwnd, key):
+        self.action_queue.append(("key_press", key))
+        logger.debug(f"[SIM] key_press({key})")
+        return True
+
+    def swipe(self, hwnd, start_x, start_y, end_x, end_y):
+        self.action_queue.append(("swipe", start_x, start_y, end_x, end_y))
+        logger.debug(f"[SIM] swipe({start_x},{start_y}→{end_x},{end_y})")
+        return True
+
+    def set_focus(self, hwnd):
+        return True
+
+
 DEFAULT_WINDOW_WIDTH = 1302
 DEFAULT_WINDOW_HEIGHT = 776
 
@@ -172,6 +206,23 @@ class _Input:
 
     def set_foreground_state(self):
         self._current_state = self._foreground_state
+
+    def set_simulation_state(self, action_queue: list = None):
+        """切换到模拟模式，所有操作仅记录日志。"""
+        self._simulation_state = SimulationInputState(action_queue)
+        self._current_state = self._simulation_state
+        self._hwnd = 99999  # 非 None 魔数，绕过 hwnd 检查
+        logger.info("[SIM] 已切换到模拟输入状态")
+
+    @property
+    def simulation_screenshot_source(self):
+        return getattr(self, '_sim_screenshot_source', None)
+
+    @simulation_screenshot_source.setter
+    def simulation_screenshot_source(self, provider):
+        """设置外部截图提供器（callable, 无参返回 PIL.Image）。"""
+        self._sim_screenshot_source = provider
+
 
     # 与任务流水线同步
     def pause(self):
@@ -240,9 +291,17 @@ class _Input:
             time.sleep(30)
 
     def capture_screenshot(self, reset=True, save_path=None):
-        """
-        截取游戏窗口屏幕并存储在screenshot属性中。
-        """
+        """截取游戏窗口屏幕并存储在screenshot属性中。
+        
+        模拟模式（hwnd=99999）：从外部截图提供器获取。"""
+        if self._hwnd == 99999:
+            provider = getattr(self, '_sim_screenshot_source', None)
+            if provider:
+                img = provider()
+                if img:
+                    self._screenshot = img
+                    return img
+        # --- 以下为原有逻辑 ---
         if self._hwnd:
             if self.set_focus():
                 self.refresh_window_state()
@@ -354,6 +413,49 @@ class _Input:
             self._width = 0
             self._height = 0
         return result
+
+    def move_window_offscreen(self, x: int = -2000, y: int = 0):
+        """
+        将游戏窗口移至屏幕外，防止用户鼠标误入导致脚本操作被干扰。
+        
+        原理:
+            LALC 的点击使用 PostMessage(WM_LBUTTONDOWN/UP) 后台点击，
+            不依赖窗口在屏幕上的实际位置。窗口在屏幕外时：
+            - 后台点击（PostMessage）正常工作 ✅
+            - win32ui.CreateDCFromHandle 截图正常工作 ✅
+            - 前台点击（SetCursorPos + mouse_event）会打到错误位置 ❌
+        
+        因此此方法适用于后台模式（background state）。
+        
+        参数:
+            x: 目标 X 坐标（默认 -2000，屏幕左侧）
+            y: 目标 Y 坐标（默认 0，屏幕顶部）
+        
+        返回:
+            bool: 是否成功移动
+        """
+        import ctypes
+        from ctypes import wintypes
+        
+        if not self._hwnd:
+            logger.warning("无有效窗口句柄，无法移动窗口")
+            return False
+        
+        SWP_NOACTIVATE = 0x0010
+        SWP_NOZORDER = 0x0004
+        
+        try:
+            ctypes.windll.user32.SetWindowPos(
+                self._hwnd, 0,
+                x, y,
+                0, 0,  # 不改变大小
+                SWP_NOACTIVATE | SWP_NOZORDER
+            )
+            logger.info(f"窗口已移至屏幕外 ({x}, {y})")
+            return True
+        except Exception as e:
+            logger.warning(f"移动窗口失败: {e}")
+            return False
 
     # 使用状态模式执行点击操作
     def click(self, x, y):

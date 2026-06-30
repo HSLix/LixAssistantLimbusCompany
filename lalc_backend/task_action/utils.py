@@ -8,9 +8,15 @@ from workflow.task_execution import *
 def exec_choose_team(self, node: TaskNode, func):
     logger.info("选择队伍")
     cfg_type = node.get_param("cfg_type")
+    
+    # 镜牢内已部署过队伍：缓存有效，直接跳过
+    if cfg_type == "mirror" and getattr(self, "_mirror_deployment_done", False):
+        logger.info("镜牢队伍缓存有效，跳过选组")
+        return
+    
     cfg = self._get_using_cfg(cfg_type)
     cfg_index = self._get_using_cfg_index(cfg_type)
-    team_no = cfg["team_indexes"][cfg_index] - 1 # 这里减一是把 1-20 化为 0-19 
+    team_no = cfg["team_indexes"][cfg_index] - 1
 
     scroll_count = team_no // 6
     scroll_count = max(0, min(scroll_count, 3)) # 确保滚动次数一定合法
@@ -56,6 +62,14 @@ team_order_map = {
 
 @TaskExecution.register("ready_to_battle")
 def exec_ready_to_battle(self, node: TaskNode, func):
+    cfg_type = node.get_param("cfg_type")
+    
+    # 镜牢内已部署过队伍：缓存有效，跳过 OCR+选人，直接开战
+    if cfg_type == "mirror" and getattr(self, "_mirror_deployment_done", False):
+        logger.info("镜牢队伍缓存有效，跳过选人，直接开战")
+        input_handler.click(1140, 590)
+        return
+    
     logger.info("准备战斗", input_handler.capture_screenshot())
     res = recognize_handler.detect_text_in_image(
         input_handler.capture_screenshot(), mask=[1130, 500, 100, 50],
@@ -89,7 +103,7 @@ def exec_ready_to_battle(self, node: TaskNode, func):
             input_handler.key_press("enter")
             time.sleep(1)
         # 下一步是转到对应的选人
-        cfg_type = node.get_param("cfg_type")
+        
         cfg = self._get_using_cfg(cfg_type)
         cfg_index = self._get_using_cfg_index(cfg_type)
 
@@ -109,6 +123,11 @@ def exec_ready_to_battle(self, node: TaskNode, func):
         # 按顺序选择未被选中的成员
         for member in remaining_members:
             input_handler.click(*team_order_map[member])
+    
+    # 标记镜牢部署完成（后续战斗跳过选人+OCR）
+    if cfg_type == "mirror":
+        self._mirror_deployment_done = True
+        logger.info("镜牢队伍部署完成，后续战斗跳过选人流程")
     
     input_handler.click(1140, 590)
     
