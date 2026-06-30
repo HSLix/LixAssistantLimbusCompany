@@ -597,7 +597,14 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
                 )
                 time.sleep(1)
                 input_handler.click(740, 480)
-                time.sleep(0.5)
+                time.sleep(0.3)
+                # 检测 connecting 是否出现：不出现 = 经费不足，跳过
+                connecting = recognize_handler.template_match(
+                    input_handler.capture_screenshot(), "connecting", mask=[1000, 0, 300, 200]
+                )
+                if len(connecting) == 0:
+                    logger.info(f"购买 {gift_name} 无响应（可能经费不足），跳过本轮回购")
+                    break
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
                 time.sleep(0.5)
                 input_handler.click(650, 535)

@@ -77,7 +77,7 @@
         "recognition":"template_match",
         "action":"click",
         "params":{
-            "pre_delay":7,
+            "pre_delay":3,
             "template":"popup_try"
         },
         "next":[
