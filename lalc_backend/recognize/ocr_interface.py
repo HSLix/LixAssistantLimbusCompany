@@ -32,6 +32,16 @@ class OcrResult:
     """置信度 0~1"""
     bbox: Optional[list] = None
     """边界框 [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]"""
+    
+    def __getitem__(self, index):
+        """向后兼容：允许像元组一样访问 (text, x, y, conf)。
+        
+        旧代码写法：result[0] → text, result[1] → x, result[2] → y
+        """
+        return (self.text, self.x, self.y, self.confidence)[index]
+    
+    def __len__(self):
+        return 4
 
 
 # ══════════════════════════════════════════════════════

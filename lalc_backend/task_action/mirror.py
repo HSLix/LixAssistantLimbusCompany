@@ -1,6 +1,7 @@
 from workflow.task_execution import *
 import cv2
 import numpy as np
+from recognize.ocr_interface import get_provider
 
 @TaskExecution.register("mirror_select_event_effect")
 def exec_mirror_select_event_effect(self, node: TaskNode, func):
@@ -100,8 +101,8 @@ def exec_mirror_select_floor_ego_gift(self, node: TaskNode, func):
     max_ego_gifts_radio = get_max_radio_of_ego_gifts()
 
     tmp_screenshot = input_handler.capture_screenshot()
-    cur_gifts = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[90, 170, 1090, 40]
+    cur_gifts = get_provider().detect_text(
+        tmp_screenshot, region=[90, 170, 1090, 40]
     )
     prefer_cur_gifts = []
 
@@ -115,8 +116,8 @@ def exec_mirror_select_floor_ego_gift(self, node: TaskNode, func):
             logger.info(f"检测到有倾向的饰品{tmp}")
             prefer_cur_gifts.append((tmp, gift[1], gift[2]))
 
-    acquire_and_owned = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[110, 120, 1090, 60]
+    acquire_and_owned = get_provider().detect_text(
+        tmp_screenshot, region=[110, 120, 1090, 60]
     )
 
     # 分类 acquire_and_owned 中的文本
@@ -290,8 +291,8 @@ def exec_mirror_shop_enhance_ego_gifts(self, node: TaskNode, func):
     need_more_money = 0
 
     def enhance_cur_gift():
-        cur_gift = recognize_handler.detect_text_in_image(
-            input_handler.capture_screenshot(), mask=[280, 150, 300, 130]
+        cur_gift = get_provider().detect_text(
+            input_handler.capture_screenshot(), region=[280, 150, 300, 130]
         )
         if len(cur_gift) == 0:
             logger.warning(
@@ -470,8 +471,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
         if len(need_to_replace_skill) == 0:
             return replaced
 
-        name_of_who_can_replace = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 320, 165, 50]
+        name_of_who_can_replace = get_provider().detect_text(
+            tmp_screenshot, region=[535, 320, 165, 50]
         )
         if len(name_of_who_can_replace) > 0:
             name_of_who_can_replace = name_of_who_can_replace[0]
@@ -537,26 +538,28 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
     ]
 
     def exec_purchase_ego_gifts():
-        gifts = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 325, 650, 50]
+        # 【优化】先模板匹配已购标识，跳过已购槽位的 OCR
+        purcased_list = get_provider().detect_text(
+            tmp_screenshot, region=[535, 200, 650, 40]
+        )
+        other_line_purchased = get_provider().detect_text(
+            tmp_screenshot, region=[535, 355, 650, 40]
+        )
+        purcased_list.extend(other_line_purchased)
+
+        gifts = get_provider().detect_text(
+            tmp_screenshot, region=[535, 325, 650, 50]
         )
         gifts.sort(key=lambda x : x[1])
-        other_line_gifts = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 480, 650, 50]
+        other_line_gifts = get_provider().detect_text(
+            tmp_screenshot, region=[535, 480, 650, 50]
         )
         other_line_gifts.sort(key=lambda x : x[1])
         gifts.extend(other_line_gifts)
-        # 由于 MD7 开始，商店购买的商品会自动后移，而不是原地不动，所以需要建立映射进行位置的变化。另一种方法是购买一次后检测，效率更低，故废弃。
+        # 由于 MD7 开始，商店购买的商品会自动后移，而不是原地不动，所以需要建立映射进/>行位置的变化。
         for i in range(len(gifts)):
             gifts[i] = (*gifts[i], i)
-
-        purcased_list = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 200, 650, 40]
-        )
-        other_line_purchased = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 355, 650, 40]
-        )
-        purcased_list.extend(other_line_purchased)
+            # gifts[i] 现在是 (text, x, y, conf, i) 的元组
 
         # 前两行能买的买完了
         if len(gifts) == len(purcased_list):
@@ -620,8 +623,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
 
         can_purchase = exec_purchase_ego_gifts()
 
-        cur_money = recognize_handler.detect_text_in_image(
-            input_handler.capture_screenshot(), mask=[568, 100, 100, 80]
+        cur_money = get_provider().detect_text(
+            input_handler.capture_screenshot(), region=[568, 100, 100, 80]
         )
         if len(cur_money) > 0:
             try:
@@ -660,8 +663,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
         )
         > 0
     )
-    name_of_who_can_replace = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[535, 320, 165, 50]
+    name_of_who_can_replace = get_provider().detect_text(
+        tmp_screenshot, region=[535, 320, 165, 50]
     )
     if (
         not is_replace_skill_sold_out
@@ -823,8 +826,8 @@ def exec_mirror_shop_fuse_ego_gifts(self, node: TaskNode, func):
 @TaskExecution.register("mirror_shop_heal_sinner")
 def exec_mirror_shop_heal_sinner(self, node: TaskNode, func):
     logger.info("镜牢商店治疗罪人")
-    cur_money = recognize_handler.detect_text_in_image(
-        input_handler.capture_screenshot(), mask=[568, 100, 100, 80]
+    cur_money = get_provider().detect_text(
+        input_handler.capture_screenshot(), region=[568, 100, 100, 80]
     )
     if len(cur_money) > 0:
         try:
