@@ -6,6 +6,7 @@ from datetime import datetime
 import difflib
 
 from recognize.img_recognizer import recognize_handler
+from recognize.ocr_interface import get_provider
 from recognize.img_registry import get_images_by_tag, get_max_radio_of_theme_packs, register_images_from_directory
 from recognize.utils import pil_to_cv2, cv2_to_pil, mask_screenshot
 from input.input_handler import input_handler
@@ -57,9 +58,9 @@ def detect_and_save_theme_pack(pil_img):
 
     draw = ImageDraw.Draw(pil_img)
     
-    ocr_results = recognize_handler.detect_text_in_image(
+    ocr_results = get_provider().detect_text(
             pil_img,
-            mask=[100, 440, 1100, 60]
+            region=[100, 440, 1100, 60]
     )
     ocr_results.sort(key=lambda x:x[1])
 

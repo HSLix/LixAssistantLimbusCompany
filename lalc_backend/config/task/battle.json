@@ -23,10 +23,12 @@
         ]
     },
     "battle_winrate":{
-        "recognition": "template_match",
+        "recognition": "template_match_row",
         "action": "battle_winrate",
         "params":{
-            "template":"win_rate"
+            "template":"win_rate",
+            "row_y": 554,
+            "row_height": 60
         },
         "next":[
             "battle_fight"
@@ -47,10 +49,12 @@
         ]
     },
     "battle_winrate_click":{
-        "recognition": "template_match",
+        "recognition": "template_match_row",
         "action": "click",
         "params":{
-            "template":"win_rate"
+            "template":"win_rate",
+            "row_y": 554,
+            "row_height": 60
         },
         "next":[
             "battle_winrate",

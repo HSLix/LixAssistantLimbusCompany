@@ -1,5 +1,32 @@
-lalc/
-lalc.zip
-logs/
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
 
-AGENTS.md
+# Virtual environments
+.venv
+venv/
+
+# Caches
+.ruff_cache
+.pytest_cache/
+.mypy_cache/
+
+# Project temp / generated
+tmp_theme_packs
+logs
+img/dataset/
+obsolete_resources/
+ai/*.py
+lalc.zip
+pystand/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Our specific ignores
+lalc/

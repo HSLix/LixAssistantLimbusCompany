@@ -92,11 +92,17 @@ def exec_swipe(self, node: TaskNode, func=None):
 @TaskExecution.register("wait_disappear")
 def exec_wait_disappear(self, node: TaskNode, func=None):
     logger.debug(f"等待元素消失: {node.name}")
-    check_interval = node.get_param("check_interval", 1)
+    check_interval = node.get_param("check_interval", 0.5)  # 从1s→0.5s
+    max_retries = node.get_param("max_retries", 30)          # 最多30次=15s
     template_name = node.get_param("template")
     
+    retries = 0
     while node.do_recognize(input_handler.capture_screenshot()):
         logger.debug(f"wait {{{template_name}}} disappear")
+        retries += 1
+        if retries > max_retries:
+            logger.warning(f"wait {{{template_name}}} 超时({max_retries}次)，强制继续")
+            break
         time.sleep(check_interval)
     
 

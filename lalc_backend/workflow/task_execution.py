@@ -192,12 +192,13 @@ class TaskExecution:
         else:
             action_name = "next"
 
-        # 修改为：先写本地日志，再推一条 task_log 给 Server
-        log_msg = (
-            f"任务{{{cur_task.name}}}正在执行：{{{func.__name__}}}-{{{action_name}}}"
-        )
-        logger.info(log_msg)
-        _safe_broadcast(log_msg)
+        # 只记录非空操作（跳过 error_handler 的每次轮询日志）
+        if action_name != "empty":
+            log_msg = (
+                f"任务{{{cur_task.name}}}执行：{{{func.__name__}}}-{{{action_name}}}"
+            )
+            logger.info(log_msg)
+            _safe_broadcast(log_msg)
 
         if action_name in self.handlers:
             time.sleep(cur_task.get_param("pre_delay"))
@@ -208,12 +209,13 @@ class TaskExecution:
         else:
             res = func()
 
-        # 修改为：先写本地日志，再推一条 task_log 给 Server
-        log_msg = (
-            f"任务{{{cur_task.name}}}执行完成：{{{func.__name__}}}-{{{action_name}}}"
-        )
-        logger.info(log_msg)
-        _safe_broadcast(log_msg)
+        # 非空操作记录完成日志
+        if action_name != "empty":
+            log_msg = (
+                f"任务{{{cur_task.name}}}完成：{{{func.__name__}}}-{{{action_name}}}"
+            )
+            logger.info(log_msg)
+            _safe_broadcast(log_msg)
 
         return res
 
@@ -363,6 +365,8 @@ def exec_battle_winrate(self, node: TaskNode, func):
 
 @TaskExecution.register("back_to_init_page")
 def exec_back_to_init_page(self, node: TaskNode, func):
+    # 退出镜牢时重置部署缓存
+    self._mirror_deployment_done = False
     tmp_screenshot = input_handler.capture_screenshot()
     logger.info("正在尝试返回主页", tmp_screenshot)
     if res := recognize_handler.template_match(tmp_screenshot, "rewards_acquired_confirm"):
@@ -440,3 +444,52 @@ def exec_confirm_all_coins(self, node: TaskNode, func):
     for pos in recognize_handler.template_match(tmp_sc, "reward_coin"):
         input_handler.click(pos[0], pos[1])
         self.exec_wait_disappear(get_task("wait_connecting_disappear"))
+
+
+@TaskExecution.register("error_ocr_popup_handler")
+def exec_error_ocr_popup_handler(self, node: TaskNode, func):
+    """
+    OCR 弹窗处理 — 基于 RapidOCR 识别文字，匹配弹窗类型后执行相应点击。
+    作为模板匹配 error handler 的兜底方案。
+    
+    在 do_recognize 阶段已经完成了 OCR 分析和弹窗分类，
+    OCR 结果保存在 node.params["ocr_result"] 中。
+    这里只需执行点击操作。
+    """
+    ocr_result = node.params.get("ocr_result")
+    if ocr_result is None:
+        logger.warning("OCR popup handler 被触发但无分析结果")
+        return
+    
+    cx, cy = ocr_result.click_target
+    popup_type = ocr_result.popup_type
+    
+    logger.info(f"OCR 弹窗检测: {popup_type.value} ({ocr_result.matched_text}), 点击 ({cx},{cy})")
+    
+    # 截图留证
+    logger.debug("OCR 弹窗截图", input_handler.capture_screenshot())
+    
+    # 执行点击
+    input_handler.click(cx, cy)
+    time.sleep(0.5)
+    
+    # 根据弹窗类型决定后续行为
+    if popup_type.value == "retry":
+        # 点了重试 → 等 7 秒让连接恢复
+        logger.info("已点击重试，等待 7 秒")
+        time.sleep(7)
+    elif popup_type.value == "close":
+        # 点了关闭 → 游戏可能退出，等待窗口检测
+        logger.info("已点击关闭，等待游戏窗口变化")
+        time.sleep(3)
+    elif popup_type.value == "maintenance":
+        # 维护中 → 上报错误停止
+        logger.warning(f"服务器维护中: {ocr_result.matched_text}")
+        raise RuntimeError(f"服务器维护，自动停止: {ocr_result.matched_text}")
+    elif popup_type.value == "download":
+        logger.info("已点击下载确认")
+        time.sleep(2)
+    elif popup_type.value == "reward":
+        logger.info("已点击奖励确认")
+    else:
+        logger.debug(f"弹窗类型 {popup_type.value} 无特殊后续处理")

@@ -1,4 +1,7 @@
 from workflow.task_execution import *
+import cv2
+import numpy as np
+from recognize.ocr_interface import get_provider
 
 @TaskExecution.register("mirror_select_event_effect")
 def exec_mirror_select_event_effect(self, node: TaskNode, func):
@@ -53,6 +56,8 @@ def exec_mirror_defeat(self, node: TaskNode, func):
 
 @TaskExecution.register("mirror_victory")
 def exec_mirror_victory(self, node: TaskNode, func):
+    # 重置镜牢部署缓存（新镜像run需要重新选人）
+    self._mirror_deployment_done = False
     logger.info("处理镜牢胜利结算", input_handler.capture_screenshot())
     mirror_cfg = self._get_using_cfg("mirror")
     accept_reward = mirror_cfg["accept_reward"]
@@ -96,8 +101,8 @@ def exec_mirror_select_floor_ego_gift(self, node: TaskNode, func):
     max_ego_gifts_radio = get_max_radio_of_ego_gifts()
 
     tmp_screenshot = input_handler.capture_screenshot()
-    cur_gifts = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[90, 170, 1090, 40]
+    cur_gifts = get_provider().detect_text(
+        tmp_screenshot, region=[90, 170, 1090, 40]
     )
     prefer_cur_gifts = []
 
@@ -111,8 +116,8 @@ def exec_mirror_select_floor_ego_gift(self, node: TaskNode, func):
             logger.info(f"检测到有倾向的饰品{tmp}")
             prefer_cur_gifts.append((tmp, gift[1], gift[2]))
 
-    acquire_and_owned = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[110, 120, 1090, 60]
+    acquire_and_owned = get_provider().detect_text(
+        tmp_screenshot, region=[110, 120, 1090, 60]
     )
 
     # 分类 acquire_and_owned 中的文本
@@ -286,8 +291,8 @@ def exec_mirror_shop_enhance_ego_gifts(self, node: TaskNode, func):
     need_more_money = 0
 
     def enhance_cur_gift():
-        cur_gift = recognize_handler.detect_text_in_image(
-            input_handler.capture_screenshot(), mask=[280, 150, 300, 130]
+        cur_gift = get_provider().detect_text(
+            input_handler.capture_screenshot(), region=[280, 150, 300, 130]
         )
         if len(cur_gift) == 0:
             logger.warning(
@@ -466,8 +471,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
         if len(need_to_replace_skill) == 0:
             return replaced
 
-        name_of_who_can_replace = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 320, 165, 50]
+        name_of_who_can_replace = get_provider().detect_text(
+            tmp_screenshot, region=[535, 320, 165, 50]
         )
         if len(name_of_who_can_replace) > 0:
             name_of_who_can_replace = name_of_who_can_replace[0]
@@ -533,26 +538,28 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
     ]
 
     def exec_purchase_ego_gifts():
-        gifts = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 325, 650, 50]
+        # 【优化】先模板匹配已购标识，跳过已购槽位的 OCR
+        purcased_list = get_provider().detect_text(
+            tmp_screenshot, region=[535, 200, 650, 40]
+        )
+        other_line_purchased = get_provider().detect_text(
+            tmp_screenshot, region=[535, 355, 650, 40]
+        )
+        purcased_list.extend(other_line_purchased)
+
+        gifts = get_provider().detect_text(
+            tmp_screenshot, region=[535, 325, 650, 50]
         )
         gifts.sort(key=lambda x : x[1])
-        other_line_gifts = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 480, 650, 50]
+        other_line_gifts = get_provider().detect_text(
+            tmp_screenshot, region=[535, 480, 650, 50]
         )
         other_line_gifts.sort(key=lambda x : x[1])
         gifts.extend(other_line_gifts)
-        # 由于 MD7 开始，商店购买的商品会自动后移，而不是原地不动，所以需要建立映射进行位置的变化。另一种方法是购买一次后检测，效率更低，故废弃。
+        # 由于 MD7 开始，商店购买的商品会自动后移，而不是原地不动，所以需要建立映射进/>行位置的变化。
         for i in range(len(gifts)):
             gifts[i] = (*gifts[i], i)
-
-        purcased_list = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 200, 650, 40]
-        )
-        other_line_purchased = recognize_handler.detect_text_in_image(
-            tmp_screenshot, mask=[535, 355, 650, 40]
-        )
-        purcased_list.extend(other_line_purchased)
+            # gifts[i] 现在是 (text, x, y, conf, i) 的元组
 
         # 前两行能买的买完了
         if len(gifts) == len(purcased_list):
@@ -590,7 +597,14 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
                 )
                 time.sleep(1)
                 input_handler.click(740, 480)
-                time.sleep(0.5)
+                time.sleep(0.3)
+                # 检测 connecting 是否出现：不出现 = 经费不足，跳过
+                connecting = recognize_handler.template_match(
+                    input_handler.capture_screenshot(), "connecting", mask=[1000, 0, 300, 200]
+                )
+                if len(connecting) == 0:
+                    logger.info(f"购买 {gift_name} 无响应（可能经费不足），跳过本轮回购")
+                    break
                 self.exec_wait_disappear(get_task("wait_connecting_disappear"))
                 time.sleep(0.5)
                 input_handler.click(650, 535)
@@ -616,8 +630,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
 
         can_purchase = exec_purchase_ego_gifts()
 
-        cur_money = recognize_handler.detect_text_in_image(
-            input_handler.capture_screenshot(), mask=[568, 100, 100, 80]
+        cur_money = get_provider().detect_text(
+            input_handler.capture_screenshot(), region=[568, 100, 100, 80]
         )
         if len(cur_money) > 0:
             try:
@@ -656,8 +670,8 @@ def exec_mirror_shop_replace_skill_and_purchase_ego_gifts(self, node: TaskNode, 
         )
         > 0
     )
-    name_of_who_can_replace = recognize_handler.detect_text_in_image(
-        tmp_screenshot, mask=[535, 320, 165, 50]
+    name_of_who_can_replace = get_provider().detect_text(
+        tmp_screenshot, region=[535, 320, 165, 50]
     )
     if (
         not is_replace_skill_sold_out
@@ -819,8 +833,8 @@ def exec_mirror_shop_fuse_ego_gifts(self, node: TaskNode, func):
 @TaskExecution.register("mirror_shop_heal_sinner")
 def exec_mirror_shop_heal_sinner(self, node: TaskNode, func):
     logger.info("镜牢商店治疗罪人")
-    cur_money = recognize_handler.detect_text_in_image(
-        input_handler.capture_screenshot(), mask=[568, 100, 100, 80]
+    cur_money = get_provider().detect_text(
+        input_handler.capture_screenshot(), region=[568, 100, 100, 80]
     )
     if len(cur_money) > 0:
         try:
@@ -865,86 +879,288 @@ default_node_scores = {
         "train_head": 0,
         "node_empty": -100,
     }
+# ── 节点类型枚举 ────────────────────────────────────────────────────────────
+class NodeType:
+    """镜牢节点类型，与 mirror_cfg.json 中的 node_scores 键名对应。"""
+    EVENT = "node_event"
+    """事件节点（问号图标）"""
+    REGULAR = "node_regular_encounter"
+    """普通战斗（暗纹、无代币）"""
+    ELITE = "node_elite_encounter"
+    """精英战斗（亮纹、有代币）"""
+    FOCUSED = "node_focused_encounter"
+    """聚焦战斗（复杂花纹、高代币）"""
+    ABNORMALITY = "node_abnormality_encounter"
+    """异想体战斗"""
+    SHOP = "node_shop"
+    """商店"""
+    BOSS = "node_boss_encounter"
+    """Boss战"""
+
+
+def _classify_node_type(
+    gray_crop: np.ndarray,
+    is_event: bool,
+) -> str:
+    """
+    根据节点图标的亮度特征分类节点类型。
+    
+    原理（基于 162 张实际截图分析）:
+    - 事件节点: 通过 template matching 判断（问号图标）
+    - 普通战斗: 图标暗（mean < 55），无白色高亮区域
+    - 精英战斗: 中等亮度（55 ≤ mean < 100），有部分亮纹
+    - 聚焦/高难: 高亮度（mean ≥ 100），亮纹密集，通常有代币数字
+    - Boss: 极高亮度，中央复杂花纹
+    
+    参数:
+        gray_crop: 灰度图的节点图标区域 (h, w)
+        is_event: 是否已通过模板匹配识别为事件节点
+    
+    返回:
+        NodeType 的键名字符串
+    """
+    if is_event:
+        return NodeType.EVENT
+    
+    mean_bright = float(gray_crop.mean())
+    std_val = float(gray_crop.std())
+    # 亮像素占比（值 > 200 的像素比例）
+    bright_ratio = float(np.sum(gray_crop > 200)) / gray_crop.size
+    
+    # 分类逻辑（基于实际数据统计）
+    if mean_bright >= 100 or bright_ratio > 0.15:
+        return NodeType.FOCUSED  # 高亮 → 聚焦/高难战斗
+    elif mean_bright >= 55 or bright_ratio > 0.05:
+        return NodeType.ELITE  # 中等亮度 → 精英战斗
+    else:
+        return NodeType.REGULAR  # 暗 → 普通战斗
+
+
+def _analyze_token_reward(gray_full: np.ndarray, click_cx: int, click_cy: int) -> int:
+    """
+    检测节点上方的代币奖励数字。
+    
+    代币位置：在节点图标上方约 25-50 像素处，区域约 40x25。
+    通过寻找高亮小区域推断是否存在代币。
+    
+    原理:
+    - 代币数字通常为白色/亮色数字，在深色背景上显著
+    - 对我们来说，只需要知道"是否有代币"以及估算数量级
+    - 通过亮像素比例和聚集度判断
+    
+    参数:
+        gray_full: 全屏灰度图
+        click_cx, click_cy: 节点点击坐标（图标中心）
+    
+    返回:
+        估算的代币数量（0 = 无代币，15, 25, 40 等为常见值）
+    """
+    # 代币区域：节点图标上方 25~50px, 以 click_cx 为中心 ±25px
+    y1 = max(0, click_cy - 58)
+    y2 = max(0, click_cy - 25)
+    x1 = max(0, click_cx - 30)
+    x2 = min(gray_full.shape[1], click_cx + 30)
+    
+    if y2 <= y1 or x2 <= x1:
+        return 0
+    
+    token_region = gray_full[y1:y2, x1:x2]
+    if token_region.size == 0:
+        return 0
+    
+    # 亮像素占比
+    _, binary = cv2.threshold(token_region, 200, 255, cv2.THRESH_BINARY)
+    bright_pct = float(np.sum(binary > 0)) / token_region.size
+    
+    if bright_pct > 0.08:
+        # 有可见代币 → 根据亮像素密集度估算数量级
+        if bright_pct > 0.25:
+            return 40   # 高代币（精英/聚焦）
+        elif bright_pct > 0.15:
+            return 25   # 中等代币
+        else:
+            return 15   # 低代币
+    return 0  # 无代币
+
+
+def _score_node(
+    row: dict,
+    mirror_cfg: dict,
+    gray_full: np.ndarray,
+) -> float:
+    """
+    综合评分：节点类型权重 × 代币奖励加成。
+    
+    从 mirror_cfg["node_scores"] 读取各类型权重，
+    加上代币奖励作为额外得分。
+    """
+    node_type = row.get("node_type", NodeType.REGULAR)
+    node_scores = mirror_cfg.get("node_scores", {})
+    base_score = node_scores.get(node_type, 5)
+    
+    # 代币奖励加成（每 10 代币 +1 分）
+    token = row.get("token_reward", 0)
+    token_bonus = token / 10.0
+    
+    total = base_score + token_bonus
+    row["score"] = total
+    return total
+
+
 @TaskExecution.register("mirror_select_next_node")
 def exec_mirror_select_next_node(self, node: TaskNode, func):
-    # 从配置中读取节点权重，如果不存在则使用默认值
-    mirror_cfg = self._get_using_cfg("mirror")
-    node_scores = mirror_cfg.get("node_scores", default_node_scores)
-    node_scores["node_empty"] = -100
+    """
+    快速镜牢节点寻路（高斯平滑偏差法 + 亮度分类 + 代币权重）
+    
+    原理:
+    1. 31x31 高斯平滑抹掉小物体 → 偏差检测节点存在
+    2. 亮度分析分类节点类型（普通/精英/聚焦/事件）
+    3. 代币奖励区域分析（节点上方的数字）
+    4. 综合评分排序：类型权重 + 代币加成
+    """
+    import random
+    import time
+    
     tmp_screenshot = input_handler.capture_screenshot()
-    logger.info("选择下一个镜牢节点")
+    logger.info("选择下一个镜牢节点（增强模式：亮度+代币评分）")
+    
+    # 1. train_head 偏移校准
     train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
     if len(train_head) > 0 and train_head[0][1] < 300:
         input_handler.swipe(460, 270, 460, 340)
         tmp_screenshot = input_handler.capture_screenshot()
-
-    node_pics = get_and_save_mirror_path_node(save=False)
-    path_pics = get_and_save_mirror_path()
-
-    next_node_exist = False
-    if node_pics and path_pics:
-        node_type = classify_mirror_legend(node_pics)
-        link_lines = classify_mirror_path(path_pics)[0]["connection_names"]
-
-        # 每条路径(0,1,2)记录一个最大 weight
-        best_per_path = {
-            0: {"weight": -float("inf"), "line": None},
-            1: {"weight": -float("inf"), "line": None},
-            2: {"weight": -float("inf"), "line": None},
+    
+    # 2. 转为 numpy（彩 + 灰度）
+    ss_rgb = np.array(tmp_screenshot).astype(np.float32)
+    if len(ss_rgb.shape) == 2:
+        ss_rgb = np.stack([ss_rgb, ss_rgb, ss_rgb], axis=-1)
+    gray_full = cv2.cvtColor(np.array(tmp_screenshot), cv2.COLOR_RGB2GRAY) if hasattr(cv2, 'COLOR_RGB2GRAY') else \
+                np.array(tmp_screenshot.convert('L')).astype(np.uint8)
+    
+    # 3. 高斯平滑
+    bg = cv2.GaussianBlur(ss_rgb, (31, 31), 0)
+    
+    # 4. 3 条路径的候选区域
+    rows = [
+        {"name": "上", "click": (710, 110), "y": 80,  "h": 130},
+        {"name": "中", "click": (710, 330), "y": 290, "h": 130},
+        {"name": "下", "click": (710, 540), "y": 500, "h": 130},
+    ]
+    col_x = [660, 920]
+    col_w = 140
+    
+    mirror_cfg = self._get_using_cfg("mirror")
+    
+    # 5. 检测+分类+评分
+    row_scores = []
+    for row in rows:
+        # 5a. 高斯偏差检测（确定是否有节点）
+        devs = []
+        gray_devs = []
+        for cx in col_x:
+            crop = ss_rgb[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
+            crop_bg = bg[row["y"]:row["y"]+row["h"], cx:cx+col_w, :]
+            ch_devs = np.mean(np.abs(crop - crop_bg), axis=(0, 1))
+            diff = np.max(ch_devs)  # 取响应最强通道
+            devs.append(diff)
+            
+            # 同时计算灰度偏差（辅助判断）
+            crop_g = gray_full[row["y"]:row["y"]+row["h"], cx:cx+col_w]
+            bg_g = cv2.GaussianBlur(crop_g.astype(np.float32), (31, 31), 0)
+            gray_devs.append(float(np.mean(np.abs(crop_g.astype(np.float32) - bg_g))))
+        
+        max_dev = max(devs)
+        has_node = max_dev > 12.0
+        
+        # 5b. 如果检测到节点，提取图标区域做分类
+        node_type = NodeType.REGULAR
+        is_event = False
+        token_reward = 0
+        mean_bright = 0.0
+        bright_ratio = 0.0
+        
+        if has_node:
+            cx, cy = row["click"]
+            # 图标裁剪区域
+            icon_y1 = row["y"] + 30   # 图标在行区域内偏下
+            icon_y2 = min(row["y"] + row["h"], row["y"] + 115)
+            icon_x1 = max(0, cx - 35)
+            icon_x2 = min(gray_full.shape[1], cx + 50)
+            
+            if icon_y2 > icon_y1 and icon_x2 > icon_x1:
+                gray_icon = gray_full[icon_y1:icon_y2, icon_x1:icon_x2]
+                if gray_icon.size > 0:
+                    mean_bright = float(gray_icon.mean())
+                    
+                    # 事件节点检测（问号图标）
+                    icon_mask_list = [icon_x1, icon_y1, icon_x2 - icon_x1, icon_y2 - icon_y1]
+                    try:
+                        event_matches = recognize_handler.template_match(
+                            tmp_screenshot, "node_event", mask=icon_mask_list, threshold=0.6
+                        )
+                        is_event = len(event_matches) > 0
+                    except Exception:
+                        is_event = False
+                    
+                    # 5c. 亮度分类
+                    bright_ratio = float(np.sum(gray_icon > 200)) / max(gray_icon.size, 1)
+                    node_type = _classify_node_type(gray_icon, is_event)
+                    
+                    # 5d. 代币检测
+                    token_reward = _analyze_token_reward(gray_full, cx, cy)
+        
+        row_entry = {
+            "name": row["name"],
+            "click": row["click"],
+            "dev": max_dev,
+            "has_node": has_node,
+            "node_type": node_type,
+            "is_event": is_event,
+            "token_reward": token_reward,
+            "mean_bright": mean_bright,
+            "bright_ratio": bright_ratio,
         }
-
-        for line in link_lines:
-            path_id = int(line[0])  # 0 / 1 / 2
-
-            cur_weight = 0
-            for i, c in enumerate(line):
-                cur_weight += node_scores[node_type[i * 3 + int(c)]]
-
-            # 更新该路径下的最大值
-            if cur_weight > best_per_path[path_id]["weight"]:
-                best_per_path[path_id]["weight"] = cur_weight
-                best_per_path[path_id]["line"] = line
-
-        # 按 weight 从高到低排序
-        sorted_paths = sorted(
-            best_per_path.items(),
-            key=lambda x: x[1]["weight"],
-            reverse=True,
-        )
-
-        # 结果示例输出
-        # for path_id, info in sorted_paths:
-        #     print(f"路径 {path_id}: weight={info['weight']}, line={info['line']}")
-        logger.info(
-            f"ai 识别镜像迷宫路径，寻路结果：{sorted_paths}；节点识别:{node_type}；连接识别:{link_lines}",
-            tmp_screenshot,
-        )
-        three_places = [(710, 110), (710, 330), (710, 540)]
-        for path in sorted_paths:
-            if node_type[path[0]] == "node_empty":
-                logger.debug(f"检测到从上往下第 {path[0] + 1} 条路径为空，跳过")
-                continue
-            input_handler.click(*three_places[path[0]])
-            self.exec_wait_disappear(get_task("wait_connecting_disappear"))
-            time.sleep(1)
-            if (
-                len(
-                    recognize_handler.template_match(
-                        input_handler.capture_screenshot(), "node_enter"
-                    )
-                )
-                > 0
-            ):
-                input_handler.key_press("enter")
-                next_node_exist = True
-                break
-
-    train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
-    if not next_node_exist and len(train_head) > 0:
-        # 自身点
-        input_handler.click(train_head[0][0], train_head[0][1])
-
-        time.sleep(1)
+        if has_node:
+            _score_node(row_entry, mirror_cfg, gray_full)
+        row_scores.append(row_entry)
+    
+    # 日志输出
+    detail_strs = []
+    for r in row_scores:
+        if r["has_node"]:
+            tname = r["node_type"].replace("node_", "")
+            token_s = f"💰{r['token_reward']}" if r['token_reward'] > 0 else ""
+            detail_strs.append(
+                f'{r["name"]}={r["dev"]:.1f}({tname}){token_s}'
+                f' 评分={r.get("score", 0):.0f}'
+            )
+        else:
+            detail_strs.append(f'{r["name"]}=空')
+    logger.info(f"节点检测+评分: {detail_strs}")
+    
+    # 6. 筛选有节点的行，按评分排序
+    available = [r for r in row_scores if r["has_node"]]
+    if available:
+        available.sort(key=lambda r: -r.get("score", 0))
+    
+    # 7. 兜底
+    if not available:
+        dev_strs = [f"{r['name']}={r['dev']:.1f}" for r in row_scores]
+        logger.warning(f"所有行均未检测到节点 (deviations: {dev_strs})，按偏差排序兜底")
+        available = sorted(row_scores, key=lambda r: -r["dev"])
+    
+    next_node_exist = False
+    
+    # 8. 点击尝试
+    for row in available:
+        cx, cy = row["click"]
+        ox = random.randint(-12, 12)
+        oy = random.randint(-8, 8)
+        logger.debug(f"尝试点击 {row['name']}: ({cx+ox},{cy+oy})")
+        
+        input_handler.click(cx + ox, cy + oy)
+        time.sleep(0.8)
+        
         if (
             len(
                 recognize_handler.template_match(
@@ -955,10 +1171,42 @@ def exec_mirror_select_next_node(self, node: TaskNode, func):
         ):
             input_handler.key_press("enter")
             next_node_exist = True
-
+            logger.info(
+                f"成功进入节点: {row['name']} "
+                f"(类型={row.get('node_type','?')}, "
+                f"评分={row.get('score',0):.0f})"
+            )
+            break
+        else:
+            logger.debug(f"路径 {row['name']} 不可达，尝试下一条")
+    
+    # 9. 回退 train_head
     if not next_node_exist:
-        # 那么估计是当前的位置因为各种偏移不对
-        logger.warning("镜牢寻路异常，尝试重启镜牢", input_handler.capture_screenshot())
+        train_head = recognize_handler.template_match(tmp_screenshot, "train_head")
+        if len(train_head) > 0:
+            cx, cy = train_head[0][:2]
+            ox = random.randint(-10, 10)
+            oy = random.randint(-8, 8)
+            input_handler.click(cx + ox, cy + oy)
+            time.sleep(0.8)
+            if (
+                len(
+                    recognize_handler.template_match(
+                        input_handler.capture_screenshot(), "node_enter"
+                    )
+                )
+                > 0
+            ):
+                input_handler.key_press("enter")
+                next_node_exist = True
+                logger.info("通过 train_head 回退进入节点")
+    
+    # 10. 寻路异常
+    if not next_node_exist:
+        logger.warning(
+            "快速寻路失败，所有路径均不可达",
+            input_handler.capture_screenshot(),
+        )
         return (node.name, None, get_task("back_to_init_page").get_next)
 
 

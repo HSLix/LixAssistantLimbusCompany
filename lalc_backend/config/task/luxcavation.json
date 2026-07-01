@@ -230,7 +230,7 @@
     },
     "thread_event":{
         "recognition":"template_match",
-        "action":"event_entry",
+        "action":"event_loop",
         "params":{
             "template":"event_skip"
         },
@@ -240,7 +240,7 @@
     },
     "thread_event_dark":{
         "recognition":"template_match",
-        "action":"event_entry_dark",
+        "action":"event_loop",
         "params":{
             "template":"event_skip_dark",
             "threshold":0.9

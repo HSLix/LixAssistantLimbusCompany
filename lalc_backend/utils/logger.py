@@ -9,6 +9,7 @@ from pathlib import Path
 from PIL import Image
 import inspect
 import cv2 
+import time
 
 _instance = None
 
@@ -30,6 +31,11 @@ class LALCLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         (self.log_dir / "images").mkdir(exist_ok=True)
         self._clean_old_folders(retain_folder_count)
+        
+        # ── 日志优化配置 ──
+        self._screenshot_level = logging.WARNING  # 仅 WARNING+ 保存截图
+        self._last_screenshot_time = 0.0
+        self._screenshot_cooldown = 5.0           # 截图冷却间隔（秒）
         
         # 如果logger还没有被配置（没有处理器），则进行配置
         if not self.logger.handlers:
@@ -68,8 +74,7 @@ class LALCLogger:
     def _base_log(self, msg, image, level, task_name, compress_image):
         try:
             if task_name is None:
-                frame = inspect.currentframe().f_back.f_back  # 跨一层封装
-                task_name = frame.f_code.co_name
+                task_name = "main"  # 不再用 inspect.currentframe()
 
             level_no = _LEVEL_MAP[level]
             if level_no >= logging.WARNING:
@@ -79,16 +84,21 @@ class LALCLogger:
                 msg += f"  ({filename}:{lineno})"
 
             if image is not None:
-                img_name = f"{datetime.now().strftime('%H%M%S_%f')[:-3]}.png"
-                img_path = self.log_dir / "images" / img_name
-                if level == "DEBUG":
-                    self._save_resized(image, img_path)
-                else:
-                    image.save(img_path, format="PNG")
+                now = time.time()
+                # 限频：只在 WARNING+ 或 冷却后 保存截图
+                if level_no >= self._screenshot_level or \
+                   (now - self._last_screenshot_time) >= self._screenshot_cooldown:
+                    img_name = f"{datetime.now().strftime('%H%M%S_%f')[:-3]}.png"
+                    img_path = self.log_dir / "images" / img_name
+                    if level == "DEBUG":
+                        self._save_resized(image, img_path)
+                    else:
+                        image.save(img_path, format="PNG")
 
-                if compress_image:
-                    self.compress_image_with_pngquant(img_path)
-                msg += f" | IMAGE:images/{img_name}"
+                    if compress_image:
+                        self.compress_image_with_pngquant(img_path)
+                    msg += f" | IMAGE:images/{img_name}"
+                    self._last_screenshot_time = now
 
             # 根据传入的level参数使用对应的日志级别
             if level == "DEBUG":
