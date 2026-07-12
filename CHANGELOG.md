@@ -1,5 +1,43 @@
 # Changelog
 
+## [5.0.0](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.5...v5.0.0) (2026-07-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **xhzxmy:** recognize.img_registry.register_images_from_directory被分解为了两个函数，现register_images才是实现原功能的 img文件夹也被分割，general是通用素材，而zh,en等为各语言专有素材。有些素材给我改掉了，尤其卡包图片被我截了一半，把文字部分直接删了，代码也同步修改了。程序初始化仅读取通用素材，开始任务后自动读取专有素材。设置中的UI语言会同步到后端（跟随系统的话后端为默认英文） 目前素材还不全，英文比较稳定，零协汉化在镜牢里可能识别不出饰品，事件判定识别不了，游戏启动提示也有些无法处理。锤本和经验本以及其他流程已经可以正常使用。
+* **xhzxmy:** recognize.img_registry.register_images_from_directory被分解为了两个函数，现register_images才是实现原功能的 img文件夹也被分割，general是通用素材，而zh,en等为各语言专有素材。有些素材给我改掉了，尤其卡包图片被我截了一半，把文字部分直接删了，代码也同步修改了。程序初始化仅读取通用素材，开始任务后自动读取专有素材。设置中的UI语言会同步到后端（跟随系统的话后端为默认英文） 目前素材还不全，英文比较稳定，零协汉化在镜牢里可能识别不出饰品，事件判定识别不了，游戏启动提示也有些无法处理。锤本和经验本以及其他流程已经可以正常使用。
+* **xhzxmy:** 删去了无效的对象及相关用法，优化了任务正常完成时的处理流程
+
+### Features
+
+* **xhzxmy:** 修改素材避免误判情况 ([b3a620a](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b3a620a4da8dbb899cac568644981a175c7a7848))
+* **xhzxmy:** 增加了对事件判定的识别，并且往中文专用包增加了ego饰品名录，以便商店选饰品的汉化支持 ([2b2578e](https://github.com/HSLix/LixAssistantLimbusCompany/commit/2b2578ef5cf543376e1d88b160cc820b60bc1e21))
+* **xhzxmy:** 增加素材。 ([d1be32f](https://github.com/HSLix/LixAssistantLimbusCompany/commit/d1be32f43cf6cf6bde08f4c75d75ddcbe9291da8))
+* **xhzxmy:** 孩子们，现在LALC支持多语言了！ ([10e2585](https://github.com/HSLix/LixAssistantLimbusCompany/commit/10e2585d8469279ed7199aa14bb75def6b2a65e3))
+* **xhzxmy:** 孩子们，现在LALC支持多语言了！ ([60bf607](https://github.com/HSLix/LixAssistantLimbusCompany/commit/60bf607efd23b7da1464643480351372798314de))
+* **xhzxmy:** 实现了中文EGO饰品处理 ([c50bbf4](https://github.com/HSLix/LixAssistantLimbusCompany/commit/c50bbf4894c174d8cc80f82722a58f2f4735ca11))
+* **xhzxmy:** 现在经验本和锤本的拖拽如果没识别出来会报错，而不是永远拖下去。 ([b27925a](https://github.com/HSLix/LixAssistantLimbusCompany/commit/b27925aee0853ab28e3d3c640d9e0f0143b85189))
+* 当狂气换脑啡肽次数设置为0时，跳过该环节，节约时间。 ([ea157a3](https://github.com/HSLix/LixAssistantLimbusCompany/commit/ea157a3bdaeaa87bc1408c7a8c4f8aaf2f2e0cad))
+
+
+### Bug Fixes
+
+* add the forgotten fix | 旧的忘记修改了什么 ([696572a](https://github.com/HSLix/LixAssistantLimbusCompany/commit/696572aac5593bdd9be54dfa719af83408c9ee0b))
+* fix the error in taskaction.mirror 470, the sinner and skill iterate the keys making the unpack error | 修复了taskaction mirror 470行sinner和skill遍历字典键而不是键值对的错误 ([53e9a60](https://github.com/HSLix/LixAssistantLimbusCompany/commit/53e9a606ebcf0da5ef34750cb776676a0db51b3b))
+* **xhzxmy:** Issue [#297](https://github.com/HSLix/LixAssistantLimbusCompany/issues/297) fix ([26b091b](https://github.com/HSLix/LixAssistantLimbusCompany/commit/26b091bdc9a9e48ae4ad10c85b499ee4aa949126))
+* **xhzxmy:** 修复了commit [#292](https://github.com/HSLix/LixAssistantLimbusCompany/issues/292)引入的bug ([25b3c39](https://github.com/HSLix/LixAssistantLimbusCompany/commit/25b3c394b7d7cfa6070bf95871c2347da2819d75))
+* **xhzxmy:** 修复了OCR容易识别错误的问题 ([0b81c24](https://github.com/HSLix/LixAssistantLimbusCompany/commit/0b81c242d089db07f5b3c2d54a4018b343f89566))
+* **xhzxmy:** 修复了无文本版rewards_acquired_confirm很容易误识别的问题 ([0eddecb](https://github.com/HSLix/LixAssistantLimbusCompany/commit/0eddecbfc5e03ff0c4acf5eeb5e366b1c0ada4a9))
+* **xhzxmy:** 修复了锤本、经验本、镜牢刷满次数停止后再次start会被直接跳过的特性；修复了Commit 3924254导致的任务顺利完成时不能正常处理的问题。 ([4d6796c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/4d6796c851764e36b3ca9ec3bc282d921726fd06))
+* **xhzxmy:** 修改素材避免误判情况 ([879ad9c](https://github.com/HSLix/LixAssistantLimbusCompany/commit/879ad9caf1da3758459eaa649c13ac0d6a8df916))
+* **xhzxmy:** 更换素材，降低了误识别概率。 ([9826a16](https://github.com/HSLix/LixAssistantLimbusCompany/commit/9826a1614ae4382803d87f92c70e0cf4243b88c8))
+
+
+### Performance Improvements
+
+* **xhzxmy:** 删去了无效的对象及相关用法，优化了任务正常完成时的处理流程 ([3924254](https://github.com/HSLix/LixAssistantLimbusCompany/commit/3924254115826f63914e065cc9401ac88c6b772c))
+
 ## [4.11.5](https://github.com/HSLix/LixAssistantLimbusCompany/compare/v4.11.4...v4.11.5) (2026-04-02)
 
 
