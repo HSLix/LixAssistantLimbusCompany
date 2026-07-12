@@ -19,7 +19,7 @@ jobs:
       - uses: googleapis/release-please-action@v4
         id: release
         with:
-          token: ${{ secrets.LALC_TOKEN }}
+          token: ${{ github.token }}
           release-type: simple
 
 
