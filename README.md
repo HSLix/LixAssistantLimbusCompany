@@ -299,4 +299,4 @@
 
 ~~悄悄更个图，应该没人发现吧~~
 
-[![Star History Chart](https://api.star-history.com/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date)](https://www.star-history.com/#HSLix/LixAssistantLimbusCompany&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=HSLix/LixAssistantLimbusCompany&type=Date)](https://star-history.dera.page/#HSLix/LixAssistantLimbusCompany&Date)
