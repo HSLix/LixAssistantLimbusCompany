@@ -30,6 +30,8 @@ class WindowsInteractionLabTests(unittest.TestCase):
             "WM_KEYDOWN": 0x0100,
             "WM_KEYUP": 0x0101,
             "MK_LBUTTON": 0x0001,
+            "SMTO_BLOCK": 0x0001,
+            "SMTO_ABORTIFHUNG": 0x0002,
         }
         for name, value in constants.items():
             setattr(win32con, name, value)
@@ -42,8 +44,15 @@ class WindowsInteractionLabTests(unittest.TestCase):
         win32gui = types.ModuleType("win32gui")
         win32gui.error = RuntimeError
         win32gui.IsWindow = lambda hwnd: hwnd == 42
+        win32gui.IsIconic = lambda _hwnd: False
         win32gui.GetClientRect = lambda _hwnd: (0, 0, 1280, 720)
         win32gui.PostMessage = lambda *args: cls.messages.append(args)
+        win32gui.SendMessageTimeout = (
+            lambda hwnd, message, wparam, lparam, _flags, _timeout: cls.messages.append(
+                (hwnd, message, wparam, lparam)
+            )
+        )
+        win32gui.GetForegroundWindow = lambda: 1
         win32gui.ScreenToClient = lambda _hwnd, point: point
 
         win32ui = types.ModuleType("win32ui")
@@ -104,6 +113,22 @@ class WindowsInteractionLabTests(unittest.TestCase):
                 (42, self.lab.win32con.WM_LBUTTONUP, 0, packed),
             ],
         )
+
+    def test_send_delivery_dispatches_without_queueing(self):
+        with mock.patch.object(self.lab.time, "sleep"):
+            self.lab.background_key_press(42, "p", delivery="send")
+
+        self.assertEqual(
+            [message[1] for message in self.messages],
+            [self.lab.win32con.WM_KEYDOWN, self.lab.win32con.WM_KEYUP],
+        )
+
+    def test_minimized_window_has_explicit_scope_error(self):
+        with mock.patch.object(self.lab.win32gui, "IsIconic", return_value=True):
+            with self.assertRaisesRegex(
+                self.lab.InteractionLabError, "当前实验只支持未最小化窗口"
+            ):
+                self.lab._client_size(42)
 
     def test_only_requested_keys_are_supported(self):
         self.assertEqual(self.lab._virtual_key("ESC"), self.lab.win32con.VK_ESCAPE)

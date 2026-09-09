@@ -1,7 +1,7 @@
 """Standalone Win32 interaction experiments for the Limbus Company window.
 
 This module deliberately stays separate from ``input_handler``.  It exists to
-measure what the Unity player accepts while foreground, occluded, or minimized.
+measure what the Unity player accepts while visible but not necessarily focused.
 All mouse coordinates passed to window messages are client-area coordinates.
 """
 
@@ -30,6 +30,8 @@ SUPPORTED_KEYS = {
     "p": ord("P"),
     "enter": win32con.VK_RETURN,
 }
+DELIVERY_MODES = ("post", "send")
+DEFAULT_SEND_TIMEOUT_MS = 1000
 
 _user32 = ctypes.WinDLL("user32", use_last_error=True)
 _user32.PrintWindow.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint]
@@ -86,6 +88,10 @@ def _require_window(hwnd: int) -> None:
 
 def _client_size(hwnd: int) -> tuple[int, int]:
     _require_window(hwnd)
+    if win32gui.IsIconic(hwnd):
+        raise InteractionLabError(
+            "目标窗口已最小化；当前实验只支持未最小化窗口（允许失焦或被遮挡）"
+        )
     left, top, right, bottom = win32gui.GetClientRect(hwnd)
     width = right - left
     height = bottom - top
@@ -103,6 +109,36 @@ def _client_lparam(hwnd: int, x: int, y: int) -> int:
             f"客户区坐标 ({x}, {y}) 超出范围 0..{width - 1}, 0..{height - 1}"
         )
     return win32api.MAKELONG(x, y)
+
+
+def _dispatch_message(
+    hwnd: int,
+    message: int,
+    wparam: int,
+    lparam: int,
+    delivery: str,
+    timeout_ms: int,
+) -> None:
+    """Deliver one message asynchronously (post) or synchronously (send)."""
+
+    if delivery not in DELIVERY_MODES:
+        raise ValueError(f"delivery 必须是 {', '.join(DELIVERY_MODES)}")
+    if timeout_ms <= 0:
+        raise ValueError("timeout_ms 必须大于 0")
+
+    if delivery == "post":
+        win32gui.PostMessage(hwnd, message, wparam, lparam)
+        return
+
+    flags = win32con.SMTO_ABORTIFHUNG | win32con.SMTO_BLOCK
+    try:
+        win32gui.SendMessageTimeout(
+            hwnd, message, wparam, lparam, flags, timeout_ms
+        )
+    except win32gui.error as exc:
+        raise InteractionLabError(
+            f"SendMessageTimeout 失败或超时（message=0x{message:04X}）"
+        ) from exc
 
 
 def capture_background(hwnd: int, save_path: str | Path | None = None) -> Image.Image:
@@ -175,32 +211,64 @@ def capture_background(hwnd: int, save_path: str | Path | None = None) -> Image.
                 pass
 
 
-def background_click(hwnd: int, x: int, y: int, hold_seconds: float = 0.05) -> None:
-    """Post a client-relative left click without moving the physical cursor."""
+def background_click(
+    hwnd: int,
+    x: int,
+    y: int,
+    hold_seconds: float = 0.05,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+) -> None:
+    """Deliver a client-relative left click without moving the physical cursor."""
 
     if hold_seconds < 0:
         raise ValueError("hold_seconds 不能为负数")
     position = _client_lparam(hwnd, x, y)
-    win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, position)
-    win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, position)
+    _dispatch_message(hwnd, win32con.WM_MOUSEMOVE, 0, position, delivery, timeout_ms)
+    _dispatch_message(
+        hwnd,
+        win32con.WM_LBUTTONDOWN,
+        win32con.MK_LBUTTON,
+        position,
+        delivery,
+        timeout_ms,
+    )
     try:
         time.sleep(hold_seconds)
     finally:
-        win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, position)
+        _dispatch_message(
+            hwnd, win32con.WM_LBUTTONUP, 0, position, delivery, timeout_ms
+        )
 
 
-def background_long_press(hwnd: int, x: int, y: int, duration: float) -> None:
+def background_long_press(
+    hwnd: int,
+    x: int,
+    y: int,
+    duration: float,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+) -> None:
     """Hold the left mouse button at a client coordinate for ``duration``."""
 
     if duration <= 0:
         raise ValueError("duration 必须大于 0")
     position = _client_lparam(hwnd, x, y)
-    win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, position)
-    win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, position)
+    _dispatch_message(hwnd, win32con.WM_MOUSEMOVE, 0, position, delivery, timeout_ms)
+    _dispatch_message(
+        hwnd,
+        win32con.WM_LBUTTONDOWN,
+        win32con.MK_LBUTTON,
+        position,
+        delivery,
+        timeout_ms,
+    )
     try:
         time.sleep(duration)
     finally:
-        win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, position)
+        _dispatch_message(
+            hwnd, win32con.WM_LBUTTONUP, 0, position, delivery, timeout_ms
+        )
 
 
 def background_drag(
@@ -211,6 +279,8 @@ def background_drag(
     end_y: int,
     duration: float = 0.5,
     steps: int = 30,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
 ) -> None:
     """Post a smooth client-relative left-button drag."""
 
@@ -221,8 +291,15 @@ def background_drag(
 
     start = _client_lparam(hwnd, start_x, start_y)
     _client_lparam(hwnd, end_x, end_y)
-    win32gui.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, start)
-    win32gui.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, win32con.MK_LBUTTON, start)
+    _dispatch_message(hwnd, win32con.WM_MOUSEMOVE, 0, start, delivery, timeout_ms)
+    _dispatch_message(
+        hwnd,
+        win32con.WM_LBUTTONDOWN,
+        win32con.MK_LBUTTON,
+        start,
+        delivery,
+        timeout_ms,
+    )
 
     try:
         step_delay = duration / steps
@@ -231,13 +308,20 @@ def background_drag(
             x = round(start_x + (end_x - start_x) * ratio)
             y = round(start_y + (end_y - start_y) * ratio)
             position = _client_lparam(hwnd, x, y)
-            win32gui.PostMessage(
-                hwnd, win32con.WM_MOUSEMOVE, win32con.MK_LBUTTON, position
+            _dispatch_message(
+                hwnd,
+                win32con.WM_MOUSEMOVE,
+                win32con.MK_LBUTTON,
+                position,
+                delivery,
+                timeout_ms,
             )
             time.sleep(step_delay)
     finally:
         end = _client_lparam(hwnd, end_x, end_y)
-        win32gui.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, end)
+        _dispatch_message(
+            hwnd, win32con.WM_LBUTTONUP, 0, end, delivery, timeout_ms
+        )
 
 
 def _virtual_key(key: str) -> int:
@@ -257,42 +341,62 @@ def _keyboard_lparam(vk_code: int, key_up: bool) -> int:
     return value
 
 
-def background_key_down(hwnd: int, key: str) -> None:
-    """Post a key-down message for esc, p, or enter."""
+def background_key_down(
+    hwnd: int,
+    key: str,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+) -> None:
+    """Deliver a key-down message for esc, p, or enter."""
 
     _require_window(hwnd)
     vk_code = _virtual_key(key)
-    win32gui.PostMessage(
+    _dispatch_message(
         hwnd,
         win32con.WM_KEYDOWN,
         vk_code,
         _keyboard_lparam(vk_code, key_up=False),
+        delivery,
+        timeout_ms,
     )
 
 
-def background_key_up(hwnd: int, key: str) -> None:
-    """Post a key-up message for esc, p, or enter."""
+def background_key_up(
+    hwnd: int,
+    key: str,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+) -> None:
+    """Deliver a key-up message for esc, p, or enter."""
 
     _require_window(hwnd)
     vk_code = _virtual_key(key)
-    win32gui.PostMessage(
+    _dispatch_message(
         hwnd,
         win32con.WM_KEYUP,
         vk_code,
         _keyboard_lparam(vk_code, key_up=True),
+        delivery,
+        timeout_ms,
     )
 
 
-def background_key_press(hwnd: int, key: str, hold_seconds: float = 0.05) -> None:
+def background_key_press(
+    hwnd: int,
+    key: str,
+    hold_seconds: float = 0.05,
+    delivery: str = "post",
+    timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+) -> None:
     """Post a complete key press while keeping down/up separately callable."""
 
     if hold_seconds < 0:
         raise ValueError("hold_seconds 不能为负数")
-    background_key_down(hwnd, key)
+    background_key_down(hwnd, key, delivery, timeout_ms)
     try:
         time.sleep(hold_seconds)
     finally:
-        background_key_up(hwnd, key)
+        background_key_up(hwnd, key, delivery, timeout_ms)
 
 
 def get_mouse_position(hwnd: int) -> MousePosition:
@@ -343,17 +447,36 @@ class WindowsInteractionLab:
         return bool(win32gui.IsIconic(self.hwnd))
 
     @property
+    def foreground(self) -> bool:
+        _require_window(self.hwnd)
+        return win32gui.GetForegroundWindow() == self.hwnd
+
+    @property
     def client_size(self) -> tuple[int, int]:
         return _client_size(self.hwnd)
 
     def screenshot(self, save_path: str | Path | None = None) -> Image.Image:
         return capture_background(self.hwnd, save_path)
 
-    def click(self, x: int, y: int, hold_seconds: float = 0.05) -> None:
-        background_click(self.hwnd, x, y, hold_seconds)
+    def click(
+        self,
+        x: int,
+        y: int,
+        hold_seconds: float = 0.05,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+    ) -> None:
+        background_click(self.hwnd, x, y, hold_seconds, delivery, timeout_ms)
 
-    def long_press(self, x: int, y: int, duration: float) -> None:
-        background_long_press(self.hwnd, x, y, duration)
+    def long_press(
+        self,
+        x: int,
+        y: int,
+        duration: float,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+    ) -> None:
+        background_long_press(self.hwnd, x, y, duration, delivery, timeout_ms)
 
     def drag(
         self,
@@ -363,19 +486,45 @@ class WindowsInteractionLab:
         end_y: int,
         duration: float = 0.5,
         steps: int = 30,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
     ) -> None:
         background_drag(
-            self.hwnd, start_x, start_y, end_x, end_y, duration, steps
+            self.hwnd,
+            start_x,
+            start_y,
+            end_x,
+            end_y,
+            duration,
+            steps,
+            delivery,
+            timeout_ms,
         )
 
-    def key_down(self, key: str) -> None:
-        background_key_down(self.hwnd, key)
+    def key_down(
+        self,
+        key: str,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+    ) -> None:
+        background_key_down(self.hwnd, key, delivery, timeout_ms)
 
-    def key_up(self, key: str) -> None:
-        background_key_up(self.hwnd, key)
+    def key_up(
+        self,
+        key: str,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+    ) -> None:
+        background_key_up(self.hwnd, key, delivery, timeout_ms)
 
-    def key_press(self, key: str, hold_seconds: float = 0.05) -> None:
-        background_key_press(self.hwnd, key, hold_seconds)
+    def key_press(
+        self,
+        key: str,
+        hold_seconds: float = 0.05,
+        delivery: str = "post",
+        timeout_ms: int = DEFAULT_SEND_TIMEOUT_MS,
+    ) -> None:
+        background_key_press(self.hwnd, key, hold_seconds, delivery, timeout_ms)
 
     def mouse_position(self) -> MousePosition:
         return get_mouse_position(self.hwnd)
@@ -392,15 +541,28 @@ def _build_parser() -> argparse.ArgumentParser:
     screenshot = subparsers.add_parser("screenshot", help="后台截图")
     screenshot.add_argument("--output", default="interaction-lab-screenshot.png")
 
+    def add_delivery_options(command_parser: argparse.ArgumentParser) -> None:
+        command_parser.add_argument(
+            "--delivery",
+            choices=DELIVERY_MODES,
+            default="post",
+            help="post=异步入队；send=同步直达窗口过程",
+        )
+        command_parser.add_argument(
+            "--timeout-ms", type=int, default=DEFAULT_SEND_TIMEOUT_MS
+        )
+
     click = subparsers.add_parser("click", help="后台点击")
     click.add_argument("x", type=int)
     click.add_argument("y", type=int)
     click.add_argument("--hold", type=float, default=0.05)
+    add_delivery_options(click)
 
     long_press = subparsers.add_parser("long-press", help="后台长按")
     long_press.add_argument("x", type=int)
     long_press.add_argument("y", type=int)
     long_press.add_argument("--duration", type=float, required=True)
+    add_delivery_options(long_press)
 
     drag = subparsers.add_parser("drag", help="后台拖动")
     drag.add_argument("start_x", type=int)
@@ -409,12 +571,14 @@ def _build_parser() -> argparse.ArgumentParser:
     drag.add_argument("end_y", type=int)
     drag.add_argument("--duration", type=float, default=0.5)
     drag.add_argument("--steps", type=int, default=30)
+    add_delivery_options(drag)
 
     for name in ("key-down", "key-up", "key-press"):
         key_parser = subparsers.add_parser(name, help=f"后台 {name}")
         key_parser.add_argument("key", choices=tuple(SUPPORTED_KEYS))
         if name == "key-press":
             key_parser.add_argument("--hold", type=float, default=0.05)
+        add_delivery_options(key_parser)
 
     monitor = subparsers.add_parser("mouse-position", help="实时显示鼠标客户区坐标")
     monitor.add_argument("--interval", type=float, default=0.05)
@@ -426,9 +590,10 @@ def main() -> int:
     lab = WindowsInteractionLab(args.title, args.window_class)
 
     if args.command == "info":
+        client = "unavailable" if lab.minimized else "x".join(map(str, lab.client_size))
         print(
-            f"hwnd={lab.hwnd} client={lab.client_size[0]}x{lab.client_size[1]} "
-            f"minimized={lab.minimized}"
+            f"hwnd={lab.hwnd} client={client} minimized={lab.minimized} "
+            f"foreground={lab.foreground}"
         )
     elif args.command == "screenshot":
         image = lab.screenshot(args.output)
@@ -437,9 +602,13 @@ def main() -> int:
             f"minimized={lab.minimized}"
         )
     elif args.command == "click":
-        lab.click(args.x, args.y, args.hold)
+        lab.click(
+            args.x, args.y, args.hold, args.delivery, args.timeout_ms
+        )
     elif args.command == "long-press":
-        lab.long_press(args.x, args.y, args.duration)
+        lab.long_press(
+            args.x, args.y, args.duration, args.delivery, args.timeout_ms
+        )
     elif args.command == "drag":
         lab.drag(
             args.start_x,
@@ -448,13 +617,15 @@ def main() -> int:
             args.end_y,
             args.duration,
             args.steps,
+            args.delivery,
+            args.timeout_ms,
         )
     elif args.command == "key-down":
-        lab.key_down(args.key)
+        lab.key_down(args.key, args.delivery, args.timeout_ms)
     elif args.command == "key-up":
-        lab.key_up(args.key)
+        lab.key_up(args.key, args.delivery, args.timeout_ms)
     elif args.command == "key-press":
-        lab.key_press(args.key, args.hold)
+        lab.key_press(args.key, args.hold, args.delivery, args.timeout_ms)
     elif args.command == "mouse-position":
         print("按 Ctrl+C 停止")
         try:
