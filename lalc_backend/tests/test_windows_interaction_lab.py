@@ -19,6 +19,7 @@ class WindowsInteractionLabTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.messages = []
+        cls.cursor_positions = []
 
         win32con = types.ModuleType("win32con")
         constants = {
@@ -29,7 +30,13 @@ class WindowsInteractionLabTests(unittest.TestCase):
             "WM_LBUTTONUP": 0x0202,
             "WM_KEYDOWN": 0x0100,
             "WM_KEYUP": 0x0101,
+            "WM_ACTIVATE": 0x0006,
+            "WM_HOTKEY": 0x0312,
             "MK_LBUTTON": 0x0001,
+            "WA_INACTIVE": 0,
+            "WA_ACTIVE": 1,
+            "KEYEVENTF_KEYUP": 0x0002,
+            "GA_ROOT": 2,
             "SMTO_BLOCK": 0x0001,
             "SMTO_ABORTIFHUNG": 0x0002,
         }
@@ -40,6 +47,7 @@ class WindowsInteractionLabTests(unittest.TestCase):
         win32api.MAKELONG = lambda low, high: (low & 0xFFFF) | ((high & 0xFFFF) << 16)
         win32api.MapVirtualKey = lambda _vk, _mode: 0x19
         win32api.GetCursorPos = lambda: (0, 0)
+        win32api.SetCursorPos = lambda point: cls.cursor_positions.append(point)
 
         win32gui = types.ModuleType("win32gui")
         win32gui.error = RuntimeError
@@ -54,6 +62,10 @@ class WindowsInteractionLabTests(unittest.TestCase):
         )
         win32gui.GetForegroundWindow = lambda: 1
         win32gui.ScreenToClient = lambda _hwnd, point: point
+        win32gui.ClientToScreen = lambda _hwnd, point: (point[0] + 10, point[1] + 20)
+        win32gui.WindowFromPoint = lambda _point: 42
+        win32gui.GetAncestor = lambda hwnd, _flag: hwnd
+        win32gui.IsChild = lambda _parent, _child: False
 
         win32ui = types.ModuleType("win32ui")
         fake_user32 = types.SimpleNamespace(PrintWindow=_CallableApi())
@@ -75,15 +87,18 @@ class WindowsInteractionLabTests(unittest.TestCase):
         )
         cls.windll_patch.start()
         cls.lab = importlib.import_module("experiments.windows_interaction_lab")
+        cls.methods = importlib.import_module("experiments.windows_interaction_methods")
 
     @classmethod
     def tearDownClass(cls):
         cls.windll_patch.stop()
         cls.module_patch.stop()
         sys.modules.pop("experiments.windows_interaction_lab", None)
+        sys.modules.pop("experiments.windows_interaction_methods", None)
 
     def setUp(self):
         self.messages.clear()
+        self.cursor_positions.clear()
 
     def test_keyboard_lparam_contains_scan_code_and_release_flags(self):
         down = self.lab._keyboard_lparam(ord("P"), key_up=False)
@@ -109,7 +124,12 @@ class WindowsInteractionLabTests(unittest.TestCase):
             self.messages,
             [
                 (42, self.lab.win32con.WM_MOUSEMOVE, 0, packed),
-                (42, self.lab.win32con.WM_LBUTTONDOWN, self.lab.win32con.MK_LBUTTON, packed),
+                (
+                    42,
+                    self.lab.win32con.WM_LBUTTONDOWN,
+                    self.lab.win32con.MK_LBUTTON,
+                    packed,
+                ),
                 (42, self.lab.win32con.WM_LBUTTONUP, 0, packed),
             ],
         )
@@ -136,6 +156,85 @@ class WindowsInteractionLabTests(unittest.TestCase):
         self.assertEqual(self.lab._virtual_key("Enter"), self.lab.win32con.VK_RETURN)
         with self.assertRaises(ValueError):
             self.lab._virtual_key("space")
+
+    def test_activate_cursor_click_wraps_mouse_messages_and_restores_cursor(self):
+        with mock.patch.object(self.methods.time, "sleep"):
+            self.methods.activate_cursor_click(42, 100, 200)
+
+        packed = 100 | (200 << 16)
+        self.assertEqual(
+            [message[1] for message in self.messages],
+            [
+                self.lab.win32con.WM_ACTIVATE,
+                self.lab.win32con.WM_MOUSEMOVE,
+                self.lab.win32con.WM_LBUTTONDOWN,
+                self.lab.win32con.WM_LBUTTONUP,
+                self.lab.win32con.WM_ACTIVATE,
+            ],
+        )
+        self.assertEqual(self.messages[2][3], packed)
+        self.assertEqual(self.cursor_positions, [(110, 220), (0, 0)])
+
+    def test_managed_key_uses_real_key_state_and_always_releases(self):
+        state = {"pressed": False}
+        sent = []
+        unregister = mock.Mock(return_value=True)
+        self.methods._user32.RegisterHotKey = mock.Mock(return_value=True)
+        self.methods._user32.UnregisterHotKey = unregister
+        self.methods._user32.PeekMessageW = mock.Mock(return_value=False)
+
+        def send_key(vk_code, key_up):
+            sent.append((vk_code, key_up))
+            state["pressed"] = not key_up
+
+        with (
+            mock.patch.object(self.methods, "_configure_keyboard_api"),
+            mock.patch.object(
+                self.methods,
+                "_is_key_pressed",
+                side_effect=lambda _vk: state["pressed"],
+            ),
+            mock.patch.object(self.methods, "_send_input_key", side_effect=send_key),
+            mock.patch.object(self.methods, "_remove_hotkey_messages"),
+            mock.patch.object(self.methods.time, "sleep"),
+        ):
+            self.methods.managed_key_press(42, ord("P"))
+
+        self.assertEqual(sent, [(ord("P"), False), (ord("P"), True)])
+        unregister.assert_called_once_with(None, 0x4C00 + ord("P"))
+
+    def test_managed_key_aborts_when_hotkey_cannot_guard_foreground(self):
+        self.methods._user32.RegisterHotKey = mock.Mock(return_value=False)
+        self.methods._user32.PeekMessageW = mock.Mock(return_value=False)
+        with (
+            mock.patch.object(self.methods, "_configure_keyboard_api"),
+            mock.patch.object(self.methods, "_is_key_pressed", return_value=False),
+            mock.patch.object(self.methods, "_send_input_key") as send_key,
+        ):
+            with self.assertRaisesRegex(
+                self.methods.ExperimentalInputError, "无法注册临时全局热键"
+            ):
+                self.methods.managed_key_press(42, ord("P"))
+        send_key.assert_not_called()
+
+    def test_touch_path_rejects_a_point_owned_by_another_window(self):
+        with mock.patch.object(
+            self.methods, "_window_owns_point", side_effect=[True] * 5 + [False]
+        ):
+            with self.assertRaisesRegex(
+                self.methods.ExperimentalInputError, "目标点被其他窗口遮挡"
+            ):
+                self.methods._assert_touch_path_visible(42, (10, 10), (20, 20))
+
+    def test_touch_info_contains_contact_metadata(self):
+        flags = self.methods._touch_flags("down")
+        info = self.methods._make_touch_info(2, 100, 200, flags)
+
+        self.assertEqual(info.type, self.methods.PT_TOUCH)
+        self.assertEqual(info.touchInfo.pointerInfo.pointerId, 2)
+        self.assertEqual(info.touchInfo.pointerInfo.pointerFlags, flags)
+        self.assertEqual(info.touchInfo.rcContact.left, 98)
+        self.assertEqual(info.touchInfo.rcContact.bottom, 202)
 
 
 if __name__ == "__main__":

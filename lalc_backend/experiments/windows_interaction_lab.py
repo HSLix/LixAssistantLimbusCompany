@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,17 @@ import win32con
 import win32gui
 import win32ui
 from PIL import Image
+
+from experiments.windows_interaction_methods import (
+    ExperimentalInputError,
+    activate_cursor_click,
+    activate_cursor_drag,
+    activate_cursor_long_press,
+    anchored_touch_click,
+    anchored_touch_drag,
+    anchored_touch_long_press,
+    managed_key_press,
+)
 
 
 DEFAULT_WINDOW_TITLE = "LimbusCompany"
@@ -529,6 +541,54 @@ class WindowsInteractionLab:
     def mouse_position(self) -> MousePosition:
         return get_mouse_position(self.hwnd)
 
+    def activate_cursor_click(
+        self, x: int, y: int, hold_seconds: float = 0.05
+    ) -> None:
+        activate_cursor_click(self.hwnd, x, y, hold_seconds)
+
+    def activate_cursor_long_press(
+        self, x: int, y: int, duration: float
+    ) -> None:
+        activate_cursor_long_press(self.hwnd, x, y, duration)
+
+    def activate_cursor_drag(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        duration: float = 0.5,
+        steps: int = 30,
+    ) -> None:
+        activate_cursor_drag(
+            self.hwnd, start_x, start_y, end_x, end_y, duration, steps
+        )
+
+    def managed_key_press(self, key: str, hold_seconds: float = 0.05) -> None:
+        managed_key_press(self.hwnd, _virtual_key(key), hold_seconds)
+
+    def anchored_touch_click(
+        self, x: int, y: int, hold_seconds: float = 0.05
+    ) -> None:
+        anchored_touch_click(self.hwnd, x, y, hold_seconds)
+
+    def anchored_touch_long_press(
+        self, x: int, y: int, duration: float
+    ) -> None:
+        anchored_touch_long_press(self.hwnd, x, y, duration)
+
+    def anchored_touch_drag(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        duration: float = 0.5,
+    ) -> None:
+        anchored_touch_drag(
+            self.hwnd, start_x, start_y, end_x, end_y, duration
+        )
+
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Limbus Company Windows 交互实验")
@@ -580,6 +640,58 @@ def _build_parser() -> argparse.ArgumentParser:
             key_parser.add_argument("--hold", type=float, default=0.05)
         add_delivery_options(key_parser)
 
+    def add_point(command_parser: argparse.ArgumentParser) -> None:
+        command_parser.add_argument("x", type=int)
+        command_parser.add_argument("y", type=int)
+
+    def add_drag_points(command_parser: argparse.ArgumentParser) -> None:
+        command_parser.add_argument("start_x", type=int)
+        command_parser.add_argument("start_y", type=int)
+        command_parser.add_argument("end_x", type=int)
+        command_parser.add_argument("end_y", type=int)
+        command_parser.add_argument("--duration", type=float, default=0.5)
+
+    cursor_click = subparsers.add_parser(
+        "activate-cursor-click", help="伪激活并对齐真实光标后点击"
+    )
+    add_point(cursor_click)
+    cursor_click.add_argument("--hold", type=float, default=0.05)
+
+    cursor_long_press = subparsers.add_parser(
+        "activate-cursor-long-press", help="伪激活并对齐真实光标后长按"
+    )
+    add_point(cursor_long_press)
+    cursor_long_press.add_argument("--duration", type=float, required=True)
+
+    cursor_drag = subparsers.add_parser(
+        "activate-cursor-drag", help="伪激活并沿拖动路径移动真实光标"
+    )
+    add_drag_points(cursor_drag)
+    cursor_drag.add_argument("--steps", type=int, default=30)
+
+    managed_key = subparsers.add_parser(
+        "managed-key-press", help="伪激活并短暂注入受守护的真实键状态"
+    )
+    managed_key.add_argument("key", choices=tuple(SUPPORTED_KEYS))
+    managed_key.add_argument("--hold", type=float, default=0.05)
+
+    touch_click = subparsers.add_parser(
+        "touch-click", help="合成触摸点击（不移动鼠标、不切换焦点）"
+    )
+    add_point(touch_click)
+    touch_click.add_argument("--hold", type=float, default=0.05)
+
+    touch_long_press = subparsers.add_parser(
+        "touch-long-press", help="合成触摸长按（不移动鼠标、不切换焦点）"
+    )
+    add_point(touch_long_press)
+    touch_long_press.add_argument("--duration", type=float, required=True)
+
+    touch_drag = subparsers.add_parser(
+        "touch-drag", help="合成触摸拖动（不移动鼠标、不切换焦点）"
+    )
+    add_drag_points(touch_drag)
+
     monitor = subparsers.add_parser("mouse-position", help="实时显示鼠标客户区坐标")
     monitor.add_argument("--interval", type=float, default=0.05)
     return parser
@@ -626,6 +738,40 @@ def main() -> int:
         lab.key_up(args.key, args.delivery, args.timeout_ms)
     elif args.command == "key-press":
         lab.key_press(args.key, args.hold, args.delivery, args.timeout_ms)
+    elif args.command == "activate-cursor-click":
+        lab.activate_cursor_click(args.x, args.y, args.hold)
+        print(f"activate-cursor click completed; foreground={lab.foreground}")
+    elif args.command == "activate-cursor-long-press":
+        lab.activate_cursor_long_press(args.x, args.y, args.duration)
+        print(f"activate-cursor long-press completed; foreground={lab.foreground}")
+    elif args.command == "activate-cursor-drag":
+        lab.activate_cursor_drag(
+            args.start_x,
+            args.start_y,
+            args.end_x,
+            args.end_y,
+            args.duration,
+            args.steps,
+        )
+        print(f"activate-cursor drag completed; foreground={lab.foreground}")
+    elif args.command == "managed-key-press":
+        lab.managed_key_press(args.key, args.hold)
+        print(f"managed-key {args.key} completed; foreground={lab.foreground}")
+    elif args.command == "touch-click":
+        lab.anchored_touch_click(args.x, args.y, args.hold)
+        print(f"touch click completed; foreground={lab.foreground}")
+    elif args.command == "touch-long-press":
+        lab.anchored_touch_long_press(args.x, args.y, args.duration)
+        print(f"touch long-press completed; foreground={lab.foreground}")
+    elif args.command == "touch-drag":
+        lab.anchored_touch_drag(
+            args.start_x,
+            args.start_y,
+            args.end_x,
+            args.end_y,
+            args.duration,
+        )
+        print(f"touch drag completed; foreground={lab.foreground}")
     elif args.command == "mouse-position":
         print("按 Ctrl+C 停止")
         try:
@@ -644,4 +790,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except (InteractionLabError, ExperimentalInputError, ValueError) as exc:
+        print(f"interaction lab error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from None

@@ -1,89 +1,171 @@
 # Windows Interaction Lab
 
-本实验工具用于验证 Limbus Company 在**窗口未最小化但没有焦点**时的截图与输入能力，不接入现有任务流水线。
+本实验工具用于验证 Limbus Company 在**窗口未最小化、焦点位于其他程序**时的截图和输入能力。实验代码与正式任务流水线隔离。
 
-## 当前边界
+## 当前目标和边界
 
-- 支持：游戏在前台、未激活、被其他窗口部分或完全遮挡。
-- 暂不支持：Windows 真正最小化。Unity 窗口最小化后客户区可能变为 `0x0`，命令会给出明确提示。
-- 已确认：窗口被遮挡时，`PrintWindow` 截图仍能得到正常画面。
-- 已观察：异步 `PostMessage` 键盘消息会在未聚焦时积累，并在游戏重新获得焦点后集中执行。
-- 已观察：异步 `PostMessage` 鼠标消息未被游戏响应。
+- 当前目标：游戏继续显示和运行，但 `foreground=False` 时仍能输入。
+- 截图：已确认游戏被其他窗口遮挡时，`PrintWindow` 仍能取得正常画面。
+- 暂不支持真正最小化：Unity 窗口最小化后客户区可能变为 `0x0`。
+- 原始 `PostMessage` 鼠标消息：已确认游戏没有反应。
+- 原始 `PostMessage` 键盘消息：已确认未聚焦时积累，游戏重新获得焦点后集中执行。
+- 新输入方法仍属于实验实现，必须经过 Windows 实机验证后才能选择正式后端。
+
+## 新增的三种输入方法
+
+### 1. `activate-cursor`：兼容性基线
+
+向游戏同步发送一次伪 `WM_ACTIVATE`，把真实鼠标临时移动到目标屏幕位置，再向游戏窗口同步发送鼠标消息，最后恢复鼠标位置和非激活提示。
+
+- 优点：最接近 ahab、ok-script 等现有项目已经使用的 Unity 兼容方案。
+- 不会调用 `SetForegroundWindow`，正常情况下不会把游戏切到前台。
+- 鼠标会短暂移动；执行点击、长按或拖动时不要同时操作实体鼠标。
+- 可测试遮挡状态，因为鼠标按键消息只发给目标窗口，不会点击遮挡窗口。
+
+### 2. `managed-key`：受守护的真实键状态
+
+先用全局热键临时截住对应按键，向游戏发送伪激活提示，再通过 `SendInput` 产生真实的按下/抬起状态。这样可供 Unity 的全局按键状态轮询读取，同时尽量阻止当前前台程序收到按键。
+
+- 仅支持完整的按下再抬起：`esc`、`p`、`enter`。
+- 如果热键注册失败，命令会在注入前退出，避免误操作前台程序。
+- 清理逻辑保证已按下的键会尝试抬起，并注销临时热键。
+- 这是针对“窗口消息已进入队列，但 Unity 未聚焦时不消费”的实验路径。
+
+### 3. `touch`：锚定合成触摸
+
+使用 Windows 合成指针 API。一个微小且不激活的置顶窗口承接第一根锚定触点，第二根触点在游戏坐标执行点击、长按或拖动。
+
+- 不移动真实鼠标，不调用 `SetForegroundWindow`。
+- 需要 Windows 10 1809 或更高版本。
+- 当前是安全验证版：执行前检查整条路径是否属于游戏；如果被其他窗口遮挡，会明确拒绝执行，避免把合成触摸送入遮挡窗口。
+- 第一轮只在“游戏可见但未聚焦”状态测试。确认 Limbus Company 接受合成触摸后，再单独研究遮挡时临时借用目标区域的方案。
 
 ## 前提
 
-- Windows 10 或 Windows 11。
-- Limbus Company 已启动，窗口标题为 `LimbusCompany`，窗口类为 `UnityWndClass`。
+- Windows 10 1809 或 Windows 11。
+- Limbus Company 已启动且没有最小化。
+- 默认窗口标题为 `LimbusCompany`，窗口类为 `UnityWndClass`。
 - 在 `lalc_backend` 目录中运行命令。
 
-## 查看目标窗口
+先检查目标窗口：
 
 ```powershell
 uv run python -m experiments.windows_interaction_lab info
 ```
 
-`foreground=False` 表示当前焦点不在游戏，正是本轮实验所需状态。
+输出应包含有效的 `client=宽x高`。测试后台输入时应确认 `foreground=False`。
 
-## 后台截图
+## 坐标与截图
 
-保持窗口未最小化；可以让其他窗口完全遮挡游戏：
-
-```powershell
-uv run python -m experiments.windows_interaction_lab screenshot --output screenshots/lab.png
-```
-
-## 实时鼠标坐标
+实时读取客户区坐标，按 `Ctrl+C` 停止：
 
 ```powershell
 uv run python -m experiments.windows_interaction_lab mouse-position
 ```
 
-输出中的 `client=(x, y)` 是鼠标操作所需的客户区坐标。按 `Ctrl+C` 停止。
+`client=(x, y)` 是所有鼠标和触摸命令使用的坐标。建议先选一个结果明确、误操作风险低的按钮。
 
-## 消息投递模式
-
-- `--delivery post`：原有异步方式，只把消息加入 Unity 线程队列；保留为对照组。
-- `--delivery send`：使用带超时的同步发送，直接调用目标窗口过程；这是下一轮应优先测试的方式。
-
-两种方式都不会移动真实鼠标，也不会调用 `SetForegroundWindow` 或主动夺取焦点。
-
-## 本轮建议测试
-
-先把焦点放在 PowerShell 或其他窗口，并确认 `info` 显示 `foreground=False`。然后测试同步键盘：
+被其他窗口遮挡时截图：
 
 ```powershell
-uv run python -m experiments.windows_interaction_lab key-press p --delivery send
-uv run python -m experiments.windows_interaction_lab key-press esc --delivery send
-uv run python -m experiments.windows_interaction_lab key-press enter --delivery send
+uv run python -m experiments.windows_interaction_lab screenshot --output screenshots/lab.png
 ```
 
-再测试同步鼠标：
+## 推荐测试顺序
+
+每轮测试前都把焦点切回 PowerShell 或记事本，并重新运行 `info` 确认 `foreground=False`。先用点击测试一个容易恢复的界面，再测试长按和拖动。
+
+### 第一轮：验证 `activate-cursor` 兼容性
+
+先让游戏可见但不聚焦：
 
 ```powershell
-uv run python -m experiments.windows_interaction_lab click 640 360 --delivery send
-uv run python -m experiments.windows_interaction_lab long-press 640 360 --duration 1.5 --delivery send
-uv run python -m experiments.windows_interaction_lab drag 400 500 900 500 --duration 0.8 --steps 40 --delivery send
+uv run python -m experiments.windows_interaction_lab activate-cursor-click 640 360
+uv run python -m experiments.windows_interaction_lab activate-cursor-long-press 640 360 --duration 1.5
+uv run python -m experiments.windows_interaction_lab activate-cursor-drag 400 500 900 500 --duration 0.8 --steps 40
 ```
 
-如果命令超时，可调整等待上限：
+通过标准：游戏立即响应；命令结束后鼠标回到原位；输出仍为 `foreground=False`。
+
+随后用另一个普通窗口遮挡目标坐标，重复一次点击。遮挡窗口不应被点击，游戏应继续响应。这一步验证同步消息和真实光标位置是否足以绕过当前 Unity 限制。
+
+### 第二轮：验证 `managed-key`
+
+焦点放在不会因按键造成损失的记事本空白页或 PowerShell：
 
 ```powershell
-uv run python -m experiments.windows_interaction_lab click 640 360 --delivery send --timeout-ms 3000
+uv run python -m experiments.windows_interaction_lab managed-key-press p
+uv run python -m experiments.windows_interaction_lab managed-key-press esc
+uv run python -m experiments.windows_interaction_lab managed-key-press enter
 ```
 
-最后用 `post` 重复同一坐标，作为对照：
+通过标准：游戏立即响应；当前前台程序没有收到字符、换行或 Esc；游戏没有变成前台；重新聚焦游戏时不会补执行旧按键。
+
+若看到“无法注册临时全局热键”，该次没有注入按键。关闭占用该全局热键的软件后重试，不建议绕过守护直接运行。
+
+### 第三轮：验证 `touch`
+
+保持游戏目标区域完全可见，但让 PowerShell 或一个不遮挡目标坐标的小窗口获得焦点：
+
+```powershell
+uv run python -m experiments.windows_interaction_lab touch-click 640 360
+uv run python -m experiments.windows_interaction_lab touch-long-press 640 360 --duration 1.5
+uv run python -m experiments.windows_interaction_lab touch-drag 400 500 900 500 --duration 0.8
+```
+
+通过标准：游戏立即响应；真实鼠标完全不动；游戏没有变成前台。若提示目标点被遮挡，请移动前台窗口后再测试，这属于当前安全边界而不是注入失败。
+
+### 第四轮：与原始消息方式对照
+
+原始方法保留为对照组：
 
 ```powershell
 uv run python -m experiments.windows_interaction_lab click 640 360 --delivery post
+uv run python -m experiments.windows_interaction_lab click 640 360 --delivery send
 uv run python -m experiments.windows_interaction_lab key-press p --delivery post
+uv run python -m experiments.windows_interaction_lab key-press p --delivery send
 ```
 
-## 结果判断
+`post` 是异步入队；`send` 是带超时的同步窗口过程调用。两者都不产生真实的全局鼠标或键盘状态。
 
-每项分别记录“命令成功”和“游戏立即产生预期变化”。如果 `send` 调用成功但游戏仍无反应，说明限制位于 Unity 的焦点/输入层，而不是 Windows 消息是否进入窗口过程；下一步再单独实验激活消息包络，不直接并入正式输入实现。
+## 推荐记录表
 
-| 状态 | 截图 | 鼠标 post | 鼠标 send | 键盘 post | 键盘 send |
-|---|---|---|---|---|---|
-| 前台可见 | 待记录 | 待记录 | 待记录 | 待记录 | 待记录 |
-| 未激活且无遮挡 | 已确认正常 | 无响应 | 待测试 | 获焦后集中执行 | 待测试 |
-| 被其他窗口完全遮挡 | 已确认正常 | 无响应 | 待测试 | 获焦后集中执行 | 待测试 |
+不要只记录“命令没有报错”，还要观察游戏是否立即变化、前台是否被切换，以及输入是否泄漏给其他程序。
+
+| 方法 | 游戏状态 | 预期游戏响应 | 光标移动 | 抢占前台 | 输入泄漏 | 实测 |
+|---|---|---|---|---|---|---|
+| `activate-cursor-click` | 可见、未聚焦 | 立即 | 短暂，结束后恢复 | 否 | 否 | 待记录 |
+| `activate-cursor-click` | 被遮挡、未聚焦 | 立即 | 短暂，结束后恢复 | 否 | 遮挡窗口不响应 | 待记录 |
+| `managed-key-press p` | 可见、未聚焦 | 立即 | 否 | 否 | 前台程序不响应 | 待记录 |
+| `managed-key-press esc` | 可见、未聚焦 | 立即 | 否 | 否 | 前台程序不响应 | 待记录 |
+| `managed-key-press enter` | 可见、未聚焦 | 立即 | 否 | 否 | 前台程序不响应 | 待记录 |
+| `touch-click` | 可见、未聚焦 | 立即 | 否 | 否 | 否 | 待记录 |
+| `touch-drag` | 可见、未聚焦 | 立即 | 否 | 否 | 否 | 待记录 |
+
+## Python 调用
+
+三个后端都保留了可独立调用的函数，也封装在 `WindowsInteractionLab` 中：
+
+```python
+from experiments.windows_interaction_lab import WindowsInteractionLab
+
+lab = WindowsInteractionLab()
+lab.activate_cursor_click(640, 360)
+lab.activate_cursor_long_press(640, 360, 1.5)
+lab.activate_cursor_drag(400, 500, 900, 500, duration=0.8, steps=40)
+
+lab.managed_key_press("p")
+
+lab.anchored_touch_click(640, 360)
+lab.anchored_touch_long_press(640, 360, 1.5)
+lab.anchored_touch_drag(400, 500, 900, 500, duration=0.8)
+```
+
+实验底层实现位于 `experiments/windows_interaction_methods.py`。正式系统在实机结果明确前不应直接依赖它。
+
+## 如何选择下一步
+
+- `activate-cursor` 成功：先用它作为鼠标兼容性基线；如果短暂移动光标可接受，可直接进入稳定性实验。
+- `managed-key` 成功：键盘无需再使用会积累的 `PostMessage`，继续测试连续调用和按住时长。
+- `touch` 成功：优先继续这条不移动光标的路线，再实现遮挡保护/目标区域临时置顶实验。
+- 三者都失败：限制更可能来自游戏自身输入模块或保护逻辑，应先记录窗口模式、Unity 输入路径和系统版本，不要直接开始构建状态图系统。
