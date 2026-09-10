@@ -203,6 +203,16 @@ class WindowsInteractionLabTests(unittest.TestCase):
         self.assertEqual(sent, [(ord("P"), False), (ord("P"), True)])
         unregister.assert_called_once_with(None, 0x4C00 + ord("P"))
 
+    def test_input_union_is_not_truncated_to_keyboard_member(self):
+        self.assertGreaterEqual(
+            ctypes.sizeof(self.methods._INPUT_UNION),
+            ctypes.sizeof(self.methods._MOUSEINPUT),
+        )
+        self.assertGreaterEqual(
+            ctypes.sizeof(self.methods._INPUT_UNION),
+            ctypes.sizeof(self.methods._KEYBDINPUT),
+        )
+
     def test_managed_key_aborts_when_hotkey_cannot_guard_foreground(self):
         self.methods._user32.RegisterHotKey = mock.Mock(return_value=False)
         self.methods._user32.PeekMessageW = mock.Mock(return_value=False)
