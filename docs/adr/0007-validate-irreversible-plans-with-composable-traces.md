@@ -1,0 +1,3 @@
+# Validate Irreversible Plans with Composable Trace Coverage
+
+Candidate approval requires structural validity and Validation Coverage, not an unconditional replay from the task's beginning. When game progress is irreversible, revised Python receives a new plan identity and executes from the earliest changed or unvalidated applicable Step; earlier evidence may cover only identical source with unchanged effective inputs and a verified boundary state. Promotion includes only verified Python control flow: unobserved branches must be omitted or raise `ExecutionInterruption` until later execution, validation, and approval, while unchanged registered Subworkflows need boundary rather than internal revalidation.
