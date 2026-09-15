@@ -1,16 +1,20 @@
-# Lix Assistant
+# LALC
 
-Lix Assistant automates a Windows-native Unity game window during an exclusive focused automation session.
+LALC automates a Windows-native Unity game window during an exclusive focused automation session.
 
 ## Language
 
 **Target Window**:
-The Windows desktop window owned by the Unity game that Lix Assistant observes and operates.
+The Windows desktop window owned by the Unity game that LALC observes and operates.
 _Avoid_: Emulator, virtual device
 
 **Focused Automation Session**:
 The supported interaction mode in which the Target Window remains restored and owns Windows foreground focus for the duration of automation. The user does not operate other desktop applications during the session.
 _Avoid_: Background operation, headless operation, foreground simulation
+
+**Architecture Demo**:
+The minimum runnable foundation that proves one accepted execution and supervision path end to end while keeping its framework code for later product development. Example business behavior and fake external adapters are replaceable placeholders, not a separate throwaway implementation.
+_Avoid_: Disposable prototype, Stage completion, production application
 
 **Cursor-Assisted Background Operation**:
 A rejected interaction mode that leaves focus on another application but temporarily moves the physical cursor to operate the Target Window.
@@ -60,16 +64,16 @@ _Avoid_: Manifest attachment, staging library
 Mutable local Asset metadata keyed by logical name, running game language, and complete content hash. It records the most recent successful use and match region but is not part of a Manifest.
 _Avoid_: Component Usage Index, Asset Manifest
 
-**Asset Batch**:
-The durable rollback record of Asset Library files added by one Top-level Execution. It survives interruption until those files are safely referenced by an approved Manifest or completely removed after rejection.
-_Avoid_: Staging library, Asset version
+**Candidate File Batch**:
+The durable ownership record of immutable Component source and Asset files actually created by one Top-level Execution. It is created only when needed, is never reused by another execution, and remains with a retained Working Manifest until approval or discard performs reference-safe final cleanup. Working Manifest mappings decide whether a file is currently usable; the Batch decides whether a file created by that execution must ultimately be retained or removed.
+_Avoid_: Manifest diff, staging library, Asset version
 
 **Recovery Ladder**:
 The fixed escalation order for an interrupted task: exhaust Deterministic Recovery, optionally invoke the Agent through Runtime Exception Handling, and otherwise perform Safe Task Termination.
 _Avoid_: Error handler chain, Agent-first recovery
 
 **Run Context**:
-The executor-owned interface between formal Components and one Task Workflow's execution environment, including component invocation, Target Window access, language, Working Manifest resolution, Trace, evidence, cancellation, and budgets. Business data flows through explicit parameters, returns, and ordinary Python locals rather than mutable fields on the Context; Agent Python receives only a JSON-compatible snapshot and never the live Context.
+The executor-owned interface between formal Components and one Task Workflow's execution environment, including component invocation, Target Window access, language, Working Manifest resolution, Trace, evidence, cancellation, and budgets. Business data flows through explicit parameters, returns, and ordinary Python locals rather than mutable fields on the Context; the Agent receives only a JSON-compatible diagnostic snapshot and never the live Context.
 _Avoid_: Global runtime state, mutable Workflow
 
 **Execution Trace**:
@@ -77,8 +81,16 @@ The executor-owned chronological record of what one real execution attempt actua
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:
-The retained record of one Agent diagnosis or planning interaction, including the information supplied to the Agent, its response, and the complete generated Python source. Execution Trace references it when the resulting temporary plan actually runs.
+The retained record of one Agent Turn, including the information supplied to the Agent and its complete response. Execution Trace references it when the executor acts on that response.
 _Avoid_: Execution Trace, Agent memory
+
+**Agent Adapter**:
+The provider boundary that sends one self-contained Context Snapshot to a local or remote model and parses exactly one of the three allowed Agent Turn results. It owns transport and provider-error normalization but never performs actions, writes files, validates or switches a Working Manifest, invokes formal code, or decides recovery and termination.
+_Avoid_: Runtime Agent Session, executor
+
+**Candidate Runner**:
+The independent operating-system process used only to execute a structurally valid but not permanently approved candidate Step for one formal trial. Its termination contains hangs, crashes, and cancellation at the process boundary but is not a security sandbox; the parent retains Trace, candidate files, Manifest state, and review evidence.
+_Avoid_: Task Workflow process, Agent Adapter, sandbox
 
 **Run Log Bundle**:
 The single retention unit for one Task Workflow run, containing its Execution Trace, Agent Interaction Logs, screenshots, and other detailed evidence. The common log-retention policy keeps or removes the bundle as a whole; only the compact Workflow Run Ledger survives independently.
@@ -96,10 +108,6 @@ _Avoid_: Mandatory end-to-end replay, assumed prefix validity
 A normal Python return from a formal Component after its own contract has been satisfied. A frozen named result is interpreted structurally through its fields rather than by Python class identity; a Task Workflow instead returns directly JSON-compatible data, which is verified against its original inputs before becoming success.
 _Avoid_: Execution Interruption, Outcome routing table
 
-**Temporary Plan Adapter**:
-The parent-side boundary that supplies a JSON Context snapshot to a Temporary Action Plan subprocess, validates and normalizes its JSON-compatible return, records Trace data, and converts subprocess exceptions, invalid results, and timeouts into `ExecutionInterruption`. The plan itself knows no transport envelope.
-_Avoid_: Temporary Action Plan, Workflow result type
-
 **Execution Interruption**:
 A raised interruption from a failed condition, timeout, unmet expected result, lack of progress, or execution error. Inside a Step, `@step` catches it before the caller frame unwinds and enters the Recovery Ladder; outside a Step it directly produces an Execution Anomaly.
 _Avoid_: Normal Outcome, Execution Anomaly
@@ -109,12 +117,24 @@ User-saved configuration executed from a frozen ordered list of Task Workflow st
 _Avoid_: Workflow, Task Workflow
 
 **Top-level Execution**:
-One user-started execution boundary: either a directly started Task Workflow or one Automation Plan and all of its sequential Task Workflows. It owns exactly one shared Working Manifest from start through final review or disposal.
+One user-started execution boundary: a directly started Task Workflow or one Automation Plan and all of its sequential Task Workflows. It owns exactly one Working Manifest and at most one Candidate File Batch from start through final review or disposal.
 _Avoid_: Task Workflow call, Subworkflow call
 
 **Runtime Exception Handling**:
-An optional Agent capability that responds when deterministic execution no longer satisfies its expected state or progress. It produces a visible Temporary Action Plan to recover the current task without making that plan a permanent system capability.
+An optional Agent capability that responds when an existing supported Task Workflow remains paused at an unrecovered Step anomaly. It may request a formal Step recheck, propose one compatible replacement of that current Step with optional related Assets, propose only Asset files and mappings used by the current Step, or recommend Safe Task Termination.
 _Avoid_: Intelligent recovery, fallback workflow
+
+**Agent Turn**:
+One Context Builder and Agent Adapter exchange within a Runtime Agent Session. It records the supplied context and one immutable response for executor handling. A model request consumes the Turn when dispatched, including an invalid response or provider error; later source revision requires another Turn.
+_Avoid_: Trusted Action call, Workflow Step
+
+**Runtime Agent Session**:
+A sequence of at most `max_turns` Agent Turns started only by an Execution Anomaly caught while an existing supported Task Workflow remains paused inside an `@step` wrapper. Provider, model, System Prompt version, generation parameters, and Agent Adapter version are fixed when the Session starts; there is no within-Session switching or fallback. It succeeds only when the executor obtains a contract-compatible normal return from a fresh formal invocation of the current Step, which resumes the caller without deciding Task Workflow success. A later Step anomaly creates a new Session with a new Turn budget while sharing the Top-level Execution's Working Manifest and Candidate File Batch. An anomaly outside a Step never starts this Session. There is no separate Session deadline, action budget, candidate budget, or plan timeout.
+_Avoid_: Independent drafting session, Deterministic Recovery
+
+**Request Step Recheck**:
+A Runtime Agent Session request for the executor to re-observe, resolve the interrupted Step through the latest Working Manifest, check compatibility and condition, and invoke it fresh. It is neither an Agent success claim nor permission to replace an entered Python frame.
+_Avoid_: Retry command, Workflow resume result
 
 **Execution Anomaly**:
 A mismatch, ambiguity, failed expectation, timeout, lack of progress, or execution-contract violation for which the deterministic executor can find no remaining legal path that continues the task. A Trusted Action access violation produces this directly without public Deterministic Recovery. It is the only condition that can trigger Runtime Exception Handling.
@@ -125,7 +145,7 @@ An executor-performed action that stops only the current Task Workflow and its r
 _Avoid_: Application exit, game shutdown, system shutdown
 
 **Cancellation**:
-An executor control signal rather than a Component exception. It stops new input and interrupts a containing Automation Plan with `reason: user_cancelled` without invoking Deterministic Recovery or Agent. If a Task Workflow run record already exists, that record becomes `failure` with `failure_code: user_cancelled`; otherwise no Task result is created. `safe_termination_performed` reports only whether the executor actually performed that action. Exact cancellation position remains in Trace, and formal source cannot catch or clear the signal.
+An executor control signal rather than a Component exception. It stops new Trusted Actions, Agent Turns, and candidate trials, wakes cooperative pause, and terminates an active Candidate Runner without closing the main application or Target Window. It interrupts a containing Automation Plan with `reason: user_cancelled` without invoking Deterministic Recovery or Agent. If a Task Workflow run record already exists, that record becomes `failure` with `failure_code: user_cancelled`; otherwise no Task result is created. `safe_termination_performed` reports only whether the executor actually performed that action. Exact cancellation position remains in Trace, and formal source cannot catch or clear the signal.
 _Avoid_: Execution Interruption, Execution Anomaly
 
 **Task Workflow Result**:
@@ -136,29 +156,35 @@ _Avoid_: Automation Plan status, Safe Task Termination, not executed
 The Ledger result of one entered Subworkflow call: `success` when it returns normally and `failure` when it exits without a normal return. It has no verifier. Its failure code is executor-owned, while Agent and recovery facts remain separate. Safe Task Termination is recorded once on the owning Task Workflow rather than duplicated on every active Subworkflow.
 _Avoid_: Task Workflow final verification, Safe Task Termination count
 
-**Temporary Action Plan**:
-A run-scoped Python plan with one `execute(ctx)` entrypoint, executed directly by the Temporary Plan Adapter in a runner subprocess from a JSON-compatible context snapshot. Its source contains no `except`, though `try/finally` is allowed; escaping exceptions are recorded and normalized by the Adapter. It is not a Component and never enters the Working Manifest. Once executed, its `plan_id` and source are immutable; changing it creates a new plan identity.
-_Avoid_: Component, Formal Workflow, sandboxed code
-
 **Controlled Evolution**:
-The human-governed process that turns evidence from Runtime Exception Handling into a tested candidate change and, only after approval, registers it as a reusable system capability.
+The human-governed process that turns evidence from Runtime Exception Handling into a structurally validated candidate change and, only after explicit permanent approval, registers it as a reusable system capability. Trial results are review evidence rather than an automatic approval gate.
 _Avoid_: Self-modification, automatic evolution
 
 **Capability Expansion**:
-A separate, user-initiated activity in which the Agent may reuse, compose, or explore Python capabilities to propose support for a previously unsupported game objective. Temporary execution follows the selected operating policy, while permanent registration still requires human approval.
-_Avoid_: Recovery, autonomous exploration
+A deferred activity in which an Agent explores and constructs support for a previously unsupported objective. Agent-assisted Workflow Drafting and maintenance of Task Workflows or Subworkflows are also deferred; Stage 3 only repairs and maintains the current paused Step and its related Assets.
+_Avoid_: Runtime Step Recovery, Step Maintenance
+
+Permanent approval is a supervised judgment over one complete Capability Proposal and its recorded evidence. Stage 3 does not encode a universal business-success threshold for that judgment: whether the candidate completed a successful formal trial, Step results, Task Workflow verifier results, Trace, and Validation Coverage are visible evidence, not automatic approval gates or authority. Unattended execution never grants permanent approval.
 
 **Supervised Operation**:
-An operating policy in which each immutable Agent Python plan requires source review and confirmation before execution. It is intended for developing, inspecting, and refining automation capabilities.
+A first-version runtime rule in which every Agent-proposed Working Manifest update requires review and an explicit approve-or-reject decision before its candidate Step or Assets become available for formal trial in the current Top-level Execution. Rejection requires user feedback for the next Agent Turn. Approval permits only that formal trial and is separate from permanent approval, which can occur only after the Top-level Execution ends. The system-level stop remains an independent immediate cancellation control.
+
+An approved candidate Step uses the same fixed Trusted Action access matrix as a normal Step. The first version introduces neither a separate high-risk action taxonomy nor per-action confirmation; safety instead relies on no direct Agent action channel, immutable pre-registered Trusted Actions, complete proposal review, and system-level cancellation.
+
+**Supervised Review Dialog**:
+The topmost modal decision boundary for one structurally valid runtime proposal. It blocks all main-window interaction until the supervisor approves one formal trial, rejects with required feedback for a later Agent Turn, or confirms cancellation of the Agent and current Task Workflow; it cannot be dismissed through the window close action or Escape key.
+_Avoid_: Editor, notification, permanent approval
+
+The Stage 3 Agent Runtime Step Recovery and Maintenance architecture is accepted. Context field selection, serialization, concrete validators, UI behavior, persistence mechanics, and Demo acceptance are implementation and experiment-planning concerns rather than unresolved architecture decisions.
 _Avoid_: Developer mode, manual mode
 
-**Unattended Operation**:
-An operating policy in which Agent-generated Python plans may execute without prior review despite not being securely sandboxed, while permanent capabilities still require later human approval.
-_Avoid_: Safe sandbox, full trust
-
 **Capability Proposal**:
-A reviewable proposal to promote the verified contents of a durable Working Manifest snapshot into a new saved Component Manifest. Its displayed changes are computed against the base Manifest rather than stored as a separate additions-and-deletions structure.
+A reviewable post-execution projection of one complete structurally valid Manifest, built from the base Working Manifest and one candidate change, for approval as a new saved Component Manifest. It may represent the successfully trialled current Working Manifest or an unselected candidate retained when execution terminates; the review displays whether a successful formal trial occurred, all recorded evidence, and changes computed against the base Manifest. The first version does not partially approve files or Components.
 _Avoid_: File change, patch
+
+**Capability Approval Dialog**:
+The topmost modal post-execution decision boundary for one complete Capability Proposal. Approval saves its immutable Component Manifest and makes it active for later Top-level Executions; rejection leaves the active Manifest unchanged and permits reference-safe candidate cleanup, while both outcomes retain the execution, trial, Agent, and review evidence.
+_Avoid_: Supervised Review Dialog, partial approval, runtime confirmation
 
 **Component**:
 An immutable, uniquely identified Python Task Workflow, Subworkflow, Step, Recovery Rule, or Trusted Action that a Component Manifest may reference. Formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. Trusted Actions are the only Components allowed to normalize caught low-level exceptions. Editing adds a new component ID rather than changing existing content.
@@ -173,7 +199,7 @@ The sole saved version unit: an immutable, validated complete document whose exe
 _Avoid_: Approval history, mutable component list
 
 **Working Manifest**:
-A durable, complete copy created from the active Component Manifest for one Top-level Execution. A directly started Task Workflow owns one; all sequential Task Workflows in an Automation Plan share one. The executor resolves their Components through this copy, and verified Agent logic may be organized into new candidate Components that update it. Temporary Action Plans never enter it. An update becomes visible only while the executor is paused and only by atomically replacing the complete file; an entered Python frame is never patched. The system retains only the current Working Manifest. The replaced file exists only long enough to recover a failed switch and is removed after a successful switch. At Top-level Execution end the current copy is discarded, retained for review, or has its verified contents saved after human approval under a new immutable Component Manifest ID.
+A durable, complete copy created from the active Component Manifest for one Top-level Execution. A directly started Task Workflow owns one and all sequential Task Workflows in an Automation Plan share one. The executor resolves Components through this copy. In the first-version Runtime Agent Session, an update may replace the current paused Step with optional related Assets or may update only Asset files and mappings used by that Step, always for an immediate legal formal trial of the current Step. An update becomes visible only while the executor is paused and only by atomically replacing the complete file; an entered Python frame is never patched. The system retains only the current Working Manifest during execution. The replaced file is used only when a failed candidate trial will continue to another Agent Turn; successful trial commits the switch, while user Cancellation ends execution without rolling back an already selected candidate. A failed or uncertain required rollback is terminal and forbids further execution until the pre-switch snapshot is restored. At Top-level Execution end the Working Manifest and any structurally valid retained candidate may supply the complete projection for one Capability Proposal.
 _Avoid_: Component Manifest, Pending Change Set, manifest diff
 
 **Component Usage Index**:

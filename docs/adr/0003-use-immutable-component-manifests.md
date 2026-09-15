@@ -8,13 +8,13 @@ Registered Task Workflows, Subworkflows, Steps, Recovery Rules, and Trusted Acti
 
 ## Consequences
 
-- Temporary Action Plans execute directly through their Adapter and never enter the Working Manifest. Only verified logic reorganized into candidate Components may update it.
+- The first version executes no Temporary Action Plan. Agent-generated executable behavior must be a structurally valid compatible replacement of the current paused Step and enters only through a complete Working Manifest update and immediate formal trial.
 - Later Task Workflows in the same sequential Automation Plan may reuse capabilities added earlier in that Top-level Execution; parallel Task Workflow execution is excluded from the first version.
 - The current Working Manifest is persisted so it survives process failure; review differences from its base are derived when needed.
-- A Working Manifest update becomes visible only while the executor is paused: the complete replacement and referenced sources are written and verified before one atomic switch. Failure leaves the prior file active; success removes it after the switch, and existing Python frames are never hot-patched.
+- A Working Manifest update becomes visible only while the executor is paused and can immediately arrange a legal formal trial call. The complete replacement and referenced sources are written and verified before one atomic switch. The prior complete file remains as the sole uncommitted marker until trial success commits or failure rolls back the switch; existing Python frames are never hot-patched.
 - A paused Step wrapper retains its logical name, original arguments, and return contract. Re-entry resolves the latest ID at that name; Trace records the name, actual ID, and hash. No replacement chain is required.
-- Trace records the formal Components and temporary plans actually executed, with identities, hashes, evidence, and Agent Interaction Log references. It does not retain `working_manifest_hash` or the unused contents of superseded Working Manifests.
-- At Top-level Execution end it may be discarded, retained for later review, or have only verified contents approved into a new immutable Manifest.
+- Trace records the formal Components actually executed, with identities, hashes, evidence, and Agent Interaction Log references. It does not retain `working_manifest_hash` or the unused contents of superseded Working Manifests.
+- At Top-level Execution end it may be discarded, retained for later review, or approved as one complete new immutable Manifest after its candidate mappings have acceptable evidence. The first version has no partial Component or file approval.
 - Approving an Agent Capability Proposal creates and activates a new Manifest; it never mutates the base Manifest.
 - Saving a user-edited manifest creates and activates a new manifest. Merely enabling an existing manifest creates nothing new.
 - Manifests are shown newest first. Only an inactive, non-sole manifest may be deleted, and deleting it does not automatically delete Components.

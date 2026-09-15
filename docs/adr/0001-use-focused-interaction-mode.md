@@ -4,7 +4,7 @@ status: accepted
 
 # Use one focused interaction mode
 
-Lix Assistant will operate Limbus Company only during a Focused Automation Session: the game is restored, owns real Windows foreground focus, receives cursor-free mouse input, and receives ordinary foreground keyboard input. Although Cursor-Assisted Background Operation can click the unfocused and occluded game reliably, it temporarily seizes the user's mouse and still has no safe background keyboard path; keeping both modes would add complexity without preserving independent desktop use.
+LALC will operate Limbus Company only during a Focused Automation Session: the game is restored, owns real Windows foreground focus, receives cursor-free mouse input, and receives ordinary foreground keyboard input. Although Cursor-Assisted Background Operation can click the unfocused and occluded game reliably, it temporarily seizes the user's mouse and still has no safe background keyboard path; keeping both modes would add complexity without preserving independent desktop use.
 
 ## Considered options
 

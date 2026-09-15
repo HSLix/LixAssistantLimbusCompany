@@ -1,3 +1,8 @@
+---
+status: superseded
+superseded_by: 0014
+---
+
 # Keep Executed Plan Identities Immutable
 
 Every plan identity becomes immutable when execution starts. Execution Trace records the base `manifest_id`, whether a temporary Working Manifest was used, the identities and hashes of Components actually executed, temporary `plan_id` values, Agent Interaction Log references, actions, observations, evidence, and interruption positions. The Agent Interaction Log stores the complete generated Python source and the interaction that produced it. A Temporary Action Plan is not a Component, executes directly through its Adapter, and never enters the Working Manifest. Editing creates a new plan identity and new execution events; rejection changes only plan status, while successful verified logic may separately be reorganized into candidate Components. The system does not retain historical Working Manifest snapshots or `working_manifest_hash`, because diagnosis reconstructs actual execution rather than every capability that was available.

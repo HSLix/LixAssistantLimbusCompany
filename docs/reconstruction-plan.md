@@ -1,10 +1,10 @@
-# Lix Assistant Reconstruction Plan
+# LALC Reconstruction Plan
 
 This plan keeps the reconstruction dependency-ordered. Accepted boundaries may change only through an explicit reopening such as the Python-first decision below.
 
 ## Stage 1: Product and Agent boundaries
 
-Status: accepted and explicitly revised for Capability Expansion and dynamic Agent Python.
+Status: accepted and explicitly revised for runtime Agent maintenance and formal trials of unapproved candidate Python.
 
 Locked contracts:
 
@@ -12,8 +12,8 @@ Locked contracts:
 - only the deterministic executor may invoke the optional Agent;
 - the Recovery Ladder remains Deterministic Recovery, Agent, then Safe Task Termination;
 - permanent capability changes require validation and human approval;
-- every Top-level Execution copies the active immutable Component Manifest into one complete durable Working Manifest; a direct Task Workflow owns one, while all sequential Task Workflows in an Automation Plan share one;
-- Agent-generated Python may execute before permanent approval under Supervised or warned Unattended Operation;
+- every Top-level Execution copies the active immutable Component Manifest into one complete durable Working Manifest; the two forms are a direct Task Workflow and one Automation Plan with its sequential Task Workflows;
+- Agent-generated formal candidate Python may receive a Working Manifest trial before permanent approval only after Supervised runtime confirmation;
 - first-version subprocess execution is explicitly not a security sandbox, and stronger enforcement is deferred.
 
 ## Stage 2: Python-first Workflow and deterministic execution
@@ -25,7 +25,7 @@ Confirmed contracts:
 - Task Workflow, Subworkflow, and Step are immutable Python Components loaded as ordinary modules from Manifest-fixed paths and hashes;
 - exactly one parameterless `@task_workflow`, `@sub_workflow`, or `@step` on each formal entrypoint is the sole component-role source; Manifest, paths, names, and tags do not duplicate or infer `component_kind`;
 - each Task Workflow, Subworkflow, or Step occupies one Python file with exactly one decorated `execute`; Task Workflow and Step may also contain their optional `condition`, Task Workflow contains its required `verify`, while Subworkflow exposes only `execute`; result classes and ordinary implementation code remain in the same file and no file contains multiple formal Components;
-- formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, every private function in their files, and Temporary Action Plans contain no `except`; `try/finally` remains available for cleanup, but loaders reject `return`, `break`, `continue`, or `raise` in every `finally` without reachability or rethrow analysis so the original exception propagates naturally;
+- formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, and every private function in their files contain no `except`; `try/finally` remains available for cleanup, but loaders reject `return`, `break`, `continue`, or `raise` in every `finally` without reachability or rethrow analysis so the original exception propagates naturally;
 - each Manifest is one complete document containing executable `logical_name → immutable Component ID and load information` mappings, dedicated `recovery_rules` and `trusted_actions` mappings, and an `assets` mapping from semantic name and language to shared relative path plus complete hash;
 - formal Components call one another only through `ctx.call(logical_name, **arguments)`; it resolves and validates the current Working Manifest entry on every call and stores no Component Ref or implementation cache;
 - every `ctx.call()` target is a string literal; before each Working Manifest atomic update, the executor validates every formal target, role permission, and Subworkflow cycle against the complete resulting candidate Manifest, while runtime validates resolution and role again and records the actual identity;
@@ -51,38 +51,41 @@ Confirmed contracts:
 - the task-start-bound `verify(ctx, result, *, ...)` compares only that normalized result with the original input snapshot; it does not read Trace, observe the game, maintain counters, or call formal Components;
 - the verifier's `result` annotation exactly matches the Task Workflow return annotation; a tuple, source-local named result, annotation mismatch, or non-normalizable root return produces an Execution Anomaly before verification, and only the exact boolean `True` marks success;
 - the executor assigns no progress meaning to Trace or Agent claims, fabricates no return records, and marks no task successful when its bound verifier is false or raises;
-- Agent Python receives a JSON snapshot derived from explicit data and runtime records rather than the live `ctx`; external game state is always re-observed, with deliberate return to a known start when it cannot be identified reliably;
-- `condition` is optional and read-only only for Task Workflow and Step: a normal false Task condition records `task_condition_not_satisfied` without Agent, while an exception produces Execution Anomaly and may let Agent repair only later capability before the current non-retried item records `task_condition_check_failed`; neither case starts execution or performs Safe Task Termination;
+- the Agent receives a JSON diagnostic snapshot derived from explicit data and runtime records rather than the live `ctx`; external game state is always re-observed;
+- `condition` is optional and read-only only for Task Workflow and Step: a normal false Task condition records `task_condition_not_satisfied` without Agent, while an exception records `task_condition_check_failed`; neither case starts execution, starts a Runtime Agent Session, or performs Safe Task Termination;
 - Task Workflow condition only grants launch permission and never restores its entry state; recoverable prerequisites belong in its first Step, while Subworkflow entry recognition likewise belongs to its first relevant Step;
 - Step condition checks before the first and every recovery-controlled fresh invocation; false, uncertainty, or exception produces `ExecutionInterruption`, never reaches Workflow as a branch value, and only a later satisfied check permits Step invocation before repeated failure escalates to Agent or Safe Task Termination;
 - a Step `condition` accepts the whole observable responsibility range rather than one instantaneous action target, and every Step safely continues from actionable, expected transitional, or completed states using only current observation and original arguments;
 - each Python Component uses one module docstring as its sole natural-language description;
 - every Task Workflow requires a matching `verify(ctx, result, *, ...) -> bool`; its exact identity, hash, and original inputs bind at Task start so Agent changes cannot alter the current success standard;
-- after every normally completed Temporary Action Plan, the executor re-observes and tries to restore the current paused Step first; final verification occurs only after the ordinary Python call chain produces a normal Task Workflow result;
+- `Request Step Recheck` makes the executor re-observe and try to restore the current paused Step; final verification occurs only after the ordinary Python call chain produces a normal Task Workflow result;
 - plain `@step` marks the smallest independently observable Python boundary and records identity, arguments, conditions, timing, Trusted Actions, evidence, returns, and interruptions;
 - first-version `@step` has no timeout, retry, or policy parameters; expected-result and lack-of-progress checks stay in ordinary Python, with no generic progress-event or heartbeat framework;
 - a Step confirms each important input, never blindly replays an earlier sequence, directly returns from an already-completed state, waits through expected transitions, and raises `ExecutionInterruption` only after an internally enforced reasonable deadline for unknown or stalled states;
 - Trusted Actions are immutable shipped or human-approved Components registered once as `observe` for screenshots, OCR, matching, and state reads or `control` for clicks, input, waits, and other execution operations; they are imported and called as ordinary functions with no `ctx.action()` API;
 - Trusted Action implementations alone may catch low-level exceptions, but must record the original and either return an explicit documented result or re-raise a normalized exception, never silently pass or fabricate success;
-- the executor hard-codes one action matrix: Task Workflow and Subworkflow `execute`, plus Task Workflow and Step `condition`, may use `observe`; Step `execute`, Recovery Rule `recover`, and Temporary Action Plan may use both; Recovery Rule `detect` may use `observe`; Task Workflow `verify` uses none;
+- the executor hard-codes one action matrix: Task Workflow and Subworkflow `execute`, plus Task Workflow and Step `condition`, may use `observe`; Step `execute` and Recovery Rule `recover` may use both; Recovery Rule `detect` may use `observe`; Task Workflow `verify` uses none;
 - candidate loading rejects direct, statically visible Trusted Action violations in formal entrypoints but does not trace private-function call chains; Trusted Action wrappers are the authoritative boundary, rechecking classification and the actual execution role before the action and tracing calls, while Agent code cannot create or replace Trusted Actions during a Top-level Execution;
 - `wait` is `control` so Workflow code cannot bypass Step observation, deadlines, and recovery; there are no component-specific lists, user-defined permissions, allow/deny rules, permission objects, or inheritance;
 - a runtime Trusted Action access violation is an execution-contract error that is rejected before the action and directly produces an Execution Anomaly without public recovery; Agent repair can rescue the current call only when a Step wrapper remains paused, while a Step-external violation cannot reconnect the failed Workflow frame and a verifier violation is terminal for that task;
 - image-using Trusted Actions accept semantic Asset names and internally resolve the game language, Working Manifest path and hash, fallback language, prior successful region, and Trace evidence; there is no `ctx.asset()`, Asset Handle, language-neutral Asset, or direct Asset path in formal source;
-- Assets are shared immutable files rather than Components: Agent additions are append-only within the run, tracked by a durable Asset Batch for crash-safe approval or rejection rollback, while a separate Asset Usage Index stores last successful use and normalized match region without automatically cleaning accepted old files;
+- Assets are shared immutable files rather than Components; Agent-created Component source and Asset files are append-only within one Top-level Execution and share one durable Candidate File Batch, while a separate Asset Usage Index stores last successful use and normalized match region without automatically cleaning accepted old files;
 - `@step` catches its own `ExecutionInterruption` before the caller frame unwinds and enters the executor-owned Recovery Ladder; an interruption outside a Step produces an Execution Anomaly directly;
 - public Recovery Rules run only inside an interrupted `@step` wrapper; successful actions and Step-external interruptions do not trigger public-rule polling;
 - if any Recovery Rule `detect()` raises, the executor stops rule enumeration, records the rule and original exception, and produces an Execution Anomaly without treating it as a non-match, invoking any recovery, or checking later rules; the current Step remains paused for Agent handling or Safe Task Termination;
 - if the uniquely selected Recovery Rule `recover()` raises or returns a value other than `None`, the executor records a Recovery Rule execution-contract failure and directly produces an Execution Anomaly; it checks no other rule and does not immediately invoke the current Step, whose wrapper and callers remain paused for Agent handling or Safe Task Termination;
 - deterministic recovery exists only inside the interrupted `@step` wrapper: check public Recovery Rules, resolve the current Step through the latest Working Manifest, and invoke it once before Agent escalation;
-- Subworkflows and Task Workflows are never restarted; an interruption outside a Step produces an Execution Anomaly directly;
+- Subworkflows and Task Workflows are never restarted; an interruption outside a Step produces an Execution Anomaly and Safe Task Termination directly without starting a Runtime Agent Session;
 - the caller frame remains paused because the wrapper catches the interruption before unwinding; a successful compatible Step return resumes ordinary Python control flow, while already unwound frames are never reconstructed and paused Workflow frames are never hot-patched;
 - a replacement Step may reconnect only through a fresh invocation after atomic Working Manifest selection: it keeps the logical name, `@step` role, every existing parameter and default, and the return contract, while allowing only new keyword-only parameters with JSON-compatible defaults;
 - the wrapper supplies a new copy of its saved arguments, and reconnection is forbidden when new required data, changed caller control flow, an out-of-scope environment, indeterminate prior effects, or an incompatible result would be required; such a Component applies only to later valid calls;
-- Agent help cannot fabricate completion data or bypass remaining Workflow actions through an early task-level verifier; inability to restore a compatible Step return continues Agent planning or causes Safe Task Termination;
-- Agent plans execute as immutable single-entry Python source in a runner subprocess; a Temporary Plan Adapter owns JSON transport and converts the plan's ordinary JSON-compatible return or subprocess failure into the same two execution channels;
+- Agent help cannot fabricate completion data or bypass remaining Workflow actions through an early task-level verifier; inability to restore a compatible Step return continues Agent diagnosis or causes Safe Task Termination;
+- the first version has no Temporary Action Plan, Temporary Plan Adapter, `plan_id`, direct model-action channel, or independent Agent-code execution contract;
+- `max_turns` is the sole Runtime Agent Session budget; a dispatched model request consumes one Turn regardless of valid response, invalid output, or provider failure, while formal Step trials use the Step's ordinary finite-wait and interruption contract;
 - the runner provides failure and lifecycle isolation but not security isolation;
-- Runtime API and Step wrappers append Traces of actual execution; Agent Interaction Logs retain complete generated Python source and Trace records the corresponding references;
+- Task Workflow orchestration remains in a background thread of the GUI process, while only a not-yet-permanently-approved candidate Step trial uses an independent Candidate Runner OS process owned and monitored by the parent;
+- the Demo candidate runner exchanges only a JSON-compatible Example scenario snapshot, Step result, and action events with the parent; it adds no general RPC, which is deferred until a real Trusted Action must remain in the parent process;
+- Runtime API and Step wrappers append Traces of actual execution; Agent Interaction Logs retain the complete context and response for every Agent Turn and Trace records the corresponding references;
 - Trace records each executed formal Component's stable logical name, actual Component ID, and content hash;
 - each Task Workflow run retains Trace, Agent Interaction Logs, screenshots, and evidence as one Run Log Bundle, while the common retention policy removes only whole bundles;
 - a local Workflow Run Ledger retains compact per-invocation outcomes, duration, public deterministic recovery counts, Step reinvocation counts, and Agent intervention counts independently of detailed Trace retention; it has no Subworkflow restart fields;
@@ -92,9 +95,8 @@ Confirmed contracts:
 - one Agent invocation is one Trace event but is attributed in Ledger to the owning Task Workflow and every active ancestor Subworkflow whose call span contains it; already returned and sibling Subworkflows remain unaffected, successful affected spans are Agent-assisted, and application-wide totals use unique Trace events rather than summed nested Ledger counts;
 - public Recovery Rule and Step-reinvocation events use the same span attribution without changing strict success when no Agent intervenes; application-wide totals likewise use unique Trace events rather than sums of overlapping Workflow records;
 - irreversible progress permits compatible Trace segments to establish Validation Coverage;
-- unknown exception handling evolves through a fixed sequence: successful temporary plan, ordinary local Python handling branch in candidate Workflow A', compatible real validation in Workflow B, then public Recovery Rule plus rebuilt Workflow A'' without the duplicate branch;
-- a first occurrence never creates a public Recovery Rule directly, and Workflow B changes only if its source must be corrected to expose the failure through the formal execution contract;
-- only verified Python control flow may be promoted, and permanent registration still requires human approval;
+- a first occurrence never creates a public Recovery Rule directly; first-version Agent maintenance cannot modify Recovery Rules;
+- formal trials execute only verified Python control flow; permanent review exposes successful-trial and Validation Coverage evidence without using either as an automatic gate, and permanent registration still requires human approval;
 - Components and saved Manifests remain immutable; the current Working Manifest may change by referencing new identities, stores no additions-and-deletions log, and cleanup remains reference-safe and user initiated.
 - concise Python docstrings support initial Agent retrieval and change with source hashes and Component IDs; tags, separate component documents, and vector retrieval remain deferred.
 
@@ -102,48 +104,48 @@ Stage 2 will not add Component Ref objects, dynamic `ctx.call()` targets, cross-
 
 The first version also does not export, inherit, migrate, or persist Task Workflow business state, Python loop positions, or entered frames. It terminates safely or restarts from an observable known point after process failure, deferring explicit Checkpoint/Resume design until cross-process or cross-implementation continuation is required.
 
-Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order in implementation without adding a Manifest field. Storage layout and formats use the most direct local representation when implementation reaches them; failure codes are added only for real execution paths; each vertical slice supplies the concrete safe action appropriate to its supported game state. Agent budgets and Capability Expansion remain Stage 3 responsibilities. The immediate next activity is planning the minimum implementation slices and their acceptance order.
+Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order in implementation without adding a Manifest field. Storage layout and formats use the most direct local representation when implementation reaches them; failure codes are added only for real execution paths; each vertical slice supplies the concrete safe action appropriate to its supported game state. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. The immediate next activity is planning the minimum implementation slices and their acceptance order.
 
 The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 begins on a clean orphan branch in this repository; the old branch remains the historical reference and rollback path rather than a runtime that the new code must coexist with. The first real Task Workflow is selected when that slice begins, using mailbox collection as the initial smallest candidate.
 
-## Stage 3: Agent adapters and capability learning
+## Stage 3: Agent Runtime Step Recovery and Maintenance
 
-Status: planned; Runtime Exception Handling and Capability Expansion are both in scope.
+Status: architecture accepted; minimum code experiment planning next.
 
-- local and remote models implement one Agent Adapter contract;
-- the Agent receives relevant Trace, Context snapshot, evidence, formal Components, and Expert Guidance;
-- it returns immutable `execute(ctx)` Python source or recommends Safe Task Termination; only the executor performs termination;
-- Temporary Action Plan source contains no `except`, may use `try/finally`, and exposes every exception to the Adapter; expected alternatives use explicit Trusted Action results or a later plan with a new identity;
-- Supervised Operation confirms source; warned Unattended Operation runs without confirmation;
-- the child imports the shipped Runtime API directly and records an independent append-only Trace;
-- Temporary Action Plans are not Components and execute directly through the Adapter without entering the Working Manifest; Trace records their actual order and Agent Interaction Log references;
-- only verified temporary logic organized into candidate Workflow, Step, or Recovery Rule Components, together with verified Asset files or mappings, may update the Working Manifest;
-- Working Manifest changes are fully written and atomically selected only at executor-controlled pause boundaries; they never hot-patch an entered Python frame, and successfully superseded Working Manifest files are not retained as historical versions;
-- first-version Automation Plans execute Task Workflows sequentially and do not support concurrent Working Manifest modification;
-- after direct launch or successful Automation Plan preflight, every considered Task Workflow final result is only `success` or `failure`; a failed condition or post-preflight incompatibility is still `failure` even when `execute()` is not entered, with executor-owned stable `failure_code`, user-facing `failure_message`, Agent and recovery facts, and Safe Task Termination recorded separately, while failure position remains in Trace, no `failure_stage` exists, and `incomplete` is only an open-record state;
-- failure codes are ordinary executor constants whose published meanings only extend and never change; Components and Agent output cannot choose them, and unclassified cases use `execution_failed` while full detail remains in Trace and the message;
-- Automation Plan uses one best-effort policy: every listed Task Workflow is considered once, and its `success` or `failure` result never blocks later items;
-- Automation Plan is user-saved configuration rather than a Component or Manifest entry; it contains only an ordered list of Task Workflow stable logical names and explicit input dictionaries, permits duplicate tasks as independent calls, and uses list position instead of a separate item identity;
-- before any task starts, Automation Plan performs one full preflight against its initial Working Manifest: parse the complete Plan structure, resolve every name to a Task Workflow, and bind, type-check, and normalize every input; it collects all errors, and any failure records `interrupted: invalid_plan` without invoking a task;
-- preflight does not run Task Workflow conditions, inspect environmental eligibility or dependencies, predict success, or test adjacency compatibility;
-- after preflight the Plan retains a frozen ordered list plus current index and no execution stack; before each item it re-resolves the latest Task Workflow, revalidates frozen inputs, runs the current condition, and records `failure_code: working_manifest_incompatible` when a Working Manifest change prevents a fresh compatible call;
-- an active Task Workflow always keeps its entered frame, locals, loop position, and remaining control flow; replacements apply only to later fresh calls, while subsequent `ctx.call()` operations continue resolving the latest compatible callees;
-- an invalid Task Workflow result or unsuccessful final verifier records `failure` with structured explanation and is terminal for that call without Agent rescue or retry; Safe Task Termination is a separate executor action, not a result category, and ends only the current Task Workflow while a containing Automation Plan proceeds with its next independent item;
-- the first version has no item-level condition, retry, result mapping, task dependency graph, configurable failure policy, `continue_on_failure`, or supervised-versus-unattended execution branch; a directly started Task Workflow simply ends after its result is recorded;
-- Automation Plan has no verifier or aggregate business-success predicate: after successful preflight, finishing traversal records `completed` plus an ordered per-task summary regardless of individual outcomes, while invalid preflight, cancellation, process failure, or inability to continue scheduling records `interrupted`;
-- reliability rates and Agent-recovery statistics remain per-Workflow Ledger data; Automation Plan has neither its own success rate nor an Agent recovery path;
-- interrupted plans return to bounded parent-controlled diagnosis and receive a new `plan_id` when revised;
-- compatible traces may validate a plan across irreversible progress;
-- at Top-level Execution end the Working Manifest may be discarded or retained for review; only validation and human approval can save verified contents as a new active Manifest.
+- only an Execution Anomaly caught while an existing supported Task Workflow remains paused inside an `@step` wrapper starts a bounded Runtime Agent Session;
+- local and remote models implement one Agent Adapter contract that only transports a self-contained Context Snapshot, normalizes provider failures, and parses one allowed Turn result; it never performs actions, writes files, changes a Manifest, invokes formal code, or decides recovery and termination;
+- the Agent may propose a compatible replacement of the current paused Step with optional related Assets, or only Asset files and mappings used by the unchanged current Step; Task Workflow, Subworkflow, other-Step, Recovery Rule, Trusted Action, and new user-startable Task Workflow changes are invalid;
+- candidate files use new immutable identities and hashes and belong to the current Top-level Execution's Candidate File Batch;
+- a complete candidate Working Manifest is atomically selected only when the executor can immediately arrange a legal formal trial call;
+- the first formal call supplies behavior evidence; success contributes only executed behavior to Validation Coverage, while failure restores the complete prior Working Manifest after preserving evidence;
+- an entered Python frame is never replaced, and Manifest rollback cannot undo external game actions;
+- after Top-level Execution ends, one complete Capability Proposal projected from either the successfully trialled Working Manifest or a structurally valid unselected candidate is the permanent-approval unit, separate from runtime confirmation;
+- permanent approval has no universal business-success threshold in Stage 3: the system presents whether a successful formal trial occurred together with the candidate and recorded evidence, while the supervisor decides whether it is sufficient; no trial result, Step result, Task verifier result, or unattended run can approve automatically;
+- a topmost modal Capability Approval Dialog requires exactly one whole-proposal approve-or-reject decision: approval saves and activates a new immutable Component Manifest for later Top-level Executions, rejection keeps the active Manifest and permits reference-safe candidate cleanup, and both retain execution and review evidence;
+- `max_turns` is the only Runtime Agent Session budget; there is no Session deadline, action budget, candidate budget, or plan timeout;
+- every Agent Turn uses a self-contained Context Snapshot rebuilt from local authoritative state and never depends on provider-retained conversation history; detailed context selection remains undecided;
+- provider, model, System Prompt version, generation parameters, and Agent Adapter version are fixed for each Runtime Agent Session, with no within-Session model switching, routing, or fallback;
+- a Runtime Agent Session succeeds only through a compatible normal return from a fresh formal invocation of the current Step; the Task Workflow then continues toward its unchanged bound verifier, and a later Step anomaly creates a new Session with a fresh `max_turns` while sharing the Top-level Execution's Working Manifest and Candidate File Batch;
+- the first version supports only Supervised Operation: every complete proposal is reviewed and confirmed before trial, while unattended trial and persisted operating-policy selection are deferred;
+- proposal confirmation is an explicit approve-or-reject decision; rejection requires feedback for the next Agent Turn, while the existing system stop remains a separate immediate cancellation control;
+- a topmost modal Supervised Review Dialog blocks main-window interaction until the supervisor approves one trial, rejects with feedback, or confirms Cancellation; its close action and Escape key cannot bypass the decision;
+- the Demo's cooperative Run Gate uses `threading.Condition` without polling and waits only before a new Trusted Action, Agent Turn, or candidate Step trial; Manifest replacement does not wait, and pause never interrupts an operation already permitted to start;
+- an approved candidate Step uses the same fixed Trusted Action access matrix as a normal Step; Stage 3 adds neither a high-risk action taxonomy nor per-action confirmation;
+- runtime confirmation and successful trial affect only the current Working Manifest; permanent whole-Manifest approval is unavailable until the complete Top-level Execution ends;
+- invalid output, rejected validation, user rejection with required feedback, a non-activating switch failure, or formal trial failure proceeds to the next Agent Turn when budget remains; trial failure first restores the prior Working Manifest, and every source revision receives a new Component ID and hash without a proposal status machine;
+- main-window stop and review-window termination share one Cancellation path that wakes cooperative pause, prevents later gated work, terminates an active Candidate Runner, and leaves the GUI and Target Window open;
+- Cancellation after a candidate Manifest switch ends the Top-level Execution without rollback and uses that complete state for the Capability Proposal; rollback is required only for a failed trial followed by another Agent Turn;
+- a failed or uncertain Working Manifest rollback is a terminal infrastructure error and forbids further Agent Turns, Component calls, and game input until the pre-switch capability snapshot is restored;
+- Agent-assisted Workflow Drafting and autonomous Capability Expansion remain explicitly deferred.
 
-The first vertical slice demonstrates Agent Python execution, Trace, interruption and revision, evidence-based promotion, approval, and later model-free formal execution on one small GUI objective.
+The Stage 3 architecture Grill is closed. The detailed accepted baseline is [Stage 3 Agent Runtime Step Recovery and Maintenance](stage-3-agent-runtime-step-recovery-and-maintenance.md). Context fields, validators, UI behavior, persistence mechanics, and Demo acceptance are intentionally left to the next minimum code experiment plan.
 
 ## Stage 4: Application structure, UI, and packaging
 
 Status: planned.
 
 - CLI and desktop UI call the same application and execution services;
-- the UI exposes task execution, Agent configuration, source review, the Unattended risk warning, proposal review, Manifest recovery, and cleanup;
+- the UI exposes task execution, Agent configuration, supervised source and Asset review, proposal review, Manifest recovery, and cleanup;
 - the UI exposes per-Workflow strict success rate, Agent-assisted completion, recovery breakdown, and average duration from the local Workflow Run Ledger;
 - a packaging spike verifies ordinary module loading, runner subprocess creation, external assets, and Trace persistence;
 - packaged formal automation must remain usable without a model.
@@ -154,4 +156,8 @@ Status: planned.
 - complex AST import or API allowlists;
 - general Workflow DSL or compiler;
 - automatic permanent promotion;
+- Agent-assisted Workflow Drafting and Trial;
+- Agent maintenance of Task Workflows and Subworkflows;
+- autonomous Capability Expansion for unsupported goals;
+- Unattended Operation for Agent-generated candidate trials;
 - skill-maturity labels and broad autonomous general-computer control.

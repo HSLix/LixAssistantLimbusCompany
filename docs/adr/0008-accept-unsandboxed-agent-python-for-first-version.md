@@ -1,5 +1,6 @@
 ---
-status: accepted
+status: superseded
+superseded_by: 0014
 ---
 
 # Accept Un-sandboxed Agent Python for the First Version

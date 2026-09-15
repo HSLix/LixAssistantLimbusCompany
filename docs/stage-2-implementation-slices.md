@@ -96,7 +96,7 @@ Acceptance:
 
 ## Slice 7: Asset capability
 
-Implement only the Asset behavior required by a real image-matching Trusted Action: Manifest resolution, hash verification, current-language selection, deterministic cross-language fallback, Usage Index update after successful use, Trace evidence, and Asset Batch rollback for files created by the execution.
+Implement only the Asset behavior required by a real image-matching Trusted Action: Manifest resolution, hash verification, current-language selection, deterministic cross-language fallback, Usage Index update after successful use, Trace evidence, and the Candidate File Batch lifecycle for Asset files created by the execution.
 
 Acceptance:
 
@@ -104,7 +104,7 @@ Acceptance:
 - matching verifies the selected file and records language, source language, score, region, path, and full hash;
 - fallback and equal-score selection are deterministic;
 - a successful Step may add a verified language alias at an atomic Working Manifest boundary;
-- rejected or abandoned run-added files are removed through resumable Asset Batch cleanup without touching accepted old Assets.
+- rejected or abandoned run-added files are removed through resumable, reference-safe Candidate File Batch cleanup without touching accepted old Assets.
 
 ## Slice 8: First real game task
 
@@ -130,4 +130,4 @@ clean project skeleton
 → first real game task
 ```
 
-Stage 2 implementation is complete only after Slice 8 passes its pure tests and supervised Windows acceptance. Agent budget configuration, a real Agent Adapter, Runtime Exception Handling orchestration, and Capability Expansion remain Stage 3 work.
+Stage 2 implementation is complete only after Slice 8 passes its pure tests and supervised Windows acceptance. A real Agent Adapter, Runtime Exception Handling orchestration, paused-Step recovery, and Workflow Maintenance remain Stage 3 work. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred.
