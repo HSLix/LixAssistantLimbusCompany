@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lix-assistant-limbus-company"
+version = "0.1.0"
+description = "Internal LALC architecture demo"
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PySide6-Essentials"]
+automation = []
+agent = []
+
+[project.gui-scripts]
+lalc = "lalc.__main__:main"
+
+[dependency-groups]
+test = ["pytest"]
+build = ["pyinstaller", "pyinstaller-hooks-contrib"]
+dev = [{ include-group = "test" }]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

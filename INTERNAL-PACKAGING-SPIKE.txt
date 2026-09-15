@@ -1,0 +1,4 @@
+This artifact is an internal packaging spike, not a production release.
+
+It is unsigned and exists only to validate PyInstaller onedir, the unified
+entry point, Candidate Runner, and temporary Packaging Probe behavior.
