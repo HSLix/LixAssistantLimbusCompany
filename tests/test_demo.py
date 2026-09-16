@@ -50,7 +50,7 @@ def test_rejection_requires_feedback_and_reaches_next_turn(tmp_path: Path) -> No
     service.decide_capability("reject")
     service.wait_for(lambda state: state["phase"] == "finished")
     logs = sorted((tmp_path / "logs").glob("*.json"))
-    assert json.loads(logs[-1].read_text())["feedback"] == "请修正"
+    assert json.loads(logs[-1].read_text(encoding="utf-8"))["feedback"] == "请修正"
 
 
 def test_failed_trial_rolls_back_before_next_turn(tmp_path: Path) -> None:
@@ -126,7 +126,8 @@ def test_candidate_runner_and_packaging_probe(tmp_path: Path) -> None:
         "def execute(ctx, *, value=1):\n"
         "    assert 'PySide6' not in sys.modules\n"
         "    ctx.control('done', value)\n"
-        "    return {'completed': True, 'api': api_version()}\n"
+        "    return {'completed': True, 'api': api_version()}\n",
+        encoding="utf-8",
     )
     result = tmp_path / "结果.json"
     request = tmp_path / "request.json"
@@ -140,29 +141,33 @@ def test_candidate_runner_and_packaging_probe(tmp_path: Path) -> None:
                 "example_scenario": {},
                 "result_path": str(result),
             }
-        )
+        ),
+        encoding="utf-8",
     )
     completed = subprocess.run(
         [sys.executable, "-m", "lalc", "--candidate-runner", str(request)], check=False
     )
     assert completed.returncode == 0
-    output = json.loads(result.read_text())
+    output = json.loads(result.read_text(encoding="utf-8"))
     assert output["result"] == {"completed": True, "api": 1}
     assert output["action_events"][0]["action"] == "control"
 
     probe = tmp_path / "external.py"
-    probe.write_text("from lalc import api_version\ndef probe(): return {'api': api_version()}\n")
+    probe.write_text(
+        "from lalc import api_version\ndef probe(): return {'api': api_version()}\n",
+        encoding="utf-8",
+    )
     probe_result = tmp_path / "probe-result.json"
     completed = subprocess.run(
         [sys.executable, "-m", "lalc", "--packaging-probe", str(probe), str(probe_result)], check=False
     )
     assert completed.returncode == 0
-    assert json.loads(probe_result.read_text())["result"] == {"api": 1}
+    assert json.loads(probe_result.read_text(encoding="utf-8"))["result"] == {"api": 1}
 
 
 def test_candidate_runner_rejects_hash_mismatch_and_context_field(tmp_path: Path) -> None:
     candidate = tmp_path / "candidate.py"
-    candidate.write_text("def execute(ctx): return {}\n")
+    candidate.write_text("def execute(ctx): return {}\n", encoding="utf-8")
     for extra in ({"expected_sha256": "0" * 64}, {"context": {}}):
         result = tmp_path / f"result-{len(list(tmp_path.glob('result-*')))}.json"
         request = {
@@ -175,12 +180,12 @@ def test_candidate_runner_rejects_hash_mismatch_and_context_field(tmp_path: Path
             **extra,
         }
         request_path = result.with_suffix(".request.json")
-        request_path.write_text(json.dumps(request))
+        request_path.write_text(json.dumps(request), encoding="utf-8")
         completed = subprocess.run(
             [sys.executable, "-m", "lalc", "--candidate-runner", str(request_path)], check=False
         )
         assert completed.returncode == 1
-        assert json.loads(result.read_text())["status"] == "failure"
+        assert json.loads(result.read_text(encoding="utf-8"))["status"] == "failure"
 
 
 def test_qt_main_window_smoke(tmp_path: Path) -> None:
