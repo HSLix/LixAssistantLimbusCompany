@@ -46,6 +46,16 @@ delete it after packaged Candidate Runner acceptance covers external source
 loading and frozen `lalc` API imports. Windows x64 acceptance must be run on
 Windows and is not implied by a macOS spike.
 
+## Text encoding
+
+- Project-controlled text files and JSON use UTF-8 without relying on the
+  operating-system locale.
+- Python text reads and writes must pass `encoding="utf-8"` explicitly,
+  including `Path.read_text()`, `Path.write_text()`, and `open()`.
+- External text in another encoding must be decoded explicitly at its input
+  boundary. Component hashing continues to use the original bytes without a
+  decode-and-reencode round trip.
+
 ## License
 
 This project is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
