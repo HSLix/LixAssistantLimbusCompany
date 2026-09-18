@@ -177,7 +177,8 @@ class DemoService:
             if self._state["phase"] != "runtime_review":
                 raise RuntimeError("runtime_review_not_pending")
             self._runtime_decision = (decision, feedback.strip())
-            self._condition.notify_all()
+            self._state["phase"] = "stopping" if decision == "terminate" else "running"
+            self._changed_locked()
         if decision == "terminate":
             self.stop()
 
@@ -188,7 +189,8 @@ class DemoService:
             if self._state["phase"] != "capability_review":
                 raise RuntimeError("capability_review_not_pending")
             self._capability_decision = decision
-            self._condition.notify_all()
+            self._state["phase"] = "finalizing"
+            self._changed_locked()
 
     def _run(self, scenario: dict[str, Any], max_turns: int) -> None:
         candidate: dict[str, Any] | None = None

@@ -13,16 +13,21 @@ from lalc.runtime import RunGate, TaskCancelled, sha256_bytes
 
 
 def test_supervised_candidate_and_permanent_approval(tmp_path: Path) -> None:
-    service = DemoService(tmp_path)
+    changes: list[dict] = []
+    service = DemoService(tmp_path, on_change=changes.append)
     service.start({"supported": False, "amount": 3})
     review = service.wait_for(lambda state: state["phase"] == "runtime_review")
     assert "不是安全沙箱" in review["pending_review"]["warning"]
+    change_count = len(changes)
     service.decide_runtime("approve")
     capability = service.wait_for(lambda state: state["phase"] == "capability_review")
+    assert all(state["phase"] != "runtime_review" for state in changes[change_count:])
     assert capability["pending_capability"]["trial_succeeded"] is True
     assert capability["result"]["status"] == "success"
+    change_count = len(changes)
     service.decide_capability("approve")
     finished = service.wait_for(lambda state: state["phase"] == "finished")
+    assert all(state["phase"] != "capability_review" for state in changes[change_count:])
     assert finished["active_manifest_id"].startswith("approved-")
     assert list((tmp_path / "traces").glob("*.jsonl"))
     assert list((tmp_path / "logs").glob("*.json"))
