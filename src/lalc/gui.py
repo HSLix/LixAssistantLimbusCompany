@@ -106,6 +106,9 @@ class CapabilityApprovalDialog(LockedDialog):
         layout.addLayout(buttons)
 
     def _decide(self, decision: str, code: QDialog.DialogCode) -> None:
+        if not self.isEnabled():
+            return
+        self.setEnabled(False)
         self.service.decide_capability(decision)
         self.done(code)
 

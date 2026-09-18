@@ -199,3 +199,27 @@ def test_qt_main_window_smoke(tmp_path: Path) -> None:
     app.processEvents()
     assert window.windowTitle() == "LALC Architecture Demo"
     window.close()
+
+
+def test_capability_approval_ignores_double_click() -> None:
+    from PySide6.QtWidgets import QApplication, QPushButton
+
+    from lalc.gui import CapabilityApprovalDialog
+
+    class Service:
+        def __init__(self) -> None:
+            self.decisions: list[str] = []
+
+        def decide_capability(self, decision: str) -> None:
+            self.decisions.append(decision)
+
+    app = QApplication.instance() or QApplication([])
+    service = Service()
+    dialog = CapabilityApprovalDialog(service, {"trial_succeeded": True})
+    approve = next(button for button in dialog.findChildren(QPushButton) if button.text() == "批准")
+
+    approve.click()
+    approve.click()
+    app.processEvents()
+
+    assert service.decisions == ["approve"]
