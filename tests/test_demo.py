@@ -1,3 +1,9 @@
+"""覆盖 Architecture Demo 的候选试运行、审批、回滚、取消、打包探针和 GUI 冒烟流程。
+
+在项目根目录运行：
+QT_QPA_PLATFORM=offscreen UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_demo.py
+"""
+
 from __future__ import annotations
 
 import json

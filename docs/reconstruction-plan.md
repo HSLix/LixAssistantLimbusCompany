@@ -22,11 +22,11 @@ Status: accepted and complete. Further changes require explicitly reopening the 
 
 Confirmed contracts:
 
-- Task Workflow, Subworkflow, and Step are immutable Python Components loaded as ordinary modules from Manifest-fixed paths and hashes;
+- Task Workflow, Subworkflow, and Step are immutable Python Components loaded as ordinary modules after their exact source bytes are verified against their Component IDs;
 - exactly one parameterless `@task_workflow`, `@sub_workflow`, or `@step` on each formal entrypoint is the sole component-role source; Manifest, paths, names, and tags do not duplicate or infer `component_kind`;
 - each Task Workflow, Subworkflow, or Step occupies one Python file with exactly one decorated `execute`; Task Workflow and Step may also contain their optional `condition`, Task Workflow contains its required `verify`, while Subworkflow exposes only `execute`; result classes and ordinary implementation code remain in the same file and no file contains multiple formal Components;
 - formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, and every private function in their files contain no `except`; `try/finally` remains available for cleanup, but loaders reject `return`, `break`, `continue`, or `raise` in every `finally` without reachability or rethrow analysis so the original exception propagates naturally;
-- each Manifest is one complete document containing executable `logical_name → immutable Component ID and load information` mappings, dedicated `recovery_rules` and `trusted_actions` mappings, and an `assets` mapping from semantic name and language to shared relative path plus complete hash;
+- each Manifest is one complete document containing executable `logical_name → immutable Component ID` mappings, dedicated `recovery_rules` and `trusted_actions` mappings, and an `assets` mapping from semantic name and language to shared relative path plus complete hash;
 - formal Components call one another only through `ctx.call(logical_name, **arguments)`; it resolves and validates the current Working Manifest entry on every call and stores no Component Ref or implementation cache;
 - every `ctx.call()` target is a string literal; before each Working Manifest atomic update, the executor validates every formal target, role permission, and Subworkflow cycle against the complete resulting candidate Manifest, while runtime validates resolution and role again and records the actual identity;
 - every `ctx.call()` in a Task Workflow or Subworkflow source file belongs to that file's single Component, including calls in private or apparently unreachable functions; Step, `condition`, `verify`, and Recovery Rule source may contain no `ctx.call()`, and the loader performs no reachability or branch analysis;
@@ -35,8 +35,8 @@ Confirmed contracts:
 - dynamic `ctx.call()` targets are invalid, and the executor never resolves a cycle by rewriting, copying, or inlining candidate source;
 - formal Component orchestration permits Task Workflow to call Subworkflow or Step and Subworkflow to call an acyclic Subworkflow or Step, while Step calls no formal Component; nested Subworkflows use the ordinary Python call stack, ordinary functions inside Component source remain unmodeled implementation details, and complete task composition belongs only to Automation Plan;
 - `condition`, Task Workflow `verify`, and Recovery Rule callables never call formal Components; conditions and verifiers are read-only, and Recovery Rules remain leaves to prevent nested recovery;
-- each Recovery Rule is an immutable Python Component with a module docstring, stable logical name, Component ID, content hash, and fixed `detect(ctx) -> bool` plus `recover(ctx) -> None` entrypoints; it has no fourth role decorator and is discovered only from `recovery_rules` rather than through `ctx.call()`;
-- the three role decorators use `functools.wraps`, while formal identity remains the logical name, Component ID, and content hash;
+- each Recovery Rule is an immutable Python Component with a module docstring, stable logical name, Component ID, and fixed `detect(ctx) -> bool` plus `recover(ctx) -> None` functions; it has no fourth role decorator and is discovered only from `recovery_rules` rather than through `ctx.call()`;
+- the three role decorators only mark role; later executor-owned wrappers use `functools.wraps`, while formal identity remains the logical name and Component ID;
 - Python native control flow, local variables, returns, and call stack replace the YAML Step graph, routing tables, Transition objects, variable mappings, and custom Subworkflow stack;
 - formal execution uses only ordinary Python returns for Normal Outcome and `ExecutionInterruption` for the interruption channel; there is no common Outcome type or output schema;
 - all formal exceptions reach their wrapper and Trace: Step exceptions normalize into the existing recovery ladder, Step-external exceptions directly produce Execution Anomaly, and verifier exceptions record Task failure without Agent rescue; ignorable cases use explicit ordinary results rather than caught exceptions;
@@ -86,7 +86,7 @@ Confirmed contracts:
 - Task Workflow orchestration remains in a background thread of the GUI process, while only a not-yet-permanently-approved candidate Step trial uses an independent Candidate Runner OS process owned and monitored by the parent;
 - the Demo candidate runner exchanges only a JSON-compatible Example scenario snapshot, Step result, and action events with the parent; it adds no general RPC, which is deferred until a real Trusted Action must remain in the parent process;
 - Runtime API and Step wrappers append Traces of actual execution; Agent Interaction Logs retain the complete context and response for every Agent Turn and Trace records the corresponding references;
-- Trace records each executed formal Component's stable logical name, actual Component ID, and content hash;
+- Trace records each executed formal Component's stable logical name and actual Component ID;
 - each Task Workflow run retains Trace, Agent Interaction Logs, screenshots, and evidence as one Run Log Bundle, while the common retention policy removes only whole bundles;
 - a local Workflow Run Ledger retains compact per-invocation outcomes, duration, public deterministic recovery counts, Step reinvocation counts, and Agent intervention counts independently of detailed Trace retention; it has no Subworkflow restart fields;
 - Task Workflow and Subworkflow use one Ledger record shape with `workflow_kind = task | sub`;

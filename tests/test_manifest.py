@@ -1,0 +1,393 @@
+"""覆盖正式 Component Manifest 的校验、发布、加载、启用和失败后保持原选择。
+
+在项目根目录运行：
+UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_manifest.py
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from pathlib import Path
+
+import pytest
+
+import lalc.manifest as manifest_module
+from lalc.manifest import ManifestManager
+
+
+SOURCES = {
+    "task.py": '''"""Test Task Workflow."""
+from lalc import task_workflow
+
+@task_workflow
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    result = ctx.call("flow.sub", amount=amount)
+    ctx.call("steps.finish", amount=amount)
+    return result
+
+def verify(ctx, result: dict[str, int], *, amount: int = 1) -> bool:
+    return result.get("amount") == amount
+''',
+    "sub.py": '''"""Test Subworkflow."""
+from lalc import sub_workflow
+
+@sub_workflow
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    return ctx.call("steps.finish", amount=amount)
+''',
+    "step.py": '''"""Test Step."""
+from lalc import step
+
+@step
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    return {"amount": amount}
+
+def condition(ctx, *, amount: int = 1) -> bool:
+    return amount >= 0
+''',
+    "recovery.py": '''"""Test Recovery Rule."""
+def detect(ctx) -> bool:
+    return False
+
+def recover(ctx) -> None:
+    return None
+''',
+    "observe.py": '''"""Test observation."""
+def execute(ctx, *, name: str = "state") -> dict[str, str]:
+    return {"name": name}
+''',
+    "control.py": '''"""Test control."""
+def execute(ctx, *, name: str = "click") -> dict[str, str]:
+    return {"name": name}
+''',
+}
+
+
+def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) -> Path:
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, source in (sources or SOURCES).items():
+        (directory / name).write_text(source, encoding="utf-8")
+    manifest = {
+        "schema_version": 1,
+        "components": {
+            "tasks.example": {"source_path": "task.py"},
+            "flow.sub": {"source_path": "sub.py"},
+            "steps.finish": {"source_path": "step.py"},
+        },
+        "recovery_rules": {"recovery.dismiss": {"source_path": "recovery.py"}},
+        "trusted_actions": {
+            "observe": {"source_path": "observe.py", "classification": "observe"},
+            "control": {"source_path": "control.py", "classification": "control"},
+        },
+        "assets": {},
+    }
+    path = directory / "candidate.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    return path
+
+
+def _codes(result) -> set[str]:
+    return {error.code for error in result.errors}
+
+
+def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) -> None:
+    candidate = _write_candidate(tmp_path / "candidate")
+    manager = ManifestManager(tmp_path / "formal")
+
+    result = manager.publish(candidate)
+
+    assert result.ok
+    assert result.loaded is manager.active
+    assert result.loaded.components["tasks.example"].role == "task_workflow"
+    assert result.loaded.components["flow.sub"].role == "sub_workflow"
+    assert result.loaded.components["steps.finish"].role == "step"
+    assert result.loaded.trusted_actions["control"].classification == "control"
+    saved_path = manager.manifests_dir / f"{result.loaded.manifest_id}.json"
+    saved = json.loads(saved_path.read_text(encoding="utf-8"))
+    assert set(saved) == {
+        "schema_version",
+        "manifest_id",
+        "components",
+        "recovery_rules",
+        "trusted_actions",
+        "assets",
+    }
+    assert "source_path" not in saved_path.read_text(encoding="utf-8")
+    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
+        "manifest_id": result.loaded.manifest_id
+    }
+    ids = {
+        entry["component_id"]
+        for section in ("components", "recovery_rules", "trusted_actions")
+        for entry in saved[section].values()
+    }
+    assert all(component_id.startswith("sha256:") for component_id in ids)
+    assert {
+        path.stem for path in manager.components_dir.glob("*.py")
+    } == {component_id.removeprefix("sha256:") for component_id in ids}
+
+    reloaded = ManifestManager(tmp_path / "formal").load_active()
+    assert reloaded.ok
+    assert (
+        reloaded.loaded.components["tasks.example"].module
+        is result.loaded.components["tasks.example"].module
+    )
+
+
+def test_validation_collects_independent_manifest_errors_without_switching(tmp_path: Path) -> None:
+    manager = ManifestManager(tmp_path / "formal")
+    valid = manager.publish(_write_candidate(tmp_path / "valid"))
+    assert valid.ok
+    active_id = valid.loaded.manifest_id
+    invalid = {
+        "schema_version": 2,
+        "components": {"not valid!": {"source_path": "../outside.py", "extra": True}},
+        "recovery_rules": {"not valid!": {"component_id": "bad"}},
+        "trusted_actions": {
+            "bad.action": {"source_path": "../outside.py", "classification": "bad"}
+        },
+        "assets": {"not": "implemented"},
+        "unknown": True,
+    }
+    path = tmp_path / "invalid" / "candidate.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(invalid), encoding="utf-8")
+
+    result = manager.publish(path)
+
+    assert {
+        "field_unknown",
+        "schema_version_unsupported",
+        "assets_not_supported",
+        "logical_name_invalid",
+        "logical_name_duplicate",
+        "source_path_escape",
+        "component_id_invalid",
+        "trusted_action_classification_invalid",
+    } <= _codes(result)
+    assert manager.active.manifest_id == active_id
+    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
+        "manifest_id": active_id
+    }
+
+
+def test_duplicate_keys_and_candidate_manifest_id_are_rejected(tmp_path: Path) -> None:
+    path = tmp_path / "candidate.json"
+    path.write_text(
+        '{"schema_version":1,"schema_version":1,"manifest_id":"x",'
+        '"components":{},"recovery_rules":{},"trusted_actions":{},"assets":{}}',
+        encoding="utf-8",
+    )
+
+    errors = ManifestManager(tmp_path / "formal").validate(path)
+
+    assert {"json_key_duplicate", "field_unknown", "manifest_id_forbidden"} <= {
+        error.code for error in errors
+    }
+
+
+def test_source_validation_reports_calls_cycles_permissions_and_control_flow(tmp_path: Path) -> None:
+    sources = dict(SOURCES)
+    sources["task.py"] = '''"""Invalid Task Workflow."""
+from lalc import task_workflow
+
+@task_workflow
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    control(ctx)
+    ctx.call(amount)
+    ctx.call("missing.component", amount=amount)
+    ctx.call("tasks.example", amount=amount)
+    return ctx.call("flow.sub", amount=amount)
+
+def verify(ctx, result: dict[str, int], *, amount: int = 1) -> bool:
+    return True
+'''
+    sources["sub.py"] = '''"""Cyclic Subworkflow."""
+from lalc import sub_workflow
+
+@sub_workflow
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    return ctx.call("flow.other", amount=amount)
+'''
+    sources["other.py"] = '''"""Other cyclic Subworkflow."""
+from lalc import sub_workflow
+
+@sub_workflow
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    return ctx.call("flow.sub", amount=amount)
+'''
+    sources["step.py"] = '''"""Invalid Step."""
+import third_party
+from lalc import step
+
+@step
+def execute(ctx, *, amount: int = 1) -> dict[str, int]:
+    try:
+        return ctx.call(amount)
+    except Exception:
+        return {"amount": amount}
+    finally:
+        return {"amount": amount}
+'''
+    candidate = _write_candidate(tmp_path / "candidate", sources=sources)
+    data = json.loads(candidate.read_text(encoding="utf-8"))
+    data["components"]["flow.other"] = {"source_path": "other.py"}
+    candidate.write_text(json.dumps(data), encoding="utf-8")
+
+    errors = ManifestManager(tmp_path / "formal").validate(candidate)
+    codes = {error.code for error in errors}
+
+    assert {
+        "trusted_action_forbidden",
+        "subworkflow_cycle",
+        "component_call_forbidden",
+        "component_call_dynamic",
+        "component_call_unresolved",
+        "component_call_role_invalid",
+        "except_forbidden",
+        "finally_control_flow_forbidden",
+        "import_forbidden",
+    } <= codes
+    assert any(
+        error.code == "subworkflow_cycle"
+        and "flow.sub" in error.message
+        and "flow.other" in error.message
+        for error in errors
+    )
+    assert all(error.line is not None for error in errors if error.code in {"except_forbidden", "import_forbidden"})
+
+
+def test_path_escape_and_conflicting_trusted_action_alias_are_rejected(tmp_path: Path) -> None:
+    candidate = _write_candidate(tmp_path / "candidate")
+    data = json.loads(candidate.read_text(encoding="utf-8"))
+    data["components"]["steps.finish"] = {"source_path": "../outside.py"}
+    data["trusted_actions"]["control_alias"] = {
+        "source_path": "control.py",
+        "classification": "observe",
+    }
+    candidate.write_text(json.dumps(data), encoding="utf-8")
+
+    errors = ManifestManager(tmp_path / "formal").validate(candidate)
+
+    assert {"source_path_escape", "trusted_action_alias_conflict"} <= {
+        error.code for error in errors
+    }
+
+
+def test_import_failure_and_activation_write_failure_keep_old_manifest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    manager = ManifestManager(tmp_path / "formal")
+    initial = manager.publish(_write_candidate(tmp_path / "initial"))
+    assert initial.ok
+    active_id = initial.loaded.manifest_id
+
+    failing_sources = dict(SOURCES)
+    failing_sources["observe.py"] = '''"""Broken trusted observation."""
+raise RuntimeError("import failed")
+def execute(ctx, *, name: str = "state") -> dict[str, str]:
+    return {"name": name}
+'''
+    failed_import = manager.publish(_write_candidate(tmp_path / "failed-import", sources=failing_sources))
+    assert _codes(failed_import) == {"component_import_failed"}
+    assert manager.active.manifest_id == active_id
+
+    changed_sources = dict(SOURCES)
+    changed_sources["step.py"] = SOURCES["step.py"].replace("amount >= 0", "amount > -1")
+    candidate = _write_candidate(tmp_path / "write-failure", sources=changed_sources)
+    real_atomic_write = manifest_module.atomic_write_json
+
+    def fail_active(path: Path, value: dict) -> None:
+        if path.name == "active.json":
+            raise OSError("scripted active write failure")
+        real_atomic_write(path, value)
+
+    monkeypatch.setattr(manifest_module, "atomic_write_json", fail_active)
+    with caplog.at_level(logging.ERROR):
+        failed_write = manager.publish(candidate)
+
+    assert _codes(failed_write) == {"manifest_update_failed"}
+    assert manager.active.manifest_id == active_id
+    assert "Manifest update failed during activate_manifest" in caplog.text
+    assert "scripted active write failure" in caplog.text
+    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
+        "manifest_id": active_id
+    }
+    assert len(list(manager.manifests_dir.glob("*.json"))) >= 3
+
+
+def test_static_error_prevents_every_component_import(tmp_path: Path) -> None:
+    marker = tmp_path / "imported.txt"
+    sources = dict(SOURCES)
+    sources["task.py"] = SOURCES["task.py"].replace(
+        'ctx.call("steps.finish", amount=amount)', "ctx.call(amount)"
+    )
+    sources["observe.py"] = f'''"""Observation with a visible import side effect."""
+from pathlib import Path
+Path({str(marker)!r}).write_text("imported", encoding="utf-8")
+def execute(ctx, *, name: str = "state") -> dict[str, str]:
+    return {{"name": name}}
+'''
+
+    result = ManifestManager(tmp_path / "formal").publish(
+        _write_candidate(tmp_path / "candidate", sources=sources)
+    )
+
+    assert "component_call_dynamic" in _codes(result)
+    assert not marker.exists()
+
+
+def test_existing_saved_manifest_can_be_activated_without_creating_another(tmp_path: Path) -> None:
+    manager = ManifestManager(tmp_path / "formal")
+    first = manager.publish(_write_candidate(tmp_path / "first"))
+    changed_sources = dict(SOURCES)
+    changed_sources["step.py"] = SOURCES["step.py"].replace("amount >= 0", "amount > -1")
+    second = manager.publish(_write_candidate(tmp_path / "second", sources=changed_sources))
+    assert first.ok and second.ok
+    saved_before = set(manager.manifests_dir.glob("*.json"))
+
+    activated = manager.activate(first.loaded.manifest_id)
+
+    assert activated.ok
+    assert manager.active.manifest_id == first.loaded.manifest_id
+    assert set(manager.manifests_dir.glob("*.json")) == saved_before
+    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
+        "manifest_id": first.loaded.manifest_id
+    }
+
+
+def test_candidate_can_mix_existing_component_id_with_new_source(tmp_path: Path) -> None:
+    manager = ManifestManager(tmp_path / "formal")
+    first = manager.publish(_write_candidate(tmp_path / "first"))
+    assert first.ok
+    old_task = first.loaded.components["tasks.example"]
+    sources = dict(SOURCES)
+    sources["step.py"] = SOURCES["step.py"].replace("amount >= 0", "amount > -1")
+    candidate = _write_candidate(tmp_path / "second", sources=sources)
+    data = json.loads(candidate.read_text(encoding="utf-8"))
+    data["components"]["tasks.example"] = {"component_id": old_task.component_id}
+    candidate.write_text(json.dumps(data), encoding="utf-8")
+
+    second = manager.publish(candidate)
+
+    assert second.ok
+    assert second.loaded.components["tasks.example"].module is old_task.module
+    assert (
+        second.loaded.components["steps.finish"].component_id
+        != first.loaded.components["steps.finish"].component_id
+    )
+
+
+def test_changed_formal_source_is_rejected_before_loading(tmp_path: Path) -> None:
+    manager = ManifestManager(tmp_path / "formal")
+    published = manager.publish(_write_candidate(tmp_path / "candidate"))
+    assert published.ok
+    component_id = published.loaded.components["steps.finish"].component_id
+    path = manager.components_dir / f"{component_id.removeprefix('sha256:')}.py"
+    path.write_text("changed", encoding="utf-8")
+
+    reloaded = ManifestManager(tmp_path / "formal").load_active()
+
+    assert "component_id_mismatch" in _codes(reloaded)
+    assert reloaded.loaded is None

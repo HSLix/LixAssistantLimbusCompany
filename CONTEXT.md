@@ -45,11 +45,11 @@ Executor-controlled handling inside an interrupted `@step` wrapper: inspect publ
 _Avoid_: Agent recovery, implicit error jump
 
 **Recovery Rule**:
-A formal immutable Python Component that identifies one cross-Workflow external interruption through a read-only `detect(ctx) -> bool` entrypoint and handles it through a `recover(ctx) -> None` entrypoint. It has a stable logical name, Component ID, and content hash, but no role decorator; neither entrypoint invokes another formal Component.
+A formal immutable Python Component that identifies one cross-Workflow external interruption through a read-only `detect(ctx) -> bool` entrypoint and handles it through a `recover(ctx) -> None` entrypoint. It has a stable logical name and Component ID but no role decorator; neither entrypoint invokes another formal Component.
 _Avoid_: Error node, task-specific branch, global exception plugin
 
 **Trusted Action**:
-An immutable, shipped or human-approved low-level Python operation registered once as `observe` or `control` in the Manifest's dedicated `trusted_actions` mapping. `observe` reads screenshots, recognition, or environment state; `control` includes input and execution waits. Formal source imports and calls it as an ordinary function under the executor's fixed role matrix; its wrapper verifies classification, caller role, Manifest-pinned identity, and hash and records the invocation. An Agent cannot create or replace a Trusted Action during a Top-level Execution, and generated code does not become trusted merely by performing the same operation.
+An immutable, shipped or human-approved low-level Python operation whose fixed `execute` function is registered once as `observe` or `control` in the Manifest's dedicated `trusted_actions` mapping. `observe` reads screenshots, recognition, or environment state; `control` includes input and execution waits. Formal source imports and calls it as an ordinary function under the executor's fixed role matrix; its wrapper verifies classification, caller role, and the Manifest-pinned Component ID against the source bytes and records the invocation. An Agent cannot create or replace a Trusted Action during a Top-level Execution, and generated code does not become trusted merely by performing the same operation.
 _Avoid_: Step, Agent-generated function, unrestricted Python call
 
 **Asset**:
@@ -187,7 +187,7 @@ The topmost modal post-execution decision boundary for one complete Capability P
 _Avoid_: Supervised Review Dialog, partial approval, runtime confirmation
 
 **Component**:
-An immutable, uniquely identified Python Task Workflow, Subworkflow, Step, Recovery Rule, or Trusted Action that a Component Manifest may reference. Formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. Trusted Actions are the only Components allowed to normalize caught low-level exceptions. Editing adds a new component ID rather than changing existing content.
+An immutable Python Task Workflow, Subworkflow, Step, Recovery Rule, or Trusted Action that a Component Manifest may reference. Its Component ID is `sha256:` followed by the SHA-256 of its exact source bytes, with no separate source-hash field. Formal Task Workflow, Subworkflow, Step, condition, verifier, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. Trusted Actions are the only Components allowed to normalize caught low-level exceptions. Editing changes the Component ID rather than changing existing content.
 _Avoid_: Component Revision, mutable component
 
 **Component Logical Name**:
@@ -195,7 +195,7 @@ The stable dotted lookup key used by a Manifest, such as `steps.enter_stage`, to
 _Avoid_: Component ID, version chain
 
 **Component Manifest**:
-The sole saved version unit: an immutable, validated complete document whose executable mappings resolve stable logical names to exact Component IDs and load information, while its Asset mapping resolves semantic names and languages to shared files and hashes. Multiple manifests may be retained, but exactly one is active and supplies the base snapshot for every automation run.
+The sole saved version unit: an immutable, validated complete document identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs, while its Asset mapping resolves semantic names and languages to shared files and hashes. Multiple manifests may be retained, but exactly one is active and supplies the base snapshot for every automation run.
 _Avoid_: Approval history, mutable component list
 
 **Working Manifest**:

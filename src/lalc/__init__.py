@@ -2,9 +2,9 @@
 
 API_VERSION = 1
 
-from .runtime import step
+from .runtime import step, sub_workflow, task_workflow
 
-__all__ = ["API_VERSION", "api_version", "step"]
+__all__ = ["API_VERSION", "api_version", "step", "sub_workflow", "task_workflow"]
 
 
 def api_version() -> int:

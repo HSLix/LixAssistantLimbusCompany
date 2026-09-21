@@ -17,9 +17,21 @@ class ExecutionAnomaly(Exception):
     pass
 
 
-def step(function):
-    function.__lalc_role__ = "step"
+def _mark_role(function: Callable[..., Any], role: str) -> Callable[..., Any]:
+    function.__lalc_role__ = role
     return function
+
+
+def task_workflow(function: Callable[..., Any]) -> Callable[..., Any]:
+    return _mark_role(function, "task_workflow")
+
+
+def sub_workflow(function: Callable[..., Any]) -> Callable[..., Any]:
+    return _mark_role(function, "sub_workflow")
+
+
+def step(function: Callable[..., Any]) -> Callable[..., Any]:
+    return _mark_role(function, "step")
 
 
 class RunGate:

@@ -1,0 +1,1270 @@
+from __future__ import annotations
+
+import ast
+import json
+import logging
+import os
+import sys
+import tempfile
+import types
+import uuid
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from .runtime import atomic_write_json, sha256_bytes
+
+SCHEMA_VERSION = 1
+SECTIONS = ("components", "recovery_rules", "trusted_actions")
+ROLES = {"task_workflow", "sub_workflow", "step"}
+CLASSIFICATIONS = {"observe", "control"}
+TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS, "assets"}
+SAVED_TOP_LEVEL_FIELDS = {*TOP_LEVEL_FIELDS, "manifest_id"}
+COMPONENT_ID_PREFIX = "sha256:"
+
+
+@dataclass(frozen=True)
+class ValidationError:
+    """一次 Manifest 校验发现的、可稳定序列化的问题。"""
+
+    code: str
+    message: str
+    logical_name: str | None = None
+    line: int | None = None
+    column: int | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {name: value for name, value in vars(self).items() if value is not None}
+
+
+@dataclass(frozen=True)
+class LoadedComponent:
+    """已验证并加载的 Component，以及本次 Manifest 赋予它的运行信息。"""
+
+    component_id: str
+    module: types.ModuleType
+    role: str
+    classification: str | None = None
+
+
+@dataclass(frozen=True)
+class LoadedManifest:
+    """完整加载后的 Manifest；各映射继续以稳定逻辑名称索引。"""
+
+    manifest: dict[str, Any]
+    components: dict[str, LoadedComponent]
+    recovery_rules: dict[str, LoadedComponent]
+    trusted_actions: dict[str, LoadedComponent]
+
+    @property
+    def manifest_id(self) -> str:
+        return self.manifest["manifest_id"]
+
+
+@dataclass(frozen=True)
+class ManifestResult:
+    """Manifest 操作结果；成功与结构化错误不会同时出现。"""
+
+    loaded: LoadedManifest | None = None
+    errors: tuple[ValidationError, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return self.loaded is not None and not self.errors
+
+
+@dataclass
+class _Source:
+    """一次校验所使用的源码快照。"""
+
+    component_id: str
+    path: Path
+    content: bytes
+    tree: ast.Module | None = None
+
+
+@dataclass
+class _Prepared:
+    """静态校验阶段生成的正式 Manifest 草稿和源码集合。"""
+
+    manifest: dict[str, Any] | None = None
+    sources: dict[str, _Source] = field(default_factory=dict)
+    roles: dict[str, str] = field(default_factory=dict)
+    errors: list[ValidationError] = field(default_factory=list)
+
+
+# 缓存只以不可变 Component ID 为键；逻辑名称变化不会触发重复导入。
+_MODULE_CACHE: dict[str, tuple[bytes, types.ModuleType]] = {}
+
+
+class ManifestManager:
+    """校验、加载、发布并启用已信任的完整 Component Manifest。"""
+
+    def __init__(
+        self,
+        data_root: Path,
+        *,
+        logger: logging.Logger | None = None,
+        trusted_action_imports: frozenset[str] = frozenset(),
+    ) -> None:
+        self.data_root = Path(data_root)
+        self.components_dir = self.data_root / "components"
+        self.manifests_dir = self.data_root / "manifests"
+        self.logger = logger or logging.getLogger(__name__)
+        self.trusted_action_imports = trusted_action_imports
+        self.active: LoadedManifest | None = None
+
+    def publish(self, candidate_path: Path) -> ManifestResult:
+        """校验并发布开发者候选；只有完整加载成功后才切换当前 Manifest。"""
+
+        candidate_path = Path(candidate_path)
+        phase = "validate_manifest"
+        try:
+            prepared = self._prepare(candidate_path, saved=False)
+            if prepared.errors:
+                # 静态错误必须阻止整个批次导入，避免部分顶层代码提前执行。
+                return ManifestResult(errors=tuple(prepared.errors))
+
+            manifest_id = str(uuid.uuid4())
+            assert prepared.manifest is not None
+            manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
+            manifest.update({name: prepared.manifest[name] for name in (*SECTIONS, "assets")})
+            phase = "load_components"
+            loaded, errors = self._load(manifest, prepared)
+            if errors:
+                return ManifestResult(errors=tuple(errors))
+
+            phase = "write_components"
+            self.components_dir.mkdir(parents=True, exist_ok=True)
+            self.manifests_dir.mkdir(parents=True, exist_ok=True)
+            for source in prepared.sources.values():
+                self._store_component(source)
+            phase = "write_manifest"
+            manifest_path = self.manifests_dir / f"{manifest_id}.json"
+            if manifest_path.exists():
+                raise FileExistsError(manifest_path)
+            atomic_write_json(manifest_path, manifest)
+            phase = "activate_manifest"
+            atomic_write_json(self.manifests_dir / "active.json", {"manifest_id": manifest_id})
+
+            self.active = loaded
+            return ManifestResult(loaded=loaded)
+        except Exception as error:
+            self.logger.exception("Manifest update failed during %s", phase)
+            return ManifestResult(
+                errors=(ValidationError("manifest_update_failed", str(error)),)
+            )
+
+    def activate(self, manifest_id: str) -> ManifestResult:
+        """完整校验并加载一个既有 Manifest，然后将它设为当前版本。"""
+
+        try:
+            parsed_id = uuid.UUID(manifest_id)
+        except (TypeError, ValueError, AttributeError):
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a UUID."),)
+            )
+        if str(parsed_id) != manifest_id:
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a canonical UUID."),)
+            )
+        path = self.manifests_dir / f"{manifest_id}.json"
+        prepared = self._prepare(path, saved=True)
+        if prepared.errors:
+            return ManifestResult(errors=tuple(prepared.errors))
+        assert prepared.manifest is not None
+        if prepared.manifest.get("manifest_id") != manifest_id:
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_mismatch", "Manifest ID does not match its file name."),)
+            )
+        loaded, errors = self._load(prepared.manifest, prepared)
+        if errors:
+            return ManifestResult(errors=tuple(errors))
+        try:
+            self.manifests_dir.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(self.manifests_dir / "active.json", {"manifest_id": manifest_id})
+        except Exception as error:
+            self.logger.exception("Manifest update failed during activate_manifest")
+            return ManifestResult(
+                errors=(ValidationError("manifest_update_failed", str(error)),)
+            )
+        self.active = loaded
+        return ManifestResult(loaded=loaded)
+
+    def load_active(self) -> ManifestResult:
+        """按照 active.json 加载当前 Manifest，但不重写任何磁盘状态。"""
+
+        active_path = self.manifests_dir / "active.json"
+        data, errors = self._read_json(active_path)
+        if errors:
+            return ManifestResult(errors=tuple(errors))
+        if not isinstance(data, dict) or set(data) != {"manifest_id"} or not isinstance(
+            data.get("manifest_id"), str
+        ):
+            return ManifestResult(
+                errors=(ValidationError("active_manifest_invalid", "active.json must contain only manifest_id."),)
+            )
+        manifest_id = data["manifest_id"]
+        try:
+            parsed_id = uuid.UUID(manifest_id)
+        except ValueError:
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a UUID."),)
+            )
+        if str(parsed_id) != manifest_id:
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a canonical UUID."),)
+            )
+        prepared = self._prepare(self.manifests_dir / f"{manifest_id}.json", saved=True)
+        if prepared.errors:
+            return ManifestResult(errors=tuple(prepared.errors))
+        assert prepared.manifest is not None
+        if prepared.manifest.get("manifest_id") != manifest_id:
+            return ManifestResult(
+                errors=(ValidationError("manifest_id_mismatch", "Manifest ID does not match active.json."),)
+            )
+        loaded, errors = self._load(prepared.manifest, prepared)
+        if errors:
+            return ManifestResult(errors=tuple(errors))
+        self.active = loaded
+        return ManifestResult(loaded=loaded)
+
+    def validate(self, path: Path, *, saved: bool = False) -> tuple[ValidationError, ...]:
+        """只做静态校验，不导入 Component，也不修改当前 Manifest。"""
+
+        return tuple(self._prepare(Path(path), saved=saved).errors)
+
+    def _prepare(self, manifest_path: Path, *, saved: bool) -> _Prepared:
+        """解析完整文档并尽可能收集互不依赖的静态错误。"""
+
+        prepared = _Prepared()
+        data, read_errors = self._read_json(manifest_path)
+        prepared.errors.extend(read_errors)
+        if data is None:
+            return prepared
+        if not isinstance(data, dict):
+            prepared.errors.append(ValidationError("manifest_type_invalid", "Manifest must be an object."))
+            return prepared
+
+        allowed = SAVED_TOP_LEVEL_FIELDS if saved else TOP_LEVEL_FIELDS
+        required = allowed
+        self._check_fields(data, allowed, required, prepared.errors)
+        if data.get("schema_version") != SCHEMA_VERSION or isinstance(data.get("schema_version"), bool):
+            prepared.errors.append(
+                ValidationError("schema_version_unsupported", "schema_version must be integer 1.")
+            )
+        if saved:
+            self._check_manifest_id(data.get("manifest_id"), prepared.errors)
+        elif "manifest_id" in data:
+            prepared.errors.append(
+                ValidationError("manifest_id_forbidden", "Candidate Manifest cannot provide manifest_id.")
+            )
+
+        for section in (*SECTIONS, "assets"):
+            if section in data and not isinstance(data[section], dict):
+                prepared.errors.append(
+                    ValidationError("manifest_field_type_invalid", f"{section} must be an object.")
+                )
+        if isinstance(data.get("assets"), dict) and data["assets"]:
+            prepared.errors.append(
+                ValidationError("assets_not_supported", "assets must be empty in schema version 1 for #308.")
+            )
+        if any(not isinstance(data.get(section), dict) for section in SECTIONS):
+            return prepared
+
+        names: dict[str, str] = {}
+        for section in SECTIONS:
+            for logical_name in data[section]:
+                if not isinstance(logical_name, str) or not self._valid_logical_name(logical_name):
+                    prepared.errors.append(
+                        ValidationError(
+                            "logical_name_invalid",
+                            "Logical name must contain case-sensitive Python identifiers separated by '.'.",
+                            str(logical_name),
+                        )
+                    )
+                if logical_name in names:
+                    prepared.errors.append(
+                        ValidationError(
+                            "logical_name_duplicate",
+                            f"Logical name also appears in {names[logical_name]}.",
+                            logical_name,
+                        )
+                    )
+                else:
+                    names[logical_name] = section
+
+        normalized = {
+            "schema_version": SCHEMA_VERSION,
+            "components": {},
+            "recovery_rules": {},
+            "trusted_actions": {},
+            "assets": {},
+        }
+        if saved and isinstance(data.get("manifest_id"), str):
+            normalized["manifest_id"] = data["manifest_id"]
+
+        for section in SECTIONS:
+            for logical_name, entry in data[section].items():
+                normalized_entry = self._prepare_entry(
+                    manifest_path, section, logical_name, entry, saved, prepared
+                )
+                if normalized_entry is not None:
+                    normalized[section][logical_name] = normalized_entry
+        prepared.manifest = normalized
+
+        self._validate_aliases(normalized, prepared.errors)
+        self._parse_sources(normalized, prepared)
+        self._validate_calls(normalized, prepared)
+        return prepared
+
+    def _prepare_entry(
+        self,
+        manifest_path: Path,
+        section: str,
+        logical_name: str,
+        entry: Any,
+        saved: bool,
+        prepared: _Prepared,
+    ) -> dict[str, Any] | None:
+        if not isinstance(entry, dict):
+            prepared.errors.append(
+                ValidationError("entry_type_invalid", "Manifest entry must be an object.", logical_name)
+            )
+            return None
+        allowed = {"component_id"}
+        if not saved:
+            allowed.add("source_path")
+        if section == "trusted_actions":
+            allowed.add("classification")
+        required = {"classification"} if section == "trusted_actions" else set()
+        self._check_fields(entry, allowed, required, prepared.errors, logical_name)
+
+        component_id = entry.get("component_id")
+        source_path = entry.get("source_path")
+        if saved:
+            if source_path is not None or not isinstance(component_id, str):
+                prepared.errors.append(
+                    ValidationError(
+                        "component_reference_invalid",
+                        "Saved entry must contain one component_id.",
+                        logical_name,
+                    )
+                )
+                return None
+        else:
+            has_component_id = "component_id" in entry
+            has_source_path = "source_path" in entry
+            if has_component_id == has_source_path:
+                prepared.errors.append(
+                    ValidationError(
+                        "component_reference_invalid",
+                        "Candidate entry must contain either component_id or source_path, but not both.",
+                        logical_name,
+                    )
+                )
+                return None
+            selected = component_id if has_component_id else source_path
+            if not isinstance(selected, str):
+                prepared.errors.append(
+                    ValidationError(
+                        "manifest_field_type_invalid",
+                        "component_id or source_path must be a string.",
+                        logical_name,
+                    )
+                )
+                return None
+
+        classification = entry.get("classification")
+        if section == "trusted_actions" and classification not in CLASSIFICATIONS:
+            prepared.errors.append(
+                ValidationError(
+                    "trusted_action_classification_invalid",
+                    "classification must be 'observe' or 'control'.",
+                    logical_name,
+                )
+            )
+
+        if isinstance(source_path, str):
+            source = self._candidate_source(manifest_path, source_path, logical_name, prepared.errors)
+            if source is None:
+                return None
+            component_id = COMPONENT_ID_PREFIX + sha256_bytes(source[1])
+            stored_path = self.components_dir / f"{component_id.removeprefix(COMPONENT_ID_PREFIX)}.py"
+            if stored_path.exists():
+                try:
+                    stored_content = stored_path.read_bytes()
+                except OSError as error:
+                    prepared.errors.append(
+                        ValidationError("component_source_unreadable", str(error), logical_name)
+                    )
+                    return None
+                if stored_content != source[1]:
+                    prepared.errors.append(
+                        ValidationError(
+                            "component_id_mismatch",
+                            "Stored source does not match the candidate Component ID.",
+                            logical_name,
+                        )
+                    )
+                    return None
+            prepared.sources.setdefault(component_id, _Source(component_id, source[0], source[1]))
+        elif isinstance(component_id, str):
+            source = self._stored_source(component_id, logical_name, prepared.errors)
+            if source is None:
+                return None
+            prepared.sources.setdefault(component_id, source)
+        else:
+            return None
+
+        normalized = {"component_id": component_id}
+        if section == "trusted_actions" and classification in CLASSIFICATIONS:
+            normalized["classification"] = classification
+        return normalized
+
+    def _candidate_source(
+        self,
+        manifest_path: Path,
+        source_path: str,
+        logical_name: str,
+        errors: list[ValidationError],
+    ) -> tuple[Path, bytes] | None:
+        relative = Path(source_path)
+        base = manifest_path.parent.resolve()
+        if relative.is_absolute():
+            errors.append(
+                ValidationError("source_path_invalid", "source_path must be relative.", logical_name)
+            )
+            return None
+        path = (manifest_path.parent / relative).resolve()
+        if not path.is_relative_to(base):
+            errors.append(
+                ValidationError(
+                    "source_path_escape", "source_path must remain inside the candidate directory.", logical_name
+                )
+            )
+            return None
+        try:
+            return path, path.read_bytes()
+        except OSError as error:
+            errors.append(ValidationError("source_unreadable", str(error), logical_name))
+            return None
+
+    def _stored_source(
+        self, component_id: str, logical_name: str, errors: list[ValidationError]
+    ) -> _Source | None:
+        digest = self._component_digest(component_id)
+        if digest is None:
+            errors.append(
+                ValidationError("component_id_invalid", "Component ID must be sha256:<64 lowercase hex>.", logical_name)
+            )
+            return None
+        path = self.components_dir / f"{digest}.py"
+        try:
+            content = path.read_bytes()
+        except OSError as error:
+            errors.append(ValidationError("component_source_unreadable", str(error), logical_name))
+            return None
+        if sha256_bytes(content) != digest:
+            errors.append(
+                ValidationError("component_id_mismatch", "Stored source does not match Component ID.", logical_name)
+            )
+            return None
+        return _Source(component_id, path, content)
+
+    def _parse_sources(self, manifest: dict[str, Any], prepared: _Prepared) -> None:
+        """按源码快照解析结构；同一 Component ID 只解析一次。"""
+
+        references: dict[str, list[tuple[str, str]]] = {}
+        for section in SECTIONS:
+            for name, entry in manifest[section].items():
+                references.setdefault(entry["component_id"], []).append((section, name))
+
+        for component_id, source in prepared.sources.items():
+            try:
+                source.tree = ast.parse(source.content, filename=str(source.path))
+            except (SyntaxError, UnicodeDecodeError) as error:
+                prepared.errors.append(
+                    ValidationError(
+                        "source_syntax_invalid",
+                        str(error),
+                        references.get(component_id, [("", None)])[0][1],
+                        getattr(error, "lineno", None),
+                        getattr(error, "offset", None),
+                    )
+                )
+                continue
+
+            assert source.tree is not None
+            for section, logical_name in references.get(component_id, []):
+                if section == "components":
+                    role = self._validate_component_source(source.tree, logical_name, prepared.errors)
+                    if role:
+                        prepared.roles[logical_name] = role
+                elif section == "recovery_rules":
+                    self._validate_recovery_source(source.tree, logical_name, prepared.errors)
+                else:
+                    self._validate_trusted_action_source(source.tree, logical_name, prepared.errors)
+            self._validate_source_structure(source.tree, references.get(component_id, []), prepared.errors)
+
+    def _validate_component_source(
+        self, tree: ast.Module, logical_name: str, errors: list[ValidationError]
+    ) -> str | None:
+        functions = self._top_functions(tree)
+        execute = functions.get("execute", [])
+        decorated = [
+            (node, decorator)
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            for decorator in node.decorator_list
+            if self._decorator_name(decorator) in ROLES
+        ]
+        role: str | None = None
+        if len(execute) != 1:
+            errors.append(
+                ValidationError("execute_invalid", "Component must define exactly one execute function.", logical_name)
+            )
+        else:
+            decorators = [self._decorator_name(item) for item in execute[0].decorator_list]
+            if (
+                len(decorators) != 1
+                or decorators[0] not in ROLES
+                or len(decorated) != 1
+                or decorated[0][0] is not execute[0]
+            ):
+                errors.append(
+                    self._node_error(
+                        "component_role_invalid",
+                        "execute must have exactly one plain role decorator.",
+                        logical_name,
+                        execute[0],
+                    )
+                )
+            else:
+                role = decorators[0]
+                self._validate_execute_signature(execute[0], logical_name, errors)
+
+        condition = functions.get("condition", [])
+        verify = functions.get("verify", [])
+        if role == "task_workflow":
+            if execute and not self._input_annotation_allowed(execute[0].returns):
+                errors.append(
+                    self._node_error(
+                        "signature_invalid",
+                        "Task Workflow return annotation must be directly JSON-compatible.",
+                        logical_name,
+                        execute[0],
+                    )
+                )
+            if len(verify) != 1:
+                errors.append(
+                    ValidationError("verify_invalid", "Task Workflow must define exactly one verify function.", logical_name)
+                )
+            elif execute:
+                self._validate_related_signature(verify[0], execute[0], "verify", logical_name, errors)
+            if len(condition) > 1:
+                errors.append(ValidationError("condition_invalid", "condition may be defined once.", logical_name))
+            elif condition and execute:
+                self._validate_related_signature(condition[0], execute[0], "condition", logical_name, errors)
+        elif role == "sub_workflow":
+            if condition or verify:
+                errors.append(
+                    ValidationError(
+                        "subworkflow_callable_forbidden",
+                        "Subworkflow cannot define condition or verify.",
+                        logical_name,
+                    )
+                )
+        elif role == "step":
+            if verify:
+                errors.append(ValidationError("verify_forbidden", "Step cannot define verify.", logical_name))
+            if len(condition) > 1:
+                errors.append(ValidationError("condition_invalid", "condition may be defined once.", logical_name))
+            elif condition and execute:
+                self._validate_related_signature(condition[0], execute[0], "condition", logical_name, errors)
+        return role
+
+    def _validate_recovery_source(
+        self, tree: ast.Module, logical_name: str, errors: list[ValidationError]
+    ) -> None:
+        functions = self._top_functions(tree)
+        for name, return_name in (("detect", "bool"), ("recover", "None")):
+            nodes = functions.get(name, [])
+            if len(nodes) != 1:
+                errors.append(
+                    ValidationError(
+                        "recovery_callable_invalid", f"Recovery Rule must define exactly one {name} function.", logical_name
+                    )
+                )
+            elif not self._simple_ctx_signature(nodes[0], return_name):
+                errors.append(
+                    self._node_error(
+                        "signature_invalid", f"{name} must have signature {name}(ctx) -> {return_name}.", logical_name, nodes[0]
+                    )
+                )
+        self._reject_role_decorators(tree, logical_name, errors)
+
+    def _validate_trusted_action_source(
+        self, tree: ast.Module, logical_name: str, errors: list[ValidationError]
+    ) -> None:
+        functions = self._top_functions(tree).get("execute", [])
+        if len(functions) != 1:
+            errors.append(
+                ValidationError("execute_invalid", "Trusted Action must define exactly one execute function.", logical_name)
+            )
+        else:
+            self._validate_execute_signature(functions[0], logical_name, errors)
+        self._reject_role_decorators(tree, logical_name, errors)
+
+    def _validate_source_structure(
+        self,
+        tree: ast.Module,
+        references: list[tuple[str, str]],
+        errors: list[ValidationError],
+    ) -> None:
+        formal = any(section != "trusted_actions" for section, _ in references)
+        logical_name = references[0][1] if references else None
+        if not ast.get_docstring(tree, clean=False):
+            errors.append(ValidationError("module_docstring_missing", "Component needs a module docstring.", logical_name))
+        if formal:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ExceptHandler):
+                    errors.append(
+                        self._node_error("except_forbidden", "Formal Component cannot catch exceptions.", logical_name, node)
+                    )
+                if isinstance(node, ast.Try):
+                    for child in node.finalbody:
+                        for nested in ast.walk(child):
+                            if isinstance(nested, (ast.Return, ast.Break, ast.Continue, ast.Raise)):
+                                errors.append(
+                                    self._node_error(
+                                        "finally_control_flow_forbidden",
+                                        "finally cannot replace or suppress the active result or exception.",
+                                        logical_name,
+                                        nested,
+                                    )
+                                )
+        self._validate_imports(
+            tree,
+            logical_name,
+            errors,
+            frozenset() if formal else self.trusted_action_imports,
+        )
+
+    def _validate_imports(
+        self,
+        tree: ast.Module,
+        logical_name: str | None,
+        errors: list[ValidationError],
+        extra_roots: frozenset[str],
+    ) -> None:
+        allowed = sys.stdlib_module_names
+        for node in ast.walk(tree):
+            modules: list[str] = []
+            relative = False
+            if isinstance(node, ast.Import):
+                modules = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                relative = node.level > 0
+                modules = [node.module or ""]
+            else:
+                continue
+            if relative or any(
+                module != "lalc"
+                and module.split(".", 1)[0] not in allowed
+                and module.split(".", 1)[0] not in extra_roots
+                for module in modules
+            ):
+                errors.append(
+                    self._node_error(
+                        "import_forbidden",
+                        "Import is not part of the allowed Component runtime.",
+                        logical_name,
+                        node,
+                    )
+                )
+
+    def _validate_calls(self, manifest: dict[str, Any], prepared: _Prepared) -> None:
+        """校验静态调用目标、角色限制、Trusted Action 权限和 Subworkflow 环。"""
+
+        actions = self._action_names(manifest)
+        edges: dict[str, set[str]] = {
+            name: set() for name, role in prepared.roles.items() if role == "sub_workflow"
+        }
+        for logical_name, entry in manifest["components"].items():
+            source = prepared.sources.get(entry["component_id"])
+            role = prepared.roles.get(logical_name)
+            if source is None or source.tree is None or role is None:
+                continue
+            forbidden_nodes: set[int] = set()
+            for function_name in ("condition", "verify"):
+                for function in self._top_functions(source.tree).get(function_name, []):
+                    for call in self._ctx_calls(function):
+                        forbidden_nodes.add(id(call))
+                        prepared.errors.append(
+                            self._node_error(
+                                "component_call_forbidden",
+                                f"ctx.call is forbidden inside {function_name}.",
+                                logical_name,
+                                call,
+                            )
+                        )
+            for call in self._ctx_calls(source.tree):
+                if id(call) in forbidden_nodes:
+                    continue
+                if role == "step":
+                    prepared.errors.append(
+                        self._node_error(
+                            "component_call_forbidden", "Step cannot use ctx.call.", logical_name, call
+                        )
+                    )
+                    continue
+                target = self._literal_call_target(call)
+                if target is None:
+                    prepared.errors.append(
+                        self._node_error(
+                            "component_call_dynamic", "ctx.call target must be a string literal.", logical_name, call
+                        )
+                    )
+                    continue
+                target_role = prepared.roles.get(target)
+                if target_role is None:
+                    prepared.errors.append(
+                        self._node_error(
+                            "component_call_unresolved", f"Unknown Component target: {target}", logical_name, call
+                        )
+                    )
+                elif target_role == "task_workflow":
+                    prepared.errors.append(
+                        self._node_error(
+                            "component_call_role_invalid", "Task Workflow cannot be called through ctx.call.", logical_name, call
+                        )
+                    )
+                elif role == "sub_workflow" and target_role == "sub_workflow":
+                    edges.setdefault(logical_name, set()).add(target)
+            self._validate_action_calls(source.tree, logical_name, role, actions, prepared.errors)
+
+        for logical_name, entry in manifest["recovery_rules"].items():
+            source = prepared.sources.get(entry["component_id"])
+            if source is None or source.tree is None:
+                continue
+            for call in self._ctx_calls(source.tree):
+                prepared.errors.append(
+                    self._node_error(
+                        "component_call_forbidden", "Recovery Rule cannot use ctx.call.", logical_name, call
+                    )
+                )
+            self._validate_action_calls(source.tree, logical_name, "recovery_rule", actions, prepared.errors)
+
+        for cycle in self._cycles(edges):
+            prepared.errors.append(
+                ValidationError(
+                    "subworkflow_cycle",
+                    "Subworkflow cycle: " + " -> ".join(cycle),
+                    cycle[0],
+                )
+            )
+
+    def _validate_action_calls(
+        self,
+        tree: ast.Module,
+        logical_name: str,
+        role: str,
+        actions: dict[str, str],
+        errors: list[ValidationError],
+    ) -> None:
+        allowed = {
+            ("task_workflow", "execute"): {"observe"},
+            ("task_workflow", "condition"): {"observe"},
+            ("task_workflow", "verify"): set(),
+            ("sub_workflow", "execute"): {"observe"},
+            ("step", "execute"): {"observe", "control"},
+            ("step", "condition"): {"observe"},
+            ("recovery_rule", "detect"): {"observe"},
+            ("recovery_rule", "recover"): {"observe", "control"},
+        }
+        for function_name, nodes in self._top_functions(tree).items():
+            permission = allowed.get((role, function_name))
+            if permission is None:
+                continue
+            for function in nodes:
+                for call in self._direct_calls(function):
+                    call_name = self._call_name(call.func)
+                    classification = actions.get(call_name)
+                    if classification is None and call_name:
+                        classification = actions.get(call_name.rsplit(".", 1)[-1])
+                    if classification and classification not in permission:
+                        errors.append(
+                            self._node_error(
+                                "trusted_action_forbidden",
+                                f"{function_name} cannot call a {classification} Trusted Action.",
+                                logical_name,
+                                call,
+                            )
+                        )
+
+    def _load(
+        self, manifest: dict[str, Any], prepared: _Prepared
+    ) -> tuple[LoadedManifest | None, list[ValidationError]]:
+        """在零静态错误之后加载全部 Component，并收集全部导入失败。"""
+
+        modules: dict[str, types.ModuleType] = {}
+        errors: list[ValidationError] = []
+        references = {
+            entry["component_id"]: name
+            for section in SECTIONS
+            for name, entry in manifest[section].items()
+        }
+        for component_id, source in prepared.sources.items():
+            try:
+                modules[component_id] = self._load_module(source)
+            except Exception as error:
+                errors.append(
+                    ValidationError("component_import_failed", str(error), references.get(component_id))
+                )
+        if errors:
+            return None, errors
+
+        loaded_sections: dict[str, dict[str, LoadedComponent]] = {name: {} for name in SECTIONS}
+        for section in SECTIONS:
+            for name, entry in manifest[section].items():
+                component_id = entry["component_id"]
+                module = modules[component_id]
+                if section == "components":
+                    role = prepared.roles[name]
+                    marker = getattr(getattr(module, "execute", None), "__lalc_role__", None)
+                    if marker != role:
+                        errors.append(
+                            ValidationError(
+                                "component_runtime_role_invalid",
+                                "Imported execute role does not match validated source.",
+                                name,
+                            )
+                        )
+                        continue
+                elif section == "recovery_rules":
+                    role = "recovery_rule"
+                    if not all(callable(getattr(module, item, None)) for item in ("detect", "recover")):
+                        errors.append(
+                            ValidationError("component_runtime_callable_missing", "Recovery callable missing.", name)
+                        )
+                        continue
+                else:
+                    role = "trusted_action"
+                    if not callable(getattr(module, "execute", None)):
+                        errors.append(
+                            ValidationError("component_runtime_callable_missing", "Trusted Action execute missing.", name)
+                        )
+                        continue
+                loaded_sections[section][name] = LoadedComponent(
+                    component_id, module, role, entry.get("classification")
+                )
+        if errors:
+            return None, errors
+        return (
+            LoadedManifest(
+                manifest,
+                loaded_sections["components"],
+                loaded_sections["recovery_rules"],
+                loaded_sections["trusted_actions"],
+            ),
+            [],
+        )
+
+    def _load_module(self, source: _Source) -> types.ModuleType:
+        """按 Component ID 复用模块；复用前仍核对本次读取的源码字节。"""
+
+        cached = _MODULE_CACHE.get(source.component_id)
+        if cached is not None:
+            if cached[0] != source.content:
+                raise ValueError("cached_component_source_mismatch")
+            return cached[1]
+        digest = source.component_id.removeprefix(COMPONENT_ID_PREFIX)
+        name = f"lalc_component_{digest}"
+        module = types.ModuleType(name)
+        module.__file__ = str(source.path)
+        module.__package__ = ""
+        sys.modules[name] = module
+        try:
+            exec(compile(source.content, str(source.path), "exec"), module.__dict__)
+        except Exception:
+            sys.modules.pop(name, None)
+            raise
+        _MODULE_CACHE[source.component_id] = (source.content, module)
+        return module
+
+    def _store_component(self, source: _Source) -> None:
+        """以不覆盖既有文件的方式保存一个内容寻址的 Component。"""
+
+        digest = source.component_id.removeprefix(COMPONENT_ID_PREFIX)
+        target = self.components_dir / f"{digest}.py"
+        if target.exists():
+            if target.read_bytes() != source.content:
+                raise ValueError("immutable_component_conflict")
+            return
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{digest}.", suffix=".tmp", dir=target.parent)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(source.content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            try:
+                # 硬链接创建目标文件时不会覆盖并发产生的同名不可变文件。
+                os.link(temporary, target)
+            except FileExistsError:
+                if target.read_bytes() != source.content:
+                    raise ValueError("immutable_component_conflict")
+        finally:
+            temporary.unlink(missing_ok=True)
+
+    def _read_json(self, path: Path) -> tuple[Any | None, list[ValidationError]]:
+        """读取 JSON，并在构造普通字典前保留重复键错误。"""
+
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as error:
+            return None, [ValidationError("manifest_unreadable", str(error))]
+        duplicates: list[str] = []
+
+        def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+            result: dict[str, Any] = {}
+            for key, value in items:
+                if key in result:
+                    duplicates.append(key)
+                result[key] = value
+            return result
+
+        try:
+            data = json.loads(text, object_pairs_hook=pairs)
+        except json.JSONDecodeError as error:
+            return None, [
+                ValidationError("manifest_json_invalid", error.msg, line=error.lineno, column=error.colno)
+            ]
+        errors = [
+            ValidationError("json_key_duplicate", f"Duplicate JSON key: {key}") for key in duplicates
+        ]
+        return data, errors
+
+    @staticmethod
+    def _check_fields(
+        value: dict[str, Any],
+        allowed: set[str],
+        required: set[str],
+        errors: list[ValidationError],
+        logical_name: str | None = None,
+    ) -> None:
+        for name in sorted(set(value) - allowed):
+            errors.append(ValidationError("field_unknown", f"Unknown field: {name}", logical_name))
+        for name in sorted(required - set(value)):
+            errors.append(ValidationError("field_missing", f"Missing field: {name}", logical_name))
+
+    @staticmethod
+    def _check_manifest_id(value: Any, errors: list[ValidationError]) -> None:
+        try:
+            parsed = uuid.UUID(value)
+        except (TypeError, ValueError, AttributeError):
+            errors.append(ValidationError("manifest_id_invalid", "manifest_id must be a canonical UUID."))
+            return
+        if str(parsed) != value:
+            errors.append(ValidationError("manifest_id_invalid", "manifest_id must be a canonical UUID."))
+
+    @staticmethod
+    def _valid_logical_name(value: str) -> bool:
+        return bool(value) and all(part.isidentifier() for part in value.split("."))
+
+    @staticmethod
+    def _component_digest(component_id: str) -> str | None:
+        if not component_id.startswith(COMPONENT_ID_PREFIX):
+            return None
+        digest = component_id[len(COMPONENT_ID_PREFIX) :]
+        if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+            return None
+        return digest
+
+    @staticmethod
+    def _top_functions(tree: ast.Module) -> dict[str, list[ast.FunctionDef | ast.AsyncFunctionDef]]:
+        result: dict[str, list[ast.FunctionDef | ast.AsyncFunctionDef]] = {}
+        for node in tree.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                result.setdefault(node.name, []).append(node)
+        return result
+
+    @staticmethod
+    def _decorator_name(node: ast.expr) -> str | None:
+        return node.id if isinstance(node, ast.Name) else None
+
+    @staticmethod
+    def _reject_role_decorators(
+        tree: ast.Module, logical_name: str, errors: list[ValidationError]
+    ) -> None:
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+                ManifestManager._decorator_name(item) in ROLES for item in node.decorator_list
+            ):
+                errors.append(
+                    ManifestManager._node_error(
+                        "component_role_forbidden", "This Component does not use a role decorator.", logical_name, node
+                    )
+                )
+
+    def _validate_execute_signature(
+        self,
+        function: ast.FunctionDef | ast.AsyncFunctionDef,
+        logical_name: str,
+        errors: list[ValidationError],
+    ) -> None:
+        arguments = function.args
+        valid = (
+            not isinstance(function, ast.AsyncFunctionDef)
+            and not arguments.posonlyargs
+            and [item.arg for item in arguments.args] == ["ctx"]
+            and not arguments.defaults
+            and arguments.vararg is None
+            and arguments.kwarg is None
+            and function.returns is not None
+            and all(item.annotation is not None for item in arguments.kwonlyargs)
+        )
+        if valid:
+            valid = all(self._input_annotation_allowed(item.annotation) for item in arguments.kwonlyargs)
+        if valid:
+            for default in arguments.kw_defaults:
+                if default is not None and not self._json_literal(default):
+                    valid = False
+        if not valid:
+            errors.append(
+                self._node_error(
+                    "signature_invalid",
+                    "execute must be typed execute(ctx, *, ...) with JSON-compatible inputs.",
+                    logical_name,
+                    function,
+                )
+            )
+
+    def _validate_related_signature(
+        self,
+        function: ast.FunctionDef | ast.AsyncFunctionDef,
+        execute: ast.FunctionDef | ast.AsyncFunctionDef,
+        kind: str,
+        logical_name: str,
+        errors: list[ValidationError],
+    ) -> None:
+        positional = [item.arg for item in function.args.posonlyargs + function.args.args]
+        expected = ["ctx", "result"] if kind == "verify" else ["ctx"]
+        valid = (
+            not isinstance(function, ast.AsyncFunctionDef)
+            and not function.args.posonlyargs
+            and positional == expected
+            and not function.args.defaults
+            and function.args.vararg is None
+            and function.args.kwarg is None
+            and isinstance(function.returns, ast.Name)
+            and function.returns.id == "bool"
+            and self._parameter_contract(function.args) == self._parameter_contract(execute.args)
+        )
+        if kind == "verify":
+            result_arg = (function.args.posonlyargs + function.args.args)[1] if len(positional) == 2 else None
+            valid = (
+                valid
+                and result_arg is not None
+                and self._annotation_dump(result_arg.annotation) == self._annotation_dump(execute.returns)
+            )
+        if not valid:
+            errors.append(
+                self._node_error("signature_invalid", f"{kind} signature must match execute.", logical_name, function)
+            )
+
+    @staticmethod
+    def _parameter_contract(arguments: ast.arguments) -> list[tuple[str, str, str | None]]:
+        return [
+            (
+                argument.arg,
+                ManifestManager._annotation_dump(argument.annotation),
+                None if default is None else ast.dump(default, include_attributes=False),
+            )
+            for argument, default in zip(arguments.kwonlyargs, arguments.kw_defaults, strict=True)
+        ]
+
+    @staticmethod
+    def _annotation_dump(annotation: ast.expr | None) -> str:
+        return "" if annotation is None else ast.dump(annotation, include_attributes=False)
+
+    @staticmethod
+    def _simple_ctx_signature(
+        function: ast.FunctionDef | ast.AsyncFunctionDef, return_name: str
+    ) -> bool:
+        args = function.args
+        return_annotation = function.returns
+        return_valid = (
+            isinstance(return_annotation, ast.Name) and return_annotation.id == return_name
+        ) or (return_name == "None" and isinstance(return_annotation, ast.Constant) and return_annotation.value is None)
+        return (
+            not isinstance(function, ast.AsyncFunctionDef)
+            and not args.posonlyargs
+            and [item.arg for item in args.args] == ["ctx"]
+            and not args.defaults
+            and not args.kwonlyargs
+            and args.vararg is None
+            and args.kwarg is None
+            and return_valid
+        )
+
+    @staticmethod
+    def _input_annotation_allowed(node: ast.expr | None) -> bool:
+        if isinstance(node, ast.Name):
+            return node.id in {"str", "int", "float", "bool"}
+        if isinstance(node, ast.Constant):
+            return node.value is None
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+            sides = (node.left, node.right)
+            return sum(isinstance(item, ast.Constant) and item.value is None for item in sides) == 1 and all(
+                ManifestManager._input_annotation_allowed(item) for item in sides
+            )
+        if not isinstance(node, ast.Subscript):
+            return False
+        name = node.value.id if isinstance(node.value, ast.Name) else None
+        elements = list(node.slice.elts) if isinstance(node.slice, ast.Tuple) else [node.slice]
+        if name == "Literal":
+            return bool(elements) and all(
+                isinstance(item, ast.Constant) and isinstance(item.value, (str, int, float, bool, type(None)))
+                for item in elements
+            )
+        if name == "list" and len(elements) == 1:
+            return ManifestManager._input_annotation_allowed(elements[0])
+        if name == "dict" and len(elements) == 2:
+            return isinstance(elements[0], ast.Name) and elements[0].id == "str" and ManifestManager._input_annotation_allowed(
+                elements[1]
+            )
+        return False
+
+    @staticmethod
+    def _json_literal(node: ast.expr) -> bool:
+        try:
+            value = ast.literal_eval(node)
+            json.dumps(value, allow_nan=False)
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    @staticmethod
+    def _ctx_calls(tree: ast.AST) -> list[ast.Call]:
+        return [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "ctx"
+            and node.func.attr == "call"
+        ]
+
+    @staticmethod
+    def _literal_call_target(call: ast.Call) -> str | None:
+        if not call.args or not isinstance(call.args[0], ast.Constant) or not isinstance(call.args[0].value, str):
+            return None
+        return call.args[0].value
+
+    @staticmethod
+    def _action_names(manifest: dict[str, Any]) -> dict[str, str]:
+        result: dict[str, str] = {}
+        ambiguous: set[str] = set()
+        for name, entry in manifest["trusted_actions"].items():
+            classification = entry.get("classification")
+            if classification not in CLASSIFICATIONS:
+                continue
+            result[name] = classification
+            short = name.rsplit(".", 1)[-1]
+            if short in result and result[short] != classification:
+                ambiguous.add(short)
+            else:
+                result[short] = classification
+        for name in ambiguous:
+            result.pop(name, None)
+        return result
+
+    @staticmethod
+    def _direct_calls(function: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.Call]:
+        calls: list[ast.Call] = []
+
+        class Visitor(ast.NodeVisitor):
+            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+                if node is function:
+                    self.generic_visit(node)
+
+            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+                if node is function:
+                    self.generic_visit(node)
+
+            def visit_Lambda(self, node: ast.Lambda) -> None:
+                return
+
+            def visit_Call(self, node: ast.Call) -> None:
+                calls.append(node)
+                self.generic_visit(node)
+
+        Visitor().visit(function)
+        return calls
+
+    @staticmethod
+    def _call_name(node: ast.expr) -> str | None:
+        if isinstance(node, ast.Name):
+            return node.id
+        if isinstance(node, ast.Attribute):
+            prefix = ManifestManager._call_name(node.value)
+            return f"{prefix}.{node.attr}" if prefix else node.attr
+        return None
+
+    @staticmethod
+    def _validate_aliases(manifest: dict[str, Any], errors: list[ValidationError]) -> None:
+        classifications: dict[str, str] = {}
+        for name, entry in manifest["trusted_actions"].items():
+            component_id = entry.get("component_id")
+            classification = entry.get("classification")
+            if component_id is None or classification is None:
+                continue
+            previous = classifications.setdefault(component_id, classification)
+            if previous != classification:
+                errors.append(
+                    ValidationError(
+                        "trusted_action_alias_conflict",
+                        "Aliases of one Trusted Action must use the same classification.",
+                        name,
+                    )
+                )
+
+    @staticmethod
+    def _cycles(edges: dict[str, set[str]]) -> list[list[str]]:
+        cycles: list[list[str]] = []
+        state: dict[str, int] = {}
+        stack: list[str] = []
+
+        def visit(node: str) -> None:
+            state[node] = 1
+            stack.append(node)
+            for target in sorted(edges.get(node, ())):
+                if state.get(target, 0) == 0:
+                    visit(target)
+                elif state.get(target) == 1:
+                    start = stack.index(target)
+                    cycle = stack[start:] + [target]
+                    if cycle not in cycles:
+                        cycles.append(cycle)
+            stack.pop()
+            state[node] = 2
+
+        for node in sorted(edges):
+            if state.get(node, 0) == 0:
+                visit(node)
+        return cycles
+
+    @staticmethod
+    def _node_error(
+        code: str, message: str, logical_name: str | None, node: ast.AST
+    ) -> ValidationError:
+        return ValidationError(
+            code,
+            message,
+            logical_name,
+            getattr(node, "lineno", None),
+            getattr(node, "col_offset", -1) + 1 if hasattr(node, "col_offset") else None,
+        )

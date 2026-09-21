@@ -21,6 +21,8 @@ Do not migrate:
 - shared mutable task parameters, special routing nodes, or error nodes created for the old architecture;
 - any compatibility adapter whose only purpose is to let both runtimes coexist.
 
+The retained Architecture Demo stores its placeholder Components and Manifests under a separate `demo/` data directory. The formal Stage 2 `components/` and `manifests/` directories accept only the new complete format; Demo data is neither migrated nor supported through a compatibility loader.
+
 Old business code is behavioral reference, not source to copy and rename.
 
 ## Slice 1: Clean project skeleton
@@ -36,13 +38,26 @@ Acceptance:
 
 ## Slice 2: Component loading and complete-manifest validation
 
-Implement the three role decorators, immutable Component identity and source-hash verification, typed signature inspection, Manifest loading, and source-wide structural validation. Use test-only Component modules and Manifests.
+Implement three role-only decorators with no registry or execution behavior, SHA-256 Component IDs verified against exact source bytes, typed signature inspection, Manifest loading, and source-wide structural validation. Use test-only Component modules and Manifests.
 
 Acceptance:
 
+- a trusted developer candidate may mix existing `component_id` entries with new `source_path` entries; saving computes missing IDs, copies exact source bytes to `components/<sha256>.py`, and produces a saved Manifest containing no source paths;
+- candidate source paths are relative to the candidate Manifest directory and cannot escape it through absolute paths, parent traversal, or symbolic links;
+- candidate and saved Manifests require `schema_version: 1`; missing, unsupported, or legacy formats are rejected without migration;
+- `assets` is required and must be an empty object in this slice; non-empty Asset entries remain invalid until the Asset slice defines their complete contract;
+- a candidate Manifest cannot provide `manifest_id`; saving generates the UUID used by the saved file and active pointer;
+- publishing writes immutable files before atomically replacing `manifests/active.json`; a write or replacement failure leaves the previous active Manifest selected and may retain safe unreferenced immutable files for later reference-based cleanup;
+- unexpected exceptions during Manifest save, load, or activation are logged at `error` with the failing phase and traceback, while ordinary validation rejection is returned as structured validation errors;
 - one valid Task Workflow, Subworkflow, Step, Recovery Rule, and Trusted Action mapping load successfully;
-- invalid hashes, role decorators, signatures, dynamic `ctx.call()` targets, illegal caller roles, unresolved targets, Subworkflow cycles, forbidden `except`, and forbidden `finally` control flow are rejected before execution;
-- a rejected candidate leaves the previously selected Working Manifest unchanged;
+- the loader uses fixed function names and the Manifest rejects any configurable `entrypoint`: Task Workflow, Subworkflow, Step, and Trusted Action use `execute`; Task Workflow also requires `verify`; Recovery Rule uses `detect` and `recover`; Task Workflow and Step may define `condition`;
+- invalid Component IDs or source mismatches, role decorators, signatures, dynamic `ctx.call()` targets, illegal caller roles, unresolved targets, Subworkflow cycles, forbidden `except`, and forbidden `finally` control flow are rejected before execution;
+- Task Workflow, Subworkflow, Step, and Recovery Rule source rejects relative imports, project-local helpers, and direct Component imports; only Trusted Actions may additionally use application dependencies fixed by the shipped environment;
+- validation reports all independently determinable errors with stable codes and source locations when available, without cascading errors after a failed prerequisite;
+- duplicate JSON keys, unknown fields, missing required fields, and wrong field types are rejected rather than ignored or corrected;
+- logical names consist of one or more case-sensitive Python identifiers separated by `.`, are not rewritten or used to infer role, and are unique across `components`, `recovery_rules`, and `trusted_actions`;
+- multiple logical names may reuse one Component ID, but aliases of one Trusted Action ID must keep the same `classification`;
+- a rejected candidate leaves the active Component Manifest unchanged;
 - tests require no GUI, recognition model, network, or game process.
 
 ## Slice 3: Complete Task Workflow with fake Trusted Actions
@@ -53,7 +68,7 @@ Acceptance:
 
 - a test Task Workflow calls a Subworkflow and Step and completes without Agent involvement;
 - the final JSON-compatible result is verified against the immutable original inputs;
-- Trace records actual logical names, Component IDs, hashes, arguments, actions, returns, and timings in order;
+- Trace records actual logical names, Component IDs, arguments, actions, returns, and timings in order;
 - mutable inputs changed by a callee do not mutate the caller, saved Step arguments, or verifier inputs;
 - false or exceptional verification records terminal failure and does not request Agent handling.
 
