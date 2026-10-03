@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .application import ApplicationService, StartError, default_data_root
+from .focused import WindowError
 from .manifest import ManifestManager, ValidationError
 
 
@@ -29,6 +30,8 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("validate")
     commands.add_parser("publish")
     commands.add_parser("clear")
+    commands.add_parser("connect")
+    commands.add_parser("data-dir")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
     run.add_argument("--manifest")
@@ -113,6 +116,9 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
 
 def _dispatch(args: argparse.Namespace) -> int:
     data_root = default_data_root()
+    if args.command == "data-dir":
+        print(data_root)
+        return 0
     manager = ManifestManager(data_root)
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"
@@ -160,6 +166,12 @@ def _dispatch(args: argparse.Namespace) -> int:
         shutil.rmtree(candidate)
         print(f"Cleared Developer Candidate: {candidate.resolve()}")
         return 0
+    if args.command == "connect":
+        result = ApplicationService(data_root, manifest_manager=manager).connect()
+        print(f"Connected: {result['window']['title']} ({result['image']['width']}x{result['image']['height']})")
+        print(f"Screenshot: {result['image_path']}")
+        print(f"Log: {result['log_path']}")
+        return 0
     if args.command in {"run", "run-plan"}:
         return _run(args, manager, data_root)
     if args.command == "list-manifests":
@@ -186,7 +198,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_gui()
     try:
         return _dispatch(_parser().parse_args(args))
-    except (EOFError, KeyboardInterrupt, OSError) as error:
+    except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:
         print(str(error) or type(error).__name__, file=sys.stderr)
         return 1
     except Exception as error:

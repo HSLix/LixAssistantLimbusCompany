@@ -16,6 +16,14 @@ import lalc.__main__ as cli
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "virtual-workflow"
 
 
+def test_data_dir_prints_default_without_creating_it(tmp_path: Path, monkeypatch, capsys) -> None:
+    target = tmp_path / "LALC"
+    monkeypatch.setattr(cli, "default_data_root", lambda: target)
+    assert cli.main(["data-dir"]) == 0
+    assert capsys.readouterr().out == f"{target}\n"
+    assert not target.exists()
+
+
 def test_complete_developer_cli_lifecycle(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:

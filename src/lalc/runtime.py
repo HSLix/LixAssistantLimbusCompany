@@ -137,6 +137,11 @@ class RunContext:
     def action(self, logical_name: str, **arguments: Any) -> Any:
         return self._executor.trusted_action(logical_name, arguments)
 
+    def capture_screen(self, *, save: bool = False) -> dict[str, Any]:
+        """只供正在执行的 observe Trusted Action 刷新本次 Run 的截图。"""
+
+        return self._executor.capture_screen(save)
+
 
 class WorkflowExecutor:
     """在当前线程同步执行正式 Component，并在 Step 边界处理恢复。"""
@@ -158,6 +163,7 @@ class WorkflowExecutor:
         gate: RunGate,
         emit: Callable[[str, dict[str, Any]], None],
         *,
+        capture_screen: Callable[[bool], dict[str, Any]] | None = None,
         manifest_manager: ManifestManager | None = None,
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         select_manifest: Callable[[LoadedManifest], None] | None = None,
@@ -165,6 +171,8 @@ class WorkflowExecutor:
         self.manifest = manifest
         self.gate = gate
         self.emit = emit
+        self._capture_screen = capture_screen
+        self._active_action: str | None = None
         self.context = RunContext(self)
         self._frames: list[_Frame] = []
         self._next_call_id = 1
@@ -435,6 +443,8 @@ class WorkflowExecutor:
 
         if not self._frames:
             raise ExecutionFailure("execution_failed", "Trusted Action called without a Component frame.")
+        if self._active_action is not None:
+            raise ExecutionFailure("execution_failed", "Trusted Actions cannot call another Trusted Action.")
         caller = self._frames[-1]
         action = self.manifest.trusted_actions.get(logical_name)
         if action is None:
@@ -462,7 +472,11 @@ class WorkflowExecutor:
         self.emit("trusted_action_started", fields)
         started = time.monotonic()
         try:
-            result = action.module.execute(self.context, **_json_copy(inputs))
+            self._active_action = action.classification
+            try:
+                result = action.module.execute(self.context, **_json_copy(inputs))
+            finally:
+                self._active_action = None
             normalized = _normalize_output(
                 result,
                 get_type_hints(action.module.execute, globalns=action.module.execute.__globals__)["return"],
@@ -484,6 +498,13 @@ class WorkflowExecutor:
                 {**fields, **_exception_fields(error), "duration_ms": _duration_ms(started)},
             )
             raise
+
+    def capture_screen(self, save: bool) -> dict[str, Any]:
+        """将原始像素留在会话中，仅返回可写入 Trace 的信息。"""
+
+        if self._active_action != "observe" or self._capture_screen is None:
+            raise ExecutionFailure("execution_failed", "Screenshot capture requires an observe Trusted Action.")
+        return self._capture_screen(save)
 
     def _invoke_component(
         self,

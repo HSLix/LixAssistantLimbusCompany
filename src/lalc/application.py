@@ -5,11 +5,13 @@ import logging
 import sys
 import threading
 import time
+import uuid
 from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
 from .manifest import LoadedManifest, ManifestManager
 from .runtime import (
@@ -43,12 +45,15 @@ class ApplicationService:
         on_change: Callable[[dict[str, Any]], None] | None = None,
         logger: logging.Logger | None = None,
         recovery_choice: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
+        window_platform: Any | None = None,
     ) -> None:
         self.data_root = Path(data_root)
         self.manifest_manager = manifest_manager or ManifestManager(self.data_root)
         self.on_change = on_change
         self.logger = logger or logging.getLogger(__name__)
         self.recovery_choice = recovery_choice
+        self.window_platform = window_platform
+        self._focused_session: FocusedAutomationSession | None = None
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
         self._gate: RunGate | None = None
@@ -133,6 +138,59 @@ class ApplicationService:
             self._changed_locked()
             return run_id
 
+    def connect(self) -> dict[str, Any]:
+        """检查唯一游戏窗口并留下截图与文字连接日志，不创建 Run。"""
+
+        with self._condition:
+            if self._state["phase"] == "running":
+                raise WindowError("Cannot connect while a Run is active.")
+            session = FocusedAutomationSession(self._window_platform(), lambda _event, _fields: None)
+            window = session.connect()
+            image = session.capture()
+            identity = uuid.uuid4().hex
+            directory = self.data_root / "connections"
+            image_path = directory / f"{identity}.png"
+            log_path = directory / f"{identity}.log"
+            try:
+                session.save(image_path)
+                log_path.write_text(
+                    "\n".join((
+                        f"recorded_at={datetime.now(UTC).isoformat()}",
+                        f"hwnd={window['hwnd']}",
+                        f"process_id={window['process_id']}",
+                        f"process_path={window['process_path']}",
+                        f"title={window['title']}",
+                        f"class={window['class']}",
+                        f"image_path={image_path}",
+                        f"width={image['width']}",
+                        f"height={image['height']}",
+                    )) + "\n", encoding="utf-8",
+                )
+            except Exception:
+                image_path.unlink(missing_ok=True)
+                log_path.unlink(missing_ok=True)
+                raise
+            return {"window": window, "image": image, "image_path": str(image_path), "log_path": str(log_path)}
+
+    def _window_platform(self) -> Any:
+        return self.window_platform if self.window_platform is not None else WindowsWindowPlatform()
+
+    def _capture_screen(self, save: bool) -> dict[str, Any]:
+        """Trusted Action 入口：刷新本次 Run 的内存图像并可显式保存。"""
+
+        if self._focused_session is None:
+            self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
+        result: dict[str, Any] = self._focused_session.capture()
+        if save:
+            run_id = self._state["run_id"]
+            assert run_id is not None
+            path = self.data_root / "evidence" / str(run_id) / f"{result['observation']}.png"
+            evidence_id = f"{run_id}/{result['observation']}"
+            saved = self._focused_session.save(path, evidence_id=evidence_id)
+            result["evidence_path"] = saved["path"]
+            result["evidence_id"] = evidence_id
+        return result
+
     def ledger_records(self) -> list[dict[str, Any]]:
         """读取当前 Run 的持久化 Workflow 记录。"""
 
@@ -161,6 +219,7 @@ class ApplicationService:
         if trace_path.exists():
             raise StartError("trace_conflict", f"Trace already exists for Run {run_id}.")
         self._gate = gate
+        self._focused_session = None
         self._trace_path = trace_path
         self._ledger = WorkflowRunLedger(self.data_root, run_id)
         self._state.update(
@@ -216,6 +275,7 @@ class ApplicationService:
         assert component.component_id == component_id
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
+            capture_screen=self._capture_screen,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
@@ -266,6 +326,7 @@ class ApplicationService:
 
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
+            capture_screen=self._capture_screen,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
@@ -352,6 +413,7 @@ class ApplicationService:
                               "failure_message": str(error)}
             self._state.update(phase="finished", paused=False,
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
+            self._focused_session = None
             self._changed_locked()
 
     def _emit(self, event: str, fields: dict[str, Any]) -> None:

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "components": {
+    "steps.capture_screen": {"source_path": "steps.capture_screen.py"}
+  },
+  "recovery_rules": {},
+  "trusted_actions": {
+    "observe.capture_screen": {"source_path": "actions.capture_screen.py", "classification": "observe"}
+  },
+  "assets": {}
+}

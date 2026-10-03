@@ -5,7 +5,7 @@ LALC automates a Windows-native Unity game window during an exclusive focused au
 ## Language
 
 **Target Window**:
-The Windows desktop window owned by the Unity game that LALC observes and operates.
+The unique existing Windows desktop window of Limbus Company that LALC selects to observe and operate. No window is selected when discovery finds zero or multiple matching windows.
 _Avoid_: Emulator, virtual device
 
 **Focused Automation Session**:

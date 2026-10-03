@@ -25,8 +25,9 @@ Start with:
 
 ## Development
 
-The current formal runtime uses Python 3.12.10 and uv. It does not yet perform
-real game, OCR, model, or Windows automation.
+The current formal runtime uses Python 3.12.10 and uv. It supports focused
+Windows game observation, but real game control, OCR, and model calls are not
+implemented yet.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
@@ -48,7 +49,19 @@ uv run lalc set-default <manifest-id>
 uv run lalc run <logical-name>
 uv run lalc run-plan examples/virtual-workflow/plan.json
 uv run lalc clear
+uv run lalc data-dir
 ```
+
+On Windows, `uv run lalc connect` finds the unique running Limbus Company
+window, brings it to the foreground once, captures its client area, and writes
+the PNG image plus a text log under the local application data directory's
+`connections/` folder. It prints both paths; it does not keep a connection
+after the command exits. `uv run lalc data-dir` prints the default data
+directory for the current system. `examples/focused-observation/` contains a complete
+Manifest with a direct Step and an `observe` Trusted Action for checking a real
+Run's screenshot and Trace. Copy that example into an empty `candidate/`, then
+use `validate`, `publish`, and `run steps.capture_screen --manifest <id>`.
+Pass `--inputs '{"save":true}'` to save that Run's screenshot as PNG evidence.
 
 `publish` keeps the editable candidate and does not change the Default
 Manifest. `clear` is the only command that removes it and asks for confirmation.
