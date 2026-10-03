@@ -98,7 +98,7 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
     result = manager.publish(candidate)
 
     assert result.ok
-    assert result.loaded is manager.active
+    assert manager.default is None
     assert result.loaded.components["tasks.example"].role == "task_workflow"
     assert result.loaded.components["flow.sub"].role == "sub_workflow"
     assert result.loaded.components["steps.finish"].role == "step"
@@ -114,9 +114,7 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
         "assets",
     }
     assert "source_path" not in saved_path.read_text(encoding="utf-8")
-    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
-        "manifest_id": result.loaded.manifest_id
-    }
+    assert not (manager.manifests_dir / "default.json").exists()
     ids = {
         entry["component_id"]
         for section in ("components", "recovery_rules", "trusted_actions")
@@ -127,7 +125,8 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
         path.stem for path in manager.components_dir.glob("*.py")
     } == {component_id.removeprefix("sha256:") for component_id in ids}
 
-    reloaded = ManifestManager(tmp_path / "formal").load_active()
+    assert manager.set_default(result.loaded.manifest_id).ok
+    reloaded = ManifestManager(tmp_path / "formal").load_default()
     assert reloaded.ok
     assert (
         reloaded.loaded.components["tasks.example"].module
@@ -139,7 +138,8 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
     manager = ManifestManager(tmp_path / "formal")
     valid = manager.publish(_write_candidate(tmp_path / "valid"))
     assert valid.ok
-    active_id = valid.loaded.manifest_id
+    assert manager.set_default(valid.loaded.manifest_id).ok
+    default_id = valid.loaded.manifest_id
     invalid = {
         "schema_version": 2,
         "components": {"not valid!": {"source_path": "../outside.py", "extra": True}},
@@ -166,9 +166,9 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
         "component_id_invalid",
         "trusted_action_classification_invalid",
     } <= _codes(result)
-    assert manager.active.manifest_id == active_id
-    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
-        "manifest_id": active_id
+    assert manager.default.manifest_id == default_id
+    assert json.loads((manager.manifests_dir / "default.json").read_text(encoding="utf-8")) == {
+        "manifest_id": default_id
     }
 
 
@@ -187,14 +187,14 @@ def test_duplicate_keys_and_candidate_manifest_id_are_rejected(tmp_path: Path) -
     }
 
 
-def test_source_validation_reports_calls_cycles_permissions_and_control_flow(tmp_path: Path) -> None:
+def test_source_validation_reports_calls_roles_permissions_and_control_flow(tmp_path: Path) -> None:
     sources = dict(SOURCES)
     sources["task.py"] = '''"""Invalid Task Workflow."""
 from lalc import task_workflow
 
 @task_workflow
 def execute(ctx, *, amount: int = 1) -> dict[str, int]:
-    control(ctx)
+    ctx.action("control")
     ctx.call(amount)
     ctx.call("missing.component", amount=amount)
     ctx.call("tasks.example", amount=amount)
@@ -203,19 +203,19 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
 def verify(ctx, result: dict[str, int], *, amount: int = 1) -> bool:
     return True
 '''
-    sources["sub.py"] = '''"""Cyclic Subworkflow."""
+    sources["sub.py"] = '''"""Invalid nested Subworkflow call."""
 from lalc import sub_workflow
 
 @sub_workflow
 def execute(ctx, *, amount: int = 1) -> dict[str, int]:
     return ctx.call("flow.other", amount=amount)
 '''
-    sources["other.py"] = '''"""Other cyclic Subworkflow."""
+    sources["other.py"] = '''"""Other Subworkflow."""
 from lalc import sub_workflow
 
 @sub_workflow
 def execute(ctx, *, amount: int = 1) -> dict[str, int]:
-    return ctx.call("flow.sub", amount=amount)
+    return ctx.call("steps.finish", amount=amount)
 '''
     sources["step.py"] = '''"""Invalid Step."""
 import third_party
@@ -240,7 +240,6 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
 
     assert {
         "trusted_action_forbidden",
-        "subworkflow_cycle",
         "component_call_forbidden",
         "component_call_dynamic",
         "component_call_unresolved",
@@ -250,9 +249,9 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
         "import_forbidden",
     } <= codes
     assert any(
-        error.code == "subworkflow_cycle"
-        and "flow.sub" in error.message
-        and "flow.other" in error.message
+        error.code == "component_call_role_invalid"
+        and error.logical_name == "flow.sub"
+        and "Subworkflow cannot call another Subworkflow" in error.message
         for error in errors
     )
     assert all(error.line is not None for error in errors if error.code in {"except_forbidden", "import_forbidden"})
@@ -275,13 +274,14 @@ def test_path_escape_and_conflicting_trusted_action_alias_are_rejected(tmp_path:
     }
 
 
-def test_import_failure_and_activation_write_failure_keep_old_manifest(
+def test_import_failure_and_default_write_failure_keep_old_manifest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     manager = ManifestManager(tmp_path / "formal")
     initial = manager.publish(_write_candidate(tmp_path / "initial"))
     assert initial.ok
-    active_id = initial.loaded.manifest_id
+    assert manager.set_default(initial.loaded.manifest_id).ok
+    default_id = initial.loaded.manifest_id
 
     failing_sources = dict(SOURCES)
     failing_sources["observe.py"] = '''"""Broken trusted observation."""
@@ -291,28 +291,30 @@ def execute(ctx, *, name: str = "state") -> dict[str, str]:
 '''
     failed_import = manager.publish(_write_candidate(tmp_path / "failed-import", sources=failing_sources))
     assert _codes(failed_import) == {"component_import_failed"}
-    assert manager.active.manifest_id == active_id
+    assert manager.default.manifest_id == default_id
 
     changed_sources = dict(SOURCES)
     changed_sources["step.py"] = SOURCES["step.py"].replace("amount >= 0", "amount > -1")
     candidate = _write_candidate(tmp_path / "write-failure", sources=changed_sources)
     real_atomic_write = manifest_module.atomic_write_json
 
-    def fail_active(path: Path, value: dict) -> None:
-        if path.name == "active.json":
-            raise OSError("scripted active write failure")
+    def fail_default(path: Path, value: dict) -> None:
+        if path.name == "default.json":
+            raise OSError("scripted default write failure")
         real_atomic_write(path, value)
 
-    monkeypatch.setattr(manifest_module, "atomic_write_json", fail_active)
+    monkeypatch.setattr(manifest_module, "atomic_write_json", fail_default)
+    published = manager.publish(candidate)
+    assert published.ok
     with caplog.at_level(logging.ERROR):
-        failed_write = manager.publish(candidate)
+        failed_write = manager.set_default(published.loaded.manifest_id)
 
     assert _codes(failed_write) == {"manifest_update_failed"}
-    assert manager.active.manifest_id == active_id
-    assert "Manifest update failed during activate_manifest" in caplog.text
-    assert "scripted active write failure" in caplog.text
-    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
-        "manifest_id": active_id
+    assert manager.default.manifest_id == default_id
+    assert "Manifest update failed during set_default" in caplog.text
+    assert "scripted default write failure" in caplog.text
+    assert json.loads((manager.manifests_dir / "default.json").read_text(encoding="utf-8")) == {
+        "manifest_id": default_id
     }
     assert len(list(manager.manifests_dir.glob("*.json"))) >= 3
 
@@ -338,21 +340,22 @@ def execute(ctx, *, name: str = "state") -> dict[str, str]:
     assert not marker.exists()
 
 
-def test_existing_saved_manifest_can_be_activated_without_creating_another(tmp_path: Path) -> None:
+def test_existing_saved_manifest_can_be_selected_without_creating_another(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path / "formal")
     first = manager.publish(_write_candidate(tmp_path / "first"))
     changed_sources = dict(SOURCES)
     changed_sources["step.py"] = SOURCES["step.py"].replace("amount >= 0", "amount > -1")
     second = manager.publish(_write_candidate(tmp_path / "second", sources=changed_sources))
     assert first.ok and second.ok
+    assert manager.set_default(second.loaded.manifest_id).ok
     saved_before = set(manager.manifests_dir.glob("*.json"))
 
-    activated = manager.activate(first.loaded.manifest_id)
+    selected = manager.set_default(first.loaded.manifest_id)
 
-    assert activated.ok
-    assert manager.active.manifest_id == first.loaded.manifest_id
+    assert selected.ok
+    assert manager.default.manifest_id == first.loaded.manifest_id
     assert set(manager.manifests_dir.glob("*.json")) == saved_before
-    assert json.loads((manager.manifests_dir / "active.json").read_text(encoding="utf-8")) == {
+    assert json.loads((manager.manifests_dir / "default.json").read_text(encoding="utf-8")) == {
         "manifest_id": first.loaded.manifest_id
     }
 
@@ -383,11 +386,14 @@ def test_changed_formal_source_is_rejected_before_loading(tmp_path: Path) -> Non
     manager = ManifestManager(tmp_path / "formal")
     published = manager.publish(_write_candidate(tmp_path / "candidate"))
     assert published.ok
+    assert manager.set_default(published.loaded.manifest_id).ok
     component_id = published.loaded.components["steps.finish"].component_id
     path = manager.components_dir / f"{component_id.removeprefix('sha256:')}.py"
     path.write_text("changed", encoding="utf-8")
 
-    reloaded = ManifestManager(tmp_path / "formal").load_active()
+    reloaded = ManifestManager(tmp_path / "formal").load_default()
+    reselected = manager.set_default(published.loaded.manifest_id)
 
     assert "component_id_mismatch" in _codes(reloaded)
+    assert "component_id_mismatch" in _codes(reselected)
     assert reloaded.loaded is None

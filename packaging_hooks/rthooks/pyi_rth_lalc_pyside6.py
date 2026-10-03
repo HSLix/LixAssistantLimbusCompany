@@ -4,7 +4,7 @@ import os
 import sys
 
 
-if not any(argument in {"--candidate-runner", "--packaging-probe"} for argument in sys.argv[1:]):
+if "--packaging-probe" not in sys.argv[1:]:
     from _pyi_rth_utils import prepend_path_to_environment_variable
     from _pyi_rth_utils import qt as qt_rth_utils
 

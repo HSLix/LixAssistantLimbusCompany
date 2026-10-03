@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 import sys
 
-from PySide6.QtCore import QObject, Qt, Signal
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import (
     QApplication,
-    QComboBox,
-    QDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -18,114 +17,29 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .application import DemoService, default_data_root
+from .application import ApplicationService, StartError, default_data_root
 
 
 class StateBridge(QObject):
     changed = Signal(dict)
 
 
-class LockedDialog(QDialog):
-    def reject(self) -> None:
-        pass
-
-    def closeEvent(self, event) -> None:  # noqa: N802 - Qt API
-        event.ignore()
-
-    def keyPressEvent(self, event) -> None:  # noqa: N802 - Qt API
-        if event.key() != Qt.Key.Key_Escape:
-            super().keyPressEvent(event)
-
-
-class RuntimeReviewDialog(LockedDialog):
-    def __init__(self, service: DemoService, review: dict) -> None:
-        super().__init__()
-        self.service = service
-        self.setWindowTitle("候选 Step 试运行批准")
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(review["warning"]))
-        evidence = QPlainTextEdit(
-            review["source"] + "\n\nManifest:\n" + json.dumps(review["manifest"], ensure_ascii=False, indent=2)
-        )
-        evidence.setReadOnly(True)
-        layout.addWidget(evidence)
-        self.feedback = QPlainTextEdit()
-        self.feedback.setPlaceholderText("不批准时必须填写反馈")
-        layout.addWidget(self.feedback)
-        buttons = QHBoxLayout()
-        for label, handler in (
-            ("批准一次试运行", self._approve),
-            ("不批准", self._reject_with_feedback),
-            ("终止任务", self._terminate),
-        ):
-            button = QPushButton(label)
-            button.clicked.connect(handler)
-            buttons.addWidget(button)
-        layout.addLayout(buttons)
-
-    def _approve(self) -> None:
-        self.service.decide_runtime("approve")
-        self.done(QDialog.DialogCode.Accepted)
-
-    def _reject_with_feedback(self) -> None:
-        feedback = self.feedback.toPlainText().strip()
-        if not feedback:
-            QMessageBox.warning(self, "需要反馈", "请填写不批准原因，供下一 Agent Turn 使用。")
-            return
-        self.service.decide_runtime("reject", feedback)
-        self.done(QDialog.DialogCode.Rejected)
-
-    def _terminate(self) -> None:
-        answer = QMessageBox.question(self, "确认终止", "立即终止当前任务和正在运行的候选进程？")
-        if answer == QMessageBox.StandardButton.Yes:
-            self.service.decide_runtime("terminate")
-            self.done(QDialog.DialogCode.Rejected)
-
-
-class CapabilityApprovalDialog(LockedDialog):
-    def __init__(self, service: DemoService, proposal: dict) -> None:
-        super().__init__()
-        self.service = service
-        self.setWindowTitle("永久 Capability 批准")
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(f"候选成功试运行：{'是' if proposal['trial_succeeded'] else '否'}"))
-        evidence = QPlainTextEdit(json.dumps(proposal, ensure_ascii=False, indent=2))
-        evidence.setReadOnly(True)
-        layout.addWidget(evidence)
-        buttons = QHBoxLayout()
-        approve = QPushButton("批准")
-        reject = QPushButton("不批准")
-        approve.clicked.connect(lambda: self._decide("approve", QDialog.DialogCode.Accepted))
-        reject.clicked.connect(lambda: self._decide("reject", QDialog.DialogCode.Rejected))
-        buttons.addWidget(approve)
-        buttons.addWidget(reject)
-        layout.addLayout(buttons)
-
-    def _decide(self, decision: str, code: QDialog.DialogCode) -> None:
-        if not self.isEnabled():
-            return
-        self.setEnabled(False)
-        self.service.decide_capability(decision)
-        self.done(code)
-
-
 class MainWindow(QMainWindow):
-    def __init__(self, service: DemoService) -> None:
+    """通过正式 ApplicationService 启动和观察任意逻辑入口。"""
+
+    def __init__(self, service: ApplicationService) -> None:
         super().__init__()
         self.service = service
-        self._dialog_phase: str | None = None
-        self.setWindowTitle("LALC Architecture Demo")
+        self.setWindowTitle("LALC")
         self.resize(820, 620)
         root = QWidget()
         layout = QVBoxLayout(root)
-        self.scenario = QComboBox()
-        self.scenario.addItem("触发可恢复异常", {"supported": False, "amount": 1})
-        self.scenario.addItem("普通确定性成功", {"supported": True, "amount": 1})
-        layout.addWidget(self.scenario)
+        self.entry = QLineEdit()
+        self.entry.setPlaceholderText("逻辑名，例如 tasks.claim_mail")
+        layout.addWidget(self.entry)
+        self.inputs = QPlainTextEdit("{}")
+        self.inputs.setPlaceholderText("JSON 输入")
+        layout.addWidget(self.inputs)
         controls = QHBoxLayout()
         self.start_button = QPushButton("开始")
         self.pause_button = QPushButton("暂停")
@@ -142,13 +56,19 @@ class MainWindow(QMainWindow):
         self.trace.setReadOnly(True)
         layout.addWidget(self.trace)
         self.setCentralWidget(root)
-        self.render_state(service.snapshot())
+        self.render_state(service.state)
 
     def _start(self) -> None:
-        self.service.start(self.scenario.currentData())
+        try:
+            inputs = json.loads(self.inputs.toPlainText())
+            if type(inputs) is not dict:
+                raise ValueError("输入必须是 JSON 对象。")
+            self.service.start(self.entry.text().strip(), inputs)
+        except (json.JSONDecodeError, ValueError, StartError) as error:
+            QMessageBox.warning(self, "无法开始", str(error))
 
     def _toggle_pause(self) -> None:
-        if self.service.snapshot()["paused"]:
+        if self.service.state["paused"]:
             self.service.resume()
         else:
             self.service.pause()
@@ -156,27 +76,21 @@ class MainWindow(QMainWindow):
     def render_state(self, state: dict) -> None:
         self.status.setText(
             f"状态：{state['phase']}  |  暂停：{state['paused']}  |  "
-            f"Active Manifest：{state['active_manifest_id']}  |  "
-            f"Working Manifest：{state['working_manifest_id']}  |  剩余 Turn：{state['remaining_turns']}"
+            f"Default Manifest：{state['default_manifest_id']}  |  "
+            f"Base Manifest：{state['base_manifest_id']}  |  "
+            f"Working Manifest：{state['working_manifest_id']}  |  Run ID：{state['run_id']}"
         )
         self.trace.setPlainText("\n".join(json.dumps(item, ensure_ascii=False) for item in state["trace"]))
         self.pause_button.setText("继续" if state["paused"] else "暂停")
-        self.start_button.setEnabled(state["phase"] in {"idle", "finished"})
-        self.stop_button.setEnabled(state["phase"] not in {"idle", "finished", "capability_review"})
-        if state["phase"] == "runtime_review" and self._dialog_phase != "runtime_review":
-            self._dialog_phase = "runtime_review"
-            RuntimeReviewDialog(self.service, state["pending_review"]).exec()
-            self._dialog_phase = None
-        elif state["phase"] == "capability_review" and self._dialog_phase != "capability_review":
-            self._dialog_phase = "capability_review"
-            CapabilityApprovalDialog(self.service, state["pending_capability"]).exec()
-            self._dialog_phase = None
+        self.start_button.setEnabled(state["phase"] != "running")
+        self.pause_button.setEnabled(state["phase"] == "running")
+        self.stop_button.setEnabled(state["phase"] == "running")
 
 
 def run_gui() -> int:
     app = QApplication.instance() or QApplication(sys.argv)
     bridge = StateBridge()
-    service = DemoService(default_data_root(), on_change=bridge.changed.emit)
+    service = ApplicationService(default_data_root(), on_change=bridge.changed.emit)
     window = MainWindow(service)
     bridge.changed.connect(window.render_state)
     window.show()

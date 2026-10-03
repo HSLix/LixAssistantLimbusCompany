@@ -14,7 +14,7 @@ gui = ["PySide6-Essentials"]
 automation = []
 agent = []
 
-[project.gui-scripts]
+[project.scripts]
 lalc = "lalc.__main__:main"
 
 [dependency-groups]

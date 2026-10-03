@@ -1,67 +1,51 @@
 # Stage 3: Agent Runtime Step Recovery and Maintenance
 
-Status: architecture accepted. Minimum code experiment planning is next.
+Status: architecture under revision for #310 and #311.
 
-Stage 3 tests whether an endpoint Agent can use the structure and evidence of an existing supported Task Workflow to recover its current paused Step and propose a durable replacement of that Step or its related Assets. It does not maintain Task Workflows or Subworkflows, discover a new objective, explore an unsupported task, or draft a new user-startable Task Workflow.
+An Agent may help an existing supported Task Workflow only after an Execution Anomaly leaves its current Step wrapper paused. It may propose changes to Steps, Task Workflows, and Subworkflows in one complete Manifest, with reasons for the changes. Trusted Actions, Recovery Rules, and Assets are outside this Agent modification scope. Normal supported execution remains deterministic and model-free.
 
 ```text
 existing supported Task Workflow
-→ Execution Anomaly
+→ Execution Anomaly inside its paused Step
 → bounded Runtime Agent Session
-→ diagnosis and candidate maintenance proposal
-→ complete structural validation
-→ reversible Working Manifest trial when an immediate legal call exists
-→ success and Validation Coverage, or rollback
-→ post-execution Capability Proposal and separate whole-Manifest human approval
+→ complete candidate Manifest and structural validation
+→ supervised permission for this execution
+→ atomic selection and fresh invocation of the current Step
+→ compatible return commits the whole selection, or failure pauses for another choice
+→ post-execution review for separate permanent publication
 ```
 
 ## Confirmed scope
 
-- Normal supported execution remains deterministic and model-free.
-- Only an Execution Anomaly caught while an existing supported Task Workflow remains paused inside an `@step` wrapper may start a Runtime Agent Session.
-- Step-external interruptions, Task Workflow condition failures, invalid root results, and verifier failures never start a Runtime Agent Session; they record evidence and finish through their existing deterministic failure or Safe Task Termination path.
-- Candidate maintenance may replace the current paused Step with optional related Asset files and mappings, or may update only Asset files and mappings used by the unchanged current Step. Asset-only repair creates no replacement Step identity.
-- The Agent cannot create or replace Trusted Actions during a Top-level Execution.
-- The first version has no Temporary Action Plan, Temporary Plan Adapter, `plan_id`, or direct model-action result. Each Agent Turn returns exactly one Working Manifest Update Proposal, `Request Step Recheck`, or Safe Task Termination recommendation.
-- `max_turns` is the only Session budget. A model request consumes its Turn when dispatched, including invalid output and provider failure; editing candidate source requires a later Turn. Formal candidate Step trials consume no extra Turn and use the Step's existing finite-wait and interruption contract.
-- Every Agent Turn receives a self-contained Context Snapshot rebuilt from local authoritative state. Correctness never depends on conversation history retained by the model provider; snapshot fields, selection, and serialization remain a later design decision.
-- Local and remote models use one Agent Adapter contract. The Adapter transports that snapshot, normalizes provider errors, and parses one allowed Turn result; it cannot perform actions, write files, validate or switch a Working Manifest, invoke formal code, decide recovery success, or use provider-native tool calling to bypass the result contract.
-- Provider, model, System Prompt version, generation parameters, and Agent Adapter version are frozen at Runtime Agent Session start. Configuration changes apply only to a later Session; there is no within-Session switching, routing, or fallback.
-- A Runtime Agent Session succeeds only when the parent executor obtains a contract-compatible normal return from a fresh formal invocation of the current Step. The paused Python callers then continue normally; the Agent cannot declare Task success, and the Task Workflow's startup-bound verifier remains authoritative.
-- A later Step anomaly within the same Top-level Execution creates a new Runtime Agent Session with a fresh `max_turns` while reusing that execution's current Working Manifest and Candidate File Batch.
-- The first version supports only Supervised Operation. The complete candidate Step source, Asset files, and mappings require an explicit approve-or-reject decision before Working Manifest selection. Rejection requires user feedback for the next Agent Turn. Approval permits only the current formal trial and does not grant permanent approval.
-- Runtime proposal review uses a topmost modal Supervised Review Dialog that disables the main window. It can approve one formal trial, reject only with feedback for the next Agent Turn, or request Cancellation through a separate confirmation; the dialog cannot be dismissed through its close action or Escape key.
-- The Demo implements cooperative pause with one `threading.Condition` Run Gate. The executor waits only before a new Trusted Action, Agent Turn, or candidate Step trial; Manifest replacement itself does not wait. A permitted operation finishes even if pause is requested immediately afterward. Resume and stop notify sleeping workers, and stop raises the executor's Cancellation signal. There is no timer polling, forced thread suspension, or asynchronous framework.
-- The first version adds no high-risk action taxonomy or per-action confirmation. An approved candidate Step has the same fixed `observe` and `control` Trusted Action access as a normal Step. The Agent has no direct action channel, cannot create Trusted Actions, and cannot bypass the existing system-level cancellation control.
-- A successful candidate Step commits the Working Manifest switch only for the current Top-level Execution, ends that Runtime Agent Session, and resumes the paused callers. Permanent whole-Manifest approval is available only after the direct Task Workflow or complete Automation Plan ends.
-- Every re-entry uses the existing recovery contract: the parent executor re-observes, formally evaluates the current Working Manifest's current-Step `condition`, and invokes that Step only when the condition permits it. Asset-only repair uses the unchanged Step condition; Step replacement uses the candidate Step condition. The Agent cannot call or substitute for this check.
-- Invalid Agent output, structural or compatibility rejection, user rejection with required feedback, an atomic switch that leaves the old Working Manifest authoritative, and a formally failed trial all consume the current Turn and continue to the next Agent Turn when budget remains. Trial failure first restores the old Working Manifest. Any source revision receives a new Component ID and hash; there is no proposal status machine or separate revision loop.
-- A failed or uncertain Working Manifest rollback is not part of that loop. It terminates the Top-level Execution and forbids further Agent Turns, Component calls, and game input until the pre-switch capability snapshot is restored; recovery mechanics remain an implementation decision.
-- Task Workflow orchestration runs in one background thread under the main GUI process. Only a not-yet-permanently-approved candidate Step formal trial runs in an independent Candidate Runner OS process; the complete Task Workflow is not moved into that process. The parent process owns Trace, candidate files, Manifest state, and review evidence.
-- The Architecture Demo adds no general parent-child RPC. A Candidate Runner receives a JSON-compatible Example scenario snapshot, invokes only pre-registered Example Trusted Actions in its process, and returns a JSON-compatible Step result plus action events for the parent to append to Trace. A narrow IPC boundary is deferred until a real Trusted Action must remain in the parent process.
-- Main-window stop and Supervised Review Dialog termination use the same Cancellation path: prevent later gated work, wake cooperative pause, force-terminate an active Candidate Runner, and leave the main GUI and Target Window open.
-- User Cancellation after a candidate Working Manifest switch does not roll that switch back. The Top-level Execution ends before another Component runs and the selected complete candidate state supplies its Capability Proposal. Rollback occurs only after a failed formal trial when another Agent Turn will continue.
-- A Working Manifest switch changes only later Component resolution; it cannot replace an entered Python frame or undo external game actions.
-- The proposal is valid only when the parent executor can immediately arrange a legal formal call of the compatible replacement Step; otherwise the Turn result is rejected without switching the Working Manifest.
-- The first formal call is the behavioral trial. Success contributes only actually executed behavior to Validation Coverage; failure durably records evidence and restores the previous Working Manifest.
-- After Top-level Execution ends, one complete Capability Proposal projected from either the successfully trialled Working Manifest or a structurally valid unselected candidate is the permanent-approval unit. Runtime confirmation does not grant permanent approval.
-- Stage 3 defines no universal business-success threshold for permanent approval. The system presents whether a successful formal trial occurred together with the candidate, execution result, Trace, and Validation Coverage; their absence does not disable approval. The supervisor decides whether that evidence is sufficient, while no trial result, Step return, Task Workflow verifier result, or unattended run can grant permanent approval automatically.
-- Permanent review uses a topmost modal Capability Approval Dialog that cannot be dismissed without choosing `approve` or `reject`. Approval saves the complete proposal as a new immutable Component Manifest and makes it active only for later Top-level Executions. Rejection leaves the active Manifest unchanged and permits reference-safe cleanup of unreferenced candidate files. Both decisions retain Trace, Agent Interaction Logs, trial status, and the review record.
-- One Top-level Execution owns at most one Candidate File Batch for immutable Component source and Asset files actually created during that execution.
-- The first version does not implement call-stack recovery, Checkpoint/Resume, or automatic restart from a known state.
+- Step-external interruptions, Task Workflow condition failures, invalid root results, and verifier failures never start a Runtime Agent Session. A Workflow error outside a Step records an Execution Anomaly and performs Safe Task Termination; it does not continue across a lost Workflow frame.
+- Each Agent Turn returns exactly one Working Manifest Update Proposal, `Request Step Recheck`, or Safe Task Termination recommendation. There is no Temporary Action Plan or direct model-action channel.
+- `max_turns` is the Session budget. A dispatched model request consumes a Turn even when its response is invalid or its provider fails. Provider, model, System Prompt version, generation parameters, and Agent Adapter version remain fixed within the Session.
+- An invalid Agent result, failed structural or compatibility check, or user rejection consumes the current Turn. Rejection requires feedback before another Turn when budget remains. Source revision receives a new immutable Component ID; there is no proposal status machine or separate revision loop.
+- The Agent Adapter transports one self-contained Context Snapshot and parses one Turn result. It does not execute actions, write files, validate or select a Manifest, invoke Components, or decide recovery and termination.
+- The Agent may propose several changes to the allowed Component roles in one complete Manifest. Every mapping, source identity, formal call, role, and signature must pass complete validation before selection. Prompt guidance asks for a narrow change and a reason for each edit; the exact proposal format remains to be designed.
+- A proposal may be selected only while the executor can immediately make a legal, compatible fresh invocation of the paused current Step. The executor retains the existing Python caller frames and their locals. Changed Workflow implementations apply to later new calls; they never replace an entered frame.
+- A user who explicitly selects an already saved Manifest ID to start an execution runs that Manifest directly. Supervised Operation requires review and explicit permission for each new complete Manifest update proposed by the Agent during that execution, before its changed code executes. That permission applies to the complete selected Manifest for this execution, including later calls; it neither permanently publishes the Manifest nor changes the Default Manifest.
+- The Supervised Review Dialog is topmost and modal. It blocks main-window interaction until the supervisor approves the complete proposal for this execution, rejects it with feedback, or confirms Cancellation; its close action and Escape key cannot bypass that decision. `Request Step Recheck` and Safe Task Termination recommendations introduce no candidate source and require no source confirmation.
+- After selection, changed Steps, Task Workflows, and Subworkflows execute through the ordinary Component path with their ordinary Trusted Action permissions. The first current-Step call is the behavioral trial. A compatible return commits the whole selected Manifest and resumes paused callers; the Task Workflow's startup-bound verifier still decides task success.
+- If that current-Step call fails, execution remains paused. The Agent may select any durably retained attempt Manifest ID as the basis for another modification and trial, or end the execution. No automatic rollback occurs. A later Step failure after a successful return is a new interruption at that Step and leaves the committed Manifest selected.
+- Every complete Manifest used for an attempt is durably saved with a Manifest ID, including the original and intermediate versions. Intermediate attempts remain available as history after execution, without separate user approval. Trying an existing Manifest again uses its existing ID and records another attempt in Trace. The Agent's Context Snapshot supplies the available IDs within its context budget; the exact context format remains to be designed.
+- Ordinary Component execution is not a security sandbox. The supervisor sees the complete proposed change and residual risk before granting runtime permission. The Agent cannot directly call Trusted Actions or modify their implementations, Recovery Rules, or Assets.
+- Cancellation prevents later gated work and wakes a cooperative pause without closing the GUI or Target Window. It neither enters recovery nor automatically changes the last selected Manifest.
+- The GUI remains on its main thread and Task Workflow orchestration stays in one background thread. Its `threading.Condition` Run Gate waits without polling before new Trusted Actions or Agent Turns; a permitted operation finishes even if Pause is requested immediately afterward. Stop and review-window termination use the same Cancellation path.
+- Runtime permission and successful trial are evidence for the separate post-execution approval decision. Saving an intermediate attempt as history does not permanently approve it, but any saved Manifest ID may be explicitly selected in a later execution. Once the current Working Manifest is approved, its permanent approval is not repeated merely because it is selected in another execution.
+- If execution ends with a current Working Manifest ID that has not already received permanent approval, only that current Working Manifest is submitted for post-execution approval. Returning to the Base Manifest or another already approved ID skips repeated approval; earlier intermediate versions remain in attempt history but are not separate approval candidates. The review shows the final Task Workflow `verify` result, failure reasons when present, Trace, and Validation Coverage; failed verification does not block human approval. The topmost modal Capability Approval Dialog requires an explicit whole-proposal approve-or-reject decision. After approval, another window asks whether to set the approved current Working Manifest as Default. Trial and review evidence remain available under their retention policy.
+- A process crash before post-execution approval preserves attempted Manifest IDs and flushed evidence but does not automatically reopen an approval dialog on restart. Any saved ID remains explicitly selectable. Independently, setting an unapproved saved ID as Default requires a warning and explicit confirmation.
+- One Top-level Execution owns at most one Candidate File Batch for immutable Component source files it creates. Its retained attempted Manifests remain available by Manifest ID through the required review and cleanup lifecycle.
 
-## Explicitly deferred
+## Deferred
 
-- Agent-assisted Workflow Drafting and Trial;
-- new user-startable Task Workflows;
-- unsupported user goals and open-ended exploration;
-- autonomous Capability Expansion;
-- production GUI or CLI design for new Workflow inputs.
-- Temporary Action Plans and independent execution of one-off Agent Python.
-- Agent changes to Task Workflows, Subworkflows, other Steps, Recovery Rules, or Trusted Actions.
-- broader Workflow Maintenance beyond the current paused Step.
-- Unattended Operation and persisted runtime-policy selection.
+- Agent-assisted Workflow Drafting for a new objective, unsupported goals, and autonomous Capability Expansion.
+- Agent-initiated Component editing outside an active task is a separate future workflow, not part of the #310/#311 runtime path.
+- Cross-Workflow continuation, frame reconstruction, and Checkpoint/Resume; revisit them only when a real case shows why current-Step recovery cannot complete a task.
+- After a Task Workflow returns and `verify` fails, a future real Agent may diagnose the recorded result and observable game state and propose a Step from which to continue. This requires a separate continuation contract because the original Workflow frame has ended; #310 and #311 do not implement it.
+- Unattended Operation, a high-risk action taxonomy, and direct model actions.
+- Concrete Agent proposal and Context Snapshot formats, persistence paths, and UI details.
 
-The Stage 3 architecture Grill is closed. Context field selection, serialization, concrete validators, UI behavior, persistence mechanics, and Demo acceptance belong to subsequent implementation and experiment planning rather than this architecture baseline.
+The current Step is the only continuation point. A changed Task Workflow or Subworkflow becomes effective when a later ordinary call resolves its logical name through the selected complete Manifest; a Workflow exception outside any Step instead terminates its current task safely.
 
-Model request timeout remains an Agent Adapter transport concern rather than a Session budget. There is no `plan_timeout`, Session deadline, action budget, or candidate-count budget. Exhausting `max_turns` makes the parent executor perform Safe Task Termination. User cancellation instead follows the existing Cancellation contract immediately, terminates an active Candidate Runner, and starts no further Turn.
+Model request timeout remains an Agent Adapter transport concern. The Adapter cancels the request before propagating a provider failure. There is no Session deadline, action budget, candidate budget, or plan timeout. Exhausting `max_turns` makes the parent executor perform Safe Task Termination. User Cancellation instead starts no further Turn.

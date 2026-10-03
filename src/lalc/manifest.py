@@ -4,6 +4,7 @@ import ast
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
 import types
@@ -98,7 +99,7 @@ _MODULE_CACHE: dict[str, tuple[bytes, types.ModuleType]] = {}
 
 
 class ManifestManager:
-    """校验、加载、发布并启用已信任的完整 Component Manifest。"""
+    """校验、加载、发布并选择已信任的完整 Component Manifest。"""
 
     def __init__(
         self,
@@ -112,10 +113,10 @@ class ManifestManager:
         self.manifests_dir = self.data_root / "manifests"
         self.logger = logger or logging.getLogger(__name__)
         self.trusted_action_imports = trusted_action_imports
-        self.active: LoadedManifest | None = None
+        self.default: LoadedManifest | None = None
 
     def publish(self, candidate_path: Path) -> ManifestResult:
-        """校验并发布开发者候选；只有完整加载成功后才切换当前 Manifest。"""
+        """完整校验并发布开发者候选，但不改变 Default Manifest。"""
 
         candidate_path = Path(candidate_path)
         phase = "validate_manifest"
@@ -144,10 +145,6 @@ class ManifestManager:
             if manifest_path.exists():
                 raise FileExistsError(manifest_path)
             atomic_write_json(manifest_path, manifest)
-            phase = "activate_manifest"
-            atomic_write_json(self.manifests_dir / "active.json", {"manifest_id": manifest_id})
-
-            self.active = loaded
             return ManifestResult(loaded=loaded)
         except Exception as error:
             self.logger.exception("Manifest update failed during %s", phase)
@@ -155,8 +152,8 @@ class ManifestManager:
                 errors=(ValidationError("manifest_update_failed", str(error)),)
             )
 
-    def activate(self, manifest_id: str) -> ManifestResult:
-        """完整校验并加载一个既有 Manifest，然后将它设为当前版本。"""
+    def load(self, manifest_id: str) -> ManifestResult:
+        """完整校验并加载一个既有 Manifest，不改变 Default。"""
 
         try:
             parsed_id = uuid.UUID(manifest_id)
@@ -180,59 +177,177 @@ class ManifestManager:
         loaded, errors = self._load(prepared.manifest, prepared)
         if errors:
             return ManifestResult(errors=tuple(errors))
-        try:
-            self.manifests_dir.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self.manifests_dir / "active.json", {"manifest_id": manifest_id})
-        except Exception as error:
-            self.logger.exception("Manifest update failed during activate_manifest")
-            return ManifestResult(
-                errors=(ValidationError("manifest_update_failed", str(error)),)
-            )
-        self.active = loaded
         return ManifestResult(loaded=loaded)
 
-    def load_active(self) -> ManifestResult:
-        """按照 active.json 加载当前 Manifest，但不重写任何磁盘状态。"""
+    def set_default(self, manifest_id: str) -> ManifestResult:
+        """完整加载一个既有 Manifest 后原子选择为 Default。"""
 
-        active_path = self.manifests_dir / "active.json"
-        data, errors = self._read_json(active_path)
+        result = self.load(manifest_id)
+        if not result.ok:
+            return result
+        if self.default_manifest_id() == manifest_id:
+            self.default = result.loaded
+            return result
+        try:
+            self.manifests_dir.mkdir(parents=True, exist_ok=True)
+            atomic_write_json(self.manifests_dir / "default.json", {"manifest_id": manifest_id})
+        except Exception as error:
+            self.logger.exception("Manifest update failed during set_default")
+            return ManifestResult(errors=(ValidationError("manifest_update_failed", str(error)),))
+        self.default = result.loaded
+        return result
+
+    def load_default(self) -> ManifestResult:
+        """按照 default.json 加载 Default Manifest，但不重写磁盘状态。"""
+
+        data, errors = self._read_json(self.manifests_dir / "default.json")
         if errors:
             return ManifestResult(errors=tuple(errors))
         if not isinstance(data, dict) or set(data) != {"manifest_id"} or not isinstance(
             data.get("manifest_id"), str
         ):
             return ManifestResult(
-                errors=(ValidationError("active_manifest_invalid", "active.json must contain only manifest_id."),)
+                errors=(ValidationError("default_manifest_invalid", "default.json must contain only manifest_id."),)
             )
-        manifest_id = data["manifest_id"]
+        result = self.load(data["manifest_id"])
+        if result.ok:
+            self.default = result.loaded
+        return result
+
+    def validate(self, path: Path, *, saved: bool = False) -> tuple[ValidationError, ...]:
+        """完整校验并导入可信源码，但不写入发布物或改变 Default。"""
+
+        prepared = self._prepare(Path(path), saved=saved)
+        if prepared.errors:
+            return tuple(prepared.errors)
+        assert prepared.manifest is not None
+        manifest = dict(prepared.manifest)
+        if not saved:
+            manifest["manifest_id"] = str(uuid.uuid4())
+        _, errors = self._load(manifest, prepared)
+        return tuple(errors)
+
+    def default_manifest_id(self) -> str | None:
+        """读取 Default ID；无效指针返回 None，且不导入 Component。"""
+
+        data, errors = self._read_json(self.manifests_dir / "default.json")
+        if errors or not isinstance(data, dict) or set(data) != {"manifest_id"}:
+            return None
+        manifest_id = data.get("manifest_id")
+        if not isinstance(manifest_id, str):
+            return None
         try:
             parsed_id = uuid.UUID(manifest_id)
         except ValueError:
-            return ManifestResult(
-                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a UUID."),)
-            )
+            return None
         if str(parsed_id) != manifest_id:
-            return ManifestResult(
-                errors=(ValidationError("manifest_id_invalid", "Manifest ID must be a canonical UUID."),)
-            )
-        prepared = self._prepare(self.manifests_dir / f"{manifest_id}.json", saved=True)
-        if prepared.errors:
-            return ManifestResult(errors=tuple(prepared.errors))
-        assert prepared.manifest is not None
-        if prepared.manifest.get("manifest_id") != manifest_id:
-            return ManifestResult(
-                errors=(ValidationError("manifest_id_mismatch", "Manifest ID does not match active.json."),)
-            )
-        loaded, errors = self._load(prepared.manifest, prepared)
-        if errors:
-            return ManifestResult(errors=tuple(errors))
-        self.active = loaded
-        return ManifestResult(loaded=loaded)
+            return None
+        manifest, manifest_errors = self._read_json(
+            self.manifests_dir / f"{manifest_id}.json"
+        )
+        if manifest_errors or not isinstance(manifest, dict):
+            return None
+        return manifest_id if manifest.get("manifest_id") == manifest_id else None
 
-    def validate(self, path: Path, *, saved: bool = False) -> tuple[ValidationError, ...]:
-        """只做静态校验，不导入 Component，也不修改当前 Manifest。"""
+    def list_manifests(self) -> list[dict[str, Any]]:
+        """按文件时间倒序列出 retained Manifest，不导入 Component。"""
 
-        return tuple(self._prepare(Path(path), saved=saved).errors)
+        summaries: list[dict[str, Any]] = []
+        for path in self.manifests_dir.glob("*.json"):
+            if path.name == "default.json":
+                continue
+            data, errors = self._read_json(path)
+            if errors or not isinstance(data, dict):
+                continue
+            sections = {
+                name: len(data.get(name, {})) if isinstance(data.get(name), dict) else 0
+                for name in SECTIONS
+            }
+            try:
+                saved_at = path.stat().st_mtime
+            except OSError:
+                continue
+            summaries.append(
+                {
+                    "manifest_id": data.get("manifest_id", path.stem),
+                    "saved_at": saved_at,
+                    **sections,
+                }
+            )
+        return sorted(summaries, key=lambda item: item["saved_at"], reverse=True)
+
+    def initialize_candidate(
+        self, candidate_dir: Path, *, manifest_id: str | None = None
+    ) -> tuple[ValidationError, ...]:
+        """把一个 retained Manifest 原子物化为扁平 Developer Candidate。"""
+
+        target = Path(candidate_dir)
+        if target.exists() and (not target.is_dir() or any(target.iterdir())):
+            return (
+                ValidationError(
+                    "candidate_not_empty",
+                    f"{target} is not empty; run lalc clear before initialization.",
+                ),
+            )
+
+        if manifest_id is None:
+            retained = any(
+                path.name != "default.json" for path in self.manifests_dir.glob("*.json")
+            )
+            if not retained:
+                manifest = {
+                    "schema_version": SCHEMA_VERSION,
+                    "components": {},
+                    "recovery_rules": {},
+                    "trusted_actions": {},
+                    "assets": {},
+                }
+            else:
+                result = self.load_default()
+                if not result.ok:
+                    return result.errors
+                assert result.loaded is not None
+                manifest = result.loaded.manifest
+        else:
+            result = self.load(manifest_id)
+            if not result.ok:
+                return result.errors
+            assert result.loaded is not None
+            manifest = result.loaded.manifest
+
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
+        try:
+            candidate: dict[str, Any] = {
+                "schema_version": SCHEMA_VERSION,
+                "components": {},
+                "recovery_rules": {},
+                "trusted_actions": {},
+                "assets": dict(manifest.get("assets", {})),
+            }
+            for section in SECTIONS:
+                for logical_name, entry in manifest.get(section, {}).items():
+                    filename = f"{logical_name}.py"
+                    component_id = entry["component_id"]
+                    digest = component_id.removeprefix(COMPONENT_ID_PREFIX)
+                    (temporary / filename).write_bytes(
+                        (self.components_dir / f"{digest}.py").read_bytes()
+                    )
+                    candidate_entry = {"source_path": filename}
+                    if section == "trusted_actions":
+                        candidate_entry["classification"] = entry["classification"]
+                    candidate[section][logical_name] = candidate_entry
+            atomic_write_json(temporary / "manifest.json", candidate)
+            if target.exists():
+                target.rmdir()
+            temporary.replace(target)
+            return ()
+        except Exception as error:
+            self.logger.exception("Candidate initialization failed")
+            return (ValidationError("candidate_initialization_failed", str(error)),)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
 
     def _prepare(self, manifest_path: Path, *, saved: bool) -> _Prepared:
         """解析完整文档并尽可能收集互不依赖的静态错误。"""
@@ -685,11 +800,12 @@ class ManifestManager:
                 )
 
     def _validate_calls(self, manifest: dict[str, Any], prepared: _Prepared) -> None:
-        """校验静态调用目标、角色限制、Trusted Action 权限和 Subworkflow 环。"""
+        """校验静态调用目标、角色限制和 Trusted Action 权限。"""
 
-        actions = self._action_names(manifest)
-        edges: dict[str, set[str]] = {
-            name: set() for name, role in prepared.roles.items() if role == "sub_workflow"
+        actions = {
+            name: entry.get("classification")
+            for name, entry in manifest["trusted_actions"].items()
+            if entry.get("classification") in CLASSIFICATIONS
         }
         for logical_name, entry in manifest["components"].items():
             source = prepared.sources.get(entry["component_id"])
@@ -741,7 +857,14 @@ class ManifestManager:
                         )
                     )
                 elif role == "sub_workflow" and target_role == "sub_workflow":
-                    edges.setdefault(logical_name, set()).add(target)
+                    prepared.errors.append(
+                        self._node_error(
+                            "component_call_role_invalid",
+                            "Subworkflow cannot call another Subworkflow.",
+                            logical_name,
+                            call,
+                        )
+                    )
             self._validate_action_calls(source.tree, logical_name, role, actions, prepared.errors)
 
         for logical_name, entry in manifest["recovery_rules"].items():
@@ -755,15 +878,6 @@ class ManifestManager:
                     )
                 )
             self._validate_action_calls(source.tree, logical_name, "recovery_rule", actions, prepared.errors)
-
-        for cycle in self._cycles(edges):
-            prepared.errors.append(
-                ValidationError(
-                    "subworkflow_cycle",
-                    "Subworkflow cycle: " + " -> ".join(cycle),
-                    cycle[0],
-                )
-            )
 
     def _validate_action_calls(
         self,
@@ -788,12 +902,29 @@ class ManifestManager:
             if permission is None:
                 continue
             for function in nodes:
-                for call in self._direct_calls(function):
-                    call_name = self._call_name(call.func)
-                    classification = actions.get(call_name)
-                    if classification is None and call_name:
-                        classification = actions.get(call_name.rsplit(".", 1)[-1])
-                    if classification and classification not in permission:
+                for call in self._ctx_action_calls(function):
+                    target = self._literal_call_target(call)
+                    if target is None:
+                        errors.append(
+                            self._node_error(
+                                "trusted_action_dynamic",
+                                "ctx.action target must be a string literal.",
+                                logical_name,
+                                call,
+                            )
+                        )
+                        continue
+                    classification = actions.get(target)
+                    if classification is None:
+                        errors.append(
+                            self._node_error(
+                                "trusted_action_unresolved",
+                                f"Unknown Trusted Action target: {target}",
+                                logical_name,
+                                call,
+                            )
+                        )
+                    elif classification not in permission:
                         errors.append(
                             self._node_error(
                                 "trusted_action_forbidden",
@@ -1159,60 +1290,22 @@ class ManifestManager:
         ]
 
     @staticmethod
+    def _ctx_action_calls(tree: ast.AST) -> list[ast.Call]:
+        return [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+            and node.func.value.id == "ctx"
+            and node.func.attr == "action"
+        ]
+
+    @staticmethod
     def _literal_call_target(call: ast.Call) -> str | None:
         if not call.args or not isinstance(call.args[0], ast.Constant) or not isinstance(call.args[0].value, str):
             return None
         return call.args[0].value
-
-    @staticmethod
-    def _action_names(manifest: dict[str, Any]) -> dict[str, str]:
-        result: dict[str, str] = {}
-        ambiguous: set[str] = set()
-        for name, entry in manifest["trusted_actions"].items():
-            classification = entry.get("classification")
-            if classification not in CLASSIFICATIONS:
-                continue
-            result[name] = classification
-            short = name.rsplit(".", 1)[-1]
-            if short in result and result[short] != classification:
-                ambiguous.add(short)
-            else:
-                result[short] = classification
-        for name in ambiguous:
-            result.pop(name, None)
-        return result
-
-    @staticmethod
-    def _direct_calls(function: ast.FunctionDef | ast.AsyncFunctionDef) -> list[ast.Call]:
-        calls: list[ast.Call] = []
-
-        class Visitor(ast.NodeVisitor):
-            def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
-                if node is function:
-                    self.generic_visit(node)
-
-            def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
-                if node is function:
-                    self.generic_visit(node)
-
-            def visit_Lambda(self, node: ast.Lambda) -> None:
-                return
-
-            def visit_Call(self, node: ast.Call) -> None:
-                calls.append(node)
-                self.generic_visit(node)
-
-        Visitor().visit(function)
-        return calls
-
-    @staticmethod
-    def _call_name(node: ast.expr) -> str | None:
-        if isinstance(node, ast.Name):
-            return node.id
-        if isinstance(node, ast.Attribute):
-            prefix = ManifestManager._call_name(node.value)
-            return f"{prefix}.{node.attr}" if prefix else node.attr
-        return None
 
     @staticmethod
     def _validate_aliases(manifest: dict[str, Any], errors: list[ValidationError]) -> None:
@@ -1231,31 +1324,6 @@ class ManifestManager:
                         name,
                     )
                 )
-
-    @staticmethod
-    def _cycles(edges: dict[str, set[str]]) -> list[list[str]]:
-        cycles: list[list[str]] = []
-        state: dict[str, int] = {}
-        stack: list[str] = []
-
-        def visit(node: str) -> None:
-            state[node] = 1
-            stack.append(node)
-            for target in sorted(edges.get(node, ())):
-                if state.get(target, 0) == 0:
-                    visit(target)
-                elif state.get(target) == 1:
-                    start = stack.index(target)
-                    cycle = stack[start:] + [target]
-                    if cycle not in cycles:
-                        cycles.append(cycle)
-            stack.pop()
-            state[node] = 2
-
-        for node in sorted(edges):
-            if state.get(node, 0) == 0:
-                visit(node)
-        return cycles
 
     @staticmethod
     def _node_error(
