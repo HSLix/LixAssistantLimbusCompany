@@ -167,7 +167,9 @@ def test_connect_cli_shows_original_exception(tmp_path: Path, monkeypatch, capsy
     assert cli.main(["connect"]) == 1
     output = capsys.readouterr().err
     assert "WindowError: Cannot focus the game window" in output
-    assert "Caused by:" in output
+    assert "direct cause" in output
+    assert "Traceback (most recent call last):" in output
+    assert 'raise OSError(5, "Access is denied")' in output
     assert "[Errno 5] Access is denied" in output
     assert not (tmp_path / "connections").exists()
 

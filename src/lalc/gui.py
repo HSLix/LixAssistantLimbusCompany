@@ -30,6 +30,7 @@ class MainWindow(QMainWindow):
     def __init__(self, service: ApplicationService) -> None:
         super().__init__()
         self.service = service
+        self._pause_notice_shown = False
         self.setWindowTitle("LALC")
         self.resize(820, 620)
         root = QWidget()
@@ -51,7 +52,11 @@ class MainWindow(QMainWindow):
             controls.addWidget(button)
         layout.addLayout(controls)
         self.status = QLabel()
+        self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.pause_notice = QLabel()
+        self.pause_notice.setWordWrap(True)
+        layout.addWidget(self.pause_notice)
         self.trace = QPlainTextEdit()
         self.trace.setReadOnly(True)
         layout.addWidget(self.trace)
@@ -74,16 +79,38 @@ class MainWindow(QMainWindow):
             self.service.pause()
 
     def render_state(self, state: dict) -> None:
+        info = state.get("pause_info")
+        if info:
+            instruction = "恢复时将检查当前 Step 的 condition。" if info["has_condition"] else \
+                "没有 condition，恢复后将从头执行当前 Step。"
+            if not info.get("restart_step", True):
+                instruction = "恢复后继续 Workflow 的观察与调度。"
+            self.pause_notice.setText(f"自动化已暂停：{info['reason']}\n{info['description']}\n{instruction}")
+            if not self._pause_notice_shown:
+                self._pause_notice_shown = True
+                self.showNormal()
+                self.raise_()
+                self.activateWindow()
+        else:
+            self._pause_notice_shown = False
+            self.pause_notice.clear()
         self.status.setText(
             f"状态：{state['phase']}  |  暂停：{state['paused']}  |  "
             f"Default Manifest：{state['default_manifest_id']}  |  "
             f"Base Manifest：{state['base_manifest_id']}  |  "
             f"Working Manifest：{state['working_manifest_id']}  |  Run ID：{state['run_id']}"
         )
-        self.trace.setPlainText("\n".join(json.dumps(item, ensure_ascii=False) for item in state["trace"]))
+        result = state.get("result") or {}
+        diagnostic = (info or {}).get("traceback", "") or result.get("traceback", "")
+        if not diagnostic and result.get("reason") == "input_release_failed":
+            diagnostic = next((item.get("traceback", "") for item in result.get("items", [])
+                               if item.get("failure_code") == "input_release_failed"), "")
+        self.trace.setPlainText(diagnostic + "\n" + "\n".join(
+            json.dumps(item, ensure_ascii=False) for item in state["trace"]
+        ))
         self.pause_button.setText("继续" if state["paused"] else "暂停")
         self.start_button.setEnabled(state["phase"] != "running")
-        self.pause_button.setEnabled(state["phase"] == "running")
+        self.pause_button.setEnabled(state["phase"] == "running" and not state.get("resume_pending", False))
         self.stop_button.setEnabled(state["phase"] == "running")
 
 

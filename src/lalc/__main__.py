@@ -64,17 +64,7 @@ def _print_errors(errors: tuple[ValidationError, ...]) -> None:
 def _print_exception(error: BaseException) -> None:
     """显示命令错误及其原始异常链，保留类型和系统错误信息。"""
 
-    detail = traceback.TracebackException.from_exception(error)
-    while detail is not None:
-        sys.stderr.write("".join(detail.format_exception_only()))
-        if detail.__cause__ is not None:
-            print("Caused by:", file=sys.stderr)
-            detail = detail.__cause__
-        elif detail.__context__ is not None and not detail.__suppress_context__:
-            print("While handling:", file=sys.stderr)
-            detail = detail.__context__
-        else:
-            break
+    traceback.print_exception(error, file=sys.stderr, chain=True)
 
 
 def _print_manifests(manager: ManifestManager, limit: int) -> bool:
@@ -116,9 +106,30 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
             inputs = _read_inputs(args)
             run_id = service.start(args.logical_name, inputs, manifest_id=args.manifest)
         try:
-            state = service.wait_for(
-                lambda current: current["run_id"] == run_id and current["phase"] == "finished"
-            )
+            while True:
+                state = service.wait_for(lambda current: current["run_id"] == run_id and (
+                    current["phase"] == "finished" or
+                    (current["pause_info"] is not None and not current["resume_pending"])
+                ))
+                if state["phase"] == "finished":
+                    break
+                info = state["pause_info"]
+                print(f"\n自动化已暂停：{info['reason']}\n{info['description']}", file=sys.stderr)
+                instruction = "恢复时检查当前 Step 的 condition。" if info["has_condition"] else \
+                    "没有 condition，恢复后将从头执行当前 Step。"
+                if not info.get("restart_step", True):
+                    instruction = "恢复后继续 Workflow 的观察与调度。"
+                print(instruction, file=sys.stderr)
+                if info.get("traceback"):
+                    sys.stderr.write(info["traceback"])
+                try:
+                    choice = input("处理游戏后输入 r 恢复，其他输入结束运行：")
+                except EOFError:
+                    choice = "q"
+                if choice.strip().lower() == "r":
+                    service.resume()
+                else:
+                    service.stop()
         except KeyboardInterrupt:
             service.stop()
             state = service.wait_for(
@@ -128,6 +139,12 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
         _print_exception(error)
         return 1
     print(json.dumps(state["result"], ensure_ascii=False, indent=2))
+    result = state["result"]
+    if result.get("traceback"):
+        sys.stderr.write(result["traceback"])
+    for item in result.get("items", []):
+        if item.get("traceback"):
+            sys.stderr.write(item["traceback"])
     return 0 if state["result"]["status"] in {"success", "completed"} else 1
 
 

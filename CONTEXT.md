@@ -9,7 +9,7 @@ The unique existing Windows desktop window of Limbus Company that LALC selects t
 _Avoid_: Emulator, virtual device
 
 **Focused Automation Session**:
-The supported interaction mode in which the Target Window remains restored and owns Windows foreground focus for the duration of automation. The user does not operate other desktop applications during the session.
+The supported interaction mode in which the Target Window remains restored and owns Windows foreground focus while automation is acting. Physical user takeover suspends automation until the user explicitly resumes it.
 _Avoid_: Background operation, headless operation, foreground simulation
 
 **Architecture Demo**:
@@ -113,7 +113,7 @@ A normal Python return from a formal Component after its own contract has been s
 _Avoid_: Execution Interruption, Outcome routing table
 
 **Execution Interruption**:
-A raised interruption from a failed condition, a leaf-boundary timeout, an unmet expected result, observed lack of progress, or an execution error. Inside a Step, `@step` catches it before the caller frame unwinds and enters the Recovery Ladder; outside a Step it directly produces an Execution Anomaly. Workflow, Subworkflow, and Step have no overall timeout; only Trusted Actions, the Agent Adapter, and external-process calls impose time limits at their own leaf boundaries.
+A raised interruption from a failed condition, a leaf-boundary timeout, an unmet expected result, observed lack of progress, or an execution error. Inside a Step, its wrapper preserves the caller frame and normally enters the Recovery Ladder; physical user takeover instead waits for explicit manual Resume and re-entry of that Step. Outside a Step it directly produces an Execution Anomaly. Workflow, Subworkflow, and Step have no overall timeout; only Trusted Actions, the Agent Adapter, and external-process calls impose time limits at their own leaf boundaries.
 _Avoid_: Normal Outcome, Execution Anomaly
 
 **Automation Plan**:

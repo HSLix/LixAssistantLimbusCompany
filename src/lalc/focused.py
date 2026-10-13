@@ -42,7 +42,7 @@ class FocusedAutomationSession:
         self.emit("target_window_connected", info)
         return info
 
-    def check(self) -> dict[str, Any]:
+    def check(self, *, record: bool = True) -> dict[str, Any]:
         """重新核验句柄和焦点，任何失效都会丢弃旧截图。"""
 
         if self.hwnd is None:
@@ -59,7 +59,8 @@ class FocusedAutomationSession:
             self.size = None
             self.emit("target_window_invalid", {"reason": str(error), "hwnd": self.hwnd})
             raise
-        self.emit("target_window_checked", info)
+        if record:
+            self.emit("target_window_checked", info)
         return info
 
     @staticmethod
@@ -136,6 +137,13 @@ class WindowsWindowPlatform:
     TITLE = "LimbusCompany"
     CLASS = "UnityWndClass"
     EXECUTABLE = "limbuscompany.exe"
+
+    def create_input_backend(self):
+        """延迟建立只读输入监测；纯连接诊断不安装输入钩子。"""
+
+        from .windows_input import WindowsInputBackend
+
+        return WindowsInputBackend(self)
 
     def __init__(self) -> None:
         if not hasattr(ctypes, "WinDLL"):
@@ -296,7 +304,7 @@ class WindowsWindowPlatform:
             raise WindowError("Client coordinates are outside the Target Window.")
         point = wintypes.POINT(x, y)
         if not self.user32.ClientToScreen(hwnd, ctypes.byref(point)):
-            raise WindowError("ClientToScreen failed.")
+            raise WindowError("ClientToScreen failed.") from ctypes.WinError(ctypes.get_last_error())
         return point.x, point.y
 
     def capture(self, hwnd: int, width: int, height: int) -> bytes:

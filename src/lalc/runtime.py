@@ -48,6 +48,17 @@ class ExecutionInterruption(RuntimeError):
     """Step 或 Workflow 报告当前执行无法安全继续。"""
 
 
+class UserTakeover(ExecutionInterruption):
+    """输入所有权已丢失；仅允许用户明确恢复当前 Step。"""
+
+
+class InputReleaseFailure(ExecutionFailure):
+    """无法确认输入释放，必须终止整个 Run，不能再恢复控制。"""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("input_release_failed", message)
+
+
 def _mark_role(function: Callable[..., Any], role: str) -> Callable[..., Any]:
     function.__lalc_role__ = role
     return function
@@ -142,6 +153,11 @@ class RunContext:
 
         return self._executor.capture_screen(save)
 
+    def control_input(self, operation: str, **arguments: Any) -> None:
+        """仅供 control Trusted Action 进入应用拥有的输入会话。"""
+
+        self._executor.control_input(operation, arguments)
+
 
 class WorkflowExecutor:
     """在当前线程同步执行正式 Component，并在 Step 边界处理恢复。"""
@@ -164,6 +180,9 @@ class WorkflowExecutor:
         emit: Callable[[str, dict[str, Any]], None],
         *,
         capture_screen: Callable[[bool], dict[str, Any]] | None = None,
+        control_input: Callable[[str, dict[str, Any]], None] | None = None,
+        check_input: Callable[[], None] | None = None,
+        prepare_resume: Callable[[], None] | None = None,
         manifest_manager: ManifestManager | None = None,
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         select_manifest: Callable[[LoadedManifest], None] | None = None,
@@ -172,6 +191,9 @@ class WorkflowExecutor:
         self.gate = gate
         self.emit = emit
         self._capture_screen = capture_screen
+        self._control_input = control_input
+        self._check_input = check_input
+        self._prepare_resume = prepare_resume
         self._active_action: str | None = None
         self.context = RunContext(self)
         self._frames: list[_Frame] = []
@@ -212,16 +234,16 @@ class WorkflowExecutor:
         except RunCancelled:
             return self._failure(logical_name, component, "user_cancelled", "Run cancelled by user.")
         except OutputValidationError as error:
-            return self._failure(logical_name, component, "invalid_output", str(error))
+            return {**self._failure(logical_name, component, "invalid_output", str(error)), **_exception_fields(error)}
         except ExecutionFailure as error:
-            return self._failure(logical_name, component, error.code, str(error))
+            return {**self._failure(logical_name, component, error.code, str(error)), **_exception_fields(error)}
         except TraceWriteError:
             raise
         except ExecutionInterruption as error:
             self._terminate_anomaly(str(error), logical_name)
-            return self._failure(logical_name, component, "execution_anomaly", str(error))
+            return {**self._failure(logical_name, component, "execution_anomaly", str(error)), **_exception_fields(error)}
         except Exception as error:
-            return self._failure(logical_name, component, "execution_failed", str(error))
+            return {**self._failure(logical_name, component, "execution_failed", str(error)), **_exception_fields(error)}
 
     @staticmethod
     def _failure(
@@ -266,18 +288,99 @@ class WorkflowExecutor:
 
         inputs = _bind_and_normalize(component.module.execute, arguments)
         try:
-            return self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
-        except ExecutionInterruption as error:
-            self.emit("step_interrupted", {"logical_name": logical_name, "component_id": component.component_id, **_exception_fields(error)})
-            recovered, outcome = self._recover_step(logical_name, component, inputs, parent_call_id)
-            if recovered:
-                return outcome
-            recovered, outcome = self._try_manifest_choices(logical_name, component, inputs, parent_call_id, str(outcome))
-            if recovered:
-                return outcome
-            reason = str(outcome)
-            self._terminate_anomaly(reason, logical_name)
-            raise ExecutionFailure("execution_anomaly", reason) from error
+            try:
+                return self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
+            except UserTakeover:
+                raise
+            except ExecutionInterruption as error:
+                self.emit("step_interrupted", {"logical_name": logical_name,
+                          "component_id": component.component_id, **_exception_fields(error)})
+                return self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
+        except UserTakeover as error:
+            current = self.manifest.components[logical_name]
+            return self._resume_step(logical_name, current, inputs, parent_call_id, error)
+
+    def _wait_manual_resume(
+        self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
+        parent_call_id: int | None, error: UserTakeover,
+    ) -> None:
+        """保持暂停，直至一次手动恢复完成观察和适用的 Step condition 检查。"""
+
+        reason = str(error)
+        diagnostic = _exception_fields(error)
+        restart_step = component.role == "step"
+        condition = getattr(component.module, "condition", None) if restart_step else None
+        while True:
+            self.gate.pause()
+            self.emit("paused_by_user", {
+                "logical_name": logical_name,
+                "description": (inspect.getdoc(component.module) or logical_name) if restart_step else
+                    "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。",
+                "has_condition": callable(condition), "restart_step": restart_step,
+                "reason": reason, **diagnostic,
+            })
+            self.gate.checkpoint()
+            try:
+                if self._prepare_resume is None:
+                    raise ExecutionFailure("execution_failed", "Input Resume is unavailable.")
+                self._prepare_resume()
+                if condition is not None:
+                    self._run_condition(component, condition, {
+                        "logical_name": logical_name, "component_id": component.component_id,
+                        "role": "step", "call_id": self._allocate_call_id(),
+                        "parent_call_id": parent_call_id, "inputs": _json_copy(inputs),
+                    }, inputs)
+            except (RunCancelled, TraceWriteError, InputReleaseFailure):
+                raise
+            except Exception as check_error:
+                reason = str(check_error)
+                diagnostic = _exception_fields(check_error)
+                self.emit("input_resume_rejected", {"logical_name": logical_name, **diagnostic})
+                continue
+            self.emit("input_resumed", {"logical_name": logical_name})
+            return
+
+    def _resume_step(
+        self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
+        parent_call_id: int | None, error: UserTakeover,
+    ) -> Any:
+        """用户接管只走手动恢复；保留调用者帧，不进入自动恢复阶梯。"""
+
+        while True:
+            self.emit("step_interrupted", {"logical_name": logical_name,
+                      "component_id": component.component_id, "outcome": "unknown", **_exception_fields(error)})
+            self._wait_manual_resume(logical_name, component, inputs, parent_call_id, error)
+            self.emit("step_reinvocation_started", {"logical_name": logical_name,
+                      "component_id": component.component_id, "reason": "manual_resume"})
+            try:
+                try:
+                    result = self._invoke_component(logical_name, component, inputs,
+                                                    parent_call_id=parent_call_id, skip_condition=True)
+                except UserTakeover:
+                    raise
+                except ExecutionInterruption as interrupted:
+                    self.emit("step_interrupted", {"logical_name": logical_name,
+                              "component_id": component.component_id, **_exception_fields(interrupted)})
+                    result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
+            except UserTakeover as next_error:
+                error = next_error
+                continue
+            self.emit("step_reinvocation_returned", {"logical_name": logical_name,
+                      "component_id": component.component_id, "reason": "manual_resume"})
+            return result
+
+    def _invoke_step_recovery(self, logical_name: str, component: LoadedComponent,
+                              inputs: dict[str, Any], parent_call_id: int | None) -> Any:
+        """新调用发生普通中断时复用既有恢复阶梯。"""
+
+        recovered, outcome = self._recover_step(logical_name, component, inputs, parent_call_id)
+        if recovered:
+            return outcome
+        recovered, outcome = self._try_manifest_choices(logical_name, component, inputs, parent_call_id, str(outcome))
+        if recovered:
+            return outcome
+        self._terminate_anomaly(str(outcome), logical_name)
+        raise ExecutionFailure("execution_anomaly", str(outcome))
 
     def _try_manifest_choices(
         self, logical_name: str, original: LoadedComponent, inputs: dict[str, Any],
@@ -322,7 +425,7 @@ class WorkflowExecutor:
                         inputs,
                     )
                 except Exception as error:
-                    if isinstance(error, (RunCancelled, TraceWriteError)):
+                    if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
                         raise
                     reason = f"Replacement Step cannot enter current state: {error}"
                     self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": reason})
@@ -341,7 +444,7 @@ class WorkflowExecutor:
                 self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": replacement.component_id})
                 return True, result
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError)):
+                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
                     raise
                 reason = f"Selected Step failed: {error}"
                 self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": replacement.component_id, **_exception_fields(error)})
@@ -383,7 +486,7 @@ class WorkflowExecutor:
             try:
                 matched = self._invoke_recovery_rule(name, rule, "detect")
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError)):
+                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
                     raise
                 return False, f"Recovery Rule {name} detect failed: {error}"
             if type(matched) is not bool:
@@ -397,7 +500,7 @@ class WorkflowExecutor:
             try:
                 recovered = self._invoke_recovery_rule(name, rule, "recover")
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError)):
+                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
                     raise
                 return False, f"Recovery Rule {name} recover failed: {error}"
             if recovered is not None:
@@ -411,7 +514,7 @@ class WorkflowExecutor:
             self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": current.component_id})
             return True, result
         except Exception as error:
-            if isinstance(error, (RunCancelled, TraceWriteError)):
+            if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
                 raise
             self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": current.component_id, **_exception_fields(error)})
             return False, f"Current Step failed again: {error}"
@@ -457,6 +560,15 @@ class WorkflowExecutor:
             )
 
         self.gate.checkpoint()
+        if self._check_input is not None:
+            try:
+                self._check_input()
+            except UserTakeover as error:
+                if caller.role == "recovery_rule" or any(frame.role == "step" for frame in self._frames):
+                    raise
+                # 没有活动 Step 时保留当前观察调用，不重启已经返回的 Step。
+                component = self.manifest.components[caller.logical_name]
+                self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
         inputs = _bind_and_normalize(action.module.execute, arguments)
         call_id = self._allocate_call_id()
         fields = {
@@ -506,6 +618,13 @@ class WorkflowExecutor:
             raise ExecutionFailure("execution_failed", "Screenshot capture requires an observe Trusted Action.")
         return self._capture_screen(save)
 
+    def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
+        """运行角色校验之外，再约束原生输入只能由 control Trusted Action 发起。"""
+
+        if self._active_action != "control" or self._control_input is None:
+            raise ExecutionFailure("execution_failed", "Input requires a control Trusted Action.")
+        self._control_input(operation, arguments)
+
     def _invoke_component(
         self,
         logical_name: str,
@@ -538,6 +657,8 @@ class WorkflowExecutor:
         self._frames.append(_Frame(logical_name, component.component_id, component.role, "execute", call_id))
         try:
             result = component.module.execute(self.context, **_json_copy(inputs))
+            if component.role == "step" and self._check_input is not None:
+                self._check_input()
             annotation = get_type_hints(
                 component.module.execute, globalns=component.module.execute.__globals__
             )["return"]
@@ -729,7 +850,7 @@ def _exception_fields(error: Exception) -> dict[str, Any]:
     return {
         "exception_type": type(error).__name__,
         "exception_message": str(error),
-        "traceback": traceback.format_exc(),
+        "traceback": "".join(traceback.TracebackException.from_exception(error).format(chain=True)),
     }
 
 

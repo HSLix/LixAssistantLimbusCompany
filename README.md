@@ -26,8 +26,9 @@ Start with:
 ## Development
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
-Windows game observation, but real game control, OCR, and model calls are not
-implemented yet.
+Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
+Input takeover has automated regression coverage and still requires supervised
+Windows game acceptance. OCR and model calls are not implemented yet.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
@@ -65,6 +66,14 @@ Pass `--inputs '{"save":true}'` to save that Run's screenshot as PNG evidence.
 Foreground activation is requested once and confirmed for up to one second.
 If it fails, the CLI reports the native return value and the window that still
 owns foreground focus; wrapped errors also include their original exception.
+
+`examples/focused-control/` provides the corresponding input Manifest and
+Windows acceptance instructions. Physical input interrupts the current Step,
+releases held input, and pauses until manual Resume. Resume refreshes observation,
+checks the Step's optional condition, and invokes that same Step from its entrypoint;
+it never replays the interrupted action. GUI notices appear once and remain movable;
+CLI Runs offer an explicit resume/stop prompt. Release failure terminates the Run
+and skips later Plan tasks. Reported errors retain the complete original traceback.
 
 `publish` keeps the editable candidate and does not change the Default
 Manifest. `clear` is the only command that removes it and asks for confirmation.

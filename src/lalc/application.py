@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
+from .control import InputSession
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
 from .manifest import LoadedManifest, ManifestManager
 from .runtime import (
@@ -22,6 +23,7 @@ from .runtime import (
     WorkingManifestWriteError,
     WorkflowExecutor,
     atomic_write_json,
+    _exception_fields,
 )
 
 
@@ -54,6 +56,8 @@ class ApplicationService:
         self.recovery_choice = recovery_choice
         self.window_platform = window_platform
         self._focused_session: FocusedAutomationSession | None = None
+        self._input_session: InputSession | None = None
+        self._monitor_input = False
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
         self._gate: RunGate | None = None
@@ -62,6 +66,8 @@ class ApplicationService:
         self._state: dict[str, Any] = {
             "phase": "idle",
             "paused": False,
+            "pause_info": None,
+            "resume_pending": False,
             "default_manifest_id": self.manifest_manager.default_manifest_id(),
             "base_manifest_id": None,
             "working_manifest_id": None,
@@ -180,7 +186,14 @@ class ApplicationService:
 
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
-        result: dict[str, Any] = self._focused_session.capture()
+        if self._monitor_input:
+            self._ensure_input_session()
+        try:
+            result: dict[str, Any] = self._focused_session.capture()
+        except WindowError:
+            if self._input_session is not None:
+                self._input_session.check()
+            raise
         if save:
             run_id = self._state["run_id"]
             assert run_id is not None
@@ -190,6 +203,36 @@ class ApplicationService:
             result["evidence_path"] = saved["path"]
             result["evidence_id"] = evidence_id
         return result
+
+    def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
+        """按需建立本次 Run 的输入监测，与观察共用唯一的前台窗口。"""
+
+        if self._focused_session is None:
+            self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
+        self._ensure_input_session()
+        assert self._input_session is not None
+        self._input_session.execute(operation, arguments)
+
+    def _ensure_input_session(self) -> None:
+        """包含控制的 Run 从首次窗口观察起监测接管；纯观察无需安装钩子。"""
+
+        assert self._focused_session is not None
+        if self._input_session is None:
+            assert self._gate is not None
+            if self._focused_session.hwnd is None:
+                self._focused_session.connect()
+            self._input_session = InputSession(
+                self._focused_session, self._focused_session.platform.create_input_backend(),
+                self._gate, self._emit,
+            )
+
+    def _check_input(self) -> None:
+        if self._input_session is not None:
+            self._input_session.check()
+
+    def _prepare_input_resume(self) -> None:
+        assert self._input_session is not None
+        self._input_session.prepare_resume()
 
     def ledger_records(self) -> list[dict[str, Any]]:
         """读取当前 Run 的持久化 Workflow 记录。"""
@@ -220,10 +263,12 @@ class ApplicationService:
             raise StartError("trace_conflict", f"Trace already exists for Run {run_id}.")
         self._gate = gate
         self._focused_session = None
+        self._input_session = None
+        self._monitor_input = any(action.classification == "control" for action in snapshot.trusted_actions.values())
         self._trace_path = trace_path
         self._ledger = WorkflowRunLedger(self.data_root, run_id)
         self._state.update(
-            phase="running", paused=False,
+            phase="running", paused=False, pause_info=None, resume_pending=False,
             default_manifest_id=self.manifest_manager.default_manifest_id(),
             base_manifest_id=snapshot.manifest_id,
             working_manifest_id=snapshot.manifest_id,
@@ -251,16 +296,23 @@ class ApplicationService:
 
     def resume(self) -> None:
         with self._condition:
-            if self._state["phase"] != "running" or self._gate is None or not self._gate.resume():
+            if (self._state["phase"] != "running" or self._gate is None or
+                    not self._gate.paused or self._state["resume_pending"]):
                 return
-            self._state["paused"] = False
-            self._record_locked("run_resumed", {})
+            if self._state["pause_info"] is not None:
+                self._state["resume_pending"] = True
+                self._record_locked("input_resume_requested", {})
+            else:
+                self._state["paused"] = False
+                self._record_locked("run_resumed", {})
+            self._gate.resume()
 
     def stop(self) -> None:
         with self._condition:
             if self._state["phase"] != "running" or self._gate is None or not self._gate.stop():
                 return
             self._state["paused"] = False
+            self._state["pause_info"] = None
             self._record_locked("run_cancel_requested", {})
 
     def _run(
@@ -276,6 +328,8 @@ class ApplicationService:
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
             capture_screen=self._capture_screen,
+            control_input=self._control_input, check_input=self._check_input,
+            prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
@@ -299,7 +353,8 @@ class ApplicationService:
                     round((time.monotonic() - started) * 1000, 3),
                 )
         except LedgerWriteError as error:
-            result = WorkflowExecutor._failure(logical_name, component, "ledger_write_failed", str(error))
+            result = {**WorkflowExecutor._failure(logical_name, component, "ledger_write_failed", str(error)),
+                      **_exception_fields(error)}
         except WorkingManifestWriteError as error:
             result = {
                 "status": "failure",
@@ -308,6 +363,7 @@ class ApplicationService:
                 "role": component.role,
                 "failure_code": "working_manifest_write_failed",
                 "failure_message": str(error),
+                **_exception_fields(error),
             }
         except TraceWriteError as error:
             result = {
@@ -317,6 +373,7 @@ class ApplicationService:
                 "role": component.role,
                 "failure_code": "trace_write_failed",
                 "failure_message": str(error),
+                **_exception_fields(error),
             }
 
         self._complete(result)
@@ -327,6 +384,8 @@ class ApplicationService:
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
             capture_screen=self._capture_screen,
+            control_input=self._control_input, check_input=self._check_input,
+            prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
@@ -337,6 +396,7 @@ class ApplicationService:
             return
         completed: list[dict[str, Any]] = []
         reason: str | None = None
+        diagnostic: dict[str, Any] = {}
         try:
             for index, item in enumerate(items):
                 gate.checkpoint()
@@ -379,45 +439,65 @@ class ApplicationService:
                                   **({"failure_code": task_result["failure_code"],
                                       "failure_message": task_result["failure_message"]}
                                      if task_result["status"] == "failure" else {})})
+                for field in ("exception_type", "exception_message", "traceback"):
+                    if field in task_result:
+                        completed[-1][field] = task_result[field]
                 self._emit("plan_item_finished", {"index": index, "task": name, "result": task_result})
+                if task_result.get("failure_code") == "input_release_failed":
+                    reason = "input_release_failed"
+                    break
                 if gate.stopped:
                     reason = "user_cancelled"
                     break
         except RunCancelled:
             reason = "user_cancelled"
-        except LedgerWriteError:
+        except LedgerWriteError as error:
             reason = "ledger_write_failed"
-        except WorkingManifestWriteError:
+            diagnostic = _exception_fields(error)
+        except WorkingManifestWriteError as error:
             reason = "working_manifest_write_failed"
-        except TraceWriteError:
+            diagnostic = _exception_fields(error)
+        except TraceWriteError as error:
             reason = "trace_write_failed"
+            diagnostic = _exception_fields(error)
         except Exception as error:
             reason = "plan_execution_failed"
+            diagnostic = _exception_fields(error)
             self.logger.exception("Automation Plan scheduling failed: %s", error)
         self._complete({"status": "interrupted" if reason else "completed",
-                        **({"reason": reason} if reason else {}), "items": completed})
+                        **({"reason": reason} if reason else {}), "items": completed, **diagnostic})
 
     def _complete(self, result: dict[str, Any]) -> None:
         """写入最终事实并发布一次 Run 的结果。"""
 
+        if self._input_session is not None:
+            self._input_session.close()
         with self._condition:
             try:
                 self._record_locked("run_finished", {"result": deepcopy(result)})
             except TraceWriteError as error:
                 if self._state["entry"]["role"] == "automation_plan":
                     result = {"status": "interrupted", "reason": "trace_write_failed",
-                              "items": result.get("items", [])}
+                              "items": result.get("items", []), **_exception_fields(error)}
                 else:
                     result = {**{key: result[key] for key in ("logical_name", "component_id", "role")},
                               "status": "failure", "failure_code": "trace_write_failed",
-                              "failure_message": str(error)}
-            self._state.update(phase="finished", paused=False,
+                              "failure_message": str(error), **_exception_fields(error)}
+            self._state.update(phase="finished", paused=False, pause_info=None, resume_pending=False,
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
             self._focused_session = None
+            self._input_session = None
             self._changed_locked()
 
     def _emit(self, event: str, fields: dict[str, Any]) -> None:
         with self._condition:
+            if event == "paused_by_user":
+                self._state.update(paused=True, pause_info=deepcopy(fields), resume_pending=False)
+            elif event == "input_resumed":
+                self._state.update(paused=False, pause_info=None, resume_pending=False)
+            elif event == "input_resume_rejected":
+                if self._state["pause_info"] is not None:
+                    self._state["pause_info"].update(reason=fields["exception_message"], traceback=fields["traceback"])
             self._record_locked(event, fields)
 
     def _select_working_manifest(self, manifest: LoadedManifest) -> None:
