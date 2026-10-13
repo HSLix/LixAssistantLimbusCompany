@@ -1,4 +1,4 @@
-"""覆盖唯一窗口连接、内存截图、失焦失效及正式 Run 的观察证据。
+"""覆盖窗口连接、异步聚焦确认、原始异常、内存截图及 Run 观察证据。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_focused_observation.py
@@ -10,13 +10,15 @@ import json
 import struct
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 import lalc.__main__ as cli
 import lalc.application as application
+import lalc.focused as focused
 from lalc.application import ApplicationService
-from lalc.focused import FocusedAutomationSession, WindowError
+from lalc.focused import FocusedAutomationSession, WindowError, WindowsWindowPlatform
 from lalc.manifest import ManifestManager
 
 
@@ -101,6 +103,73 @@ def test_connect_cli_reports_saved_paths(tmp_path: Path, monkeypatch, capsys) ->
     assert "Screenshot: " in output and "Log: " in output
     assert len(list((tmp_path / "connections").glob("*.png"))) == 1
     assert len(list((tmp_path / "connections").glob("*.log"))) == 1
+
+
+def test_focus_waits_for_async_activation_on_repeated_connections(monkeypatch) -> None:
+    now = [0.0]
+    foreground = [10]
+    requests: list[int] = []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: foreground[0],
+        IsIconic=lambda hwnd: False,
+        SetForegroundWindow=lambda hwnd: requests.append(hwnd) or 1,
+    )
+
+    def sleep(duration: float) -> None:
+        now[0] += duration
+        foreground[0] = 42
+
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", sleep)
+    for _ in range(2):
+        foreground[0] = 10
+        platform.focus(42)
+        assert foreground[0] == 42
+    platform.focus(42)
+    assert requests == [42, 42]
+
+
+@pytest.mark.parametrize("returned", [0, 1])
+def test_focus_timeout_preserves_api_result_and_foreground_identity(monkeypatch, returned: int) -> None:
+    now = [0.0]
+    requests: list[int] = []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 10,
+        IsIconic=lambda hwnd: False,
+        SetForegroundWindow=lambda hwnd: requests.append(hwnd) or returned,
+    )
+    platform._identity = lambda hwnd: ("PowerShell", "ConsoleWindowClass", 7, "powershell.exe")
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", lambda duration: now.__setitem__(0, now[0] + duration))
+    with pytest.raises(WindowError) as captured:
+        platform.focus(42)
+    assert f"SetForegroundWindow returned {returned}" in str(captured.value)
+    assert "foreground_hwnd=10" in str(captured.value)
+    assert "PowerShell" in str(captured.value)
+    assert requests == [42]
+    assert now[0] == pytest.approx(1.0)
+
+
+def test_connect_cli_shows_original_exception(tmp_path: Path, monkeypatch, capsys) -> None:
+    platform = FakeWindowPlatform()
+
+    def focus(hwnd: int) -> None:
+        try:
+            raise OSError(5, "Access is denied")
+        except OSError as error:
+            raise WindowError("Cannot focus the game window") from error
+
+    platform.focus = focus
+    monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
+    monkeypatch.setattr(application, "WindowsWindowPlatform", lambda: platform)
+    assert cli.main(["connect"]) == 1
+    output = capsys.readouterr().err
+    assert "WindowError: Cannot focus the game window" in output
+    assert "Caused by:" in output
+    assert "[Errno 5] Access is denied" in output
+    assert not (tmp_path / "connections").exists()
 
 
 @pytest.mark.parametrize("windows", [[], [42, 43]])

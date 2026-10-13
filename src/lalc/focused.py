@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import struct
+import time
 import zlib
 from ctypes import wintypes
 from pathlib import Path
@@ -68,7 +69,11 @@ class FocusedAutomationSession:
         if info["width"] <= 0 or info["height"] <= 0:
             raise WindowError("Target Window client area is empty.")
         if not info["foreground"]:
-            raise WindowError("Target Window is not foreground.")
+            raise WindowError(
+                f"Target Window is not foreground. target_hwnd={info['hwnd']}, "
+                f"foreground_hwnd={info.get('foreground_hwnd', 'unavailable')}, "
+                f"title={info['title']!r}."
+            )
 
     def capture(self) -> dict[str, int]:
         """取得客户区原始图像；失败不沿用旧图。"""
@@ -248,19 +253,41 @@ class WindowsWindowPlatform:
         width = rect.right - rect.left if client_ok else 0
         height = rect.bottom - rect.top if client_ok else 0
         identity_ok = title == self.TITLE and window_class == self.CLASS and Path(process_path).name.lower() == self.EXECUTABLE
+        foreground_hwnd = self.user32.GetForegroundWindow()
         return {
             "hwnd": int(hwnd), "process_id": pid, "process_path": process_path,
             "title": title, "class": window_class, "valid": valid and identity_ok,
             "visible": bool(self.user32.IsWindowVisible(hwnd)) if valid else False,
             "minimized": bool(self.user32.IsIconic(hwnd)) if valid else False,
-            "foreground": self.user32.GetForegroundWindow() == hwnd,
+            "foreground": foreground_hwnd == hwnd, "foreground_hwnd": foreground_hwnd,
             "width": width, "height": height,
         }
 
     def focus(self, hwnd: int) -> None:
+        """只请求置前一次，最多等待一秒确认跨线程的异步激活。"""
+
+        if self.user32.GetForegroundWindow() == hwnd:
+            return
         if self.user32.IsIconic(hwnd):
             self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        self.user32.SetForegroundWindow(hwnd)
+        returned = self.user32.SetForegroundWindow(hwnd)
+        # 跨线程激活可能尚未完成；等待真实焦点，不重复抢占前台。
+        deadline = time.monotonic() + 1.0
+        while True:
+            foreground_hwnd = self.user32.GetForegroundWindow()
+            if foreground_hwnd == hwnd:
+                return
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.02, remaining))
+        title, window_class, pid, process_path = self._identity(foreground_hwnd) if foreground_hwnd else ("", "", 0, "")
+        raise WindowError(
+            "Target Window did not become foreground within 1.0 seconds.\n"
+            f"SetForegroundWindow returned {int(returned)}; this API does not provide a documented extended error code.\n"
+            f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, foreground_process_id={pid}, "
+            f"foreground_title={title!r}, foreground_class={window_class!r}, foreground_process_path={process_path!r}."
+        )
 
     def client_to_screen(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         info = self.window_info(hwnd)

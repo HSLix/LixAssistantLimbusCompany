@@ -62,6 +62,9 @@ Manifest with a direct Step and an `observe` Trusted Action for checking a real
 Run's screenshot and Trace. Copy that example into an empty `candidate/`, then
 use `validate`, `publish`, and `run steps.capture_screen --manifest <id>`.
 Pass `--inputs '{"save":true}'` to save that Run's screenshot as PNG evidence.
+Foreground activation is requested once and confirmed for up to one second.
+If it fails, the CLI reports the native return value and the window that still
+owns foreground focus; wrapped errors also include their original exception.
 
 `publish` keeps the editable candidate and does not change the Default
 Manifest. `clear` is the only command that removes it and asks for confirmation.

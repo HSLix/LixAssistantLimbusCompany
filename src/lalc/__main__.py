@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 import sys
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,22 @@ def _print_errors(errors: tuple[ValidationError, ...]) -> None:
         print(f"{error.code}{location}: {error.message}", file=sys.stderr)
 
 
+def _print_exception(error: BaseException) -> None:
+    """显示命令错误及其原始异常链，保留类型和系统错误信息。"""
+
+    detail = traceback.TracebackException.from_exception(error)
+    while detail is not None:
+        sys.stderr.write("".join(detail.format_exception_only()))
+        if detail.__cause__ is not None:
+            print("Caused by:", file=sys.stderr)
+            detail = detail.__cause__
+        elif detail.__context__ is not None and not detail.__suppress_context__:
+            print("While handling:", file=sys.stderr)
+            detail = detail.__context__
+        else:
+            break
+
+
 def _print_manifests(manager: ManifestManager, limit: int) -> bool:
     if limit < 1:
         print("-n must be a positive integer.", file=sys.stderr)
@@ -108,7 +125,7 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
                 lambda current: current["run_id"] == run_id and current["phase"] == "finished"
             )
     except (OSError, UnicodeError, json.JSONDecodeError, ValueError, StartError) as error:
-        print(str(error), file=sys.stderr)
+        _print_exception(error)
         return 1
     print(json.dumps(state["result"], ensure_ascii=False, indent=2))
     return 0 if state["result"]["status"] in {"success", "completed"} else 1
@@ -199,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return _dispatch(_parser().parse_args(args))
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:
-        print(str(error) or type(error).__name__, file=sys.stderr)
+        _print_exception(error)
         return 1
     except Exception as error:
         logging.getLogger(__name__).exception("CLI command failed")
