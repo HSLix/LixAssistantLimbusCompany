@@ -4,6 +4,8 @@ status: accepted
 
 # Resume user-interrupted Steps manually
 
+ADR 0004 now uses ExecutionFailure for non-user task errors and UserInterruption for internal user-control unwinding. Its revised named-value rules supersede mandatory tuple or result-class representations; user Resume safety checks remain unchanged.
+
 Physical user takeover interrupts the current Step and waits for an explicit
 manual Resume, preserving its Workflow caller frames. It bypasses automatic
 Recovery Rules and Agent recovery because the user is intentionally changing

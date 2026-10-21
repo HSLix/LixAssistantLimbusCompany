@@ -80,10 +80,6 @@ class WorkflowRunLedger:
                 return
             self._new(event, "task" if role == "task_workflow" else "sub")
             return
-        if name in {"condition_evaluated", "condition_failed"} and role == "task_workflow":
-            if not any(record["workflow_kind"] == "task" for record in self.active):
-                self._new(event, "task")
-            return
         if name in {"component_returned", "component_failed"} and role == "sub_workflow":
             record = next((item for item in reversed(self.active) if item["call_id"] == event["call_id"]), None)
             if record is not None:
@@ -91,7 +87,7 @@ class WorkflowRunLedger:
                 record["ended_at"] = event["recorded_at"]
                 record["duration_ms"] = event["duration_ms"]
                 if name == "component_failed":
-                    record["failure_message"] = event.get("exception_message", "Subworkflow failed.")
+                    record["failure_message"] = event.get("failure_message", "Subworkflow failed.")
                 self.active.remove(record)
                 self._save()
             return
@@ -121,7 +117,7 @@ class WorkflowRunLedger:
     def finish_task(
         self, event: dict[str, Any], result: dict[str, Any], duration_ms: float,
     ) -> None:
-        """Task 验证之后才确定最终结果；未进入 execute 的失败也可入账。"""
+        """按 Task 正常返回或最终失败确定结果；不提供独立验证回调。"""
 
         task = next((item for item in self.active if item["workflow_kind"] == "task"), None)
         if task is None:

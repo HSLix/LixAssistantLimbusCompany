@@ -13,7 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .runtime import atomic_write_json, sha256_bytes
+from .runtime import _exception_fields, atomic_write_json, sha256_bytes
+from .assets import AssetLibrary
 
 SCHEMA_VERSION = 1
 SECTIONS = ("components", "recovery_rules", "trusted_actions")
@@ -33,9 +34,13 @@ class ValidationError:
     logical_name: str | None = None
     line: int | None = None
     column: int | None = None
+    cause: Exception | None = field(default=None, repr=False, compare=False)
 
     def as_dict(self) -> dict[str, Any]:
-        return {name: value for name, value in vars(self).items() if value is not None}
+        result = {name: value for name, value in vars(self).items() if value is not None and name != "cause"}
+        if self.cause is not None:
+            result["traceback"] = _exception_fields(self.cause)["traceback"]
+        return result
 
 
 @dataclass(frozen=True)
@@ -94,8 +99,8 @@ class _Prepared:
     errors: list[ValidationError] = field(default_factory=list)
 
 
-# 缓存只以不可变 Component ID 为键；逻辑名称变化不会触发重复导入。
-_MODULE_CACHE: dict[str, tuple[bytes, types.ModuleType]] = {}
+# 同一内容在不同存储根目录加载时，源码位置也必须对应各自的哈希文件。
+_MODULE_CACHE: dict[tuple[Path, str], tuple[bytes, types.ModuleType]] = {}
 
 
 class ManifestManager:
@@ -130,16 +135,16 @@ class ManifestManager:
             assert prepared.manifest is not None
             manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
             manifest.update({name: prepared.manifest[name] for name in (*SECTIONS, "assets")})
-            phase = "load_components"
-            loaded, errors = self._load(manifest, prepared)
-            if errors:
-                return ManifestResult(errors=tuple(errors))
-
             phase = "write_components"
             self.components_dir.mkdir(parents=True, exist_ok=True)
             self.manifests_dir.mkdir(parents=True, exist_ok=True)
             for source in prepared.sources.values():
                 self._store_component(source)
+                source.path = (self.components_dir / f"{source.component_id.removeprefix(COMPONENT_ID_PREFIX)}.py").resolve()
+            phase = "load_components"
+            loaded, errors = self._load(manifest, prepared)
+            if errors:
+                return ManifestResult(errors=tuple(errors))
             phase = "write_manifest"
             manifest_path = self.manifests_dir / f"{manifest_id}.json"
             if manifest_path.exists():
@@ -149,7 +154,7 @@ class ManifestManager:
         except Exception as error:
             self.logger.exception("Manifest update failed during %s", phase)
             return ManifestResult(
-                errors=(ValidationError("manifest_update_failed", str(error)),)
+                errors=(ValidationError("manifest_update_failed", str(error), cause=error),)
             )
 
     def load(self, manifest_id: str) -> ManifestResult:
@@ -193,7 +198,7 @@ class ManifestManager:
             atomic_write_json(self.manifests_dir / "default.json", {"manifest_id": manifest_id})
         except Exception as error:
             self.logger.exception("Manifest update failed during set_default")
-            return ManifestResult(errors=(ValidationError("manifest_update_failed", str(error)),))
+            return ManifestResult(errors=(ValidationError("manifest_update_failed", str(error), cause=error),))
         self.default = result.loaded
         return result
 
@@ -222,9 +227,7 @@ class ManifestManager:
             return tuple(prepared.errors)
         assert prepared.manifest is not None
         manifest = dict(prepared.manifest)
-        if not saved:
-            manifest["manifest_id"] = str(uuid.uuid4())
-        _, errors = self._load(manifest, prepared)
+        _, errors = self._load(manifest, prepared, cache=saved)
         return tuple(errors)
 
     def default_manifest_id(self) -> str | None:
@@ -344,7 +347,7 @@ class ManifestManager:
             return ()
         except Exception as error:
             self.logger.exception("Candidate initialization failed")
-            return (ValidationError("candidate_initialization_failed", str(error)),)
+            return (ValidationError("candidate_initialization_failed", str(error), cause=error),)
         finally:
             if temporary.exists():
                 shutil.rmtree(temporary)
@@ -380,10 +383,6 @@ class ManifestManager:
                 prepared.errors.append(
                     ValidationError("manifest_field_type_invalid", f"{section} must be an object.")
                 )
-        if isinstance(data.get("assets"), dict) and data["assets"]:
-            prepared.errors.append(
-                ValidationError("assets_not_supported", "assets must be empty in schema version 1 for #308.")
-            )
         if any(not isinstance(data.get(section), dict) for section in SECTIONS):
             return prepared
 
@@ -418,6 +417,13 @@ class ManifestManager:
         }
         if saved and isinstance(data.get("manifest_id"), str):
             normalized["manifest_id"] = data["manifest_id"]
+
+        if isinstance(data.get("assets"), dict) and data["assets"]:
+            try:
+                normalized["assets"] = AssetLibrary(self.data_root).validate(data["assets"])
+            except Exception as error:
+                self.logger.exception("Asset validation failed")
+                prepared.errors.append(ValidationError("asset_invalid", str(error), cause=error))
 
         for section in SECTIONS:
             for logical_name, entry in data[section].items():
@@ -511,7 +517,7 @@ class ManifestManager:
                     stored_content = stored_path.read_bytes()
                 except OSError as error:
                     prepared.errors.append(
-                        ValidationError("component_source_unreadable", str(error), logical_name)
+                        ValidationError("component_source_unreadable", str(error), logical_name, cause=error)
                     )
                     return None
                 if stored_content != source[1]:
@@ -562,7 +568,7 @@ class ManifestManager:
         try:
             return path, path.read_bytes()
         except OSError as error:
-            errors.append(ValidationError("source_unreadable", str(error), logical_name))
+            errors.append(ValidationError("source_unreadable", str(error), logical_name, cause=error))
             return None
 
     def _stored_source(
@@ -578,7 +584,7 @@ class ManifestManager:
         try:
             content = path.read_bytes()
         except OSError as error:
-            errors.append(ValidationError("component_source_unreadable", str(error), logical_name))
+            errors.append(ValidationError("component_source_unreadable", str(error), logical_name, cause=error))
             return None
         if sha256_bytes(content) != digest:
             errors.append(
@@ -671,16 +677,14 @@ class ManifestManager:
                         execute[0],
                     )
                 )
-            if len(verify) != 1:
-                errors.append(
-                    ValidationError("verify_invalid", "Task Workflow must define exactly one verify function.", logical_name)
-                )
-            elif execute:
-                self._validate_related_signature(verify[0], execute[0], "verify", logical_name, errors)
-            if len(condition) > 1:
-                errors.append(ValidationError("condition_invalid", "condition may be defined once.", logical_name))
-            elif condition and execute:
-                self._validate_related_signature(condition[0], execute[0], "condition", logical_name, errors)
+            if condition:
+                errors.append(ValidationError(
+                    "condition_forbidden", "Task Workflow entry checks belong in a Step, not condition.", logical_name,
+                ))
+            if verify:
+                errors.append(ValidationError(
+                    "verify_forbidden", "Task Workflow result checks belong in a Step, not verify.", logical_name,
+                ))
         elif role == "sub_workflow":
             if condition or verify:
                 errors.append(
@@ -696,7 +700,7 @@ class ManifestManager:
             if len(condition) > 1:
                 errors.append(ValidationError("condition_invalid", "condition may be defined once.", logical_name))
             elif condition and execute:
-                self._validate_related_signature(condition[0], execute[0], "condition", logical_name, errors)
+                self._validate_condition_signature(condition[0], execute[0], logical_name, errors)
         return role
 
     def _validate_recovery_source(
@@ -813,7 +817,7 @@ class ManifestManager:
             if source is None or source.tree is None or role is None:
                 continue
             forbidden_nodes: set[int] = set()
-            for function_name in ("condition", "verify"):
+            for function_name in ("condition",):
                 for function in self._top_functions(source.tree).get(function_name, []):
                     for call in self._ctx_calls(function):
                         forbidden_nodes.add(id(call))
@@ -889,8 +893,6 @@ class ManifestManager:
     ) -> None:
         allowed = {
             ("task_workflow", "execute"): {"observe"},
-            ("task_workflow", "condition"): {"observe"},
-            ("task_workflow", "verify"): set(),
             ("sub_workflow", "execute"): {"observe"},
             ("step", "execute"): {"observe", "control"},
             ("step", "condition"): {"observe"},
@@ -935,7 +937,7 @@ class ManifestManager:
                         )
 
     def _load(
-        self, manifest: dict[str, Any], prepared: _Prepared
+        self, manifest: dict[str, Any], prepared: _Prepared, *, cache: bool = True,
     ) -> tuple[LoadedManifest | None, list[ValidationError]]:
         """在零静态错误之后加载全部 Component，并收集全部导入失败。"""
 
@@ -948,10 +950,11 @@ class ManifestManager:
         }
         for component_id, source in prepared.sources.items():
             try:
-                modules[component_id] = self._load_module(source)
+                modules[component_id] = self._load_module(source, cache=cache)
             except Exception as error:
+                self.logger.exception("Component import failed: %s (%s)", references.get(component_id), source.path)
                 errors.append(
-                    ValidationError("component_import_failed", str(error), references.get(component_id))
+                    ValidationError("component_import_failed", str(error), references.get(component_id), cause=error)
                 )
         if errors:
             return None, errors
@@ -1002,26 +1005,33 @@ class ManifestManager:
             [],
         )
 
-    def _load_module(self, source: _Source) -> types.ModuleType:
-        """按 Component ID 复用模块；复用前仍核对本次读取的源码字节。"""
+    def _load_module(self, source: _Source, *, cache: bool = True) -> types.ModuleType:
+        """正式模块只从哈希存储加载；候选校验使用不进入缓存的临时模块。"""
 
-        cached = _MODULE_CACHE.get(source.component_id)
+        path = source.path.resolve()
+        digest = source.component_id.removeprefix(COMPONENT_ID_PREFIX)
+        if cache and path != (self.components_dir / f"{digest}.py").resolve():
+            raise ValueError("formal_component_path_invalid")
+        key = (path, source.component_id)
+        cached = _MODULE_CACHE.get(key) if cache else None
         if cached is not None:
             if cached[0] != source.content:
                 raise ValueError("cached_component_source_mismatch")
             return cached[1]
-        digest = source.component_id.removeprefix(COMPONENT_ID_PREFIX)
-        name = f"lalc_component_{digest}"
+        name = f"lalc_{'component' if cache else 'candidate'}_{digest}_{uuid.uuid4().hex}"
         module = types.ModuleType(name)
-        module.__file__ = str(source.path)
+        module.__file__ = str(path)
         module.__package__ = ""
         sys.modules[name] = module
         try:
-            exec(compile(source.content, str(source.path), "exec"), module.__dict__)
+            exec(compile(source.content, str(path), "exec"), module.__dict__)
         except Exception:
             sys.modules.pop(name, None)
             raise
-        _MODULE_CACHE[source.component_id] = (source.content, module)
+        if cache:
+            _MODULE_CACHE[key] = (source.content, module)
+        else:
+            sys.modules.pop(name, None)
         return module
 
     def _store_component(self, source: _Source) -> None:
@@ -1055,7 +1065,7 @@ class ManifestManager:
         try:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
-            return None, [ValidationError("manifest_unreadable", str(error))]
+            return None, [ValidationError("manifest_unreadable", str(error), cause=error)]
         duplicates: list[str] = []
 
         def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -1172,16 +1182,15 @@ class ManifestManager:
                 )
             )
 
-    def _validate_related_signature(
+    def _validate_condition_signature(
         self,
         function: ast.FunctionDef | ast.AsyncFunctionDef,
         execute: ast.FunctionDef | ast.AsyncFunctionDef,
-        kind: str,
         logical_name: str,
         errors: list[ValidationError],
     ) -> None:
         positional = [item.arg for item in function.args.posonlyargs + function.args.args]
-        expected = ["ctx", "result"] if kind == "verify" else ["ctx"]
+        expected = ["ctx"]
         valid = (
             not isinstance(function, ast.AsyncFunctionDef)
             and not function.args.posonlyargs
@@ -1193,16 +1202,9 @@ class ManifestManager:
             and function.returns.id == "bool"
             and self._parameter_contract(function.args) == self._parameter_contract(execute.args)
         )
-        if kind == "verify":
-            result_arg = (function.args.posonlyargs + function.args.args)[1] if len(positional) == 2 else None
-            valid = (
-                valid
-                and result_arg is not None
-                and self._annotation_dump(result_arg.annotation) == self._annotation_dump(execute.returns)
-            )
         if not valid:
             errors.append(
-                self._node_error("signature_invalid", f"{kind} signature must match execute.", logical_name, function)
+                self._node_error("signature_invalid", "condition signature must match execute.", logical_name, function)
             )
 
     @staticmethod

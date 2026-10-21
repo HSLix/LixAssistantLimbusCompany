@@ -16,7 +16,7 @@ from lalc.application import ApplicationService
 from lalc.control import InputSession, PhysicalInputMonitor
 from lalc.focused import FocusedAutomationSession
 from lalc.manifest import ManifestManager
-from lalc.runtime import InputReleaseFailure, RunCancelled, RunGate, UserTakeover
+from lalc.runtime import InputReleaseFailure, UserInterruption, RunGate
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "focused-control"
@@ -111,7 +111,6 @@ class FakeWindow:
 @pytest.fixture(autouse=True)
 def fast_quiet(monkeypatch):
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0.001)
-    monkeypatch.setattr(InputSession, "RESUME_TIMEOUT", 0.04)
 
 
 def service_for(tmp_path: Path, *, condition: str = ""):
@@ -130,8 +129,6 @@ def execute(ctx, *, operation: str = "drag") -> str:
     ctx.call("steps.control", operation=operation, seconds=0.03)
     return "finished"
 
-def verify(ctx, result: str, *, operation: str = "drag") -> bool:
-    return result == "finished"
 '''
     (candidate / "task.py").write_text(task)
     manifest = json.loads((EXAMPLE / "manifest.json").read_text())
@@ -187,7 +184,7 @@ def test_takeover_releases_once_then_reenters_same_step_manually(tmp_path, opera
     assert window.focus_calls == 1
     interrupted = next(event for event in state["trace"] if event["event"] == "step_interrupted")
     assert interrupted["outcome"] == "unknown"
-    assert "UserTakeover" in interrupted["traceback"]
+    assert "UserInterruption" in interrupted["traceback"]
     service.resume()
     state = finished(service)
     assert state["result"]["output"] == "finished"
@@ -253,7 +250,7 @@ def test_release_failure_ends_plan_without_resume_or_later_task(tmp_path):
     failed = next(event for event in state["trace"] if event["event"] == "plan_item_finished")["result"]
     assert failed["failure_code"] == "input_release_failed"
     assert "touch release denied" in failed["traceback"]
-    assert "UserTakeover" in failed["traceback"]
+    assert "UserInterruption" in failed["traceback"]
     assert not any(event["event"] in {"safe_task_termination", "input_released", "paused_by_user"} for event in state["trace"])
     assert len([e for e in window.backend.events if isinstance(e, tuple) and e[0] == "up"]) == 1
     assert window.backend.closed
@@ -279,18 +276,25 @@ def test_wait_observes_takeover_and_can_be_cancelled(tmp_path, monkeypatch):
     assert finished(service)["result"]["failure_code"] == "user_cancelled"
 
 
-def test_quiet_resume_rejects_held_physical_input(tmp_path):
+def test_quiet_resume_waits_for_released_input_without_another_resume(tmp_path, monkeypatch):
     service, window = service_for(tmp_path)
     window.backend.takeovers = 1
     service.start("tasks.control", {})
     paused(service)
     window.backend.pressed = True
+    waiting = threading.Event()
+
+    def any_pressed():
+        if window.backend.pressed:
+            waiting.set()
+        return window.backend.pressed
+
+    monkeypatch.setattr(window.backend, "any_pressed", any_pressed)
     service.resume()
-    state = paused(service, 2)
-    assert "保持安静" in state["pause_info"]["reason"]
+    assert waiting.wait(2)
+    assert service.state["resume_pending"]
     assert window.focus_calls == 1
     window.backend.pressed = False
-    service.resume()
     assert finished(service)["result"]["status"] == "success"
 
 
@@ -301,7 +305,7 @@ def test_focus_loss_pauses_without_automatic_refocus_and_clears_image():
     focused.capture()
     session = InputSession(focused, window.backend, RunGate(), lambda event, fields: events.append(event))
     window.foreground = False
-    with pytest.raises(UserTakeover):
+    with pytest.raises(UserInterruption):
         session.execute("key_press", {"key": "esc"})
     assert focused.image is None and window.focus_calls == 1
     assert not window.backend.events
@@ -314,7 +318,7 @@ def test_cancellation_during_held_key_releases_once():
     gate = RunGate()
     session = InputSession(focused, window.backend, gate, lambda event, fields: None)
     window.backend.on_down = gate.stop
-    with pytest.raises(RunCancelled):
+    with pytest.raises(UserInterruption):
         session.execute("key_press", {"key": "p"})
     assert window.backend.events == [("key", 80, False), ("key", 80, True)]
 
@@ -380,7 +384,7 @@ def test_cli_release_failure_shows_full_original_stack(tmp_path, monkeypatch, ca
     assert json.loads(output.out)["failure_code"] == "input_release_failed"
     assert "Traceback (most recent call last):" in output.err
     assert "touch release denied" in output.err
-    assert "UserTakeover" in output.err
+    assert "UserInterruption" in output.err
 
 
 def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path, monkeypatch):
@@ -508,3 +512,75 @@ def test_takeover_during_first_observation_prevents_first_control(tmp_path, monk
     assert window.backend.events == []
     service.resume()
     assert finished(service)["result"]["status"] == "success"
+
+
+@pytest.mark.parametrize("problem", ["focus", "takeover"])
+@pytest.mark.parametrize("plan", [False, True])
+def test_workflow_observation_interruption_waits_for_resume_without_cancelling(tmp_path, monkeypatch, problem, plan):
+    """观察动作内部发生暂停或接管时保留 Workflow 帧，仅重新观察，不重放 Step。"""
+
+    from lalc import task_workflow
+    service, window = service_for(tmp_path)
+    window.backend.takeovers = 0
+    entries = []
+    @task_workflow
+    def execute(ctx, *, operation: str = "drag") -> str:
+        entries.append("entered")
+        ctx.action("observe.capture_screen")
+        return "finished"
+    monkeypatch.setattr(service.manifest_manager.default.components["tasks.control"].module, "execute", execute)
+    capture = window.capture
+    first = True
+    def observe(hwnd, width, height):
+        nonlocal first
+        if first:
+            first = False
+            if problem == "focus":
+                window.foreground = False
+            else:
+                window.backend.monitor.record("鼠标", False)
+                window.foreground = False
+        return capture(hwnd, width, height)
+    monkeypatch.setattr(window, "capture", observe)
+    if plan:
+        path = tmp_path / "plan.json"
+        path.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}]}))
+        service.start_plan(path)
+    else:
+        service.start("tasks.control", {})
+    state = paused(service)
+    assert state["pause_info"]["restart_step"] is False
+    assert state["result"] is None and not service._gate.stopped
+    service.resume()
+    state = finished(service)
+    if plan:
+        assert state["result"]["status"] == "completed"
+        assert state["result"]["items"][0]["result"] == "success"
+    else:
+        assert state["result"]["output"] == "finished"
+    assert entries == ["entered"]
+    attempts = [event["call_id"] for event in state["trace"] if event["event"] == "trusted_action_started"]
+    assert len(attempts) == 2 and len(set(attempts)) == 2
+    assert window.backend.events == []
+
+
+def test_application_shutdown_waits_for_input_release(tmp_path, monkeypatch):
+    """正常应用退出也必须等待运行线程的输入释放，不直接放弃后台线程。"""
+
+    service, window = service_for(tmp_path)
+    window.backend.takeovers = 0
+    pressed, release = threading.Event(), threading.Event()
+    def on_down():
+        pressed.set()
+        release.wait()
+    window.backend.on_down = on_down
+    service.start("tasks.control", {"operation": "key_press"})
+    assert pressed.wait(2)
+    waiting = threading.Thread(target=service.shutdown)
+    waiting.start()
+    release.set()
+    waiting.join(2)
+    assert not waiting.is_alive() and not service._thread.is_alive()
+    assert service.state["result"]["failure_code"] == "user_cancelled"
+    assert window.backend.events.count(("key", 0x1B, True)) == 1
+    assert window.backend.closed

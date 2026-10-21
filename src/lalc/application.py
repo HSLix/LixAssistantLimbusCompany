@@ -12,13 +12,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
+from .assets import AssetLibrary, game_language as checked_game_language
 from .control import InputSession
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
-from .manifest import LoadedManifest, ManifestManager
+from .manifest import LoadedManifest, ManifestManager, ValidationError
 from .runtime import (
     InputValidationError,
     RunGate,
-    RunCancelled,
+    UserInterruption,
     TraceWriteError,
     WorkingManifestWriteError,
     WorkflowExecutor,
@@ -30,10 +31,12 @@ from .runtime import (
 class StartError(RuntimeError):
     """运行建立前的结构化同步拒绝。"""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str, *, errors: tuple[ValidationError, ...] = ()) -> None:
         super().__init__(message)
         self.code = code
         self.message = message
+        self.errors = [error.as_dict() for error in errors]
+        self.__cause__ = next((error.cause for error in errors if error.cause is not None), None)
 
 
 class ApplicationService:
@@ -48,6 +51,7 @@ class ApplicationService:
         logger: logging.Logger | None = None,
         recovery_choice: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         window_platform: Any | None = None,
+        game_language: str = "en",
     ) -> None:
         self.data_root = Path(data_root)
         self.manifest_manager = manifest_manager or ManifestManager(self.data_root)
@@ -55,9 +59,12 @@ class ApplicationService:
         self.logger = logger or logging.getLogger(__name__)
         self.recovery_choice = recovery_choice
         self.window_platform = window_platform
+        self.game_language = checked_game_language(game_language)
+        self.asset_library = AssetLibrary(self.data_root)
         self._focused_session: FocusedAutomationSession | None = None
         self._input_session: InputSession | None = None
         self._monitor_input = False
+        self._fatal = False
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
         self._gate: RunGate | None = None
@@ -99,6 +106,8 @@ class ApplicationService:
         """同步校验启动请求，再在单一后台线程执行已捕获的 Manifest。"""
 
         with self._condition:
+            if self._fatal:
+                raise StartError("application_failed", "Application cannot continue after a fatal error.")
             if self._state["phase"] == "running":
                 raise StartError("run_already_active", "Another Run is already active.")
             manifest = self._loaded_manifest(manifest_id)
@@ -114,8 +123,8 @@ class ApplicationService:
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs)
 
             self._thread = threading.Thread(
-                target=self._run,
-                args=(snapshot, logical_name, component.component_id, normalized_inputs, gate),
+                target=self._worker,
+                args=(self._run, snapshot, logical_name, component.component_id, normalized_inputs, gate),
                 name=f"lalc-run-{run_id}",
                 daemon=True,
             )
@@ -127,6 +136,8 @@ class ApplicationService:
         """启动用户保存的 JSON Plan；结构问题作为本次 Run 的 invalid_plan 结果。"""
 
         with self._condition:
+            if self._fatal:
+                raise StartError("application_failed", "Application cannot continue after a fatal error.")
             if self._state["phase"] == "running":
                 raise StartError("run_already_active", "Another Run is already active.")
             manifest = self._loaded_manifest(manifest_id)
@@ -137,7 +148,7 @@ class ApplicationService:
             entry = {"role": "automation_plan", "path": str(path)}
             run_id, snapshot, gate = self._begin_run(manifest, entry, {})
             self._thread = threading.Thread(
-                target=self._run_plan, args=(snapshot, source, gate),
+                target=self._worker, args=(self._run_plan, snapshot, source, gate),
                 name=f"lalc-run-{run_id}", daemon=True,
             )
             self._thread.start()
@@ -179,7 +190,9 @@ class ApplicationService:
             return {"window": window, "image": image, "image_path": str(image_path), "log_path": str(log_path)}
 
     def _window_platform(self) -> Any:
-        return self.window_platform if self.window_platform is not None else WindowsWindowPlatform()
+        return self.window_platform if self.window_platform is not None else WindowsWindowPlatform(
+            checkpoint=self._gate.checkpoint if self._gate is not None else None,
+        )
 
     def _capture_screen(self, save: bool) -> dict[str, Any]:
         """Trusted Action 入口：刷新本次 Run 的内存图像并可显式保存。"""
@@ -202,6 +215,37 @@ class ApplicationService:
             saved = self._focused_session.save(path, evidence_id=evidence_id)
             result["evidence_path"] = saved["path"]
             result["evidence_id"] = evidence_id
+        return result
+
+    def _match_asset(self, mapping: dict[str, Any], name: str, **options: Any) -> list[dict[str, Any]]:
+        """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
+
+        session = self._focused_session
+        if session is None or session.image is None or session.size is None:
+            raise WindowError("No current screenshot for Asset matching; capture explicitly first.")
+        try:
+            session.check()
+        except WindowError:
+            if self._input_session is not None:
+                self._input_session.check()
+            raise
+        assert session.image is not None and session.size is not None
+        return self.asset_library.match(
+            mapping, name, self.game_language, session.image, session.size,
+            run_id=self._state["run_id"], observation=session.observation, emit=self._emit, **options,
+        )
+
+    def _crop_asset(self, name: str, region: dict[str, int]) -> dict[str, Any]:
+        """每次请求重新截图，再保存新 Asset 及实际截图来源，不改变映射。"""
+
+        observation = self._capture_screen(False)
+        session = self._focused_session
+        assert session is not None and session.image is not None and session.size is not None
+        result = self.asset_library.save_crop(
+            name, self.game_language, session.image, session.size, region,
+            run_id=self._state["run_id"], observation=observation["observation"],
+        )
+        self._emit("asset_created", result)
         return result
 
     def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
@@ -277,7 +321,7 @@ class ApplicationService:
         )
         try:
             self._persist_working_locked()
-            self._record_locked("run_started", {**entry, "base_manifest_id": snapshot.manifest_id, "inputs": deepcopy(inputs)})
+            self._record_locked("run_started", {**entry, "base_manifest_id": snapshot.manifest_id, "game_language": self.game_language, "inputs": deepcopy(inputs)})
         except TraceWriteError as error:
             self._state.update(phase="idle", base_manifest_id=None, working_manifest_id=None, attempted_manifest_ids=[], run_id=None, entry=None, trace=[])
             self._gate = None
@@ -315,6 +359,68 @@ class ApplicationService:
             self._state["pause_info"] = None
             self._record_locked("run_cancel_requested", {})
 
+    def shutdown(self) -> None:
+        """应用退出时请求协作式停止，并等运行线程完成输入释放和最终记录。"""
+
+        try:
+            self.stop()
+        finally:
+            if self._thread is not None:
+                self._thread.join()
+
+    def _worker(self, execute: Callable[..., dict[str, Any]], *arguments: Any) -> None:
+        """统一包住执行、输入清理和结果发布；未处理错误标为致命且保证唤醒观察者。"""
+
+        result: dict[str, Any] = {}
+        errors: list[dict[str, Any]] = []
+        try:
+            result = execute(*arguments)
+        except BaseException as error:
+            self.logger.exception("Unhandled execution failure")
+            errors.append(_exception_fields(error))
+        finally:
+            try:
+                if self._input_session is not None:
+                    self._input_session.close()
+            except BaseException as error:
+                self.logger.exception("Input session cleanup failed")
+                errors.append(_exception_fields(error))
+            if errors:
+                result = self._fatal_result(result, errors)
+            try:
+                self._complete(result)
+            except BaseException as error:
+                self.logger.exception("Run completion failed")
+                errors.append(_exception_fields(error))
+                result = self._fatal_result(result, errors)
+                with self._condition:
+                    self._state.update(phase="finished", paused=False, pause_info=None,
+                                       resume_pending=False, result=result)
+                    self._focused_session = None
+                    self._input_session = None
+                    self._condition.notify_all()
+                    if self.on_change is not None:
+                        self.on_change(deepcopy(self._state))
+
+    def _fatal_result(
+        self, previous: dict[str, Any], errors: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """保留原执行结果和所有收尾错误，阻止同一服务再次启动。"""
+
+        previous = previous.get("previous_result", previous) if previous.get("fatal") else previous
+        self._fatal = True
+        if self._gate is not None:
+            self._gate.stop()
+        entry = self._state.get("entry") or {}
+        result = {**entry, "fatal": True, **errors[-1],
+                  "fatal_errors": list(errors), "previous_result": previous}
+        if entry.get("role") == "automation_plan":
+            result.update(status="interrupted", reason="fatal_error",
+                          items=deepcopy(previous.get("items", [])))
+        else:
+            result.update(status="failure", failure_code="fatal_error")
+        return result
+
     def _run(
         self,
         manifest: LoadedManifest,
@@ -322,7 +428,7 @@ class ApplicationService:
         component_id: str,
         inputs: dict[str, Any],
         gate: RunGate,
-    ) -> None:
+    ) -> dict[str, Any]:
         component = manifest.components[logical_name]
         assert component.component_id == component_id
         executor = WorkflowExecutor(
@@ -333,6 +439,7 @@ class ApplicationService:
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
+            game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
         )
         started = time.monotonic()
         started_at = datetime.now(UTC).isoformat()
@@ -376,9 +483,9 @@ class ApplicationService:
                 **_exception_fields(error),
             }
 
-        self._complete(result)
+        return result
 
-    def _run_plan(self, manifest: LoadedManifest, source: str | Exception, gate: RunGate) -> None:
+    def _run_plan(self, manifest: LoadedManifest, source: str | Exception, gate: RunGate) -> dict[str, Any]:
         """一次预检后按冻结顺序逐项执行，并复用同一个 Working Manifest。"""
 
         executor = WorkflowExecutor(
@@ -389,11 +496,11 @@ class ApplicationService:
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
+            game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
         )
         items, errors = _prepare_plan(source, manifest)
         if errors:
-            self._complete({"status": "interrupted", "reason": "invalid_plan", "errors": errors, "items": []})
-            return
+            return {"status": "interrupted", "reason": "invalid_plan", "errors": errors, "items": []}
         completed: list[dict[str, Any]] = []
         reason: str | None = None
         diagnostic: dict[str, Any] = {}
@@ -439,7 +546,7 @@ class ApplicationService:
                                   **({"failure_code": task_result["failure_code"],
                                       "failure_message": task_result["failure_message"]}
                                      if task_result["status"] == "failure" else {})})
-                for field in ("exception_type", "exception_message", "traceback"):
+                for field in ("traceback",):
                     if field in task_result:
                         completed[-1][field] = task_result[field]
                 self._emit("plan_item_finished", {"index": index, "task": name, "result": task_result})
@@ -449,7 +556,9 @@ class ApplicationService:
                 if gate.stopped:
                     reason = "user_cancelled"
                     break
-        except RunCancelled:
+        except UserInterruption as error:
+            if error.reason != "cancel":
+                raise
             reason = "user_cancelled"
         except LedgerWriteError as error:
             reason = "ledger_write_failed"
@@ -464,25 +573,26 @@ class ApplicationService:
             reason = "plan_execution_failed"
             diagnostic = _exception_fields(error)
             self.logger.exception("Automation Plan scheduling failed: %s", error)
-        self._complete({"status": "interrupted" if reason else "completed",
-                        **({"reason": reason} if reason else {}), "items": completed, **diagnostic})
+        return {"status": "interrupted" if reason else "completed",
+                **({"reason": reason} if reason else {}), "items": completed, **diagnostic}
 
     def _complete(self, result: dict[str, Any]) -> None:
         """写入最终事实并发布一次 Run 的结果。"""
 
-        if self._input_session is not None:
-            self._input_session.close()
         with self._condition:
             try:
                 self._record_locked("run_finished", {"result": deepcopy(result)})
             except TraceWriteError as error:
+                self.logger.exception("Final Trace write failed")
+                previous = result
                 if self._state["entry"]["role"] == "automation_plan":
-                    result = {"status": "interrupted", "reason": "trace_write_failed",
+                    result = {**result, "status": "interrupted", "reason": "trace_write_failed",
                               "items": result.get("items", []), **_exception_fields(error)}
                 else:
-                    result = {**{key: result[key] for key in ("logical_name", "component_id", "role")},
+                    result = {**result,
                               "status": "failure", "failure_code": "trace_write_failed",
                               "failure_message": str(error), **_exception_fields(error)}
+                result["previous_result"] = previous
             self._state.update(phase="finished", paused=False, pause_info=None, resume_pending=False,
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
             self._focused_session = None
@@ -497,7 +607,7 @@ class ApplicationService:
                 self._state.update(paused=False, pause_info=None, resume_pending=False)
             elif event == "input_resume_rejected":
                 if self._state["pause_info"] is not None:
-                    self._state["pause_info"].update(reason=fields["exception_message"], traceback=fields["traceback"])
+                    self._state["pause_info"].update(reason=fields["failure_message"], traceback=fields["traceback"])
             self._record_locked(event, fields)
 
     def _select_working_manifest(self, manifest: LoadedManifest) -> None:
@@ -556,12 +666,12 @@ class ApplicationService:
             result = self.manifest_manager.load(manifest_id)
             if result.loaded is None:
                 message = "; ".join(error.message for error in result.errors)
-                raise StartError("manifest_unavailable", message)
+                raise StartError("manifest_unavailable", message, errors=result.errors)
             return result.loaded
         result = self.manifest_manager.load_default()
         if result.loaded is None:
             message = "; ".join(error.message for error in result.errors) or "No Default Manifest."
-            raise StartError("default_manifest_unavailable", message)
+            raise StartError("default_manifest_unavailable", message, errors=result.errors)
         return result.loaded
 
     def _allocate_run_id(self) -> int:

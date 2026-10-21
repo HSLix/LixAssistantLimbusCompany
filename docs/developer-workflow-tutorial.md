@@ -68,9 +68,6 @@ def condition(ctx, *, name: str) -> bool:
     return ctx.action("actions.name_ready", name=name)
 
 
-def verify(ctx, result: str, *, name: str) -> bool:
-    """核对最终结果与最初输入。"""
-    return result == f"Hello, {name}！"
 ```
 
 `candidate/subworkflows.greet.py`：
@@ -157,7 +154,7 @@ def execute(ctx, *, name: str) -> str:
 }
 ```
 
-候选 Manifest 不填写 `manifest_id` 或 `component_id`。发布时程序会为整份 Manifest 分配新 ID，并按每个 Python 文件的准确字节计算不可变 Component ID。当前 schema v1 的 `assets` 必须为空。
+候选 Manifest 不填写 `manifest_id`。本教程全部使用 `source_path`，方便编辑源码。候选 Manifest 也允许通过 `component_id` 复用已保存的组件；每个条目必须在两者中选择一种。发布时程序会为整份 Manifest 分配新 ID，并按每个 Python 文件的准确字节计算不可变 Component ID。当前 schema v1 的 `assets` 必须为空。
 
 ## 4. 校验、发布、运行
 
@@ -218,7 +215,7 @@ uv run lalc run tasks.greet --inputs '{"name":"Lix"}'
 uv run lalc run steps.say_hello --inputs '{"name":"Lix"}'
 ```
 
-它们仍保留各自的角色和返回值；只有 Task Workflow 执行 `verify()`。
+它们保留各自的角色和返回值；Task 没有独立 condition 或 verify，前置检查和结果核验建议通过普通 Step 完成。
 
 ## 5. 修改与继续开发
 
@@ -231,17 +228,17 @@ uv run lalc run steps.say_hello --inputs '{"name":"Lix"}'
 | Task Workflow 的 `execute()` | Subworkflow、Step、`observe` Action |
 | Subworkflow 的 `execute()` | Step、`observe` Action |
 | Step 的 `execute()` | `observe` 或 `control` Action；不能调用其他 Workflow Component |
-| Task Workflow 的 `verify()` | 只核对返回结果和原始输入；不能调用 Action 或其他 Component |
 
-所有 Workflow/Step 的 `execute` 必须是同步的 `execute(ctx, *, 参数: 类型, ...) -> 返回类型`；Task Workflow 还必须提供与 `execute` 输入和返回类型匹配的 `verify(ctx, result: 返回类型, *, ...) -> bool`。参数和返回值使用直接 JSON 兼容类型，例如 `str`、`int`、`bool`、`list[str]`、`dict[str, str]`。正式 Workflow/Step 源码不能写 `except`，也不能直接导入另一个组件文件；需要复用能力时在 Manifest 中登记并通过逻辑名调用。Trusted Action 不使用角色装饰器，可在自己的边界处理低层异常。
+
+所有 Workflow/Step 使用同步 execute 和直接 JSON 兼容的参数、返回类型。只有 Step 可提供同签名的只读 condition。Task 不提供 condition 或 verify；建议在普通 Step 中核验重要结果，失败时抛出 ExecutionFailure，复用 Step 恢复。
 
 若 `validate` 失败，先看错误中的逻辑名、行号和错误码：
 
 - `source_unreadable`：`source_path` 对应的文件不存在或无法读取。
-- `signature_invalid`：`execute` 或 `verify` 的参数、类型注解不符合要求。
+- `signature_invalid`：execute 或 Step condition 的参数、类型注解不符合要求。
 - `component_call_unresolved` / `trusted_action_unresolved`：调用的逻辑名没有在 Manifest 中登记。
 - `trusted_action_forbidden`：当前角色调用了不允许的 Action 分类，例如 Task Workflow 直接调用 `control`。
 - `component_call_role_invalid`：调用目标的角色不允许，例如 Subworkflow 调用另一个 Subworkflow。
-- `verification_rejected`：这是运行结果，不是发布错误；Task Workflow 返回了值，但 `verify()` 没有返回 `True`。
+- `condition_forbidden` / `verify_forbidden`：旧 Task 回调需要迁移到普通 Step。
 
 `validate` 通过只表示结构、导入和调用关系有效；是否完成真实任务仍取决于实际 Trusted Action、业务判断和运行验证。修改真实外部操作时，先把副作用限制在对应的 Trusted Action 中。当前 #309 尚未提供真实游戏、OCR、模型操作或 Agent 恢复。

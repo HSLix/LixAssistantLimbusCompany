@@ -8,12 +8,14 @@ from __future__ import annotations
 
 import json
 import logging
+import shutil
 from pathlib import Path
 
 import pytest
 
 import lalc.manifest as manifest_module
 from lalc.manifest import ManifestManager
+from lalc.application import ApplicationService, StartError
 
 
 SOURCES = {
@@ -26,8 +28,6 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
     ctx.call("steps.finish", amount=amount)
     return result
 
-def verify(ctx, result: dict[str, int], *, amount: int = 1) -> bool:
-    return result.get("amount") == amount
 ''',
     "sub.py": '''"""Test Subworkflow."""
 from lalc import sub_workflow
@@ -89,6 +89,107 @@ def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) 
 
 def _codes(result) -> set[str]:
     return {error.code for error in result.errors}
+
+
+def test_validate_does_not_allocate_manifest_id_before_publish(tmp_path: Path, monkeypatch) -> None:
+    """校验完整导入但不分配 Manifest ID，正式发布才建立持久身份。"""
+
+    manager = ManifestManager(tmp_path / "formal")
+    candidate = _write_candidate(tmp_path / "candidate")
+    loaded_manifests = []
+    load = manager._load
+
+    def record_load(manifest, prepared, *, cache=True):
+        loaded_manifests.append(dict(manifest))
+        return load(manifest, prepared, cache=cache)
+
+    monkeypatch.setattr(manager, "_load", record_load)
+    assert not manager.validate(candidate)
+    assert len(loaded_manifests) == 1
+    assert "manifest_id" not in loaded_manifests[0]
+    assert not manager.manifests_dir.exists()
+    assert not manager.components_dir.exists()
+
+    result = manager.publish(candidate)
+    assert result.ok, result.errors
+    assert result.loaded.manifest_id
+    assert (manager.manifests_dir / f"{result.loaded.manifest_id}.json").is_file()
+
+
+def test_candidate_validation_cannot_supply_formal_modules(tmp_path: Path) -> None:
+    """校验后移除草稿，正式运行仍使用各自存储中的哈希源码与报错行。"""
+
+    sources = dict(SOURCES)
+    sources["step.py"] = '''"""返回实际源码位置或产生带原因链的错误。"""
+from lalc import step
+
+def fail():
+    raise OSError("stored source failure") from ValueError("original cause")
+
+@step
+def execute(ctx, *, amount: int = 1) -> str:
+    if amount < 0:
+        fail()
+    return __file__
+'''
+    for name in ("first", "second"):
+        manager = ManifestManager(tmp_path / name / "formal")
+        candidate = _write_candidate(tmp_path / name / "candidate", sources=sources)
+        assert not manager.validate(candidate)
+        assert not manager.components_dir.exists()
+        published = manager.publish(candidate)
+        assert published.ok, published.errors
+        component = published.loaded.components["steps.finish"]
+        stored = (manager.components_dir / f"{component.component_id.split(':')[1]}.py").resolve()
+        shutil.rmtree(candidate.parent)
+        service = ApplicationService(manager.data_root, manifest_manager=manager)
+        run_id = service.start("steps.finish", {}, manifest_id=published.loaded.manifest_id)
+        state = service.wait_for(lambda s: s["run_id"] == run_id and s["phase"] == "finished")
+        assert state["result"]["output"] == str(stored)
+        assert manager.load(published.loaded.manifest_id).loaded.components["steps.finish"].module is component.module
+        run_id = service.start("steps.finish", {"amount": -1}, manifest_id=published.loaded.manifest_id)
+        state = service.wait_for(lambda s: s["run_id"] == run_id and s["phase"] == "finished")
+        diagnostic = state["result"]["traceback"]
+        assert str(stored) in diagnostic
+        assert str(candidate.parent) not in diagnostic
+        assert "in fail" in diagnostic
+        assert 'raise OSError("stored source failure")' in diagnostic
+        assert "ValueError: original cause" in diagnostic
+        assert "OSError: stored source failure" in diagnostic
+
+
+def test_import_error_retains_serializable_diagnostics_and_start_cause(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """导入失败在日志、校验结果和同步启动拒绝中保留原始原因链。"""
+
+    sources = dict(SOURCES)
+    sources["observe.py"] = '''"""导入时报告完整错误链。"""
+raise OSError("import failed") from ValueError("import root cause")
+def execute(ctx, *, name: str = "state") -> dict[str, str]:
+    return {"name": name}
+'''
+    manager = ManifestManager(tmp_path / "formal")
+    candidate = _write_candidate(tmp_path / "candidate", sources=sources)
+    with caplog.at_level(logging.ERROR):
+        result = manager.publish(candidate)
+    assert not result.ok
+    error = result.errors[0]
+    payload = json.loads(json.dumps(error.as_dict()))
+    assert "cause" not in payload
+    assert "OSError:" in payload["traceback"]
+    assert "ValueError: import root cause" in payload["traceback"]
+    assert "OSError: import failed" in payload["traceback"]
+    assert "import root cause" in caplog.text
+    assert "Traceback" in caplog.text
+    assert not list(manager.manifests_dir.glob("*.json"))
+    monkeypatch.setattr(manager, "load", lambda _: result)
+    service = ApplicationService(manager.data_root, manifest_manager=manager)
+    with pytest.raises(StartError) as rejected:
+        service.start("tasks.example", {}, manifest_id="unavailable")
+    assert rejected.value.__cause__ is error.cause
+    assert rejected.value.errors[0]["traceback"] == payload["traceback"]
+    assert service.state["run_id"] is None
 
 
 def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) -> None:
@@ -159,7 +260,7 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
     assert {
         "field_unknown",
         "schema_version_unsupported",
-        "assets_not_supported",
+        "asset_invalid",
         "logical_name_invalid",
         "logical_name_duplicate",
         "source_path_escape",
@@ -200,8 +301,6 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
     ctx.call("tasks.example", amount=amount)
     return ctx.call("flow.sub", amount=amount)
 
-def verify(ctx, result: dict[str, int], *, amount: int = 1) -> bool:
-    return True
 '''
     sources["sub.py"] = '''"""Invalid nested Subworkflow call."""
 from lalc import sub_workflow

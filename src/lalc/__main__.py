@@ -13,6 +13,7 @@ from typing import Any
 from .application import ApplicationService, StartError, default_data_root
 from .focused import WindowError
 from .manifest import ManifestManager, ValidationError
+from .errors import FATAL_MESSAGE, configure_logging, result_diagnostics
 
 
 class _Parser(argparse.ArgumentParser):
@@ -36,12 +37,14 @@ def _parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run")
     run.add_argument("logical_name")
     run.add_argument("--manifest")
+    run.add_argument("--language", default="en", help="Running game language (default: en)")
     inputs = run.add_mutually_exclusive_group()
     inputs.add_argument("--inputs")
     inputs.add_argument("--inputs-file", type=Path)
     plan = commands.add_parser("run-plan")
     plan.add_argument("path", type=Path)
     plan.add_argument("--manifest")
+    plan.add_argument("--language", default="en", help="Running game language (default: en)")
     listing = commands.add_parser("list-manifests")
     listing.add_argument("-n", type=int, default=9)
     default = commands.add_parser("set-default")
@@ -58,13 +61,23 @@ def _print_errors(errors: tuple[ValidationError, ...]) -> None:
             location += f" line {error.line}"
             if error.column is not None:
                 location += f":{error.column}"
+        logging.getLogger(__name__).error("%s%s: %s", error.code, location, error.message,
+                                          exc_info=(type(error.cause), error.cause, error.cause.__traceback__)
+                                          if error.cause is not None else None)
         print(f"{error.code}{location}: {error.message}", file=sys.stderr)
+        if error.cause is not None:
+            traceback.print_exception(error.cause, file=sys.stderr, chain=True)
 
 
 def _print_exception(error: BaseException) -> None:
     """显示命令错误及其原始异常链，保留类型和系统错误信息。"""
 
+    logging.getLogger(__name__).error("Command failed", exc_info=(type(error), error, error.__traceback__))
     traceback.print_exception(error, file=sys.stderr, chain=True)
+    if isinstance(error, StartError):
+        for diagnostic in error.errors[1:]:
+            if diagnostic.get("traceback"):
+                sys.stderr.write(diagnostic["traceback"])
 
 
 def _print_manifests(manager: ManifestManager, limit: int) -> bool:
@@ -99,7 +112,7 @@ def _read_inputs(args: argparse.Namespace) -> dict[str, Any]:
 
 def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) -> int:
     try:
-        service = ApplicationService(data_root, manifest_manager=manager)
+        service = ApplicationService(data_root, manifest_manager=manager, game_language=args.language)
         if args.command == "run-plan":
             run_id = service.start_plan(args.path, manifest_id=args.manifest)
         else:
@@ -140,11 +153,13 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
         return 1
     print(json.dumps(state["result"], ensure_ascii=False, indent=2))
     result = state["result"]
-    if result.get("traceback"):
-        sys.stderr.write(result["traceback"])
-    for item in result.get("items", []):
-        if item.get("traceback"):
-            sys.stderr.write(item["traceback"])
+    if result.get("fatal"):
+        print(FATAL_MESSAGE, file=sys.stderr)
+    details = result_diagnostics(result)
+    if details:
+        if result.get("failure_code", result.get("reason")) != "user_cancelled":
+            logging.getLogger(__name__).error("Execution result: %s", details)
+        print(details, file=sys.stderr)
     return 0 if state["result"]["status"] in {"success", "completed"} else 1
 
 
@@ -227,17 +242,20 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_probe(args[1], args[2])
     if not args:
-        from .gui import run_gui
+        from .lifecycle import run_application
 
-        return run_gui()
+        return run_application()
     try:
+        if args[0] != "data-dir":
+            configure_logging(default_data_root())
         return _dispatch(_parser().parse_args(args))
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:
         _print_exception(error)
         return 1
     except Exception as error:
         logging.getLogger(__name__).exception("CLI command failed")
-        print(f"Command failed: {error}", file=sys.stderr)
+        print(FATAL_MESSAGE, file=sys.stderr)
+        _print_exception(error)
         return 1
 
 

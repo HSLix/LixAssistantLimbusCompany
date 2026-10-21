@@ -145,7 +145,8 @@ class WindowsWindowPlatform:
 
         return WindowsInputBackend(self)
 
-    def __init__(self) -> None:
+    def __init__(self, *, checkpoint: Callable[[], None] | None = None) -> None:
+        self.checkpoint = checkpoint
         if not hasattr(ctypes, "WinDLL"):
             raise WindowError("Windows observation is available only on Windows.")
         self.user32 = ctypes.WinDLL("user32", use_last_error=True)
@@ -272,30 +273,23 @@ class WindowsWindowPlatform:
         }
 
     def focus(self, hwnd: int) -> None:
-        """只请求置前一次，最多等待一秒确认跨线程的异步激活。"""
+        """只请求置前一次，等待异步激活；不以等待时长报错，允许用户取消。"""
 
         if self.user32.GetForegroundWindow() == hwnd:
             return
         if self.user32.IsIconic(hwnd):
             self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        returned = self.user32.SetForegroundWindow(hwnd)
+        self.user32.SetForegroundWindow(hwnd)
         # 跨线程激活可能尚未完成；等待真实焦点，不重复抢占前台。
-        deadline = time.monotonic() + 1.0
         while True:
+            if self.checkpoint is not None:
+                self.checkpoint()
             foreground_hwnd = self.user32.GetForegroundWindow()
             if foreground_hwnd == hwnd:
                 return
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                break
-            time.sleep(min(0.02, remaining))
-        title, window_class, pid, process_path = self._identity(foreground_hwnd) if foreground_hwnd else ("", "", 0, "")
-        raise WindowError(
-            "Target Window did not become foreground within 1.0 seconds.\n"
-            f"SetForegroundWindow returned {int(returned)}; this API does not provide a documented extended error code.\n"
-            f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, foreground_process_id={pid}, "
-            f"foreground_title={title!r}, foreground_class={window_class!r}, foreground_process_path={process_path!r}."
-        )
+            if not self.user32.IsWindow(hwnd):
+                raise WindowError(f"Target Window disappeared while waiting for foreground: target_hwnd={hwnd}.")
+            time.sleep(0.02)
 
     def client_to_screen(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         info = self.window_info(hwnd)

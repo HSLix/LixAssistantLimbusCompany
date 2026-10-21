@@ -8,7 +8,7 @@ import time
 from typing import Any, Callable
 
 from .focused import FocusedAutomationSession, WindowError
-from .runtime import InputReleaseFailure, RunCancelled, RunGate, UserTakeover, _exception_fields
+from .runtime import InputReleaseFailure, UserInterruption, RunGate, _exception_fields
 
 
 class PhysicalInputMonitor:
@@ -40,7 +40,6 @@ class InputSession:
     """在运行线程注入输入并负责唯一的释放；物理接管只中断，不重放。"""
 
     QUIET_SECONDS = 0.3
-    RESUME_TIMEOUT = 2.0
     POLL_SECONDS = 0.012
     KEYS = {"esc": 0x1B, "p": 0x50, "enter": 0x0D}
 
@@ -58,7 +57,7 @@ class InputSession:
         if self.failed:
             raise InputReleaseFailure("Input session was disabled after release failure.")
         if self.gate.stopped:
-            raise RunCancelled
+            raise UserInterruption
         generation, _, kind = self.monitor.snapshot()
         if generation != self.owned_generation:
             self._interrupt(f"检测到用户{kind}输入，当前 Step 已中断。", "physical_input")
@@ -77,22 +76,20 @@ class InputSession:
         self.window.size = None
         if first:
             self.emit("input_takeover", {"reason": reason, "source": source, "outcome": "unknown"})
+        intent = "takeover" if source == "physical_input" else "pause"
         if original is not None:
-            raise UserTakeover(reason) from original
-        raise UserTakeover(reason)
+            raise UserInterruption(reason, reason=intent) from original
+        raise UserInterruption(reason, reason=intent)
 
     def prepare_resume(self) -> None:
         """安静且无按住的物理输入后只聚焦一次；失败仍需再次手动恢复。"""
 
-        deadline = time.monotonic() + self.RESUME_TIMEOUT
         while True:
             if self.gate.stopped:
-                raise RunCancelled
+                raise UserInterruption
             generation, last, _ = self.monitor.snapshot()
             if time.monotonic() - last >= self.QUIET_SECONDS and not self.backend.any_pressed():
                 break
-            if time.monotonic() >= deadline:
-                raise WindowError("等待用户释放输入并保持安静后，请再次恢复。")
             time.sleep(self.POLL_SECONDS)
         self.emit("input_quiet", {"quiet_seconds": self.QUIET_SECONDS})
         assert self.window.hwnd is not None

@@ -11,7 +11,10 @@ dependencies = []
 
 [project.optional-dependencies]
 gui = ["PySide6-Essentials"]
-automation = []
+automation = [
+    "numpy>=2.0,<3",
+    "opencv-python-headless>=4.10,<5",
+]
 agent = []
 
 [project.scripts]

@@ -19,8 +19,10 @@ This repository uses a single-context layout:
 ├── CONTEXT.md
 ├── docs/
 │   └── adr/
-├── lalc_frontend/
-└── lalc_backend/
+├── src/
+│   └── lalc/
+├── tests/
+└── examples/
 ```
 
 `CONTEXT.md` records the shared domain language and boundaries. System-wide architectural decisions belong under `docs/adr/`.
@@ -34,3 +36,12 @@ If the required concept is missing, reconsider whether the term belongs to the p
 ## Flag ADR conflicts
 
 If proposed work contradicts an existing ADR, surface the conflict explicitly instead of silently overriding the decision.
+
+## Agent changes to Manifests and Assets
+
+- Existing Manifest and Asset files are read-only to the Agent, including through generated code or executor requests. Never overwrite, rename, or delete them as part of a repair.
+- To adapt a template, create a new Asset and a new complete candidate Manifest pointing to its path and hash. Changing mappings in that new candidate does not modify an existing Manifest or its Asset files.
+- Do not design Agent repair around editing an old image and then fixing old Manifest hashes; that operation is forbidden. Human editing and management through a future GUI are deferred separately.
+- For crop requests, capture the current game anew, crop it, and return the crop for inspection. Do not require an earlier observation ID to remain current or read a saved screenshot file.
+
+See [ADR 0020](../adr/0020-allow-screenshot-derived-assets-and-explicit-search-regions.md) and [ADR 0021](../adr/0021-retain-created-files-and-defer-resource-maintenance.md).

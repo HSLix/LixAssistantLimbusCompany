@@ -22,11 +22,6 @@ from lalc import task_workflow
 def execute(ctx, *, value: int) -> int:
     return ctx.call("flows.double", value=value)
 
-def condition(ctx, *, value: int) -> bool:
-    return value >= 0
-
-def verify(ctx, result: int, *, value: int) -> bool:
-    return result == value * 2
 '''
 SUB = '''"""Plan test Subworkflow."""
 from lalc import sub_workflow
@@ -36,15 +31,17 @@ def execute(ctx, *, value: int) -> int:
     return ctx.call("steps.double", value=value)
 '''
 STEP = '''"""Plan test Step."""
-from lalc import ExecutionInterruption, step
+from lalc import ExecutionFailure, step
 calls = 0
 
 @step
 def execute(ctx, *, value: int) -> int:
     global calls
     calls += 1
+    if value < 0:
+        raise ExecutionFailure("negative value")
     if calls == 1:
-        raise ExecutionInterruption("observe again")
+        raise ExecutionFailure("observe again")
     return value * 2
 '''
 
@@ -91,7 +88,7 @@ def test_plan_continues_after_item_failure_and_ledger_counts_unique_events(tmp_p
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "completed"
     assert [item["result"] for item in result["items"]] == ["success", "failure", "success"]
-    assert result["items"][1]["failure_code"] == "task_condition_not_satisfied"
+    assert result["items"][1]["failure_code"] == "execution_failed"
     assert {item["run_id"] for item in result["items"]} == {1}
 
     service = ApplicationService(tmp_path, manifest_manager=manager)
@@ -99,16 +96,16 @@ def test_plan_continues_after_item_failure_and_ledger_counts_unique_events(tmp_p
     tasks = [record for record in saved["records"] if record["workflow_kind"] == "task"]
     subs = [record for record in saved["records"] if record["workflow_kind"] == "sub"]
     assert [record["result"] for record in tasks] == ["success", "failure", "success"]
-    assert [record["result"] for record in subs] == ["success", "success"]
+    assert [record["result"] for record in subs] == ["success", "failure", "success"]
     assert tasks[0]["step_reinvocations"] == subs[0]["step_reinvocations"] == 1
-    assert service.application_event_totals()["step_reinvocations"] == 1
+    assert service.application_event_totals()["step_reinvocations"] == 2
     health = service.workflow_health()[manager.default.components["tasks.double"].component_id]
     assert health["strict_success_rate"] == 2 / 3
     assert health["agent_assisted_completion_rate"] == 0
     trace = [json.loads(line) for line in (tmp_path / "traces" / "1.jsonl").read_text(encoding="utf-8").splitlines()]
     started = [event for event in trace if event["event"] == "component_started" and event["role"] == "task_workflow"]
-    verified = [event for event in trace if event["event"] == "verification_started"]
-    assert [event["parent_call_id"] for event in verified] == [event["call_id"] for event in started]
+    assert len(started) == 3
+    assert not any(event["event"].startswith("verification_") for event in trace)
 
 
 def test_invalid_plan_reports_all_errors_before_any_task(tmp_path: Path) -> None:
@@ -165,11 +162,11 @@ def test_cancellation_stops_plan_and_skips_later_item(tmp_path: Path, monkeypatc
 
 def test_later_item_uses_current_working_manifest(tmp_path: Path) -> None:
     broken = '''"""Interrupting Step."""
-from lalc import ExecutionInterruption, step
+from lalc import ExecutionFailure, step
 
 @step
 def execute(ctx, *, value: int) -> int:
-    raise ExecutionInterruption("cannot continue")
+    raise ExecutionFailure("cannot continue")
 '''
     replacement = '''"""Replacement Step."""
 from lalc import step
@@ -226,8 +223,10 @@ def test_ledger_write_failure_interrupts_plan(tmp_path: Path, monkeypatch) -> No
     assert state["result"]["status"] == "interrupted"
     assert state["result"]["reason"] == "ledger_write_failed"
     assert state["result"]["items"] == []
-    assert [event["event"] for event in state["trace"]].count("condition_evaluated") == 1
-    assert not any(event["event"] == "component_started" for event in state["trace"])
+    assert [event["event"] for event in state["trace"]].count("component_started") == 1
+    assert not any(event["event"] == "component_started" and event["role"] == "step"
+                   for event in state["trace"])
+    assert manager.default.components["steps.double"].module.calls == 0
 
 
 def test_cancellation_between_items_creates_no_next_task_record(tmp_path: Path) -> None:

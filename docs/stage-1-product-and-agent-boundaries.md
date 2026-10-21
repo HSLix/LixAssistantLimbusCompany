@@ -9,7 +9,7 @@ Stage 1 was reopened to allow a supervised Agent-proposed complete Manifest to r
 - LALC automates explicitly supported Limbus Company content; it is not a general game-playing Agent.
 - A Deterministic Workflow must complete every officially supported task without a model service.
 - The only supported interaction environment is a Focused Automation Session, as established by ADR 0001. Cursor-Assisted Background Operation remains experimental.
-- Stage 3 provides supervised Agent recovery from a paused current Step. One proposal may change Steps, Task Workflows, and Subworkflows together; Trusted Actions, Recovery Rules, and Assets are outside this Agent modification scope. Agent-assisted drafting of a new objective, autonomous Capability Expansion, and unattended operation remain deferred.
+- Stage 3 provides supervised Agent recovery from a paused current Step. One proposal may change Steps, Task Workflows, and Subworkflows together; Trusted Actions and Recovery Rules are outside this Agent modification scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. Agent-assisted drafting of a new objective, autonomous Capability Expansion, and unattended operation remain deferred.
 
 ## Agent lifecycle
 
@@ -22,7 +22,7 @@ When enabled, the Agent does not participate in normal Workflow steps. Runtime E
 - lack of progress within the allowed checks;
 - contradiction between the observed state and the active Workflow constraints.
 
-Deterministic recovery is confined to an interrupted `@step` wrapper. The wrapper keeps its caller's Python frame paused, checks public Recovery Rules, and then resolves and invokes the current Step again through the latest Working Manifest. A second interruption, an unsatisfied Step `condition`, or an incompatible return produces an Execution Anomaly and may start a Runtime Agent Session only while that wrapper remains paused. An `ExecutionInterruption` outside a Step does not restart a Subworkflow or Task Workflow, never starts a Runtime Agent Session, and proceeds directly to Safe Task Termination. Every Task Workflow supplies one final `verify` function whose Component ID and original inputs bind when that task starts. It runs only after the Task Workflow normally returns a normalized result and decides success from that result and the original inputs. Agent help must first restore the current Step and ordinary Python return chain; it cannot bypass them with an Agent claim or task-level verification. Once the Task Workflow has returned, an invalid root result or unsuccessful final verification is terminal for that call: the executor records `failure` with `failure_code` and `failure_message` without invoking the Agent or starting the same task again.
+One common invocation mechanism covers Component execute, Step condition, Trusted Actions, and Recovery Rules. Only the whole Step is a recovery boundary: public rules and one fresh invocation may restore its paused caller chain; exhausted recovery may enter Agent handling or explicit termination. Workflow errors outside a Step are reported without replay, and Recovery Rule errors never recursively recover. Task has no entry condition or final verify callback. Business entry and outcome checks are recommended as ordinary Steps. Normal JSON-compatible Task return records success.
 
 ## Runtime Agent Turns
 
@@ -40,7 +40,7 @@ Local and remote models share one Agent Adapter contract. The Adapter only trans
 
 Safe Task Termination is an executor action that stops only the current Task Workflow and its remaining inputs. It is recorded separately from the Task Workflow's `failure` result and does not become another result category. It does not exit LALC, close the game, perform system shutdown, or stop a containing Automation Plan. The application preserves the failure reason, screenshots, execution history, and current Working Manifest changes, then offers the user a way to add Expert Guidance. A directly started Task Workflow therefore ends, while an Automation Plan records that task's result and proceeds to its next independent item.
 
-User cancellation is a separate executor control signal, not an exception or Execution Anomaly. It stops further input without Deterministic Recovery or Agent. A containing Automation Plan records `status: interrupted` with `reason: user_cancelled` and starts no later item. If a Task Workflow run record already exists, it records `result: failure` with `failure_code: user_cancelled`; if none exists, cancellation creates no Task result. `safe_termination_performed` reflects only whether the executor actually performed that action, not an inferred execution stage. The exact cancellation position remains in Trace. Formal source cannot catch or clear cancellation. A process crash instead records `process_crash` and cannot claim that Safe Task Termination ran.
+User pause, takeover, and cancellation are user controls rather than execution failures. An internal `UserInterruption` may unwind an operation when necessary, preserving whether the user requested resumable pause or final cancellation. It stops further input without Deterministic Recovery or Agent. A containing Automation Plan records `status: interrupted` with `reason: user_cancelled` and starts no later item. If a Task Workflow run record already exists, it records `result: failure` with `failure_code: user_cancelled`; if none exists, cancellation creates no Task result. `safe_termination_performed` reflects only whether the executor actually performed that action, not an inferred execution stage. The exact cancellation position remains in Trace. Formal source cannot catch or clear cancellation. A process crash instead records `process_crash` and cannot claim that Safe Task Termination ran.
 
 ## Runtime confirmation
 
@@ -51,7 +51,7 @@ The first version supports only Supervised Operation. The user reviews and permi
 The Runtime Agent may:
 
 - read screenshots, recognition results, execution history, active capability definitions, and relevant Expert Guidance;
-- propose one complete Manifest changing Steps, Task Workflows, or Subworkflows, with reasons for every change; it cannot modify Trusted Actions, Recovery Rules, or Assets.
+- propose one complete Manifest changing Steps, Task Workflows, or Subworkflows, with reasons for every change; it cannot modify Trusted Actions or Recovery Rules. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files.
 
 It may not:
 
@@ -62,7 +62,7 @@ The intended Agent interface remains the project Runtime API and Target Window, 
 
 ## Agent scope boundary
 
-The Agent starts only from an Execution Anomaly while an existing supported Task Workflow remains paused inside its current Step. It may diagnose that execution and propose changes to Steps, Task Workflows, and Subworkflows in one complete Manifest. The current Step remains the only continuation point; entered Workflow frames keep their code and locals, and later new calls resolve the selected Manifest. A Workflow exception outside a Step records the anomaly and performs Safe Task Termination, without cross-Workflow continuation. The Agent does not modify Trusted Actions, Recovery Rules, or Assets or create a new user-startable objective in this scope.
+The Agent starts only from an Execution Anomaly while an existing supported Task Workflow remains paused inside its current Step. It may diagnose that execution and propose changes to Steps, Task Workflows, and Subworkflows in one complete Manifest. The current Step remains the only continuation point; entered Workflow frames keep their code and locals, and later new calls resolve the selected Manifest. Workflow exceptions outside a Step are reported without cross-Workflow continuation; any Safe Task Termination is an explicitly performed action. The Agent does not modify Trusted Actions or Recovery Rules or create a new user-startable objective in this scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files.
 
 ## Evidence requirements
 
@@ -72,13 +72,13 @@ Runtime API and Step wrappers record the evidence needed to show targets and ver
 
 ## Controlled Evolution
 
-A Capability Proposal presents the execution's current Working Manifest ID when that ID has not already received permanent approval, together with its Task verification result and trial evidence. Returning to the Base Manifest or another already approved ID skips repeated approval. Earlier intermediate attempts remain in history but are not separate approval candidates. The review UI computes differences from the Base Manifest; the system does not persist a parallel additions-and-deletions model.
+A Capability Proposal presents the execution's current Working Manifest ID when that ID has not already received permanent approval, together with its Task result and checking-Step evidence and trial evidence. Returning to the Base Manifest or another already approved ID skips repeated approval. Earlier intermediate attempts remain in history but are not separate approval candidates. The review UI computes differences from the Base Manifest; the system does not persist a parallel additions-and-deletions model.
 
 Every complete Manifest actually used for an attempt is durably retained by Manifest ID, including the initial and intermediate versions. Trying an existing Manifest ID again reuses that ID while Trace records another attempt. A validated proposal becomes visible through one atomic selection while the executor can immediately invoke the paused current Step. If that call fails, execution remains paused without automatic rollback; the Agent may base another proposal on any retained attempt ID or end execution. No Component call or game input occurs while that decision is pending.
 
 A complete Manifest may be inspected and execution-validated before permanent approval. Validation may combine compatible evidence from multiple real attempts when irreversible game progress prevents replay from the beginning. Human runtime permission is required before the current execution uses Agent-proposed content. Permanent approval occurs only after the Top-level Execution ends; it publishes the reviewed retained Manifest ID without automatically changing the Default Manifest. Each Task Workflow run keeps its Trace, Agent Interaction Logs, screenshots, and other evidence in a Run Log Bundle.
 
-Agent modification of Trusted Actions, Recovery Rules, and Assets is outside this scope. No first occurrence automatically creates a public Recovery Rule.
+Agent modification of Trusted Actions and Recovery Rules is outside this scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. No first occurrence automatically creates a public Recovery Rule.
 
 Executable code remains eligible for whole-Manifest permanent approval. The approval UI must mark it in red with a warning symbol and an **Executable Code** label, state how many source changes are included, and allow advanced users to inspect file differences. Permanent approval records the reviewed Manifest ID and does not alter the Default selection; any saved Manifest ID may be explicitly selected in a later execution. Code may only use dependencies already approved and shipped with the application.
 
@@ -92,12 +92,12 @@ Python Components use concise docstrings to help the Agent retrieve and understa
 
 The Component Manifest is the sole saved, versioned, and recoverable unit. Every Top-level Execution selects one retained Base Manifest, explicitly or through the Default Manifest, and copies it into one complete durable Working Manifest. A directly started Task Workflow, Subworkflow, or Step and an Automation Plan with all of its sequential Task Workflows are the Top-level Execution forms:
 
-- multiple immutable Manifests may exist, but exactly one is the Default used only when a start request does not name another retained Manifest;
+- multiple saved Manifests protected from Agent modification may exist, but exactly one is the Default used only when a start request does not name another retained Manifest;
 - the executor resolves every current-run component through its Working Manifest;
 - resolution uses the stable logical name as the lookup key and obtains the currently referenced immutable Component ID;
 - every Task Workflow, Subworkflow, and Step inside the same Top-level Execution resolves through the same Working Manifest;
 - each Task Workflow still writes its own Run Log Bundle and Workflow Run Ledger records;
-- structurally valid Agent logic may change immutable Steps, Task Workflows, and Subworkflows in a complete Manifest for a fresh current-Step call, while new Component source follows the Candidate File Batch lifecycle without mutating the Base Manifest;
+- structurally valid Agent logic may change immutable Steps, Task Workflows, and Subworkflows in a complete Manifest for a fresh current-Step call, while new Component source is stored immutably in the shared library without mutating the Base Manifest;
 - an update takes effect only at an executor-controlled pause boundary, after a complete replacement has been durably written and atomically selected;
 - already-entered Python frames are never hot-patched; subsequent resolution occurs through a fresh invocation;
 - every complete Manifest used for an attempt remains retained by Manifest ID; attempts selecting the same Manifest share that ID but have separate Trace events;
@@ -108,27 +108,25 @@ The Component Manifest is the sole saved, versioned, and recoverable unit. Every
 - approving an Agent proposal permanently publishes its retained Manifest ID without selecting it as Default;
 - editing and publishing a Manifest creates a new Manifest, leaving the source Manifest and Default selection unchanged;
 - selecting an existing Manifest as Default creates no copy;
-- only a non-default Manifest may be deleted, and the sole remaining Manifest cannot be deleted;
-- deleting a manifest does not automatically delete its Components;
-- any Component referenced by a retained manifest or durable Working Manifest must remain available.
+- retained Manifests and their referenced files remain available; deletion and reference-scanning policies are deferred for future discussion, not first-version requirements.
 
 Every retained Manifest is a Recovery Point. Recovery selects that Manifest as the Default directly. The system does not preserve or replay an approval undo chain, maintain per-component version histories, or provide a separate single-component rollback function; a user who wants a different component combination edits a Manifest and publishes the result as a new Manifest.
 
-A separate mutable Component Usage Index records each Component's `last_used_at`. The timestamp changes only when a Workflow or Step is entered or a Trusted Action is invoked. Only a Component with no reference from any retained Manifest or durable Working Manifest may become a cleanup candidate. Elapsed time since actual use may identify and order such candidates but cannot override a live reference.
+Component Usage Index is a possible future maintenance feature, deferred for discussion. This version commits to neither its data structure nor collection or cleanup rules. Asset Usage Index remains a separate accepted recognition requirement.
 
-Assets use a separate local Asset Usage Index keyed by logical name, running language, and full content hash. Accepted old Assets are not cleaned automatically; their usage and Manifest references are shown only for later human review. Agent modification of Assets is outside the current repair scope. One Top-level Execution may create at most one durable Candidate File Batch for Component source files it actually creates; reusing an existing identical file adds no Batch entry.
+Assets use a separate local Asset Usage Index keyed by logical name, running language, and full content hash. Its latest successful use and evidence references support inspection and never change detection regions. New Agent-proposed templates may only be cropped from a fresh Target Window screenshot taken for that crop request under ADR 0020. New immutable files go directly into their normal libraries; resource maintenance is deferred under ADR 0021.
 
 One retained complete Manifest ID is the first version's permanent-approval unit. Runtime permission and successful trials affect only the current Top-level Execution. After it ends, the interface reviews the selected Manifest, its changes, and Validation Coverage for a separate whole-Manifest decision. Approval does not duplicate the selected Manifest under another ID or change the Default Manifest.
 
-Retaining attempted Manifests for review also retains the complete closed Candidate File Batch. Permanent approval marks one reviewed complete Manifest ID as published without changing the Default Manifest. Rejection grants no permanent approval. Cleanup recomputes references from every retained Manifest and Capability Proposal before removing any Batch file; an attempted Manifest retained for history keeps its referenced source available.
+Post-execution review records human approval or rejection for the reviewed Manifest ID separately from its contents protected from Agent modification. Approval marks the existing ID as permanently approved without changing the Default; rejection grants no approval. Both outcomes retain final and intermediate attempted Manifests, source files, Assets, and evidence. Neither outcome triggers resource deletion. Candidate File Batch tracking is removed; resource maintenance is outside this version (ADR 0021).
 
 The first version retains every attempted complete Manifest by ID. Any saved Manifest ID, including one from an unfinished or unapproved attempt, may be explicitly selected by another Top-level Execution. Permanent approval and Default selection remain distinct from permission for one execution.
 
-Any saved Manifest ID may be set as Default. Selecting one without permanent approval first shows a warning and requires explicit confirmation; declining leaves the existing Default unchanged. Explicitly selecting a saved ID to start one execution does not change the Default.
+Any saved Manifest ID may be set as Default. Explicit selection requires no additional confirmation, regardless of permanent approval status; a validation or load failure leaves the existing Default unchanged. Explicitly selecting a saved ID to start one execution does not change the Default.
 
 A process crash preserves attempted Manifests and flushed execution evidence, but does not automatically reopen a post-execution approval dialog on restart. A saved ID from that execution remains explicitly selectable.
 
-Cleanup is a user-initiated maintenance operation. The application presents candidates but never deletes them because a time threshold elapsed. Immediately before a requested deletion, it recomputes references from retained Manifests and durable Working Manifests; any current reference rejects the deletion. The Agent, background maintenance, and ordinary update flows cannot delete Components automatically.
+Resource deletion, reference scanning, and cleanup UI are deferred for future discussion under ADR 0021. No deletion eligibility rule, reference index, or maintenance interface is committed for this version.
 
 ## Knowledge Library
 

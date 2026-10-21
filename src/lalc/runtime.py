@@ -16,8 +16,15 @@ if TYPE_CHECKING:
     from .manifest import LoadedComponent, LoadedManifest, ManifestManager
 
 
-class RunCancelled(Exception):
-    """用户取消信号；它不属于 Component 可处理的业务异常。"""
+class UserInterruption(Exception):
+    """用户控制信号；保留取消、暂停或接管意图，不进入任务恢复。"""
+
+    def __init__(
+        self, message: str = "Run cancelled by user.", *,
+        reason: Literal["cancel", "pause", "takeover"] = "cancel",
+    ) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 class InputValidationError(ValueError):
@@ -39,17 +46,13 @@ class WorkingManifestWriteError(TraceWriteError):
 class ExecutionFailure(RuntimeError):
     """Executor 已分类的运行失败。"""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(self, code: str, message: str | None = None, *, cause: Exception | None = None) -> None:
+        if message is None:
+            code, message = "execution_failed", code
         super().__init__(message)
         self.code = code
-
-
-class ExecutionInterruption(RuntimeError):
-    """Step 或 Workflow 报告当前执行无法安全继续。"""
-
-
-class UserTakeover(ExecutionInterruption):
-    """输入所有权已丢失；仅允许用户明确恢复当前 Step。"""
+        if cause is not None:
+            self.__cause__ = cause
 
 
 class InputReleaseFailure(ExecutionFailure):
@@ -88,7 +91,7 @@ class RunGate:
         with self._condition:
             self._condition.wait_for(lambda: not self._paused or self._stopped)
             if self._stopped:
-                raise RunCancelled
+                raise UserInterruption
 
     def pause(self) -> bool:
         with self._condition:
@@ -153,6 +156,26 @@ class RunContext:
 
         return self._executor.capture_screen(save)
 
+    @property
+    def game_language(self) -> str:
+        return self._executor.game_language
+
+    def match_asset(
+        self, logical_name: str, *, region: dict[str, int] | None = None,
+        threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
+    ) -> list[dict[str, Any]]:
+        """仅供 observe Action 在现有内存截图中匹配语义 Asset。"""
+
+        return self._executor.match_asset(logical_name, {
+            "region": region, "threshold": threshold, "nms": nms,
+            "nms_iou_threshold": nms_iou_threshold,
+        })
+
+    def crop_asset(self, logical_name: str, *, region: dict[str, int]) -> dict[str, Any]:
+        """仅供 observe Action 请求现场截图裁剪；只新增文件，不改 Manifest。"""
+
+        return self._executor.crop_asset(logical_name, region)
+
     def control_input(self, operation: str, **arguments: Any) -> None:
         """仅供 control Trusted Action 进入应用拥有的输入会话。"""
 
@@ -164,8 +187,6 @@ class WorkflowExecutor:
 
     _ACTION_ACCESS = {
         ("task_workflow", "execute"): {"observe"},
-        ("task_workflow", "condition"): {"observe"},
-        ("task_workflow", "verify"): set(),
         ("sub_workflow", "execute"): {"observe"},
         ("step", "execute"): {"observe", "control"},
         ("step", "condition"): {"observe"},
@@ -186,6 +207,9 @@ class WorkflowExecutor:
         manifest_manager: ManifestManager | None = None,
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         select_manifest: Callable[[LoadedManifest], None] | None = None,
+        game_language: str = "en",
+        match_asset: Callable[..., list[dict[str, Any]]] | None = None,
+        crop_asset: Callable[..., dict[str, Any]] | None = None,
     ) -> None:
         self.manifest = manifest
         self.gate = gate
@@ -202,6 +226,9 @@ class WorkflowExecutor:
         self.manifest_manager = manifest_manager
         self.choose_manifest = choose_manifest
         self.select_manifest = select_manifest
+        self.game_language = game_language
+        self._match_asset = match_asset
+        self._crop_asset = crop_asset
         self.attempted_manifest_ids = [manifest.manifest_id]
 
     @staticmethod
@@ -221,9 +248,6 @@ class WorkflowExecutor:
                 output = self._invoke_step(logical_name, component, inputs, None)
             else:
                 output = self._invoke_component(logical_name, component, inputs, parent_call_id=None)
-            if component.role == "task_workflow":
-                self.gate.checkpoint()
-                self._verify_task(logical_name, component, output, inputs)
             return {
                 "status": "success",
                 "logical_name": logical_name,
@@ -231,7 +255,9 @@ class WorkflowExecutor:
                 "role": component.role,
                 "output": _json_copy(output),
             }
-        except RunCancelled:
+        except UserInterruption as error:
+            if error.reason != "cancel":
+                raise
             return self._failure(logical_name, component, "user_cancelled", "Run cancelled by user.")
         except OutputValidationError as error:
             return {**self._failure(logical_name, component, "invalid_output", str(error)), **_exception_fields(error)}
@@ -239,9 +265,6 @@ class WorkflowExecutor:
             return {**self._failure(logical_name, component, error.code, str(error)), **_exception_fields(error)}
         except TraceWriteError:
             raise
-        except ExecutionInterruption as error:
-            self._terminate_anomaly(str(error), logical_name)
-            return {**self._failure(logical_name, component, "execution_anomaly", str(error)), **_exception_fields(error)}
         except Exception as error:
             return {**self._failure(logical_name, component, "execution_failed", str(error)), **_exception_fields(error)}
 
@@ -290,19 +313,23 @@ class WorkflowExecutor:
         try:
             try:
                 return self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
-            except UserTakeover:
+            except UserInterruption:
                 raise
-            except ExecutionInterruption as error:
+            except InputReleaseFailure:
+                raise
+            except ExecutionFailure as error:
                 self.emit("step_interrupted", {"logical_name": logical_name,
                           "component_id": component.component_id, **_exception_fields(error)})
                 return self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
-        except UserTakeover as error:
+        except UserInterruption as error:
+            if error.reason == "cancel":
+                raise
             current = self.manifest.components[logical_name]
             return self._resume_step(logical_name, current, inputs, parent_call_id, error)
 
     def _wait_manual_resume(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
-        parent_call_id: int | None, error: UserTakeover,
+        parent_call_id: int | None, error: UserInterruption,
     ) -> None:
         """保持暂停，直至一次手动恢复完成观察和适用的 Step condition 检查。"""
 
@@ -330,7 +357,7 @@ class WorkflowExecutor:
                         "role": "step", "call_id": self._allocate_call_id(),
                         "parent_call_id": parent_call_id, "inputs": _json_copy(inputs),
                     }, inputs)
-            except (RunCancelled, TraceWriteError, InputReleaseFailure):
+            except (UserInterruption, TraceWriteError, InputReleaseFailure):
                 raise
             except Exception as check_error:
                 reason = str(check_error)
@@ -342,7 +369,7 @@ class WorkflowExecutor:
 
     def _resume_step(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
-        parent_call_id: int | None, error: UserTakeover,
+        parent_call_id: int | None, error: UserInterruption,
     ) -> Any:
         """用户接管只走手动恢复；保留调用者帧，不进入自动恢复阶梯。"""
 
@@ -356,13 +383,17 @@ class WorkflowExecutor:
                 try:
                     result = self._invoke_component(logical_name, component, inputs,
                                                     parent_call_id=parent_call_id, skip_condition=True)
-                except UserTakeover:
+                except UserInterruption:
                     raise
-                except ExecutionInterruption as interrupted:
+                except InputReleaseFailure:
+                    raise
+                except ExecutionFailure as interrupted:
                     self.emit("step_interrupted", {"logical_name": logical_name,
                               "component_id": component.component_id, **_exception_fields(interrupted)})
                     result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
-            except UserTakeover as next_error:
+            except UserInterruption as next_error:
+                if next_error.reason == "cancel":
+                    raise
                 error = next_error
                 continue
             self.emit("step_reinvocation_returned", {"logical_name": logical_name,
@@ -376,15 +407,17 @@ class WorkflowExecutor:
         recovered, outcome = self._recover_step(logical_name, component, inputs, parent_call_id)
         if recovered:
             return outcome
-        recovered, outcome = self._try_manifest_choices(logical_name, component, inputs, parent_call_id, str(outcome))
+        recovered, outcome = self._try_manifest_choices(logical_name, component, inputs, parent_call_id, outcome)
         if recovered:
             return outcome
         self._terminate_anomaly(str(outcome), logical_name)
-        raise ExecutionFailure("execution_anomaly", str(outcome))
+        if isinstance(outcome, ExecutionFailure):
+            raise outcome
+        raise ExecutionFailure(str(outcome))
 
     def _try_manifest_choices(
         self, logical_name: str, original: LoadedComponent, inputs: dict[str, Any],
-        parent_call_id: int | None, reason: str,
+        parent_call_id: int | None, reason: str | ExecutionFailure,
     ) -> tuple[bool, Any]:
         """在原调用链仍暂停时，尝试完整 Manifest 选择或结束本次任务。"""
 
@@ -393,18 +426,23 @@ class WorkflowExecutor:
         while True:
             self.gate.checkpoint()
             try:
-                manifest_id = self.choose_manifest(reason, logical_name, tuple(self.attempted_manifest_ids))
-            except (RunCancelled, TraceWriteError):
+                manifest_id = self.choose_manifest(str(reason), logical_name, tuple(self.attempted_manifest_ids))
+            except (UserInterruption, TraceWriteError, InputReleaseFailure):
                 raise
             except Exception as error:
-                return False, f"Recovery choice failed: {error}"
+                self.emit("recovery_choice_failed", {"logical_name": logical_name, **_exception_fields(error)})
+                return False, ExecutionFailure(str(error), cause=error)
             self.gate.checkpoint()
             if manifest_id is None:
                 return False, reason
             loaded = self.manifest_manager.load(manifest_id)
             if not loaded.ok:
-                reason = "; ".join(error.message for error in loaded.errors)
-                self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": reason})
+                reason = ExecutionFailure(
+                    "execution_failed", "; ".join(error.message for error in loaded.errors),
+                    cause=next((error.cause for error in loaded.errors if error.cause is not None), None),
+                )
+                self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(reason),
+                          "errors": [error.as_dict() for error in loaded.errors]})
                 continue
             candidate = loaded.loaded
             assert candidate is not None
@@ -417,18 +455,23 @@ class WorkflowExecutor:
             condition = getattr(replacement.module, "condition", None)
             if condition is not None:
                 try:
-                    self._run_condition(
-                        replacement, condition,
-                        {"logical_name": logical_name, "component_id": replacement.component_id,
-                         "role": "step", "manifest_id": manifest_id,
-                         "call_id": self._allocate_call_id(), "inputs": _json_copy(inputs)},
-                        inputs,
-                    )
+                    previous = self.manifest
+                    self.manifest = candidate
+                    try:
+                        self._run_condition(
+                            replacement, condition,
+                            {"logical_name": logical_name, "component_id": replacement.component_id,
+                             "role": "step", "manifest_id": manifest_id,
+                             "call_id": self._allocate_call_id(), "inputs": _json_copy(inputs)},
+                            inputs,
+                        )
+                    finally:
+                        self.manifest = previous
                 except Exception as error:
-                    if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
+                    if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
                         raise
-                    reason = f"Replacement Step cannot enter current state: {error}"
-                    self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": reason})
+                    reason = error
+                    self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(reason), **_exception_fields(error)})
                     continue
             self.gate.checkpoint()
             self.select_manifest(candidate)
@@ -444,9 +487,9 @@ class WorkflowExecutor:
                 self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": replacement.component_id})
                 return True, result
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
                     raise
-                reason = f"Selected Step failed: {error}"
+                reason = error
                 self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": replacement.component_id, **_exception_fields(error)})
 
     def _replacement_problem(
@@ -457,7 +500,7 @@ class WorkflowExecutor:
 
         if replacement is None or replacement.role != "step":
             return "Current logical name must still identify a Step."
-        for section in ("trusted_actions", "recovery_rules", "assets"):
+        for section in ("trusted_actions", "recovery_rules"):
             if candidate.manifest[section] != self.manifest.manifest[section]:
                 return f"Runtime replacement cannot modify {section}."
         old = inspect.signature(original.module.execute)
@@ -486,9 +529,9 @@ class WorkflowExecutor:
             try:
                 matched = self._invoke_recovery_rule(name, rule, "detect")
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
                     raise
-                return False, f"Recovery Rule {name} detect failed: {error}"
+                return False, error
             if type(matched) is not bool:
                 return False, f"Recovery Rule {name} detect did not return bool."
             if matched:
@@ -500,9 +543,9 @@ class WorkflowExecutor:
             try:
                 recovered = self._invoke_recovery_rule(name, rule, "recover")
             except Exception as error:
-                if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
                     raise
-                return False, f"Recovery Rule {name} recover failed: {error}"
+                return False, error
             if recovered is not None:
                 return False, f"Recovery Rule {name} recover did not return None."
         current = self.manifest.components[logical_name]
@@ -514,28 +557,20 @@ class WorkflowExecutor:
             self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": current.component_id})
             return True, result
         except Exception as error:
-            if isinstance(error, (RunCancelled, TraceWriteError, UserTakeover, InputReleaseFailure)):
+            if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
                 raise
             self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": current.component_id, **_exception_fields(error)})
-            return False, f"Current Step failed again: {error}"
+            return False, error
 
     def _invoke_recovery_rule(self, name: str, rule: LoadedComponent, phase: str) -> Any:
         self.gate.checkpoint()
         call_id = self._allocate_call_id()
         fields = {"call_id": call_id, "logical_name": name, "component_id": rule.component_id, "manifest_id": self.manifest.manifest_id, "phase": phase}
-        self.emit("recovery_rule_started", fields)
-        self._frames.append(_Frame(name, rule.component_id, "recovery_rule", phase, call_id))
-        try:
-            result = getattr(rule.module, phase)(self.context)
-            self.emit("recovery_rule_returned", {**fields, "return_value": _trace_value(result)})
-            return result
-        except (RunCancelled, TraceWriteError):
-            raise
-        except Exception as error:
-            self.emit("recovery_rule_failed", {**fields, **_exception_fields(error)})
-            raise
-        finally:
-            self._frames.pop()
+        fields.update(role="recovery_rule", parent_call_id=self._frames[-1].call_id if self._frames else None)
+        return self._invoke(
+            lambda: getattr(rule.module, phase)(self.context), fields,
+            phase=phase, event="recovery_rule",
+        )
 
     def _terminate_anomaly(self, reason: str, logical_name: str) -> None:
         self.emit("execution_anomaly", {"logical_name": logical_name, "reason": reason})
@@ -556,14 +591,17 @@ class WorkflowExecutor:
         if action.classification not in allowed:
             raise ExecutionFailure(
                 "execution_failed",
-                f"{caller.role}.{caller.phase} cannot call {action.classification} Trusted Action.",
+                f"{caller.role}.{caller.phase} cannot call {action.classification} Trusted Action "
+                f"{logical_name!r}; caller={caller.logical_name!r}, component_id={caller.component_id}.",
             )
 
         self.gate.checkpoint()
         if self._check_input is not None:
             try:
                 self._check_input()
-            except UserTakeover as error:
+            except UserInterruption as error:
+                if error.reason == "cancel":
+                    raise
                 if caller.role == "recovery_rule" or any(frame.role == "step" for frame in self._frames):
                     raise
                 # 没有活动 Step 时保留当前观察调用，不重启已经返回的 Step。
@@ -581,35 +619,29 @@ class WorkflowExecutor:
             "classification": action.classification,
             "inputs": _json_copy(inputs),
         }
-        self.emit("trusted_action_started", fields)
-        started = time.monotonic()
-        try:
+        def invoke() -> Any:
             self._active_action = action.classification
             try:
                 result = action.module.execute(self.context, **_json_copy(inputs))
+                return _normalize_output(result, get_type_hints(
+                    action.module.execute, globalns=action.module.execute.__globals__
+                )["return"])
             finally:
                 self._active_action = None
-            normalized = _normalize_output(
-                result,
-                get_type_hints(action.module.execute, globalns=action.module.execute.__globals__)["return"],
-            )
-            self.emit(
-                "trusted_action_returned",
-                {
-                    **fields,
-                    "return_value": _trace_value(normalized),
-                    "duration_ms": _duration_ms(started),
-                },
-            )
-            return normalized
-        except (RunCancelled, TraceWriteError):
-            raise
-        except Exception as error:
-            self.emit(
-                "trusted_action_failed",
-                {**fields, **_exception_fields(error), "duration_ms": _duration_ms(started)},
-            )
-            raise
+
+        while True:
+            self.gate.checkpoint()
+            try:
+                return self._invoke(invoke, fields, phase="execute", event="trusted_action")
+            except UserInterruption as error:
+                if (error.reason == "cancel" or caller.role == "recovery_rule"
+                        or any(frame.role == "step" for frame in self._frames)):
+                    raise
+                # 只重做无副作用的观察；在这里等待可保留 Workflow 调用栈。
+                component = self.manifest.components[caller.logical_name]
+                self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
+                fields = {**fields, "call_id": self._allocate_call_id()}
+
 
     def capture_screen(self, save: bool) -> dict[str, Any]:
         """将原始像素留在会话中，仅返回可写入 Trace 的信息。"""
@@ -617,6 +649,16 @@ class WorkflowExecutor:
         if self._active_action != "observe" or self._capture_screen is None:
             raise ExecutionFailure("execution_failed", "Screenshot capture requires an observe Trusted Action.")
         return self._capture_screen(save)
+
+    def match_asset(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
+        if self._active_action != "observe" or self._match_asset is None:
+            raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
+        return self._match_asset(self.manifest.manifest["assets"], logical_name, **options)
+
+    def crop_asset(self, logical_name: str, region: dict[str, int]) -> dict[str, Any]:
+        if self._active_action != "observe" or self._crop_asset is None:
+            raise ExecutionFailure("execution_failed", "Asset cropping requires an observe Trusted Action.")
+        return self._crop_asset(logical_name, region)
 
     def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
         """运行角色校验之外，再约束原生输入只能由 control Trusted Action 发起。"""
@@ -648,120 +690,67 @@ class WorkflowExecutor:
             "role": component.role,
             "inputs": _json_copy(inputs),
         }
-        condition = getattr(component.module, "condition", None)
+        condition = getattr(component.module, "condition", None) if component.role == "step" else None
         if condition is not None and not skip_condition:
             self._run_condition(component, condition, identity, inputs)
 
-        self.emit("component_started", identity)
-        started = time.monotonic()
-        self._frames.append(_Frame(logical_name, component.component_id, component.role, "execute", call_id))
-        try:
+        def invoke() -> Any:
             result = component.module.execute(self.context, **_json_copy(inputs))
             if component.role == "step" and self._check_input is not None:
                 self._check_input()
-            annotation = get_type_hints(
+            return _normalize_output(result, get_type_hints(
                 component.module.execute, globalns=component.module.execute.__globals__
-            )["return"]
-            normalized = _normalize_output(result, annotation)
-            self.emit(
-                "component_returned",
-                {
-                    **identity,
-                    "return_value": _trace_value(normalized),
-                    "duration_ms": _duration_ms(started),
-                },
-            )
-            return normalized
-        except (RunCancelled, TraceWriteError):
-            raise
-        except Exception as error:
-            self.emit(
-                "component_failed",
-                {**identity, **_exception_fields(error), "duration_ms": _duration_ms(started)},
-            )
-            raise
-        finally:
-            self._frames.pop()
+            )["return"])
+
+        return self._invoke(invoke, identity, phase="execute", event="component")
 
     def _run_condition(
-        self,
-        component: LoadedComponent,
-        condition: Callable[..., Any],
-        identity: dict[str, Any],
-        inputs: dict[str, Any],
+        self, component: LoadedComponent, condition: Callable[..., Any],
+        identity: dict[str, Any], inputs: dict[str, Any],
     ) -> None:
-        started = time.monotonic()
-        self._frames.append(
-            _Frame(
-                identity["logical_name"],
-                component.component_id,
-                component.role,
-                "condition",
-                identity["call_id"],
-            )
-        )
-        try:
-            value = condition(self.context, **_json_copy(inputs))
-            self.emit(
-                "condition_evaluated",
-                {**identity, "return_value": _trace_value(value), "duration_ms": _duration_ms(started)},
-            )
-            if value is not True:
-                if component.role == "step":
-                    raise ExecutionInterruption(f"Condition not satisfied: {identity['logical_name']}")
-                code = "task_condition_not_satisfied" if component.role == "task_workflow" else "execution_failed"
-                raise ExecutionFailure(code, f"Condition not satisfied: {identity['logical_name']}")
-        except (ExecutionFailure, ExecutionInterruption, RunCancelled, TraceWriteError):
-            raise
-        except Exception as error:
-            self.emit(
-                "condition_failed",
-                {**identity, **_exception_fields(error), "duration_ms": _duration_ms(started)},
-            )
-            code = "task_condition_check_failed" if component.role == "task_workflow" else "execution_failed"
-            if component.role == "step":
-                raise ExecutionInterruption(str(error)) from error
-            raise ExecutionFailure(code, str(error)) from error
-        finally:
-            self._frames.pop()
+        """Step 前置检查使用同一调用入口；失败由整个 Step 的恢复边界接住。"""
 
-    def _verify_task(
-        self,
-        logical_name: str,
-        component: LoadedComponent,
-        result: Any,
-        inputs: dict[str, Any],
-    ) -> None:
-        verify = component.module.verify
-        call_id = self._allocate_call_id()
-        fields = {
-            "call_id": call_id,
-            "parent_call_id": self._root_call_id,
-            "logical_name": logical_name,
-            "component_id": component.component_id,
-            "role": component.role,
-            "inputs": _json_copy(inputs),
-            "root_result": _trace_value(result),
-        }
-        self.emit("verification_started", fields)
+        value = self._invoke(
+            lambda: condition(self.context, **_json_copy(inputs)),
+            identity, phase="condition", event="condition", returned="condition_evaluated",
+        )
+        if value is not True:
+            raise ExecutionFailure(f"Condition not satisfied: {identity['logical_name']}")
+
+    def _invoke(
+        self, invoke: Callable[[], Any], fields: dict[str, Any], *,
+        phase: str, event: str, returned: str | None = None,
+    ) -> Any:
+        """统一记录调用、耗时和完整异常；保留已归一错误，只有原始错误需包装。"""
+
+        fields = {"manifest_id": self.manifest.manifest_id, "inputs": {}, **fields, "phase": phase}
+        self.emit(f"{event}_started", fields)
         started = time.monotonic()
-        self._frames.append(_Frame(logical_name, component.component_id, component.role, "verify", call_id))
+        self._frames.append(_Frame(
+            fields["logical_name"], fields["component_id"], fields["role"], phase, fields["call_id"],
+        ))
         try:
-            verified = verify(self.context, _json_copy(result), **_json_copy(inputs))
-            self.emit(
-                "verification_returned",
-                {**fields, "return_value": _trace_value(verified), "duration_ms": _duration_ms(started)},
-            )
-            if verified is not True:
-                raise ExecutionFailure("verification_rejected", "Task verifier did not return true.")
-        except (ExecutionFailure, RunCancelled, TraceWriteError):
+            result = invoke()
+            self.emit(returned or f"{event}_returned", {
+                **fields, "return_value": _trace_value(result), "duration_ms": _duration_ms(started),
+            })
+            return result
+        except UserInterruption as error:
+            self.emit(f"{event}_interrupted", {
+                **fields, "reason": error.reason, "message": str(error),
+                "duration_ms": _duration_ms(started),
+            })
+            raise
+        except TraceWriteError:
             raise
         except Exception as error:
-            self.emit(
-                "verification_failed",
-                {**fields, **_exception_fields(error), "duration_ms": _duration_ms(started)},
-            )
-            raise ExecutionFailure("verification_failed", str(error)) from error
+            self.emit(f"{event}_failed", {
+                **fields, **_exception_fields(error), "duration_ms": _duration_ms(started),
+            })
+            if isinstance(error, ExecutionFailure):
+                raise
+            code = "invalid_output" if isinstance(error, OutputValidationError) else "execution_failed"
+            raise ExecutionFailure(code, str(error), cause=error) from error
         finally:
             self._frames.pop()
 
@@ -846,10 +835,9 @@ def _duration_ms(started: float) -> float:
     return round((time.monotonic() - started) * 1000, 3)
 
 
-def _exception_fields(error: Exception) -> dict[str, Any]:
+def _exception_fields(error: BaseException) -> dict[str, Any]:
     return {
-        "exception_type": type(error).__name__,
-        "exception_message": str(error),
+        "failure_message": str(error),
         "traceback": "".join(traceback.TracebackException.from_exception(error).format(chain=True)),
     }
 

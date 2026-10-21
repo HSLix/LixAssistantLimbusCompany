@@ -27,13 +27,16 @@ Start with:
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
+Semantic Asset template matching, explicit local detection, and fresh-screenshot
+template cropping are available through observe Trusted Actions; see
+[the Asset example](examples/asset-recognition/README.md).
 Input takeover has automated regression coverage and still requires supervised
 Windows game acceptance. OCR and model calls are not implemented yet.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run lalc
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run pytest
+UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run --all-extras pytest
 ```
 
 Running `lalc` without arguments opens the GUI. The developer workflow uses a
@@ -63,9 +66,9 @@ Manifest with a direct Step and an `observe` Trusted Action for checking a real
 Run's screenshot and Trace. Copy that example into an empty `candidate/`, then
 use `validate`, `publish`, and `run steps.capture_screen --manifest <id>`.
 Pass `--inputs '{"save":true}'` to save that Run's screenshot as PNG evidence.
-Foreground activation is requested once and confirmed for up to one second.
-If it fails, the CLI reports the native return value and the window that still
-owns foreground focus; wrapped errors also include their original exception.
+Foreground activation is requested once and awaited without an automatic cutoff.
+Run Stop or terminal Ctrl-C can interrupt cooperative waiting; actual errors retain
+their original exception chain.
 
 `examples/focused-control/` provides the corresponding input Manifest and
 Windows acceptance instructions. Physical input interrupts the current Step,

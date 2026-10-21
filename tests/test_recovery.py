@@ -26,8 +26,6 @@ def execute(ctx, *, value: int) -> list[str]:
     second = ctx.call("flows.next", value=value)
     return ["task-old", first, second]
 
-def verify(ctx, result: list[str], *, value: int) -> bool:
-    return len(result) == 3
 '''
 SUB = '''"""Recovery subworkflow."""
 from lalc import sub_workflow
@@ -37,7 +35,7 @@ def execute(ctx, *, value: int) -> str:
     return "sub-old"
 '''
 STEP = '''"""Interrupting Step {nonce}."""
-from lalc import ExecutionInterruption, step
+from lalc import ExecutionFailure, step
 calls = 0
 
 @step
@@ -45,7 +43,7 @@ def execute(ctx, *, value: int) -> str:
     global calls
     calls += 1
     if calls == 1:
-        raise ExecutionInterruption("state unknown")
+        raise ExecutionFailure("state unknown")
     return f"step-old:{value}"
 '''
 NEW_STEP = '''"""Replacement Step."""
@@ -56,14 +54,14 @@ def execute(ctx, *, value: int) -> str:
     return f"step-new:{value}"
 '''
 FAIL_STEP = '''"""Still interrupting Step."""
-from lalc import ExecutionInterruption, step
+from lalc import ExecutionFailure, step
 
 @step
 def execute(ctx, *, value: int) -> str:
-    raise ExecutionInterruption("still broken")
+    raise ExecutionFailure("still broken")
 '''
 LATER_FAIL_STEP = '''"""Step that fails at its next new call."""
-from lalc import ExecutionInterruption, step
+from lalc import ExecutionFailure, step
 calls = 0
 
 @step
@@ -71,7 +69,7 @@ def execute(ctx, *, value: int) -> str:
     global calls
     calls += 1
     if calls == 2:
-        raise ExecutionInterruption("later failure")
+        raise ExecutionFailure("later failure")
     return f"step-new:{value}"
 '''
 
@@ -117,8 +115,70 @@ def recover(ctx) -> None:
 '''
 
 
+@pytest.mark.parametrize("phase", ["detect", "recover", "reinvoke", "choice", "trial", "condition"])
+def test_recovery_failures_propagate_original_traceback(tmp_path: Path, phase: str) -> None:
+    """恢复各分支的原始错误链须进入公开结果、持久 Trace 与 Plan 条目。"""
+
+    manager = ManifestManager(tmp_path)
+    native = 'raise OSError("native failure") from ValueError("root cause")'
+    rules = {}
+    source = FAIL_STEP.replace('"still broken"', f'"still broken {phase}"')
+    if phase == "detect":
+        rules = {"blocking": _rule(native)}
+    elif phase == "recover":
+        rules = {"blocking": _rule("return True", native)}
+    elif phase == "reinvoke":
+        source = STEP.replace("{nonce}", phase).replace('return f"step-old:{value}"', native)
+    base = _publish(tmp_path, manager, step_source=source, rules=rules)
+    choice = None
+    if phase == "choice":
+        def choose(*_):
+            raise OSError("native failure") from ValueError("root cause")
+        choice = choose
+    elif phase in {"trial", "condition"}:
+        replacement_source = NEW_STEP.replace('return f"step-new:{value}"', native) if phase == "trial" else (
+            NEW_STEP + '\ndef condition(ctx, *, value: int) -> bool:\n    ' + native + '\n'
+        )
+        replacement = _publish(tmp_path, manager, step_source=replacement_source, rules=rules)
+        choices = iter([replacement, None])
+        choice = lambda *_: next(choices)
+    service = ApplicationService(tmp_path, manifest_manager=manager, recovery_choice=choice)
+    plan = tmp_path / "plan.json"
+    plan.write_text(json.dumps({"items": [{"task": "tasks.run", "inputs": {"value": 1}}]}), encoding="utf-8")
+    state = _finish(service, service.start_plan(plan, manifest_id=base))
+    item = state["result"]["items"][0]
+    assert item["failure_code"] == "execution_failed"
+    diagnostic = item["traceback"]
+    assert "ValueError: root cause" in diagnostic
+    assert "OSError: native failure" in diagnostic
+    assert "direct cause" in diagnostic
+    assert 'raise OSError("native failure")' in diagnostic
+    persisted = [json.loads(line) for line in (tmp_path / "traces" / "1.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert persisted[-1]["result"]["items"][0]["traceback"] == diagnostic
+
+
 def _finish(service: ApplicationService, run_id: int) -> dict[str, Any]:
     return service.wait_for(lambda state: state["run_id"] == run_id and state["phase"] == "finished")
+
+
+@pytest.mark.parametrize("exception_name", ["ExecutionFailure", "ValueError", "OSError"])
+def test_step_failure_enters_recovery_without_unwinding_callers(tmp_path: Path, exception_name: str) -> None:
+    """显式失败与原生异常都在 Step 边界恢复，原 Task 调用只进入一次。"""
+
+    manager = ManifestManager(tmp_path)
+    source = STEP.replace("{nonce}", exception_name).replace(
+        'raise ExecutionFailure("state unknown")', f'raise {exception_name}("state unknown")',
+    )
+    manifest_id = _publish(tmp_path, manager, step_source=source)
+    service = ApplicationService(tmp_path, manifest_manager=manager)
+    state = _finish(service, service.start("tasks.run", {"value": 3}, manifest_id=manifest_id))
+    assert state["result"]["output"] == ["task-old", "step-old:3", "sub-old"]
+    started = [event for event in state["trace"] if event["event"] == "component_started"]
+    assert sum(event["role"] == "task_workflow" for event in started) == 1
+    assert sum(event["logical_name"] == "steps.break" for event in started) == 2
+    interrupted = next(event for event in state["trace"] if event["event"] == "step_interrupted")
+    assert f"{exception_name}: state unknown" in interrupted["traceback"]
+    assert "ExecutionFailure:" in interrupted["traceback"]
 
 
 @pytest.mark.parametrize(
@@ -132,6 +192,8 @@ def _finish(service: ApplicationService, run_id: int) -> dict[str, Any]:
         ({"one": _rule("return True", 'raise RuntimeError("recover boom")')}, False, "recovery_rule_failed"),
     ],
 )
+
+
 def test_rule_paths_keep_workflow_frame_and_stop_safely(
     tmp_path: Path, rules: dict[str, str], success: bool, expected: str,
 ) -> None:
@@ -155,7 +217,7 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
         assert state["result"]["output"] == ["task-old", "step-old:7", "sub-old"]
         assert "safe_task_termination" not in events
     else:
-        assert state["result"]["failure_code"] == "execution_anomaly"
+        assert state["result"]["failure_code"] == "execution_failed"
         assert events.count("safe_task_termination") == 1
         assert "component_started" not in events[events.index("execution_anomaly"):]
     assert json.loads((tmp_path / "runs" / "1.json").read_text())["working_manifest_id"] == manifest_id
@@ -217,7 +279,7 @@ def test_later_step_failure_keeps_selected_manifest(tmp_path: Path) -> None:
 
     state = _finish(service, service.start("tasks.run", {"value": 3}))
 
-    assert state["result"]["failure_code"] == "execution_anomaly"
+    assert state["result"]["failure_code"] == "execution_failed"
     assert state["working_manifest_id"] == selected
     assert [event["manifest_id"] for event in state["trace"] if event["event"] == "working_manifest_selected"] == [selected]
     assert [event["event"] for event in state["trace"]].count("step_interrupted") == 2
@@ -244,7 +306,7 @@ def test_incompatible_replacement_is_rejected_before_selection(
 
     state = _finish(service, service.start("tasks.run", {"value": 6}))
 
-    assert state["result"]["failure_code"] == "execution_anomaly"
+    assert state["result"]["failure_code"] == "execution_failed"
     assert state["working_manifest_id"] == base
     assert state["attempted_manifest_ids"] == [base]
     assert any(event["event"] == "manifest_selection_rejected" and event["manifest_id"] == incompatible for event in state["trace"])
@@ -257,21 +319,21 @@ def test_repeated_interruption_and_step_external_interruption_terminate(tmp_path
     service = ApplicationService(tmp_path, manifest_manager=manager)
 
     repeated_state = _finish(service, service.start("tasks.run", {"value": 2}))
-    assert repeated_state["result"]["failure_code"] == "execution_anomaly"
+    assert repeated_state["result"]["failure_code"] == "execution_failed"
     repeated_events = [event["event"] for event in repeated_state["trace"]]
     assert sum(event["event"] == "component_failed" and event["logical_name"] == "steps.break" for event in repeated_state["trace"]) == 2
     assert repeated_events.count("step_reinvocation_failed") == 1
 
     external_task = TASK.replace(
         '    first = ctx.call("steps.break", value=value)',
-        '    raise ExecutionInterruption("outside Step")',
-    ).replace("from lalc import task_workflow", "from lalc import ExecutionInterruption, task_workflow")
+        '    raise ExecutionFailure("outside Step")',
+    ).replace("from lalc import task_workflow", "from lalc import ExecutionFailure, task_workflow")
     external = _publish(tmp_path, manager, step_source=NEW_STEP, task_source=external_task)
     external_state = _finish(service, service.start("tasks.run", {"value": 2}, manifest_id=external))
-    assert external_state["result"]["failure_code"] == "execution_anomaly"
+    assert external_state["result"]["failure_code"] == "execution_failed"
     external_events = [event["event"] for event in external_state["trace"]]
     assert "step_reinvocation_started" not in external_events
-    assert external_events.count("safe_task_termination") == 1
+    assert "safe_task_termination" not in external_events
 
 
 def test_unsatisfied_step_condition_never_enters_step_body(tmp_path: Path) -> None:
@@ -292,7 +354,7 @@ def condition(ctx, *, value: int) -> bool:
 
     state = _finish(service, service.start("tasks.run", {"value": 1}))
 
-    assert state["result"]["failure_code"] == "execution_anomaly"
+    assert state["result"]["failure_code"] == "execution_failed"
     assert not any(event["event"] == "component_started" and event["logical_name"] == "steps.break" for event in state["trace"])
     assert [event["return_value"] for event in state["trace"] if event["event"] == "condition_evaluated"] == [False, False]
 
@@ -312,7 +374,7 @@ def test_invalid_complete_manifest_cannot_replace_working_manifest(tmp_path: Pat
 
     state = _finish(service, service.start("tasks.run", {"value": 9}))
 
-    assert state["result"]["failure_code"] == "execution_anomaly"
+    assert state["result"]["failure_code"] == "execution_failed"
     assert state["working_manifest_id"] == base
     assert state["attempted_manifest_ids"] == [base]
     assert any(event["event"] == "manifest_selection_rejected" and event["manifest_id"] == invalid for event in state["trace"])

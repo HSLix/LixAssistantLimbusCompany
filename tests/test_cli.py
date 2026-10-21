@@ -11,9 +11,32 @@ import shutil
 from pathlib import Path
 
 import lalc.__main__ as cli
+from lalc.manifest import ManifestManager, ManifestResult, ValidationError
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "virtual-workflow"
+
+
+def test_start_rejection_prints_every_import_traceback(tmp_path: Path, monkeypatch, capsys) -> None:
+    """多个模块导入失败时，命令行不能只保留第一个异常链。"""
+
+    errors = []
+    for name in ("first", "second"):
+        try:
+            raise OSError(f"{name} import") from ValueError(f"{name} root")
+        except OSError as error:
+            errors.append(ValidationError("component_import_failed", str(error), name, cause=error))
+    manager = ManifestManager(tmp_path)
+    monkeypatch.setattr(manager, "load", lambda _: ManifestResult(errors=tuple(errors)))
+    monkeypatch.setattr(cli, "ManifestManager", lambda _: manager)
+    monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
+    assert cli.main(["run", "tasks.example", "--manifest", "unavailable"]) == 1
+    diagnostic = capsys.readouterr().err
+    for name in ("first", "second"):
+        assert f"ValueError: {name} root" in diagnostic
+        assert f"OSError: {name} import" in diagnostic
+    assert "in test_start_rejection_prints_every_import_traceback" in diagnostic
+    assert not (tmp_path / "run-sequence.json").exists()
 
 
 def test_data_dir_prints_default_without_creating_it(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -67,13 +90,14 @@ def test_complete_developer_cli_lifecycle(
     assert components[1]["parent_call_id"] == components[0]["call_id"]
     assert components[2]["parent_call_id"] == components[1]["call_id"]
     actions = [item for item in trace if item["event"] == "trusted_action_started"]
-    assert [item["classification"] for item in actions] == ["observe", "observe", "control"]
-    assert any(item["event"] == "verification_returned" and item["return_value"] is True for item in trace)
+    assert [item["classification"] for item in actions] == ["observe", "control"]
+    assert any(item["event"] == "component_returned" and item["logical_name"] == "steps.say_hello"
+               and item["return_value"] == "Hello, Lix！" for item in trace)
 
     assert cli.main(
         ["run", "tasks.greet", "--manifest", manifest_id, "--inputs", '{"name":"   "}']
     ) == 1
-    assert json.loads(capsys.readouterr().out)["failure_code"] == "task_condition_not_satisfied"
+    assert json.loads(capsys.readouterr().out)["failure_code"] == "execution_failed"
 
     assert cli.main(["set-default", manifest_id]) == 0
     capsys.readouterr()
@@ -83,7 +107,7 @@ def test_complete_developer_cli_lifecycle(
     assert json.loads(capsys.readouterr().out)["output"] == "Hello, 文件！"
 
     assert cli.main(["run", "steps.say_hello", "--inputs", '{"name":" "}']) == 1
-    assert json.loads(capsys.readouterr().out)["failure_code"] == "execution_anomaly"
+    assert json.loads(capsys.readouterr().out)["failure_code"] == "execution_failed"
 
     assert cli.main(["list-manifests", "-n", "1"]) == 0
     listing = capsys.readouterr().out.splitlines()

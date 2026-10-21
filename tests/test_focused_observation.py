@@ -20,6 +20,7 @@ import lalc.focused as focused
 from lalc.application import ApplicationService
 from lalc.focused import FocusedAutomationSession, WindowError, WindowsWindowPlatform
 from lalc.manifest import ManifestManager
+from lalc.runtime import UserInterruption
 
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "focused-observation"
@@ -43,7 +44,7 @@ def png_image(path: Path) -> tuple[tuple[int, int], bytes]:
 class FakeWindowPlatform:
     """用可控前台状态代替 Windows API，不模拟游戏输入。"""
 
-    def __init__(self, windows: list[int] | None = None) -> None:
+    def __init__(self, windows: list[int] | None = None, *, checkpoint=None) -> None:
         self.windows = [42] if windows is None else windows
         self.foreground = False
         self.minimized = True
@@ -110,8 +111,10 @@ def test_focus_waits_for_async_activation_on_repeated_connections(monkeypatch) -
     foreground = [10]
     requests: list[int] = []
     platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
     platform.user32 = SimpleNamespace(
         GetForegroundWindow=lambda: foreground[0],
+        IsWindow=lambda hwnd: True,
         IsIconic=lambda hwnd: False,
         SetForegroundWindow=lambda hwnd: requests.append(hwnd) or 1,
     )
@@ -131,25 +134,28 @@ def test_focus_waits_for_async_activation_on_repeated_connections(monkeypatch) -
 
 
 @pytest.mark.parametrize("returned", [0, 1])
-def test_focus_timeout_preserves_api_result_and_foreground_identity(monkeypatch, returned: int) -> None:
+def test_focus_wait_has_no_deadline_and_can_be_cancelled(monkeypatch, returned: int) -> None:
     now = [0.0]
-    requests: list[int] = []
+    requests = []
     platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
     platform.user32 = SimpleNamespace(
         GetForegroundWindow=lambda: 10,
+        IsWindow=lambda hwnd: True,
         IsIconic=lambda hwnd: False,
         SetForegroundWindow=lambda hwnd: requests.append(hwnd) or returned,
     )
-    platform._identity = lambda hwnd: ("PowerShell", "ConsoleWindowClass", 7, "powershell.exe")
-    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+
+    def checkpoint():
+        if now[0] >= 4:
+            raise UserInterruption()
+
+    platform.checkpoint = checkpoint
     monkeypatch.setattr(focused.time, "sleep", lambda duration: now.__setitem__(0, now[0] + duration))
-    with pytest.raises(WindowError) as captured:
+    with pytest.raises(UserInterruption) as captured:
         platform.focus(42)
-    assert f"SetForegroundWindow returned {returned}" in str(captured.value)
-    assert "foreground_hwnd=10" in str(captured.value)
-    assert "PowerShell" in str(captured.value)
+    assert captured.value.reason == "cancel"
     assert requests == [42]
-    assert now[0] == pytest.approx(1.0)
+    assert now[0] >= 4
 
 
 def test_connect_cli_shows_original_exception(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -163,7 +169,7 @@ def test_connect_cli_shows_original_exception(tmp_path: Path, monkeypatch, capsy
 
     platform.focus = focus
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
-    monkeypatch.setattr(application, "WindowsWindowPlatform", lambda: platform)
+    monkeypatch.setattr(application, "WindowsWindowPlatform", lambda **_: platform)
     assert cli.main(["connect"]) == 1
     output = capsys.readouterr().err
     assert "WindowError: Cannot focus the game window" in output

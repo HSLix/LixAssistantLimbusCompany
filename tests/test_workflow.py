@@ -1,4 +1,4 @@
-"""覆盖正式异步入口、Task/Subworkflow/Step、fake Trusted Action、Trace 与失败闭环。
+"""覆盖正式异步入口、Task/Subworkflow/Step、Trace、失败闭环与启动错误详情。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_workflow.py
@@ -25,8 +25,6 @@ def execute(ctx, *, teams: list[str], runs: int = 2) -> list[str]:
         used.append(ctx.call("flows.run_once", teams=teams, index=len(used)))
     return used
 
-def verify(ctx, result: list[str], *, teams: list[str], runs: int = 2) -> bool:
-    return result == [teams[index % len(teams)] for index in range(runs)]
 '''
 
 SUB_SOURCE = '''"""Deterministic test Subworkflow."""
@@ -64,6 +62,7 @@ def _publish(
     task_source: str = TASK_SOURCE,
     sub_source: str = SUB_SOURCE,
     step_source: str = STEP_SOURCE,
+    control_source: str = CONTROL_SOURCE,
 ) -> ManifestManager:
     candidate = root / f"candidate-{len(list(root.glob('candidate-*')))}"
     candidate.mkdir(parents=True)
@@ -72,7 +71,7 @@ def _publish(
         "sub.py": sub_source,
         "step.py": step_source,
         "observe.py": OBSERVE_SOURCE,
-        "control.py": CONTROL_SOURCE,
+        "control.py": control_source,
     }
     for name, source in sources.items():
         (candidate / name).write_text(source, encoding="utf-8")
@@ -141,8 +140,7 @@ def test_complete_task_uses_real_manifest_executor_and_persists_trace(tmp_path: 
     action = next(event for event in state["trace"] if event["event"] == "trusted_action_started")
     assert action["classification"] in {"observe", "control"}
     assert action["component_id"].startswith("sha256:")
-    verification = next(event for event in state["trace"] if event["event"] == "verification_started")
-    assert verification["inputs"] == {"teams": ["one", "two"], "runs": 3}
+    assert not any(event["event"].startswith("verification_") for event in state["trace"])
     persisted = [
         json.loads(line)
         for line in (tmp_path / "traces" / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()
@@ -188,34 +186,18 @@ def test_start_rejection_has_no_run_or_state_change(tmp_path: Path) -> None:
     assert not (tmp_path / "formal" / "run-sequence.json").exists()
 
 
-@pytest.mark.parametrize(
-    ("replacement", "failure_code", "terminal_event"),
-    [
-        ("    return [1]\n", "invalid_output", "component_failed"),
-        ("    return False\n", "verification_rejected", "verification_returned"),
-        ("    raise RuntimeError(\"verify boom\")\n", "verification_failed", "verification_failed"),
-    ],
-)
-def test_invalid_root_or_verifier_failure_is_terminal_without_agent(
-    tmp_path: Path,
-    replacement: str,
-    failure_code: str,
-    terminal_event: str,
-) -> None:
-    if failure_code == "invalid_output":
-        source = TASK_SOURCE.replace("    return used\n\n", replacement + "\n")
-    else:
-        source = TASK_SOURCE.rsplit("    return result ==", 1)[0] + replacement
+def test_invalid_root_is_terminal_without_replaying_workflow(tmp_path: Path) -> None:
+    """根结果格式错误只报错；业务正确性应由显式 Step 检查。"""
+
+    source = TASK_SOURCE.replace("    return used", "    return [1]")
     manager = _publish(tmp_path, task_source=source)
     service = ApplicationService(tmp_path, manifest_manager=manager)
-
     state = _finished(service, service.start("tasks.rotate_teams", {"teams": ["one"], "runs": 1}))
-
-    assert state["result"]["status"] == "failure"
-    assert state["result"]["failure_code"] == failure_code
+    assert state["result"]["failure_code"] == "invalid_output"
     events = [event["event"] for event in state["trace"]]
-    assert terminal_event in events
-    assert not any("agent" in event for event in events)
+    assert not any("agent" in event or "verification" in event for event in events)
+    assert sum(event["event"] == "component_started" and event["role"] == "task_workflow"
+               for event in state["trace"]) == 1
 
 
 def test_manifest_snapshot_pause_resume_and_stop(
@@ -296,4 +278,76 @@ def execute(ctx, *, value: float) -> float:
         service.start("steps.run_team", {"value": True})
     with pytest.raises(StartError):
         service.start("steps.run_team", {"value": float("nan")})
+
+
+def test_gui_start_error_exposes_original_traceback(tmp_path: Path, monkeypatch) -> None:
+    """启动被拒绝时，界面的错误详情保留底层异常与源码调用位置。"""
+
+    from PySide6.QtWidgets import QApplication
+    from lalc.gui import MainWindow, ErrorDialog
+
+    app = QApplication.instance() or QApplication([])
+    service = ApplicationService(tmp_path)
+
+    def reject(*args, **kwargs):
+        raise StartError("manifest_unavailable", "cannot start") from OSError("native startup failure")
+
+    notices = []
+    monkeypatch.setattr(service, "start", reject)
+    monkeypatch.setattr(ErrorDialog, "open", lambda notice: notices.append(notice.details.toPlainText()))
+    window = MainWindow(service)
+    window._start()
+    assert "OSError: native startup failure" in notices[0]
+    assert "in reject" in notices[0]
+    assert "StartError: cannot start" in notices[0]
+    window.close()
+    app.processEvents()
+
+
+@pytest.mark.parametrize("outcome", ["success", "failure", "cancel", "takeover"])
+def test_every_executed_trusted_action_records_inputs_result_and_elapsed(tmp_path: Path, outcome: str) -> None:
+    """统一分派器为成功、失败和用户中断记录参数、真实结果及单次耗时。"""
+
+    body = {
+        "success": 'return {"team": team}',
+        "failure": 'raise OSError("action failed") from ValueError("root cause")',
+        "cancel": 'raise UserInterruption()',
+        "takeover": 'raise UserInterruption("physical input", reason="takeover")',
+    }[outcome]
+    source = f'''"""测试统一动作日志。"""
+from lalc import UserInterruption
+def execute(ctx, *, team: str) -> dict[str, str]:
+    {body}
+'''
+    manager = _publish(tmp_path, control_source=source)
+    service = ApplicationService(tmp_path, manifest_manager=manager)
+    run_id = service.start("steps.run_team", {"team": "alpha"})
+    if outcome == "takeover":
+        service.wait_for(lambda s: s["pause_info"] is not None)
+        service.stop()
+    state = _finished(service, run_id)
+    events = [json.loads(line) for line in (tmp_path / "traces" / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]
+    closing_name = "trusted_action_returned" if outcome == "success" else (
+        "trusted_action_failed" if outcome == "failure" else "trusted_action_interrupted"
+    )
+    started = [event for event in events if event["event"] == "trusted_action_started"]
+    closed = {event["call_id"]: event for event in events if event["event"] == closing_name}
+    assert started
+    assert len(started) == len(closed)
+    for event in started:
+        result = closed[event["call_id"]]
+        assert result["inputs"] == event["inputs"] == {"team": "alpha"}
+        assert result["parent_call_id"] == event["parent_call_id"]
+        assert result["duration_ms"] >= 0
+        if outcome == "success":
+            assert result["return_value"] == {"team": "alpha"}
+        elif outcome == "failure":
+            assert "ValueError: root cause" in result["traceback"]
+            assert "OSError: action failed" in result["traceback"]
+        else:
+            assert result["reason"] == outcome
+            assert "return_value" not in result
+    if outcome in {"cancel", "takeover"}:
+        assert state["result"]["failure_code"] == "user_cancelled"
+        assert not any(event["event"] == "step_reinvocation_started" for event in events)
 

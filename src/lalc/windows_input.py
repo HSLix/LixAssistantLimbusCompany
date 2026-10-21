@@ -158,9 +158,13 @@ class WindowsInputBackend:
         self._configure()
         self._thread = threading.Thread(target=self._listen, name="lalc-input-monitor", daemon=True)
         self._thread.start()
-        if not self._ready.wait(2):
+        try:
+            while not self._ready.wait(0.02):
+                if self.platform.checkpoint is not None:
+                    self.platform.checkpoint()
+        except BaseException:
             self.close()
-            raise RuntimeError("Input monitor startup timed out.")
+            raise
         self.monitor.snapshot()
 
     def _configure(self) -> None:
@@ -278,4 +282,4 @@ class WindowsInputBackend:
         self._closing = True
         if self._thread_id:
             self.user32.PostThreadMessageW(self._thread_id, 0x12, 0, 0)
-        self._thread.join(timeout=2)
+        self._thread.join()
