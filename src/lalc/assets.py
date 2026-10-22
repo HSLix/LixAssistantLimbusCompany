@@ -1,4 +1,4 @@
-"""语义 Asset 的校验、仅新增保存、模板匹配与独立使用索引。"""
+"""语义 Asset 的校验、完整哈希保存、模板匹配与独立使用索引。"""
 
 from __future__ import annotations
 
@@ -61,6 +61,8 @@ class AssetLibrary:
 
         from .recognition import decode_image
 
+        if type(mapping) is not dict:
+            raise ValueError("Asset Library must be an object.")
         result = {}
         for name, languages in mapping.items():
             asset_name(name)
@@ -73,33 +75,38 @@ class AssetLibrary:
                 result[name][language] = dict(entry)
         return result
 
-    def save_crop(
-        self, name: str, language: str, pixels: bytes, size: tuple[int, int],
-        region: dict[str, int], *, run_id: int, observation: int,
-    ) -> dict[str, Any]:
-        """保存现场截图的裁剪和来源；相同内容可复用，失败不删除已经保存的文件。"""
+    @staticmethod
+    def crop_content(pixels: bytes, size: tuple[int, int], region: dict[str, int]) -> tuple[bytes, dict[str, int]]:
+        """在内存编码现场裁剪，确认前不创建文件或来源记录。"""
 
         import cv2
         from .recognition import checked_region, client_image
 
-        asset_name(name)
-        game_language(language)
         area = checked_region(region, *size)
         image = client_image(pixels, size)
         x, y, w, h = (area[key] for key in ("x", "y", "width", "height"))
         ok, encoded = cv2.imencode(".png", image[y:y + h, x:x + w])
         if not ok:
             raise ValueError("PNG encoding failed.")
-        content = encoded.tobytes()
+        return encoded.tobytes(), area
+
+    def save_crop(
+        self, name: str, language: str, pixels: bytes, size: tuple[int, int],
+        region: dict[str, int], *, run_id: int | None, observation: int,
+    ) -> dict[str, Any]:
+        """保存现场截图的裁剪和来源；相同内容可复用，失败不删除已经保存的文件。"""
+
+        asset_name(name)
+        game_language(language)
+        content, area = self.crop_content(pixels, size, region)
         digest = sha256_bytes(content)
-        for length in range(12, 65):
-            relative = f"{name}-{language}-{digest[:length]}.png"
-            path = self.path(relative)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            if path.exists():
-                if path.read_bytes() == content:
-                    break
-                continue
+        relative = f"{name}-{language}-{digest}.png"
+        path = self.path(relative)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if path.exists():
+            if path.read_bytes() != content:
+                raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
+        else:
             descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=".asset-")
             try:
                 with os.fdopen(descriptor, "wb") as stream:
@@ -108,14 +115,11 @@ class AssetLibrary:
                     os.fsync(stream.fileno())
                 try:
                     os.link(temporary, path)
-                    break
                 except FileExistsError:
-                    if path.read_bytes() == content:
-                        break
+                    if path.read_bytes() != content:
+                        raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
             finally:
                 Path(temporary).unlink(missing_ok=True)
-        else:
-            raise FileExistsError("Asset hash filename collision.")
         provenance_id = uuid.uuid4().hex
         result = {"logical_name": name, "source_language": language, "path": relative,
                   "sha256": digest, "image_path": str(path), "run_id": run_id,
@@ -168,7 +172,7 @@ class AssetLibrary:
         event = {**identity, "source_language": source_language, **entry, "detections": output}
         emit("asset_matched", event)
         index_path = self.data_root / "asset-usage.json"
-        index = json.loads(index_path.read_text()) if index_path.exists() else {}
+        index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
         key = json.dumps([name, language, entry["sha256"]], ensure_ascii=False)
         index[key] = {**event, "last_used_at": datetime.now(UTC).isoformat()}
         atomic_write_json(index_path, index)

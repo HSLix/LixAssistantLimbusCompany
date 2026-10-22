@@ -9,9 +9,11 @@ Stage 1 was reopened to allow a supervised Agent-proposed complete Manifest to r
 - LALC automates explicitly supported Limbus Company content; it is not a general game-playing Agent.
 - A Deterministic Workflow must complete every officially supported task without a model service.
 - The only supported interaction environment is a Focused Automation Session, as established by ADR 0001. Cursor-Assisted Background Operation remains experimental.
-- Stage 3 provides supervised Agent recovery from a paused current Step. One proposal may change Steps, Task Workflows, and Subworkflows together; Trusted Actions and Recovery Rules are outside this Agent modification scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. Agent-assisted drafting of a new objective, autonomous Capability Expansion, and unattended operation remain deferred.
+- Stage 3.5 provides supervised Agent recovery from a paused current Step. One proposal may change Steps, Task Workflows, and Subworkflows together; Trusted Actions and Recovery Rules are outside this Agent modification scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. Agent-assisted drafting of a new objective, autonomous Capability Expansion, and unattended operation remain deferred.
 
-## Agent lifecycle
+Stage 3 separately permits manual single-Component repair through an independent CLI with retained model/tool/output logs; see [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md). It does not start runtime recovery or automatic real-game trials.
+
+## Agent lifecycle (Stage 3.5 runtime design)
 
 The Agent module is disabled on first installation. The user must configure and verify a local or remote model before enabling it. When disabled, Deterministic Workflows continue normally; an Execution Anomaly terminates the task safely after evidence is saved.
 
@@ -84,9 +86,9 @@ Executable code remains eligible for whole-Manifest permanent approval. The appr
 
 ## Immutable components, saved manifests, and working manifests
 
-Neither users nor the Agent mutate registered executable Components in place. Every registered Task Workflow, Subworkflow, Step, Recovery Rule, and Trusted Action has an immutable unique Component ID. Editing an eligible Component adds a new ID instead of overwriting existing content or maintaining a separate per-Component version sequence. Assets are not Components: the Manifest records their semantic names, language mappings, relative shared-library paths, and complete content hashes directly.
+Neither users nor the Agent mutate registered executable Components in place. Every registered Task Workflow, Subworkflow, Step, and Recovery Rule has an immutable unique Component ID. Trusted Actions are registered by the application and are not Manifest Components. Editing an eligible Component adds a new ID instead of overwriting existing content or maintaining a separate per-Component version sequence. Assets are not Components: each Manifest owns an external Asset Library recording semantic names, languages, relative shared-file paths, and complete content hashes.
 
-Each Manifest is one complete document. Its executable mappings resolve stable dotted logical names such as `steps.enter_stage` to immutable Component IDs; dedicated Recovery Rule and Trusted Action mappings select their validation rules; its Asset mapping contains language-specific shared-file references and hashes. Updating an executable capability changes the ID referenced by its stable name without creating an ID-to-ID version chain. A new capability receives a new logical name. Renaming is represented only by the resulting complete Manifest, not by a persisted rename or additions-and-deletions operation.
+Each Manifest is one complete document. Its executable mappings resolve stable dotted logical names such as `steps.enter_stage` to immutable Component IDs; a dedicated Recovery Rule mapping selects its validation rules. Its external Asset Library contains language-specific shared-file references and hashes; Trusted Actions resolve through application registration. Updating an executable capability changes the ID referenced by its stable name without creating an ID-to-ID version chain. A new capability receives a new logical name. Renaming is represented only by the resulting complete Manifest, not by a persisted rename or additions-and-deletions operation.
 
 Python Components use concise docstrings to help the Agent retrieve and understand their behavior. A behavior change updates the docstring in the same source change; the resulting source has a new Component ID. The first version adds no tag system, separate component documentation, or vector-retrieval layer.
 

@@ -8,7 +8,7 @@ a = Analysis(
     [str(root / "packaging_entry.py")],
     pathex=[str(root / "src")],
     binaries=[],
-    datas=[(".")],
+    datas=[],
     hiddenimports=[],  # Add only imports promised by the Component Runtime Capability Contract.
     hookspath=[str(root / "packaging_hooks")],
     hooksconfig={},

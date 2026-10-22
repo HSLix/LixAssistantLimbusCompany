@@ -23,7 +23,7 @@ from lalc.manifest import ManifestManager
 from lalc.runtime import UserInterruption
 
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "focused-observation"
+FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "focused-observation"
 
 
 def png_image(path: Path) -> tuple[tuple[int, int], bytes]:
@@ -54,6 +54,10 @@ class FakeWindowPlatform:
         self.captures = 0
         self.focus_calls = 0
         self.blur_during_capture = False
+
+    def create_input_backend(self):
+        from test_input_control import FakeInput
+        return FakeInput()
 
     def find_windows(self) -> list[int]:
         return self.windows
@@ -235,7 +239,7 @@ def test_client_resize_discards_old_image(tmp_path: Path) -> None:
 
 def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    published = manager.publish(EXAMPLE / "manifest.json")
+    published = manager.publish(FIXTURE / "manifest.json")
     assert published.ok, published.errors
     assert manager.set_default(published.loaded.manifest_id).ok
     platform = FakeWindowPlatform()
@@ -265,12 +269,14 @@ def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) ->
 
 def test_focus_loss_during_run_capture_never_saves_image(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    published = manager.publish(EXAMPLE / "manifest.json")
+    published = manager.publish(FIXTURE / "manifest.json")
     assert published.ok, published.errors
     platform = FakeWindowPlatform()
     platform.blur_during_capture = True
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=platform)
     run_id = service.start("steps.capture_screen", {"save": True}, manifest_id=published.loaded.manifest_id)
+    service.wait_for(lambda current: current["paused"])
+    service.stop()
     state = service.wait_for(lambda current: current["run_id"] == run_id and current["phase"] == "finished")
     assert state["result"]["status"] == "failure"
     events = [item["event"] for item in state["trace"]]

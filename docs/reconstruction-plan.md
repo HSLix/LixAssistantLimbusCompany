@@ -9,7 +9,7 @@ Status: accepted and explicitly revised for runtime Agent maintenance and formal
 Locked contracts:
 
 - officially supported objectives run through deterministic Python Workflows without a model;
-- only the deterministic executor may invoke the optional Agent;
+- Stage 3 permits manual CLI invocation for independent Component repair; only the deterministic executor may invoke runtime recovery in Stage 3.5;
 - the Recovery Ladder remains Deterministic Recovery, Agent, then Safe Task Termination;
 - permanent capability changes require validation and human approval;
 - every Top-level Execution selects one Base Manifest protected from Agent modification explicitly or through the Default Manifest and copies it into one complete durable Working Manifest; its forms are a directly started Task Workflow, Subworkflow, or Step and one Automation Plan with its sequential Task Workflows;
@@ -22,11 +22,13 @@ Status: accepted and complete. Further changes require explicitly reopening the 
 
 Confirmed contracts:
 
+Agent runtime references below describe retained Stage 3.5 integration contracts, not Stage 2 implementation or Stage 3 prerequisites (ADR 0025).
+
 - Task Workflow, Subworkflow, and Step are immutable Python Components loaded as ordinary modules after their exact source bytes are verified against their Component IDs;
 - exactly one parameterless `@task_workflow`, `@sub_workflow`, or `@step` on each formal entrypoint is the sole component-role source; Manifest, paths, names, and tags do not duplicate or infer `component_kind`;
 - each Task Workflow, Subworkflow, and Step has one source file with one decorated execute; only Step may expose a matching optional condition; Task/Subworkflow condition and standalone verify callbacks are rejected;
 - formal Task Workflow, Subworkflow, Step, Step condition, Recovery Rule, and every private function in their files contain no `except`; `try/finally` remains available for cleanup, but loaders reject `return`, `break`, `continue`, or `raise` in every `finally` without reachability or rethrow analysis so the original exception propagates naturally;
-- each Manifest is one complete document containing executable `logical_name → immutable Component ID` mappings, dedicated `recovery_rules` and `trusted_actions` mappings, and an `assets` mapping from semantic name and language to shared relative path plus complete hash;
+- each Manifest is one complete document containing executable `logical_name → immutable Component ID` mappings, a `recovery_rules` mapping; its dedicated external Asset Library contains semantic-name/language mappings, while Trusted Actions are application-registered;
 - formal Components call one another only through `ctx.call(logical_name, **arguments)`; it resolves and validates the current Working Manifest entry on every call and stores no Component Ref or implementation cache;
 - every `ctx.call()` target is a string literal; before each Working Manifest atomic update, the executor validates every formal target and role permission against the complete resulting candidate Manifest, while runtime validates resolution and role again and records the actual identity;
 - every `ctx.call()` in a Task Workflow or Subworkflow source file belongs to that file's single Component, including calls in private or apparently unreachable functions; Step, Step `condition`, and Recovery Rule source may contain no `ctx.call()`, and the loader performs no reachability or branch analysis;
@@ -62,13 +64,13 @@ Confirmed contracts:
 - plain `@step` marks the smallest independently observable Python boundary and records identity, arguments, conditions, timing, Trusted Actions, evidence, returns, and interruptions;
 - first-version `@step` has no timeout, retry, or policy parameters; expected-result and observed lack-of-progress checks stay in ordinary Python, with no generic progress-event or heartbeat framework;
 - a Step confirms each important input, never blindly replays an earlier sequence, directly returns from an already-completed state, waits through expected transitions, and raises `ExecutionFailure` for an unknown or observably stalled state;
-- Trusted Actions are immutable shipped or human-approved Components registered once as `observe` for screenshots, OCR, matching, and state reads or `control` for clicks, input, waits, and other execution operations; formal source invokes their literal logical names through `ctx.action()`, while developer inspection derives descriptions and signatures from their Python source without generated wrappers or duplicate schemas;
+- Trusted Actions are shipped or human-approved application callables registered once as `observe` for screenshots, OCR, matching, and state reads or `control` for clicks, input, waits, and other execution operations; formal source invokes their literal logical names through `ctx.action()`, while developer inspection derives descriptions and signatures from their Python source without generated wrappers or duplicate schemas;
 - Trusted Action implementations alone may catch low-level exceptions, but must record the original and either return an explicit documented result or re-raise a normalized exception, never silently pass or fabricate success;
 - the fixed action matrix allows observe in Task/Subworkflow execute, Step condition, and Rule detect; Step execute and Rule recover allow observe/control;
 - candidate loading rejects direct, statically visible Trusted Action violations in formal entrypoints but does not trace private-function call chains; Trusted Action wrappers are the authoritative boundary, rechecking classification and the actual execution role before the action and tracing calls, while Agent code cannot create or replace Trusted Actions during a Top-level Execution;
 - `wait` is `control` so Workflow code cannot bypass Trusted Action cancellation handling or Step observation and recovery; there are no component-specific lists, user-defined permissions, allow/deny rules, permission objects, or inheritance;
 - a runtime Trusted Action access violation is ExecutionFailure, rejected before action and logged with the offending source line; Step-local failure uses Step recovery and never grants forbidden permissions;
-- image-using Trusted Actions accept semantic Asset names and internally resolve the game language, Working Manifest path and hash, fallback language and Trace evidence; successful regions are recorded only for reference and never change the caller-selected search region; there is no `ctx.asset()`, Asset Handle, language-neutral Asset, or direct Asset path in formal source;
+- image-using Trusted Actions accept semantic Asset names and internally resolve the game language, Working Manifest dedicated-library path and hash, fallback language and Trace evidence; successful regions are recorded only for reference and never change the caller-selected search region; there is no `ctx.asset()`, Asset Handle, language-neutral Asset, or direct Asset path in formal source;
 - Assets are shared files protected from Agent modification rather than Components. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. New immutable source, Assets, and complete Manifests go directly into their normal stores; approval and rejection retain them without cleanup (ADR 0021). A separate Asset Usage Index records last successful use and normalized match region only for reference, without changing the search region.
 - Step catches execution failures before caller unwinding; errors elsewhere in Workflow execute are reported without replay;
 - public Recovery Rules run only after a Step failure, never by polling or recursive Rule recovery;
@@ -104,52 +106,54 @@ Stage 2 will not add Component Ref objects, dynamic `ctx.call()` targets, cross-
 
 The first version also does not export, inherit, migrate, or persist Task Workflow business state, Python loop positions, or entered frames. It terminates safely or restarts from an observable known point after process failure, deferring explicit Checkpoint/Resume design until cross-process or cross-implementation continuation is required.
 
-Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order in implementation without adding a Manifest field. Storage layout and formats use the most direct local representation when implementation reaches them; failure codes are added only for real execution paths; each vertical slice supplies the concrete safe action appropriate to its supported game state. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. The immediate next activity is planning the minimum implementation slices and their acceptance order.
+Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order in implementation without adding a Manifest field. Storage layout and formats use the most direct local representation when implementation reaches them; failure codes are added only for real execution paths; each vertical slice supplies the concrete safe action appropriate to its supported game state. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 independently validates single-Component repair through a manual CLI. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. The immediate next activity is planning the minimum implementation slices and their acceptance order.
 
 The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 begins on a clean orphan branch in this repository; the old branch remains the historical reference and rollback path rather than a runtime that the new code must coexist with. The first real Task Workflow is selected when that slice begins, using mailbox collection as the initial smallest candidate.
 
-## Stage 3: Agent Runtime Step Recovery and Maintenance
+## Stage 3 — Agent-assisted Component Repair
 
-Status: architecture accepted, including the #310 and #311 decisions. Agent runtime implementation remains future work.
+Status: accepted scope under ADR 0025; implementation and model-backed acceptance pending.
 
-- only an Execution Anomaly caught while an existing supported Task Workflow remains paused inside an `@step` wrapper starts a bounded Runtime Agent Session;
-- local and remote models implement one Agent Adapter contract that only transports a self-contained Context Snapshot, normalizes provider failures, and parses one allowed Turn result; it never performs actions, writes files, changes a Manifest, invokes formal code, or decides recovery and termination;
-- the Agent may propose one complete Manifest changing Steps, Task Workflows, or Subworkflows, with reasons for each change; Trusted Action, Recovery Rule, and new-objective changes are outside the current scope; The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files.
-- new source files, screenshot-derived Assets, and complete attempted Manifests are saved directly in their normal stores; review records approval or rejection without deleting files;
-- a complete candidate Working Manifest is atomically selected only when the executor can immediately arrange a legal formal trial call;
-- the first fresh current-Step call supplies behavior evidence; success commits the whole selected Manifest for later calls, while failure leaves the execution paused for another Agent choice or termination without automatic rollback;
-- an entered Python frame is never replaced, and Manifest rollback cannot undo external game actions;
-- after Top-level Execution ends, only its current Working Manifest is presented as the Capability Proposal when its ID has not already received permanent approval, including when final Task verification failed; returning to the Base Manifest or another approved ID skips repeated approval, and intermediate attempts are not separately reviewed;
-- permanent approval has no universal business-success threshold in Stage 3: the system presents whether a successful formal trial occurred together with the candidate and recorded evidence, while the supervisor decides whether it is sufficient; no trial result, Step result, Task result and checking-Step evidence, or unattended run can approve automatically;
-- a topmost modal Capability Approval Dialog requires exactly one whole-proposal approve-or-reject decision: approval marks the reviewed Manifest ID as permanently published, rejection grants no permanent approval, and both retain execution and review evidence; after approval, a separate window asks whether to set the approved current Working Manifest as Default;
-- `max_turns` is the only Runtime Agent Session budget; there is no Session deadline, action budget, candidate budget, or plan timeout;
-- every Agent Turn uses a self-contained Context Snapshot rebuilt from local authoritative state and never depends on provider-retained conversation history; detailed context selection remains undecided;
-- provider, model, System Prompt version, generation parameters, and Agent Adapter version are fixed for each Runtime Agent Session, with no within-Session model switching, routing, or fallback;
-- a Runtime Agent Session succeeds only through a compatible normal return from a fresh formal invocation of the current Step; the Task Workflow then continues its remaining ordinary Steps, and a later Step anomaly creates a new Session with a fresh `max_turns` while sharing the Top-level Execution's Working Manifest and retained immutable files;
-- the first version supports only Supervised Operation: every complete proposal is reviewed and confirmed before trial, while unattended trial and persisted operating-policy selection are deferred;
-- proposal confirmation is an explicit approve-or-reject decision; rejection requires feedback for the next Agent Turn, while the existing system stop remains a separate immediate cancellation control;
-- a topmost modal Supervised Review Dialog blocks main-window interaction until the supervisor approves one trial, rejects with feedback, or confirms Cancellation; its close action and Escape key cannot bypass the decision;
-- the cooperative Run Gate uses `threading.Condition` without polling and waits before new Trusted Actions or Agent Turns; Manifest selection does not wait, and pause never interrupts an operation already permitted to start;
-- changed Steps and Workflows use their ordinary role-based Trusted Action access after runtime permission; Stage 3 adds neither a high-risk action taxonomy nor per-action confirmation;
-- runtime permission lets the complete selected Manifest execute in the current Top-level Execution; permanent whole-Manifest publication is a separate decision after that execution ends and does not change the Default selection;
-- invalid output, rejected validation, user rejection with feedback, a non-activating switch failure, or a failed current-Step call proceeds to the next Agent Turn when budget remains; a failed call pauses without automatic rollback, and the Agent may base the next attempt on any retained Manifest ID;
-- main-window stop and review-window termination share one Cancellation path that wakes cooperative pause, prevents later gated work, and leaves the GUI and Target Window open;
-- Cancellation after Manifest selection ends the Top-level Execution without automatically changing the last selected Manifest;
-- every complete Manifest used for an attempt is durably retained by Manifest ID; an existing Manifest reused in another attempt keeps that ID while Trace distinguishes attempts;
-- Agent-assisted Workflow Drafting and autonomous Capability Expansion remain explicitly deferred.
+- Manually start an independent CLI with one existing Component, game screenshots, exception information, and necessary context.
+- Use Deep Agents or a similar SDK to inspect source, make local edits, invoke the existing Validator, and revise from validation feedback.
+- Output complete candidate Component source, its Diff, and validation results; retain the model inputs, tool operations, and final outputs for the entire CLI invocation.
+- Reuse Developer Candidate / ManifestManager for subsequent human-reviewed Publish. Never overwrite formal Components or existing Manifests/Assets, automatically publish, or modify Default Manifest.
+- Limit the first version to one existing Component. No Runtime Agent Session, automatic anomaly takeover, new Asset, multi-Component editing, automatic real-game trial, or runtime continuation.
+- Demonstrate at least one reproducible before/after repair case. Human-run behavior verification is separate from Validator success and from the repair CLI.
 
-The Stage 3 architecture Grill is closed. The detailed accepted baseline is [Stage 3 Agent Runtime Step Recovery and Maintenance](stage-3-agent-runtime-step-recovery-and-maintenance.md). Context fields, validators, UI behavior, persistence mechanics, and Demo acceptance are intentionally left to the next minimum code experiment plan.
+The accepted scope and acceptance evidence are in [Stage 3 — Agent-assisted Component Repair](stage-3-agent-assisted-component-repair.md).
+
+## Stage 3.5 — Agent Runtime Step Recovery and Maintenance
+
+Status: deferred. ADR 0025 transfers the prior Stage 3 runtime architecture here without requiring it for the Stage 3 experiment.
+
+Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Agent Asset creation, and multi-Component evolution belong here. The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
 
 ## Stage 4: Application structure, UI, and packaging
 
 Status: planned.
 
 - CLI and desktop UI call the same application and execution services;
+- TODO: a developer coordinate display shows the physical client-pixel mouse position relative to the Target Window in real time, using the same coordinate system as screenshots, crop regions, and click inputs; mark positions outside the client area explicitly. This is a future GUI aid, not a change to the current coordinate-input crop API.
 - the UI exposes task execution, Agent configuration, supervised Step and Workflow source review, proposal review, and Manifest recovery;
 - TODO for future discussion: resource deletion, reference scanning, Component Usage Index, and cleanup UI; no maintenance policy or UI is committed for this version.
 - the UI exposes per-Workflow strict success rate, Agent-assisted completion, recovery breakdown, and average duration from the local Workflow Run Ledger;
 - a packaging spike verifies main-process immutable module loading, external assets, and Trace persistence; TODO after the first release: evaluate moving executor execution into a subprocess and the required Context transport, cancellation, and original-error propagation;
 - packaged formal automation must remain usable without a model.
+
+## TODO after Stage 4
+
+- Explore learning and memory of game states, using [Agent S](https://github.com/simular-ai/Agent-S) as a reference. Investigate how experience from observations and execution can be retained and retrieved to help recognize game states and handle similar situations. This is future research after Stage 4, not a prerequisite for Stages 3 or 4 or a commitment to adopt the framework.
+
+### Discussion TODO: Workflow Bundle distribution
+
+Discuss distributing the existing **Capability Bundle** (called Workflow Bundle in this proposal: Manifest, its dedicated Asset Library mapping, referenced Components, Assets, and other required resources) as an update resource independent of the LALC application, allowing separate Workflow releases and automatic updates. This is a post-Stage-4 discussion proposal, not an implemented updater or an accepted distribution contract.
+
+- **GitHub Releases as the primary source:** automate attaching a Bundle to an existing Release with [`gh release upload`](https://cli.github.com/manual/gh_release_upload), or maintain a separate Workflow Release version line. GitHub currently requires each release asset to be **under 2 GiB** and documents no fixed bandwidth quota for release downloads; recheck the [release limits](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases#storage-and-bandwidth-quotas) when implementing.
+- **Mirror 酱 for distribution in mainland China:** reference [MaaResource](https://github.com/MaaAssistantArknights/MaaResource)'s separate resource release approach; apply for a dedicated Resource ID and automate update-package synchronization with GitHub Actions. The client checks versions and obtains downloads through the API; downloads may require a CDK. Consult the [MirrorChyan integration guide](https://github.com/MirrorChyan/docs) and [uploading action](https://github.com/MirrorChyan/uploading-action) for onboarding and integration details.
+- **Quark Drive as a backup channel:** evaluate automated Bundle uploads into a designated folder using an official or third-party CLI; the [official upload reference](https://github.com/quark-clouddrive/quarkclouddrive_offical/blob/main/skills/quarkclouddrive/references/file-upload.md) is an initial reference. Prefer this for backup/manual distribution rather than client automatic updates.
+
+All three channels distribute the same Bundle. The client uses one version, full-hash, and signature verification/import path for immutable Components and resources. Retain historical versions and user-local Manifests, without overwriting existing versions; updates affect only subsequent executions. The suggested implementation order is Bundle export/import first, GitHub automated publishing second, then Mirror 酱 and Quark Drive as needed.
 
 ## Explicitly deferred
 

@@ -33,6 +33,10 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("publish")
     commands.add_parser("clear")
     commands.add_parser("connect")
+    crop = commands.add_parser("crop-asset")
+    crop.add_argument("asset")
+    crop.add_argument("--language", default="en")
+    crop.add_argument("--region", required=True, help="JSON client-pixel rectangle")
     commands.add_parser("data-dir")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
@@ -87,12 +91,12 @@ def _print_manifests(manager: ManifestManager, limit: int) -> bool:
     manifests = manager.list_manifests()
     shown = manifests[:limit]
     print(f"Showing {len(shown)} of {len(manifests)} manifests (use -n COUNT to change).")
-    print("MANIFEST ID                          SAVED AT            COMPONENTS  RULES  ACTIONS")
+    print("MANIFEST ID                          SAVED AT            COMPONENTS  RULES")
     for item in shown:
         saved_at = datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M")
         print(
             f"{item['manifest_id']:<36} {saved_at:<19} "
-            f"{item['components']:<11} {item['recovery_rules']:<6} {item['trusted_actions']}"
+            f"{item['components']:<11} {item['recovery_rules']}"
         )
     print(f"Default Manifest: {manager.default_manifest_id() or 'unavailable'}")
     return True
@@ -172,6 +176,21 @@ def _dispatch(args: argparse.Namespace) -> int:
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"
 
+    if args.command == "crop-asset":
+        def confirm(prompt: str) -> bool:
+            try:
+                return input(prompt).strip().lower() in {"y", "yes"}
+            except (EOFError, KeyboardInterrupt):
+                return False
+
+        result = ApplicationService(data_root, manifest_manager=manager, game_language=args.language).crop_candidate_asset(
+            candidate, args.asset, json.loads(args.region), confirm,
+        )
+        if result is None:
+            print("Candidate Asset replacement cancelled.", file=sys.stderr)
+            return 1
+        print(json.dumps(result, ensure_ascii=False))
+        return 0
     if args.command == "init":
         errors = manager.initialize_candidate(candidate, manifest_id=args.manifest_id)
         if errors:

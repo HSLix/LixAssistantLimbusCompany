@@ -9,7 +9,8 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 1 product and Agent boundaries: accepted.
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
 - Stage 2 implementation: Component Manifest loading and the model-free formal Workflow execution loop are implemented.
-- Stage 3 Agent Runtime Step Recovery and Maintenance architecture: accepted.
+- Stage 3 Agent-assisted Component Repair: scope accepted; independent CLI repair implementation and reproducible acceptance pending.
+- Stage 3.5 Agent Runtime Step Recovery and Maintenance: prior runtime architecture retained; implementation deferred.
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
 - Agent-assisted Workflow Drafting and autonomous Capability Expansion: explicitly deferred.
 
@@ -19,8 +20,8 @@ Start with:
 - [Reconstruction plan](docs/reconstruction-plan.md)
 - [Stage 2 implementation slices](docs/stage-2-implementation-slices.md)
 - [Developer Workflow tutorial](docs/developer-workflow-tutorial.md)
-- [Runnable virtual Workflow example](examples/virtual-workflow/manifest.json)
-- [Stage 3 Agent Runtime Step Recovery and Maintenance](docs/stage-3-agent-runtime-step-recovery-and-maintenance.md)
+- [Stage 3 Agent-assisted Component Repair](docs/stage-3-agent-assisted-component-repair.md)
+- [Stage 3.5 Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
 - [Architecture decisions](docs/adr/)
 
 ## Development
@@ -29,7 +30,7 @@ The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
 Semantic Asset template matching, explicit local detection, and fresh-screenshot
 template cropping are available through observe Trusted Actions; see
-[the Asset example](examples/asset-recognition/README.md).
+[the developer tutorial](docs/developer-workflow-tutorial.md).
 Input takeover has automated regression coverage and still requires supervised
 Windows game acceptance. OCR and model calls are not implemented yet.
 
@@ -44,14 +45,14 @@ single Git-ignored `candidate/` directory in the current project:
 
 ```bash
 uv run lalc init
-# Edit candidate/manifest.json and its flat Python Component files.
+# Edit candidate/manifest.json, candidate/assets.json and Component source.
 uv run lalc validate
 uv run lalc publish
 uv run lalc list-manifests
 uv run lalc run <logical-name> --manifest <manifest-id> --inputs '{}'
 uv run lalc set-default <manifest-id>
 uv run lalc run <logical-name>
-uv run lalc run-plan examples/virtual-workflow/plan.json
+uv run lalc run-plan <plan.json>
 uv run lalc clear
 uv run lalc data-dir
 ```
@@ -61,17 +62,13 @@ window, brings it to the foreground once, captures its client area, and writes
 the PNG image plus a text log under the local application data directory's
 `connections/` folder. It prints both paths; it does not keep a connection
 after the command exits. `uv run lalc data-dir` prints the default data
-directory for the current system. `examples/focused-observation/` contains a complete
-Manifest with a direct Step and an `observe` Trusted Action for checking a real
-Run's screenshot and Trace. Copy that example into an empty `candidate/`, then
-use `validate`, `publish`, and `run steps.capture_screen --manifest <id>`.
-Pass `--inputs '{"save":true}'` to save that Run's screenshot as PNG evidence.
+directory for the current system. Every formal Run connects and focuses the game
+window and starts physical input monitoring before Component execution.
 Foreground activation is requested once and awaited without an automatic cutoff.
 Run Stop or terminal Ctrl-C can interrupt cooperative waiting; actual errors retain
 their original exception chain.
 
-`examples/focused-control/` provides the corresponding input Manifest and
-Windows acceptance instructions. Physical input interrupts the current Step,
+Physical input interrupts the current Step,
 releases held input, and pauses until manual Resume. Resume refreshes observation,
 checks the Step's optional condition, and invokes that same Step from its entrypoint;
 it never replays the interrupted action. GUI notices appear once and remain movable;

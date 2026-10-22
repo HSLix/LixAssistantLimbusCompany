@@ -19,7 +19,7 @@ from lalc.manifest import ManifestManager
 from lalc.runtime import InputReleaseFailure, UserInterruption, RunGate
 
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "focused-control"
+FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "focused-control"
 
 
 class FakeInput:
@@ -116,11 +116,12 @@ def fast_quiet(monkeypatch):
 def service_for(tmp_path: Path, *, condition: str = ""):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
-    for path in EXAMPLE.glob("*.py"):
-        (candidate / path.name).write_text(path.read_text())
-    step = (candidate / "steps.control.py").read_text()
+    (candidate / "assets.json").write_text("{}", encoding="utf-8")
+    for path in FIXTURE.glob("*.py"):
+        (candidate / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+    step = (candidate / "steps.control.py").read_text(encoding="utf-8")
     step += condition
-    (candidate / "steps.control.py").write_text(step)
+    (candidate / "steps.control.py").write_text(step, encoding="utf-8")
     task = '''"""证明调用者只在当前 Step 正常返回后继续。"""
 from lalc import task_workflow
 
@@ -130,10 +131,10 @@ def execute(ctx, *, operation: str = "drag") -> str:
     return "finished"
 
 '''
-    (candidate / "task.py").write_text(task)
-    manifest = json.loads((EXAMPLE / "manifest.json").read_text())
+    (candidate / "task.py").write_text(task, encoding="utf-8")
+    manifest = json.loads((FIXTURE / "manifest.json").read_text(encoding="utf-8"))
     manifest["components"]["tasks.control"] = {"source_path": "task.py"}
-    (candidate / "manifest.json").write_text(json.dumps(manifest))
+    (candidate / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     manager = ManifestManager(tmp_path)
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
@@ -242,7 +243,7 @@ def test_release_failure_ends_plan_without_resume_or_later_task(tmp_path):
     window.backend.takeovers = 1
     window.backend.fail_release = True
     plan = tmp_path / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}] * 2}))
+    plan.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}] * 2}), encoding="utf-8")
     service.start_plan(plan)
     state = finished(service)
     assert state["result"]["reason"] == "input_release_failed"
@@ -423,8 +424,10 @@ def test_observe_action_cannot_bypass_control_role(tmp_path, monkeypatch):
         ctx.control_input("key_press", key="p")
         return {}
 
-    module = service.manifest_manager.default.trusted_actions["observe.capture_screen"].module
-    monkeypatch.setattr(module, "execute", bypass)
+    from types import MappingProxyType
+    from lalc.actions import TrustedAction
+    manager = service.manifest_manager
+    manager.actions = MappingProxyType({**manager.actions, "observe.capture_screen": TrustedAction(bypass, "observe")})
     service.start("steps.control", {})
     result = finished(service)["result"]
     assert result["status"] == "failure"
@@ -544,7 +547,7 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
     monkeypatch.setattr(window, "capture", observe)
     if plan:
         path = tmp_path / "plan.json"
-        path.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}]}))
+        path.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}]}), encoding="utf-8")
         service.start_plan(path)
     else:
         service.start("tasks.control", {})

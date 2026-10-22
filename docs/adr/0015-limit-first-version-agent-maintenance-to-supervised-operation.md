@@ -4,6 +4,8 @@ status: accepted
 
 # Limit first-version Agent maintenance to Supervised Operation
 
+ADR 0025 moves the runtime recovery, supervised trial, and Agent Asset creation scope described here to Stage 3.5. Current Stage 3 is independent single-Component repair; these runtime contracts are not its prerequisites.
+
 ADR 0020 supersedes only the blanket exclusion of Asset additions below: new templates may be cropped from real game screenshots and proposed through the complete Manifest review path. Existing Asset files remain immutable.
 
 Every first-version Working Manifest Update Proposal requires human review and an explicit approve-or-reject decision before its changed Steps or Workflows execute. Explicitly selecting an already saved Manifest ID at execution start runs it directly and is not a new Agent proposal. Rejection requires user feedback and starts the next Agent Turn when budget remains. Approval permits the complete selected Manifest to execute in the current Top-level Execution, including later calls after the current Step returns; it does not publish the Manifest permanently or change the Default Manifest. `Request Step Recheck` and a Safe Task Termination recommendation require no source confirmation because they introduce no candidate executable content. Whole-Manifest permanent approval is unavailable until the execution ends.

@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "components": {
+    "steps.detect": {
+      "source_path": "steps.detect.py"
+    },
+    "steps.crop": {
+      "source_path": "steps.crop.py"
+    }
+  },
+  "recovery_rules": {}
+}

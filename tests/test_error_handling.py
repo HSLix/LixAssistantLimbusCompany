@@ -218,7 +218,7 @@ def test_gui_outer_hooks_forward_main_and_thread_errors_then_restore(tmp_path: P
     assert len(received) == 2
     assert all("OSError: outer cause" in detail and "RuntimeError: outer failure" in detail for detail in received)
     assert (sys.excepthook, threading.excepthook) == previous
-    assert "outer failure" in (tmp_path / "logs" / "lalc.log").read_text()
+    assert "outer failure" in (tmp_path / "logs" / "lalc.log").read_text(encoding="utf-8")
 
 
 def test_business_verification_in_step_recovers_without_replaying_task(tmp_path: Path) -> None:
@@ -237,7 +237,7 @@ def test_business_verification_in_step_recovers_without_replaying_task(tmp_path:
     service = ApplicationService(tmp_path, manifest_manager=manager)
     state = _finished(service, service.start("tasks.rotate_teams", {"teams": ["alpha"], "runs": 1}))
     assert state["result"]["output"] == ["alpha"]
-    assert manager.default.trusted_actions["fake_control"].module.calls == 2
+    assert manager.actions["fake_control"].execute.__globals__["calls"] == 2
     assert sum(event["event"] == "component_started" and event["role"] == "task_workflow"
                for event in state["trace"]) == 1
     assert any(event["event"] == "step_interrupted" and "team mismatch" in event["failure_message"]
@@ -311,7 +311,7 @@ def test_error_payload_has_only_failure_message_and_full_traceback(tmp_path: Pat
     assert state["result"]["failure_message"] == "native fault"
     assert "ValueError: root cause" in state["result"]["traceback"]
     assert "OSError: native fault" in state["result"]["traceback"]
-    persisted = (tmp_path / "traces" / "1.jsonl").read_text()
+    persisted = (tmp_path / "traces" / "1.jsonl").read_text(encoding="utf-8")
     assert '"exception_type"' not in persisted and '"exception_message"' not in persisted
 
 
@@ -337,7 +337,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
         execute.__lalc_role__ = "task_workflow"
         manager.default.components["tasks.rotate_teams"].module.execute = execute
     path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [{"task": "tasks.rotate_teams", "inputs": {"teams": ["alpha"]}}]}))
+    path.write_text(json.dumps({"items": [{"task": "tasks.rotate_teams", "inputs": {"teams": ["alpha"]}}]}), encoding="utf-8")
     state = _finished(service, service.start_plan(path))
     result = state["result"]
     assert result["fatal"] and result["status"] == "interrupted"
@@ -365,7 +365,7 @@ def test_main_gui_bootstrap_failure_uses_lifecycle_report(tmp_path: Path, monkey
     assert cli.main([]) == 1
     assert "OSError: bootstrap cause" in reports[0] and "RuntimeError: GUI startup failed" in reports[0]
     assert (sys.excepthook, threading.excepthook) == original
-    assert "bootstrap cause" in (tmp_path / "logs" / "lalc.log").read_text()
+    assert "bootstrap cause" in (tmp_path / "logs" / "lalc.log").read_text(encoding="utf-8")
 
 
 def test_gui_import_failure_falls_back_to_bilingual_report(tmp_path: Path, monkeypatch, capsys) -> None:

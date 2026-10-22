@@ -53,14 +53,7 @@ def detect(ctx) -> bool:
 def recover(ctx) -> None:
     return None
 ''',
-    "observe.py": '''"""Test observation."""
-def execute(ctx, *, name: str = "state") -> dict[str, str]:
-    return {"name": name}
-''',
-    "control.py": '''"""Test control."""
-def execute(ctx, *, name: str = "click") -> dict[str, str]:
-    return {"name": name}
-''',
+
 }
 
 
@@ -69,19 +62,15 @@ def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) 
     for name, source in (sources or SOURCES).items():
         (directory / name).write_text(source, encoding="utf-8")
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "components": {
             "tasks.example": {"source_path": "task.py"},
             "flow.sub": {"source_path": "sub.py"},
             "steps.finish": {"source_path": "step.py"},
         },
         "recovery_rules": {"recovery.dismiss": {"source_path": "recovery.py"}},
-        "trusted_actions": {
-            "observe": {"source_path": "observe.py", "classification": "observe"},
-            "control": {"source_path": "control.py", "classification": "control"},
-        },
-        "assets": {},
     }
+    (directory / "assets.json").write_text("{}", encoding="utf-8")
     path = directory / "candidate.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     return path
@@ -164,8 +153,10 @@ def test_import_error_retains_serializable_diagnostics_and_start_cause(
     """导入失败在日志、校验结果和同步启动拒绝中保留原始原因链。"""
 
     sources = dict(SOURCES)
-    sources["observe.py"] = '''"""导入时报告完整错误链。"""
+    sources["step.py"] = '''"""导入时报告完整错误链。"""
+from lalc import step
 raise OSError("import failed") from ValueError("import root cause")
+@step
 def execute(ctx, *, name: str = "state") -> dict[str, str]:
     return {"name": name}
 '''
@@ -203,7 +194,7 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
     assert result.loaded.components["tasks.example"].role == "task_workflow"
     assert result.loaded.components["flow.sub"].role == "sub_workflow"
     assert result.loaded.components["steps.finish"].role == "step"
-    assert result.loaded.trusted_actions["control"].classification == "control"
+    assert manager.actions["control"].classification == "control"
     saved_path = manager.manifests_dir / f"{result.loaded.manifest_id}.json"
     saved = json.loads(saved_path.read_text(encoding="utf-8"))
     assert set(saved) == {
@@ -211,14 +202,12 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
         "manifest_id",
         "components",
         "recovery_rules",
-        "trusted_actions",
-        "assets",
     }
     assert "source_path" not in saved_path.read_text(encoding="utf-8")
     assert not (manager.manifests_dir / "default.json").exists()
     ids = {
         entry["component_id"]
-        for section in ("components", "recovery_rules", "trusted_actions")
+        for section in ("components", "recovery_rules")
         for entry in saved[section].values()
     }
     assert all(component_id.startswith("sha256:") for component_id in ids)
@@ -242,7 +231,7 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
     assert manager.set_default(valid.loaded.manifest_id).ok
     default_id = valid.loaded.manifest_id
     invalid = {
-        "schema_version": 2,
+        "schema_version": 1,
         "components": {"not valid!": {"source_path": "../outside.py", "extra": True}},
         "recovery_rules": {"not valid!": {"component_id": "bad"}},
         "trusted_actions": {
@@ -260,12 +249,11 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
     assert {
         "field_unknown",
         "schema_version_unsupported",
-        "asset_invalid",
+        "manifest_unreadable",
         "logical_name_invalid",
         "logical_name_duplicate",
         "source_path_escape",
         "component_id_invalid",
-        "trusted_action_classification_invalid",
     } <= _codes(result)
     assert manager.default.manifest_id == default_id
     assert json.loads((manager.manifests_dir / "default.json").read_text(encoding="utf-8")) == {
@@ -356,11 +344,11 @@ def execute(ctx, *, amount: int = 1) -> dict[str, int]:
     assert all(error.line is not None for error in errors if error.code in {"except_forbidden", "import_forbidden"})
 
 
-def test_path_escape_and_conflicting_trusted_action_alias_are_rejected(tmp_path: Path) -> None:
+def test_path_escape_and_manifest_action_registration_are_rejected(tmp_path: Path) -> None:
     candidate = _write_candidate(tmp_path / "candidate")
     data = json.loads(candidate.read_text(encoding="utf-8"))
     data["components"]["steps.finish"] = {"source_path": "../outside.py"}
-    data["trusted_actions"]["control_alias"] = {
+    data["trusted_actions"] = {
         "source_path": "control.py",
         "classification": "observe",
     }
@@ -368,7 +356,7 @@ def test_path_escape_and_conflicting_trusted_action_alias_are_rejected(tmp_path:
 
     errors = ManifestManager(tmp_path / "formal").validate(candidate)
 
-    assert {"source_path_escape", "trusted_action_alias_conflict"} <= {
+    assert {"source_path_escape", "field_unknown"} <= {
         error.code for error in errors
     }
 
@@ -383,8 +371,10 @@ def test_import_failure_and_default_write_failure_keep_old_manifest(
     default_id = initial.loaded.manifest_id
 
     failing_sources = dict(SOURCES)
-    failing_sources["observe.py"] = '''"""Broken trusted observation."""
+    failing_sources["step.py"] = '''"""Broken trusted observation."""
+from lalc import step
 raise RuntimeError("import failed")
+@step
 def execute(ctx, *, name: str = "state") -> dict[str, str]:
     return {"name": name}
 '''
@@ -424,9 +414,11 @@ def test_static_error_prevents_every_component_import(tmp_path: Path) -> None:
     sources["task.py"] = SOURCES["task.py"].replace(
         'ctx.call("steps.finish", amount=amount)', "ctx.call(amount)"
     )
-    sources["observe.py"] = f'''"""Observation with a visible import side effect."""
+    sources["step.py"] = f'''"""Observation with a visible import side effect."""
 from pathlib import Path
+from lalc import step
 Path({str(marker)!r}).write_text("imported", encoding="utf-8")
+@step
 def execute(ctx, *, name: str = "state") -> dict[str, str]:
     return {{"name": name}}
 '''

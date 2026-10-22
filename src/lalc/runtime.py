@@ -500,7 +500,7 @@ class WorkflowExecutor:
 
         if replacement is None or replacement.role != "step":
             return "Current logical name must still identify a Step."
-        for section in ("trusted_actions", "recovery_rules"):
+        for section in ("recovery_rules",):
             if candidate.manifest[section] != self.manifest.manifest[section]:
                 return f"Runtime replacement cannot modify {section}."
         old = inspect.signature(original.module.execute)
@@ -577,14 +577,14 @@ class WorkflowExecutor:
         self.emit("safe_task_termination", {"logical_name": logical_name, "reason": reason})
 
     def trusted_action(self, logical_name: str, arguments: dict[str, Any]) -> Any:
-        """校验调用角色并执行 Manifest 固定的 Trusted Action。"""
+        """校验调用角色并执行应用注册的 Trusted Action。"""
 
         if not self._frames:
             raise ExecutionFailure("execution_failed", "Trusted Action called without a Component frame.")
         if self._active_action is not None:
             raise ExecutionFailure("execution_failed", "Trusted Actions cannot call another Trusted Action.")
         caller = self._frames[-1]
-        action = self.manifest.trusted_actions.get(logical_name)
+        action = self.manifest_manager.actions.get(logical_name) if self.manifest_manager else None
         if action is None:
             raise ExecutionFailure("execution_failed", f"Unknown Trusted Action: {logical_name}")
         allowed = self._ACTION_ACCESS.get((caller.role, caller.phase), set())
@@ -607,24 +607,23 @@ class WorkflowExecutor:
                 # 没有活动 Step 时保留当前观察调用，不重启已经返回的 Step。
                 component = self.manifest.components[caller.logical_name]
                 self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
-        inputs = _bind_and_normalize(action.module.execute, arguments)
+        inputs = _bind_and_normalize(action.execute, arguments)
         call_id = self._allocate_call_id()
         fields = {
             "call_id": call_id,
             "parent_call_id": caller.call_id,
             "manifest_id": self.manifest.manifest_id,
             "logical_name": logical_name,
-            "component_id": action.component_id,
-            "role": action.role,
+            "role": "trusted_action",
             "classification": action.classification,
             "inputs": _json_copy(inputs),
         }
         def invoke() -> Any:
             self._active_action = action.classification
             try:
-                result = action.module.execute(self.context, **_json_copy(inputs))
+                result = action.execute(self.context, **_json_copy(inputs))
                 return _normalize_output(result, get_type_hints(
-                    action.module.execute, globalns=action.module.execute.__globals__
+                    action.execute, globalns=action.execute.__globals__
                 )["return"])
             finally:
                 self._active_action = None
@@ -653,7 +652,7 @@ class WorkflowExecutor:
     def match_asset(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
         if self._active_action != "observe" or self._match_asset is None:
             raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
-        return self._match_asset(self.manifest.manifest["assets"], logical_name, **options)
+        return self._match_asset(self.manifest.assets, logical_name, **options)
 
     def crop_asset(self, logical_name: str, region: dict[str, int]) -> dict[str, Any]:
         if self._active_action != "observe" or self._crop_asset is None:
@@ -727,7 +726,7 @@ class WorkflowExecutor:
         self.emit(f"{event}_started", fields)
         started = time.monotonic()
         self._frames.append(_Frame(
-            fields["logical_name"], fields["component_id"], fields["role"], phase, fields["call_id"],
+            fields["logical_name"], fields.get("component_id", ""), fields["role"], phase, fields["call_id"],
         ))
         try:
             result = invoke()

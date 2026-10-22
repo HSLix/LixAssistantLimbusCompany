@@ -1,0 +1,9 @@
+{
+  "schema_version": 2,
+  "components": {
+    "steps.capture_screen": {
+      "source_path": "steps.capture_screen.py"
+    }
+  },
+  "recovery_rules": {}
+}

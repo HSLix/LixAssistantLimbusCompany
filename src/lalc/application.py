@@ -25,6 +25,7 @@ from .runtime import (
     WorkflowExecutor,
     atomic_write_json,
     _exception_fields,
+    sha256_bytes,
 )
 
 
@@ -63,7 +64,6 @@ class ApplicationService:
         self.asset_library = AssetLibrary(self.data_root)
         self._focused_session: FocusedAutomationSession | None = None
         self._input_session: InputSession | None = None
-        self._monitor_input = False
         self._fatal = False
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
@@ -189,6 +189,39 @@ class ApplicationService:
                 raise
             return {"window": window, "image": image, "image_path": str(image_path), "log_path": str(log_path)}
 
+    def crop_candidate_asset(
+        self, candidate_dir: Path, name: str, region: dict[str, int],
+        confirm: Callable[[str], bool],
+    ) -> dict[str, Any] | None:
+        """开发者现场裁剪只更新 Candidate 库；拒绝或取消时不保存图片与映射。"""
+
+        from .assets import asset_name
+
+        asset_name(name)
+        errors = self.manifest_manager.validate(candidate_dir / "manifest.json")
+        if errors:
+            raise StartError("candidate_invalid", "; ".join(error.message for error in errors), errors=errors)
+        library_path = candidate_dir / "assets.json"
+        mapping = self.asset_library.validate(json.loads(library_path.read_text(encoding="utf-8")))
+        session = FocusedAutomationSession(self._window_platform(), lambda *_: None)
+        session.capture()
+        assert session.image is not None and session.size is not None
+        content, _ = self.asset_library.crop_content(session.image, session.size, region)
+        existing = mapping.get(name, {}).get(self.game_language)
+        if existing is not None:
+            if existing["sha256"] == sha256_bytes(content):
+                return {"logical_name": name, "source_language": self.game_language, **existing,
+                        "image_path": str(self.asset_library.path(existing["path"])), "unchanged": True}
+            if not confirm(f"Asset {name!r} ({self.game_language}) already has an image. Replace Candidate mapping? [y/N] "):
+                return None
+        result = self.asset_library.save_crop(
+            name, self.game_language, session.image, session.size, region,
+            run_id=None, observation=session.observation,
+        )
+        mapping.setdefault(name, {})[self.game_language] = {key: result[key] for key in ("path", "sha256")}
+        atomic_write_json(library_path, mapping)
+        return result
+
     def _window_platform(self) -> Any:
         return self.window_platform if self.window_platform is not None else WindowsWindowPlatform(
             checkpoint=self._gate.checkpoint if self._gate is not None else None,
@@ -199,8 +232,6 @@ class ApplicationService:
 
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
-        if self._monitor_input:
-            self._ensure_input_session()
         try:
             result: dict[str, Any] = self._focused_session.capture()
         except WindowError:
@@ -257,8 +288,17 @@ class ApplicationService:
         assert self._input_session is not None
         self._input_session.execute(operation, arguments)
 
+    def _start_session(self) -> None:
+        """正式执行前连接并聚焦游戏窗口，随后启动本次 Run 的输入监听。"""
+
+        assert self._gate is not None
+        self._gate.checkpoint()
+        self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
+        self._focused_session.connect()
+        self._ensure_input_session()
+
     def _ensure_input_session(self) -> None:
-        """包含控制的 Run 从首次窗口观察起监测接管；纯观察无需安装钩子。"""
+        """每个 Run 开始时建立输入监测，生命周期由 worker 统一清理。"""
 
         assert self._focused_session is not None
         if self._input_session is None:
@@ -308,7 +348,6 @@ class ApplicationService:
         self._gate = gate
         self._focused_session = None
         self._input_session = None
-        self._monitor_input = any(action.classification == "control" for action in snapshot.trusted_actions.values())
         self._trace_path = trace_path
         self._ledger = WorkflowRunLedger(self.data_root, run_id)
         self._state.update(
@@ -444,6 +483,7 @@ class ApplicationService:
         started = time.monotonic()
         started_at = datetime.now(UTC).isoformat()
         try:
+            self._start_session()
             result = executor.run(logical_name, component, inputs)
             if component.role == "task_workflow":
                 assert self._ledger is not None
@@ -459,6 +499,13 @@ class ApplicationService:
                     result, datetime.now(UTC).isoformat(),
                     round((time.monotonic() - started) * 1000, 3),
                 )
+        except UserInterruption as error:
+            if error.reason != "cancel":
+                raise
+            result = WorkflowExecutor._failure(logical_name, component, "user_cancelled", "Run cancelled.")
+        except (WindowError, OSError) as error:
+            result = {**WorkflowExecutor._failure(logical_name, component, "execution_failed", str(error)),
+                      **_exception_fields(error)}
         except LedgerWriteError as error:
             result = {**WorkflowExecutor._failure(logical_name, component, "ledger_write_failed", str(error)),
                       **_exception_fields(error)}
@@ -505,6 +552,7 @@ class ApplicationService:
         reason: str | None = None
         diagnostic: dict[str, Any] = {}
         try:
+            self._start_session()
             for index, item in enumerate(items):
                 gate.checkpoint()
                 assert self._ledger is not None
@@ -711,7 +759,7 @@ def _manifest_snapshot(manifest: LoadedManifest) -> LoadedManifest:
         deepcopy(manifest.manifest),
         dict(manifest.components),
         dict(manifest.recovery_rules),
-        dict(manifest.trusted_actions),
+        deepcopy(manifest.assets),
     )
 
 

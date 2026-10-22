@@ -49,15 +49,15 @@ A formal immutable Python Component that identifies one cross-Workflow external 
 _Avoid_: Error node, task-specific branch, global exception plugin
 
 **Trusted Action**:
-An immutable, shipped or human-approved low-level Python operation whose fixed `execute` function is registered once as `observe` or `control` in the Manifest's dedicated `trusted_actions` mapping. `observe` reads screenshots, recognition, or environment state; `control` includes input and execution waits. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed role matrix; runtime dispatch verifies classification, caller role, arguments, and the Manifest-pinned Component ID against the source bytes and records the invocation. An Agent cannot create or replace a Trusted Action during a Top-level Execution, and generated code does not become trusted merely by performing the same operation.
+A shipped or human-approved low-level Python operation registered by the application once as `observe` or `control` and shared by all Manifests. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed permission matrix, validation, timing, and Trace; the Agent cannot create, replace, or reclassify it, and a Manifest does not select its implementation.
 _Avoid_: Step, Agent-generated function, unrestricted Python call
 
 **Asset**:
-A stable semantic resource name whose Manifest entry maps each recorded game language to one relative Asset Library path and complete content hash. It is not a Component, has no Component ID, and has no language or file extension in its logical name.
+A stable semantic resource name resolved by game language through the current Manifest's dedicated Asset Library mapping to a relative file path and complete content hash. It is not a Component, has no Component ID, and has no language or file extension in its logical name.
 _Avoid_: Asset Component, image version, absolute resource path
 
 **Asset Library**:
-The shared local store of Asset files used by all Manifests; existing files cannot be modified by the Agent. Manifests reference these files by relative path and complete content hash rather than copying them.
+The collection of semantic-name/language mappings dedicated to one Manifest, referencing globally shared Asset files. A published library stays unchanged; developers edit the Developer Candidate library and publish a new Manifest/library pair. Different Manifests reuse image files independently; duplicates require both semantic name and language to match.
 _Avoid_: Manifest attachment, staging library
 
 **Asset Usage Index**:
@@ -65,11 +65,15 @@ Mutable local Asset metadata keyed by logical name, running game language, and c
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, containing developer-authored Component source intended for validation and publication. It shares Manifest format and validation rules with runtime proposals but remains separate from their runtime storage protected from Agent modification.
+The one editable complete Manifest draft in a project checkout, containing developer-authored Component source intended for validation and publication. Agent-assisted Component Repair produces isolated candidate source for developer review and publication through this same path; it does not overwrite an existing developer draft or formal source. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
+**Agent-assisted Component Repair**:
+A manually initiated repair of one existing Component using supplied screenshots, exception information and context. The Agent reads source, makes local candidate edits and checks them with the existing Validator, yielding complete candidate source, a Diff and validation results for subsequent developer review and Publish. It retains the model inputs, tool operations and final outputs of the invocation and neither takes over a running Workflow nor changes formal source or the Default Manifest.
+_Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
+
 **Capability Bundle**:
-The transport-neutral software-release data package containing one complete retained Component Manifest and every immutable Component and referenced Asset file. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.
+The transport-neutral software-release data package containing one complete retained Component Manifest, its dedicated Asset Library mapping, and every immutable Component and referenced Asset file. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.
 _Avoid_: Developer Candidate, application binary, single-Component package
 
 **Recovery Ladder**:
@@ -85,7 +89,7 @@ The executor-owned chronological record of what one real execution attempt actua
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:
-The retained record of one Agent Turn, including the information supplied to the Agent and its complete response. Execution Trace references it when the executor acts on that response.
+The retained record of information supplied to an Agent, its tool operations and results, and its outputs. An independent repair invocation groups all its model exchanges into one retained record; runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
 _Avoid_: Execution Trace, Agent memory
 
 **Agent Adapter**:
@@ -173,10 +177,10 @@ The human-governed process that turns evidence from Runtime Exception Handling i
 _Avoid_: Self-modification, automatic evolution
 
 **Capability Expansion**:
-A deferred activity in which an Agent explores and constructs support for a previously unsupported objective. Stage 3 may change existing Steps, Task Workflows, and Subworkflows to repair a supported task, but does not draft a new user-startable objective or continue execution across an unwound Workflow frame.
+A deferred activity in which an Agent explores and constructs support for a previously unsupported objective. Runtime repair may change existing Steps, Task Workflows, and Subworkflows to repair a supported task, but does not draft a new user-startable objective or continue execution across an unwound Workflow frame.
 _Avoid_: Runtime Step Recovery, Step Maintenance
 
-Permanent approval is a supervised judgment over one complete Capability Proposal and its recorded evidence. Stage 3 does not encode a universal business-success threshold for that judgment: whether the candidate completed a successful formal trial, Step results, Task Workflow results and checking-Step evidence, Trace, and Validation Coverage are visible evidence, not automatic approval gates or authority. Unattended execution never grants permanent approval.
+Permanent approval is a supervised judgment over one complete Capability Proposal and its recorded evidence. Runtime approval does not encode a universal business-success threshold for that judgment: whether the candidate completed a successful formal trial, Step results, Task Workflow results and checking-Step evidence, Trace, and Validation Coverage are visible evidence, not automatic approval gates or authority. Unattended execution never grants permanent approval.
 
 **Supervised Operation**:
 A first-version runtime rule in which every Agent-proposed complete Manifest update requires review and an explicit approve-or-reject decision before its changed Components execute in the current Top-level Execution. Rejection requires user feedback for the next Agent Turn. Approval permits the selected Manifest to run for this execution; it is separate from permanent approval after the execution ends. The system-level stop remains an independent immediate cancellation control.
@@ -187,9 +191,6 @@ Changed Steps and Workflows use the ordinary Component execution path and their 
 The topmost modal decision boundary for one structurally valid runtime proposal. It blocks all main-window interaction until the supervisor approves one formal trial, rejects with required feedback for a later Agent Turn, or confirms cancellation of the Agent and current Task Workflow; it cannot be dismissed through the window close action or Escape key.
 _Avoid_: Editor, notification, permanent approval
 
-The Stage 3 Agent Runtime Step Recovery and Maintenance architecture is accepted. Context field selection, serialization, concrete validators, UI behavior, persistence mechanics, and Demo acceptance are implementation and experiment-planning concerns rather than unresolved architecture decisions.
-_Avoid_: Developer mode, manual mode
-
 **Capability Proposal**:
 A reviewable post-execution choice of the execution's current Working Manifest when its ID has not already received permanent approval. Earlier attempted Manifests remain saved by ID as history but are not separate approval candidates. Ending on the Base Manifest or another already approved ID skips repeated approval. Otherwise the review shows the Task Workflow's final result and checking-Step evidence, including failure reasons, trial evidence, and changes from the Base Manifest. A failed verification does not prevent the user from permanently approving that Working Manifest ID; approval is whole-Manifest.
 _Avoid_: File change, patch
@@ -199,7 +200,7 @@ The topmost modal post-execution decision boundary for one complete Capability P
 _Avoid_: Supervised Review Dialog, partial approval, runtime confirmation
 
 **Component**:
-An immutable Python Task Workflow, Subworkflow, Step, Recovery Rule, or Trusted Action that a Component Manifest may reference. Its Component ID is `sha256:` followed by the SHA-256 of its exact source bytes, with no separate source-hash field. Formal Task Workflow, Subworkflow, Step, Step condition, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. Trusted Actions are the only Components allowed to normalize caught low-level exceptions. Editing changes the Component ID rather than changing existing content.
+An immutable Python Task Workflow, Subworkflow, Step, or Recovery Rule that a Component Manifest may reference; application-registered Trusted Actions are not Manifest source Components. Its Component ID is `sha256:` followed by the SHA-256 of its exact source bytes, with no separate source-hash field. Formal Task Workflow, Subworkflow, Step, Step condition, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. The Trusted Action boundary alone may normalize caught low-level exceptions. Editing changes the Component ID rather than changing existing content.
 _Avoid_: Component Revision, mutable component
 
 **Component Logical Name**:
@@ -207,7 +208,7 @@ The stable dotted lookup key used by a Manifest, such as `steps.enter_stage`, to
 _Avoid_: Component ID, version chain
 
 **Component Manifest**:
-The sole saved version unit: a validated complete document protected from Agent modification identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs, while its Asset mapping resolves semantic names and languages to shared files and hashes. Every Manifest used for an execution attempt is saved by Manifest ID; reusing that Manifest records another attempt in Trace under the same ID. Any saved Manifest, including an intermediate attempt, may be explicitly selected for a later execution regardless of its permanent approval status. Intermediate attempts are not separately offered for post-execution approval; the current Working Manifest is offered only when its ID has not already received permanent approval. Choosing whether to set an approved current Working Manifest as Default is a separate decision.
+The sole saved version unit: a validated complete document protected from Agent modification identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs, while its dedicated Asset Library is maintained separately from the document and Trusted Actions are registered by the application. Every Manifest used for an execution attempt is saved by Manifest ID; reusing that Manifest records another attempt in Trace under the same ID. Any saved Manifest, including an intermediate attempt, may be explicitly selected for a later execution regardless of its permanent approval status. Intermediate attempts are not separately offered for post-execution approval; the current Working Manifest is offered only when its ID has not already received permanent approval. Choosing whether to set an approved current Working Manifest as Default is a separate decision.
 _Avoid_: Approval history, mutable component list
 
 **Default Manifest**:

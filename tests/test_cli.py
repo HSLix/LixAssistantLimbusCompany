@@ -14,7 +14,7 @@ import lalc.__main__ as cli
 from lalc.manifest import ManifestManager, ManifestResult, ValidationError
 
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "virtual-workflow"
+FIXTURE = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "virtual-workflow"
 
 
 def test_start_rejection_prints_every_import_traceback(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -61,7 +61,7 @@ def test_complete_developer_cli_lifecycle(
     manifest_path = candidate / "manifest.json"
     assert json.loads(manifest_path.read_text(encoding="utf-8"))["components"] == {}
 
-    for source in EXAMPLE.iterdir():
+    for source in FIXTURE.iterdir():
         shutil.copyfile(source, candidate / source.name)
 
     assert cli.main(["validate"]) == 0
@@ -137,10 +137,9 @@ def test_complete_developer_cli_lifecycle(
     assert cli.main(["init"]) == 0
     materialized = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert materialized["components"]["tasks.greet"] == {"source_path": "tasks.greet.py"}
-    assert (candidate / "tasks.greet.py").read_bytes() == (EXAMPLE / "tasks.greet.py").read_bytes()
+    assert (candidate / "tasks.greet.py").read_bytes() == (FIXTURE / "tasks.greet.py").read_bytes()
 
     assert cli.main(["clear"]) == 0
     assert cli.main(["init", "--from", manifest_id]) == 0
-    assert (candidate / "actions.name_ready.py").read_bytes() == (
-        EXAMPLE / "actions.name_ready.py"
-    ).read_bytes()
+    assert not (candidate / "actions.name_ready.py").exists()
+    assert (candidate / "assets.json").read_text(encoding="utf-8").strip() == "{}"

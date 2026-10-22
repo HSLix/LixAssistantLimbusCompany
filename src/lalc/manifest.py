@@ -9,18 +9,20 @@ import sys
 import tempfile
 import types
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from types import MappingProxyType
 
+from .actions import TrustedAction, application_actions
 from .runtime import _exception_fields, atomic_write_json, sha256_bytes
 from .assets import AssetLibrary
 
-SCHEMA_VERSION = 1
-SECTIONS = ("components", "recovery_rules", "trusted_actions")
+SCHEMA_VERSION = 2
+SECTIONS = ("components", "recovery_rules")
 ROLES = {"task_workflow", "sub_workflow", "step"}
-CLASSIFICATIONS = {"observe", "control"}
-TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS, "assets"}
+TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS}
 SAVED_TOP_LEVEL_FIELDS = {*TOP_LEVEL_FIELDS, "manifest_id"}
 COMPONENT_ID_PREFIX = "sha256:"
 
@@ -50,7 +52,6 @@ class LoadedComponent:
     component_id: str
     module: types.ModuleType
     role: str
-    classification: str | None = None
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,7 @@ class LoadedManifest:
     manifest: dict[str, Any]
     components: dict[str, LoadedComponent]
     recovery_rules: dict[str, LoadedComponent]
-    trusted_actions: dict[str, LoadedComponent]
+    assets: dict[str, Any]
 
     @property
     def manifest_id(self) -> str:
@@ -97,6 +98,7 @@ class _Prepared:
     sources: dict[str, _Source] = field(default_factory=dict)
     roles: dict[str, str] = field(default_factory=dict)
     errors: list[ValidationError] = field(default_factory=list)
+    assets: dict[str, Any] = field(default_factory=dict)
 
 
 # 同一内容在不同存储根目录加载时，源码位置也必须对应各自的哈希文件。
@@ -111,13 +113,14 @@ class ManifestManager:
         data_root: Path,
         *,
         logger: logging.Logger | None = None,
-        trusted_action_imports: frozenset[str] = frozenset(),
+        actions: Mapping[str, TrustedAction] | None = None,
     ) -> None:
         self.data_root = Path(data_root)
         self.components_dir = self.data_root / "components"
         self.manifests_dir = self.data_root / "manifests"
         self.logger = logger or logging.getLogger(__name__)
-        self.trusted_action_imports = trusted_action_imports
+        self.actions = MappingProxyType(dict(application_actions() if actions is None else actions))
+        self.asset_libraries_dir = self.data_root / "asset-libraries"
         self.default: LoadedManifest | None = None
 
     def publish(self, candidate_path: Path) -> ManifestResult:
@@ -134,7 +137,7 @@ class ManifestManager:
             manifest_id = str(uuid.uuid4())
             assert prepared.manifest is not None
             manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
-            manifest.update({name: prepared.manifest[name] for name in (*SECTIONS, "assets")})
+            manifest.update({name: prepared.manifest[name] for name in SECTIONS})
             phase = "write_components"
             self.components_dir.mkdir(parents=True, exist_ok=True)
             self.manifests_dir.mkdir(parents=True, exist_ok=True)
@@ -149,6 +152,10 @@ class ManifestManager:
             manifest_path = self.manifests_dir / f"{manifest_id}.json"
             if manifest_path.exists():
                 raise FileExistsError(manifest_path)
+            library_path = self.asset_libraries_dir / f"{manifest_id}.json"
+            if library_path.exists():
+                raise FileExistsError(library_path)
+            atomic_write_json(library_path, prepared.assets)
             atomic_write_json(manifest_path, manifest)
             return ManifestResult(loaded=loaded)
         except Exception as error:
@@ -260,7 +267,10 @@ class ManifestManager:
             if path.name == "default.json":
                 continue
             data, errors = self._read_json(path)
-            if errors or not isinstance(data, dict):
+            if (errors or not isinstance(data, dict)
+                    or set(data) != SAVED_TOP_LEVEL_FIELDS
+                    or type(data.get("schema_version")) is not int
+                    or data["schema_version"] != SCHEMA_VERSION):
                 continue
             sections = {
                 name: len(data.get(name, {})) if isinstance(data.get(name), dict) else 0
@@ -293,6 +303,7 @@ class ManifestManager:
                 ),
             )
 
+        assets: dict[str, Any] = {}
         if manifest_id is None:
             retained = any(
                 path.name != "default.json" for path in self.manifests_dir.glob("*.json")
@@ -302,8 +313,6 @@ class ManifestManager:
                     "schema_version": SCHEMA_VERSION,
                     "components": {},
                     "recovery_rules": {},
-                    "trusted_actions": {},
-                    "assets": {},
                 }
             else:
                 result = self.load_default()
@@ -311,12 +320,14 @@ class ManifestManager:
                     return result.errors
                 assert result.loaded is not None
                 manifest = result.loaded.manifest
+                assets = result.loaded.assets
         else:
             result = self.load(manifest_id)
             if not result.ok:
                 return result.errors
             assert result.loaded is not None
             manifest = result.loaded.manifest
+            assets = result.loaded.assets
 
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
@@ -325,8 +336,6 @@ class ManifestManager:
                 "schema_version": SCHEMA_VERSION,
                 "components": {},
                 "recovery_rules": {},
-                "trusted_actions": {},
-                "assets": dict(manifest.get("assets", {})),
             }
             for section in SECTIONS:
                 for logical_name, entry in manifest.get(section, {}).items():
@@ -337,9 +346,8 @@ class ManifestManager:
                         (self.components_dir / f"{digest}.py").read_bytes()
                     )
                     candidate_entry = {"source_path": filename}
-                    if section == "trusted_actions":
-                        candidate_entry["classification"] = entry["classification"]
                     candidate[section][logical_name] = candidate_entry
+            atomic_write_json(temporary / "assets.json", assets)
             atomic_write_json(temporary / "manifest.json", candidate)
             if target.exists():
                 target.rmdir()
@@ -369,7 +377,7 @@ class ManifestManager:
         self._check_fields(data, allowed, required, prepared.errors)
         if data.get("schema_version") != SCHEMA_VERSION or isinstance(data.get("schema_version"), bool):
             prepared.errors.append(
-                ValidationError("schema_version_unsupported", "schema_version must be integer 1.")
+                ValidationError("schema_version_unsupported", "schema_version must be integer 2; legacy formats are not supported.")
             )
         if saved:
             self._check_manifest_id(data.get("manifest_id"), prepared.errors)
@@ -378,7 +386,7 @@ class ManifestManager:
                 ValidationError("manifest_id_forbidden", "Candidate Manifest cannot provide manifest_id.")
             )
 
-        for section in (*SECTIONS, "assets"):
+        for section in SECTIONS:
             if section in data and not isinstance(data[section], dict):
                 prepared.errors.append(
                     ValidationError("manifest_field_type_invalid", f"{section} must be an object.")
@@ -412,18 +420,21 @@ class ManifestManager:
             "schema_version": SCHEMA_VERSION,
             "components": {},
             "recovery_rules": {},
-            "trusted_actions": {},
-            "assets": {},
         }
         if saved and isinstance(data.get("manifest_id"), str):
             normalized["manifest_id"] = data["manifest_id"]
 
-        if isinstance(data.get("assets"), dict) and data["assets"]:
-            try:
-                normalized["assets"] = AssetLibrary(self.data_root).validate(data["assets"])
-            except Exception as error:
-                self.logger.exception("Asset validation failed")
-                prepared.errors.append(ValidationError("asset_invalid", str(error), cause=error))
+        if not any(error.code == "manifest_id_invalid" for error in prepared.errors):
+            library_path = (self.asset_libraries_dir / f"{data.get('manifest_id')}.json"
+                            if saved else manifest_path.parent / "assets.json")
+            mapping, errors = self._read_json(library_path)
+            prepared.errors.extend(errors)
+            if not errors:
+                try:
+                    prepared.assets = AssetLibrary(self.data_root).validate(mapping)
+                except Exception as error:
+                    self.logger.exception("Asset Library validation failed")
+                    prepared.errors.append(ValidationError("asset_invalid", str(error), cause=error))
 
         for section in SECTIONS:
             for logical_name, entry in data[section].items():
@@ -434,7 +445,6 @@ class ManifestManager:
                     normalized[section][logical_name] = normalized_entry
         prepared.manifest = normalized
 
-        self._validate_aliases(normalized, prepared.errors)
         self._parse_sources(normalized, prepared)
         self._validate_calls(normalized, prepared)
         return prepared
@@ -456,9 +466,7 @@ class ManifestManager:
         allowed = {"component_id"}
         if not saved:
             allowed.add("source_path")
-        if section == "trusted_actions":
-            allowed.add("classification")
-        required = {"classification"} if section == "trusted_actions" else set()
+        required: set[str] = set()
         self._check_fields(entry, allowed, required, prepared.errors, logical_name)
 
         component_id = entry.get("component_id")
@@ -496,16 +504,6 @@ class ManifestManager:
                 )
                 return None
 
-        classification = entry.get("classification")
-        if section == "trusted_actions" and classification not in CLASSIFICATIONS:
-            prepared.errors.append(
-                ValidationError(
-                    "trusted_action_classification_invalid",
-                    "classification must be 'observe' or 'control'.",
-                    logical_name,
-                )
-            )
-
         if isinstance(source_path, str):
             source = self._candidate_source(manifest_path, source_path, logical_name, prepared.errors)
             if source is None:
@@ -539,8 +537,6 @@ class ManifestManager:
             return None
 
         normalized = {"component_id": component_id}
-        if section == "trusted_actions" and classification in CLASSIFICATIONS:
-            normalized["classification"] = classification
         return normalized
 
     def _candidate_source(
@@ -624,8 +620,6 @@ class ManifestManager:
                         prepared.roles[logical_name] = role
                 elif section == "recovery_rules":
                     self._validate_recovery_source(source.tree, logical_name, prepared.errors)
-                else:
-                    self._validate_trusted_action_source(source.tree, logical_name, prepared.errors)
             self._validate_source_structure(source.tree, references.get(component_id, []), prepared.errors)
 
     def _validate_component_source(
@@ -723,59 +717,39 @@ class ManifestManager:
                 )
         self._reject_role_decorators(tree, logical_name, errors)
 
-    def _validate_trusted_action_source(
-        self, tree: ast.Module, logical_name: str, errors: list[ValidationError]
-    ) -> None:
-        functions = self._top_functions(tree).get("execute", [])
-        if len(functions) != 1:
-            errors.append(
-                ValidationError("execute_invalid", "Trusted Action must define exactly one execute function.", logical_name)
-            )
-        else:
-            self._validate_execute_signature(functions[0], logical_name, errors)
-        self._reject_role_decorators(tree, logical_name, errors)
-
     def _validate_source_structure(
         self,
         tree: ast.Module,
         references: list[tuple[str, str]],
         errors: list[ValidationError],
     ) -> None:
-        formal = any(section != "trusted_actions" for section, _ in references)
         logical_name = references[0][1] if references else None
         if not ast.get_docstring(tree, clean=False):
             errors.append(ValidationError("module_docstring_missing", "Component needs a module docstring.", logical_name))
-        if formal:
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ExceptHandler):
-                    errors.append(
-                        self._node_error("except_forbidden", "Formal Component cannot catch exceptions.", logical_name, node)
-                    )
-                if isinstance(node, ast.Try):
-                    for child in node.finalbody:
-                        for nested in ast.walk(child):
-                            if isinstance(nested, (ast.Return, ast.Break, ast.Continue, ast.Raise)):
-                                errors.append(
-                                    self._node_error(
-                                        "finally_control_flow_forbidden",
-                                        "finally cannot replace or suppress the active result or exception.",
-                                        logical_name,
-                                        nested,
-                                    )
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ExceptHandler):
+                errors.append(
+                    self._node_error("except_forbidden", "Formal Component cannot catch exceptions.", logical_name, node)
+                )
+            if isinstance(node, ast.Try):
+                for child in node.finalbody:
+                    for nested in ast.walk(child):
+                        if isinstance(nested, (ast.Return, ast.Break, ast.Continue, ast.Raise)):
+                            errors.append(
+                                self._node_error(
+                                    "finally_control_flow_forbidden",
+                                    "finally cannot replace or suppress the active result or exception.",
+                                    logical_name,
+                                    nested,
                                 )
-        self._validate_imports(
-            tree,
-            logical_name,
-            errors,
-            frozenset() if formal else self.trusted_action_imports,
-        )
+                            )
+        self._validate_imports(tree, logical_name, errors)
 
     def _validate_imports(
         self,
         tree: ast.Module,
         logical_name: str | None,
         errors: list[ValidationError],
-        extra_roots: frozenset[str],
     ) -> None:
         allowed = sys.stdlib_module_names
         for node in ast.walk(tree):
@@ -791,7 +765,6 @@ class ManifestManager:
             if relative or any(
                 module != "lalc"
                 and module.split(".", 1)[0] not in allowed
-                and module.split(".", 1)[0] not in extra_roots
                 for module in modules
             ):
                 errors.append(
@@ -806,11 +779,7 @@ class ManifestManager:
     def _validate_calls(self, manifest: dict[str, Any], prepared: _Prepared) -> None:
         """校验静态调用目标、角色限制和 Trusted Action 权限。"""
 
-        actions = {
-            name: entry.get("classification")
-            for name, entry in manifest["trusted_actions"].items()
-            if entry.get("classification") in CLASSIFICATIONS
-        }
+        actions = {name: action.classification for name, action in self.actions.items()}
         for logical_name, entry in manifest["components"].items():
             source = prepared.sources.get(entry["component_id"])
             role = prepared.roles.get(logical_name)
@@ -983,15 +952,8 @@ class ManifestManager:
                             ValidationError("component_runtime_callable_missing", "Recovery callable missing.", name)
                         )
                         continue
-                else:
-                    role = "trusted_action"
-                    if not callable(getattr(module, "execute", None)):
-                        errors.append(
-                            ValidationError("component_runtime_callable_missing", "Trusted Action execute missing.", name)
-                        )
-                        continue
                 loaded_sections[section][name] = LoadedComponent(
-                    component_id, module, role, entry.get("classification")
+                    component_id, module, role
                 )
         if errors:
             return None, errors
@@ -1000,7 +962,7 @@ class ManifestManager:
                 manifest,
                 loaded_sections["components"],
                 loaded_sections["recovery_rules"],
-                loaded_sections["trusted_actions"],
+                prepared.assets,
             ),
             [],
         )
@@ -1308,24 +1270,6 @@ class ManifestManager:
         if not call.args or not isinstance(call.args[0], ast.Constant) or not isinstance(call.args[0].value, str):
             return None
         return call.args[0].value
-
-    @staticmethod
-    def _validate_aliases(manifest: dict[str, Any], errors: list[ValidationError]) -> None:
-        classifications: dict[str, str] = {}
-        for name, entry in manifest["trusted_actions"].items():
-            component_id = entry.get("component_id")
-            classification = entry.get("classification")
-            if component_id is None or classification is None:
-                continue
-            previous = classifications.setdefault(component_id, classification)
-            if previous != classification:
-                errors.append(
-                    ValidationError(
-                        "trusted_action_alias_conflict",
-                        "Aliases of one Trusted Action must use the same classification.",
-                        name,
-                    )
-                )
 
     @staticmethod
     def _node_error(

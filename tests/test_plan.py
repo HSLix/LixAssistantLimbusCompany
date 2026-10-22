@@ -54,14 +54,15 @@ def _publish(
     candidate.mkdir(parents=True)
     for name, source in {"task.py": task_source, "sub.py": SUB, "step.py": step_source}.items():
         (candidate / name).write_text(source, encoding="utf-8")
+    (candidate / "assets.json").write_text("{}", encoding="utf-8")
     (candidate / "manifest.json").write_text(json.dumps({
-        "schema_version": 1,
+        "schema_version": 2,
         "components": {
             "tasks.double": {"source_path": "task.py"},
             "flows.double": {"source_path": "sub.py"},
             "steps.double": {"source_path": "step.py"},
         },
-        "recovery_rules": {}, "trusted_actions": {}, "assets": {},
+        "recovery_rules": {},
     }), encoding="utf-8")
     manager = manager or ManifestManager(root)
     published = manager.publish(candidate / "manifest.json")

@@ -70,28 +70,25 @@ def _publish(
         "task.py": task_source,
         "sub.py": sub_source,
         "step.py": step_source,
-        "observe.py": OBSERVE_SOURCE,
-        "control.py": control_source,
     }
     for name, source in sources.items():
         (candidate / name).write_text(source, encoding="utf-8")
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "components": {
             "tasks.rotate_teams": {"source_path": "task.py"},
             "flows.run_once": {"source_path": "sub.py"},
             "steps.run_team": {"source_path": "step.py"},
         },
         "recovery_rules": {},
-        "trusted_actions": {
-            "fake_observe": {"source_path": "observe.py", "classification": "observe"},
-            "fake_control": {"source_path": "control.py", "classification": "control"},
-        },
-        "assets": {},
     }
+    (candidate / "assets.json").write_text("{}", encoding="utf-8")
     path = candidate / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
-    manager = manager or ManifestManager(root)
+    if manager is None:
+        manager = ManifestManager(root)
+        from runtime_support import register_sources
+        register_sources(manager, {"fake_observe": (OBSERVE_SOURCE, "observe"), "fake_control": (control_source, "control")})
     result = manager.publish(path)
     assert result.ok, result.errors
     assert manager.set_default(result.loaded.manifest_id).ok
@@ -139,7 +136,7 @@ def test_complete_task_uses_real_manifest_executor_and_persists_trace(tmp_path: 
     assert step_call["parent_call_id"] == sub_call["call_id"]
     action = next(event for event in state["trace"] if event["event"] == "trusted_action_started")
     assert action["classification"] in {"observe", "control"}
-    assert action["component_id"].startswith("sha256:")
+    assert "component_id" not in action
     assert not any(event["event"].startswith("verification_") for event in state["trace"])
     persisted = [
         json.loads(line)
@@ -208,18 +205,16 @@ def test_manifest_snapshot_pause_resume_and_stop(
     service = ApplicationService(tmp_path, manifest_manager=manager)
     observe_entered = threading.Event()
     observe_release = threading.Event()
-    original_observe = manager.default.trusted_actions["fake_observe"].module.execute
+    original_observe = manager.actions["fake_observe"].execute
 
     def blocking_observe(ctx, *, completed: int, target: int) -> bool:
         observe_entered.set()
         observe_release.wait()
         return original_observe(ctx, completed=completed, target=target)
 
-    monkeypatch.setattr(
-        manager.default.trusted_actions["fake_observe"].module,
-        "execute",
-        blocking_observe,
-    )
+    from types import MappingProxyType
+    from lalc.actions import TrustedAction
+    manager.actions = MappingProxyType({**manager.actions, "fake_observe": TrustedAction(blocking_observe, "observe")})
 
     first_run = service.start("tasks.rotate_teams", {"teams": ["old"], "runs": 1})
     observe_entered.wait()

@@ -4,6 +4,8 @@ status: accepted
 
 # Keep Agent recovery optional and bounded
 
+ADR 0025 moves the runtime recovery, supervised trial, and Agent Asset creation scope described here to Stage 3.5. Current Stage 3 is independent single-Component repair; these runtime contracts are not its prerequisites.
+
 LALC keeps normal automation deterministic and independent of any model. The Agent is an optional module invoked only after an Execution Anomaly leaves an existing supported task paused inside a Step; it may diagnose evidence and propose a formal candidate maintenance change, but permanent capability still requires later human approval. This preserves a model-free product path while allowing bounded repair of known automation.
 
 ## Consequences

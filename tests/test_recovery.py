@@ -86,7 +86,7 @@ def _publish(
     for name, source in sources.items():
         (folder / name).write_text(source, encoding="utf-8")
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "components": {
             "tasks.run": {"source_path": "task.py"},
             "flows.next": {"source_path": "sub.py"},
@@ -95,9 +95,8 @@ def _publish(
         "recovery_rules": {
             name: {"source_path": f"{name}.py"} for name in (rules or {})
         },
-        "trusted_actions": {},
-        "assets": {},
     }
+    (folder / "assets.json").write_text("{}", encoding="utf-8")
     path = folder / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     result = manager.publish(path)
@@ -220,7 +219,7 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
         assert state["result"]["failure_code"] == "execution_failed"
         assert events.count("safe_task_termination") == 1
         assert "component_started" not in events[events.index("execution_anomaly"):]
-    assert json.loads((tmp_path / "runs" / "1.json").read_text())["working_manifest_id"] == manifest_id
+    assert json.loads((tmp_path / "runs" / "1.json").read_text(encoding="utf-8"))["working_manifest_id"] == manifest_id
 
 
 def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path: Path) -> None:
@@ -239,7 +238,7 @@ def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path
     assert state["base_manifest_id"] == base
     assert state["working_manifest_id"] == replacement
     assert state["attempted_manifest_ids"] == [base, replacement]
-    persisted = json.loads((tmp_path / "runs" / "1.json").read_text())
+    persisted = json.loads((tmp_path / "runs" / "1.json").read_text(encoding="utf-8"))
     assert persisted == {
         "base_manifest_id": base,
         "working_manifest_id": replacement,
@@ -365,9 +364,9 @@ def test_invalid_complete_manifest_cannot_replace_working_manifest(tmp_path: Pat
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     invalid = _publish(tmp_path, manager, step_source=NEW_STEP, rules=rules)
     path = manager.manifests_dir / f"{invalid}.json"
-    document = json.loads(path.read_text())
+    document = json.loads(path.read_text(encoding="utf-8"))
     document["components"]["steps.break"]["component_id"] = "sha256:" + "0" * 64
-    path.write_text(json.dumps(document))
+    path.write_text(json.dumps(document), encoding="utf-8")
     assert manager.set_default(base).ok
     choices = iter([invalid, None])
     service = ApplicationService(tmp_path, manifest_manager=manager, recovery_choice=lambda *_: next(choices))
@@ -403,5 +402,5 @@ def test_working_manifest_write_failure_prevents_replacement_execution(
 
     assert state["result"]["failure_code"] == "working_manifest_write_failed"
     assert state["working_manifest_id"] == base
-    assert json.loads((tmp_path / "runs" / "1.json").read_text())["working_manifest_id"] == base
+    assert json.loads((tmp_path / "runs" / "1.json").read_text(encoding="utf-8"))["working_manifest_id"] == base
     assert not any(event["event"] == "component_started" and event["component_id"] == replacement_step_id for event in state["trace"])

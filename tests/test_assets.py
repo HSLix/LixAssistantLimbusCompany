@@ -93,7 +93,7 @@ def test_language_selection_index_and_no_automatic_mapping(tmp_path: Path) -> No
     assert found[0]["normalized_region"]["x"] == 2 / 12
     assert mapping == original
     assert not (tmp_path / "evidence").exists()
-    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text()).values()))
+    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8")).values()))
     assert stored["detections"] == found
     assert stored["observation"] == 7 and stored["trace_path"] == "traces/3.jsonl"
     before = (tmp_path / "asset-usage.json").read_bytes()
@@ -133,6 +133,10 @@ class Window:
     def find_windows(self):
         return [7]
 
+    def create_input_backend(self):
+        from test_input_control import FakeInput
+        return FakeInput()
+
     def focus(self, hwnd):
         pass
 
@@ -166,19 +170,18 @@ def execute(ctx) -> str:
 
 def publish(folder: Path, manager: ManifestManager, mapping: dict, source: str = STEP) -> str:
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "step.py").write_text(source)
-    (folder / "action.py").write_text(ACTION)
-    (folder / "capture.py").write_text('''"""刷新内存截图。"""
+    (folder / "step.py").write_text(source, encoding="utf-8")
+    capture = '''"""刷新内存截图。"""
 def execute(ctx) -> int:
     return ctx.capture_screen()["observation"]
-''')
-    candidate = {"schema_version": 1, "components": {"steps.find": {"source_path": "step.py"}},
-                 "trusted_actions": {
-                     "observe.capture": {"source_path": "capture.py", "classification": "observe"},
-                     "observe.match": {"source_path": "action.py", "classification": "observe"}},
-                 "recovery_rules": {}, "assets": mapping}
+'''
+    candidate = {"schema_version": 2, "components": {"steps.find": {"source_path": "step.py"}},
+                 "recovery_rules": {}}
+    from runtime_support import register_sources
+    register_sources(manager, {"observe.match": (ACTION, "observe"), "observe.capture": (capture, "observe")})
+    (folder / "assets.json").write_text(json.dumps(mapping), encoding="utf-8")
     path = folder / "manifest.json"
-    path.write_text(json.dumps(candidate))
+    path.write_text(json.dumps(candidate), encoding="utf-8")
     result = manager.publish(path)
     assert result.ok, result.errors
     return result.loaded.manifest_id
@@ -199,7 +202,7 @@ def test_formal_run_trace_index_and_original_errors(tmp_path: Path) -> None:
     match = next(e for e in state["trace"] if e["event"] == "asset_matched")
     assert match["source_language"] == "zh" and match["running_language"] == "ja"
     assert not (tmp_path / "evidence").exists()
-    assert manager.load(manifest).loaded.manifest["assets"] == {"ui/claim": {"zh": saved}}
+    assert manager.load(manifest).loaded.assets == {"ui/claim": {"zh": saved}}
     # 在成功加载之后破坏文件，必须由运行时报告原始错误而非空匹配。
     window = Window()
     original_capture = window.capture
@@ -273,7 +276,7 @@ def test_step_failure_keeps_successful_match_index(tmp_path: Path) -> None:
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window())
     state = finish(service, service.start("steps.find", {}, manifest_id=manifest))
     assert state["result"]["status"] == "failure"
-    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text()).values()))
+    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8")).values()))
     assert len(stored["detections"]) == 2
 
 
@@ -287,7 +290,7 @@ def test_crop_hash_prefix_collision_does_not_overwrite(tmp_path: Path) -> None:
     collision.write_bytes(b"existing file")
     result = library.save_crop("ui/claim", "en", pixels(image), (12, 8),
                                {"x": 2, "y": 1, "width": 2, "height": 2}, run_id=1, observation=1)
-    assert result["path"].endswith(f"-{digest[:13]}.png")
+    assert result["path"].endswith(f"-{digest}.png")
     assert collision.read_bytes() == b"existing file"
     assert Path(result["image_path"]).read_bytes() == content
 
@@ -298,9 +301,12 @@ def test_assets_incomplete_or_corrupt_manifest_never_publishes(tmp_path: Path) -
     manifest = publish(tmp_path / "draft", manager, {"ui/claim": {"en": saved}})
     assert manager.set_default(manifest).ok
     path = tmp_path / "draft" / "manifest.json"
-    data = json.loads(path.read_text())
-    data["assets"]["ui/claim"]["en"]["sha256"] = "0" * 64
-    path.write_text(json.dumps(data))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    library = path.parent / "assets.json"
+    mapping = json.loads(library.read_text(encoding="utf-8"))
+    mapping["ui/claim"]["en"]["sha256"] = "0" * 64
+    library.write_text(json.dumps(mapping), encoding="utf-8")
+    path.write_text(json.dumps(data), encoding="utf-8")
     result = manager.publish(path)
     assert not result.ok
     error = next(e for e in result.errors if e.code == "asset_invalid")
@@ -325,10 +331,10 @@ def test_candidate_condition_rejection_keeps_base(tmp_path: Path) -> None:
     assert state["attempted_manifest_ids"] == [base]
 
 
-def test_asset_example_publishes_and_runs_with_typed_results(tmp_path: Path) -> None:
-    example = Path(__file__).resolve().parents[1] / "examples" / "asset-recognition"
+def test_asset_fixture_publishes_and_runs_with_typed_results(tmp_path: Path) -> None:
+    fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "asset-recognition"
     manager = ManifestManager(tmp_path)
-    result = manager.publish(example / "manifest.json")
+    result = manager.publish(fixture / "manifest.json")
     assert result.ok, result.errors
     manifest = result.loaded.manifest_id
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window(), game_language="zh")
@@ -340,26 +346,26 @@ def test_asset_example_publishes_and_runs_with_typed_results(tmp_path: Path) -> 
     assert crop["source_language"] == "zh" and crop["observation"] == 1
     # 新建候选引用裁剪文件，通过正式加载、Plan 入口检测，不改原 Manifest。
     draft = tmp_path / "new"
-    shutil.copytree(example, draft)
-    data = json.loads((draft / "manifest.json").read_text())
-    data["assets"] = {"ui/claim": {"zh": {key: crop[key] for key in ("path", "sha256")}}}
+    shutil.copytree(fixture, draft)
+    data = json.loads((draft / "manifest.json").read_text(encoding="utf-8"))
+    (draft / "assets.json").write_text(json.dumps({"ui/claim": {"zh": {key: crop[key] for key in ("path", "sha256")}}}), encoding="utf-8")
     data["components"]["tasks.detect"] = {"source_path": "task.py"}
     (draft / "task.py").write_text('''"""识别任务。"""
 from lalc import task_workflow
 @task_workflow
 def execute(ctx) -> int:
     return len(ctx.call("steps.detect", asset="ui/claim", threshold=0.999))
-''')
-    (draft / "manifest.json").write_text(json.dumps(data))
+''', encoding="utf-8")
+    (draft / "manifest.json").write_text(json.dumps(data), encoding="utf-8")
     published = manager.publish(draft / "manifest.json")
     assert published.ok, published.errors
     plan = draft / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.detect", "inputs": {}}]}))
+    plan.write_text(json.dumps({"items": [{"task": "tasks.detect", "inputs": {}}]}), encoding="utf-8")
     state = finish(service, service.start_plan(plan, manifest_id=published.loaded.manifest_id))
     assert state["result"]["status"] == "completed"
     task = next(e for e in state["trace"] if e["event"] == "component_returned" and e["logical_name"] == "tasks.detect")
     assert task["return_value"] == 2
-    assert manager.load(manifest).loaded.manifest["assets"] == {}
+    assert manager.load(manifest).loaded.assets == {}
 
 
 def test_matching_cannot_bypass_trusted_action_gate(tmp_path: Path) -> None:
@@ -376,8 +382,8 @@ def test_cli_carries_running_language_to_crop(tmp_path: Path, monkeypatch, capsy
     import lalc.__main__ as cli
 
     manager = ManifestManager(tmp_path)
-    example = Path(__file__).resolve().parents[1] / "examples" / "asset-recognition"
-    published = manager.publish(example / "manifest.json")
+    fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "asset-recognition"
+    published = manager.publish(fixture / "manifest.json")
     assert published.ok
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
     monkeypatch.setattr(cli, "ApplicationService", lambda root, **kwargs: ApplicationService(
