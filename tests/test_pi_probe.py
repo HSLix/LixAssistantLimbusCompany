@@ -29,7 +29,7 @@ pytestmark = pytest.mark.agent
 @pytest.fixture
 def probe(tmp_path):
     if not shutil.which("pi"):
-        pytest.skip("Requires pi 0.86.1 standalone executable")
+        pytest.skip("Requires an installed pi executable")
     root = tmp_path / "source"
     root.mkdir()
     (root / "sample.py").write_text('"""只读样例。"""\nANSWER = "source evidence"\n', encoding="utf-8")
@@ -39,7 +39,7 @@ def probe(tmp_path):
     image = tmp_path / "image.png"
     # 图片由 HTTP 替身检查原样传入，不需要替身执行视觉推理。
     import base64
-    image.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII="))
+    image.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"))
     state = {"calls": [], "path": "sample.py", "status": 200, "started": Event(), "release": Event()}
 
     class Handler(BaseHTTPRequestHandler):
@@ -110,8 +110,11 @@ def test_cli_probe_skips_persistent_logging(monkeypatch, tmp_path):
     assert cli.main(["pi-probe", "--image", "a.png", "--source-root", str(tmp_path), "--source", "a.py"]) == 0
 
 
-def test_image_and_restricted_read_with_real_pi(probe):
+@pytest.mark.parametrize("full_screenshot", [False, True])
+def test_image_and_restricted_read_with_real_pi(probe, full_screenshot):
     command, state, directory = probe
+    if full_screenshot:
+        command[command.index("--image") + 1] = str(Path(__file__).resolve().parents[1] / "test_pi_img.png")
     # 私人上下文与扩展发现必须被关闭，即使进程继承了已有配置路径。
     private = directory / "personal"
     private.mkdir()

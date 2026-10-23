@@ -8,16 +8,18 @@ from contextlib import asynccontextmanager, contextmanager
 import getpass
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
 
-PI_VERSION = "0.86.1"
+PI_VERSION = "1.4.0"
 
 
 def _models(base_url: str, key: str) -> list[dict]:
@@ -77,6 +79,14 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
         await errors
 
 
+async def rpc_event(event, waiting_for: str) -> dict:
+    """为就绪和配置响应等待保留明确的超时阶段及原始异常。"""
+    try:
+        return await asyncio.wait_for(event(), timeout=30)
+    except TimeoutError as error:
+        raise TimeoutError(f"等待 pi {waiting_for} 超时（30 秒）；请查看 pi stderr 诊断。") from error
+
+
 async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str) -> int:
     """验证受限读取并展示事件；完整修复复用 RPC 传输而非此成功判据。"""
     requests = 0
@@ -100,7 +110,7 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
         async def configure(kind: str) -> None:
             await send({"id": kind, "type": kind, "enabled": False})
             while True:
-                item = await event()
+                item = await rpc_event(event, f"配置响应 {kind}")
                 show(item)
                 if item.get("id") == kind:
                     if not item.get("success"):
@@ -109,7 +119,7 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
 
         try:
             while True:
-                item = await asyncio.wait_for(event(), timeout=30)
+                item = await rpc_event(event, "就绪事件 lalc_ready")
                 show(item)
                 if item.get("type") == "lalc_ready":
                     if item.get("tools") != ["read"]:
@@ -155,8 +165,8 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
 
 
 @contextmanager
-def configured_pi(args, root: Path, key: str, system_prompt: str):
-    """固定服务、版本和请求上限，隔离 pi 配置且不持久化密钥。"""
+def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None):
+    """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
     executable = shutil.which(args.pi)
     if executable is None:
         raise ValueError(f"pi executable not found: {args.pi}")
@@ -171,7 +181,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str):
     status = model.get("status", {}).get("value")
     if status is not None and status != "loaded":
         raise ValueError(f"Selected model is not loaded (status={status}); load it on the server first")
-    if "image" not in model.get("architecture", {}).get("input_modalities", []):
+    if require_image and "image" not in model.get("architecture", {}).get("input_modalities", []):
         raise ValueError("Selected service model does not declare image input support")
     with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
         agent_dir = Path(temporary) / "agent"
@@ -189,10 +199,18 @@ def configured_pi(args, root: Path, key: str, system_prompt: str):
         env.pop("LALC_PI_PAYLOAD_DIR", None)
         env.pop("LALC_PI_PREFLIGHT", None)
         env.pop("LALC_PI_REQUESTS_USED", None)
+        env.pop("LALC_PI_REPAIR_FILES", None)
+        env.pop("LALC_PI_HISTORY", None)
         version = subprocess.run([executable, "--version"], env=env, cwd=temporary,
                                  check=True, capture_output=True, text=True).stdout.strip()
         if version != PI_VERSION:
-            raise ValueError(f"Expected pi {PI_VERSION}, got {version}")
+            message = f"pi 版本不匹配：已验证 {PI_VERSION}，实际 {version}；继续启动，但兼容性尚未验证。"
+            logging.getLogger(__name__).warning(message)
+            print("WARNING: " + message, file=sys.stderr, flush=True)
+            if on_warning:
+                on_warning({"type": "pi_version_warning", "expected_version": PI_VERSION,
+                            "actual_version": version, "message": message})
+        env["LALC_PI_VERSION"] = version
         command = [executable, "--mode", "rpc", "--no-session", "--no-extensions",
                    "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes",
                    "--no-approve", "--offline", "--no-builtin-tools", "--tools", "read",
@@ -203,7 +221,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str):
 
 
 def run_probe(args) -> int:
-    """固定版本及临时配置，仅允许模型通过 read 读取显式指定目录。"""
+    """使用临时配置及受限读取；不同于已验证版本时提示但不阻止启动。"""
     key = "lalc-no-key"
     try:
         if args.ask_api_key:
@@ -225,7 +243,8 @@ def run_probe(args) -> int:
             "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(data).decode()}],
         }
         with configured_pi(args, root, key, "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。") as (command, env, temporary, model):
-            print(json.dumps({"pi": PI_VERSION, "base_url": env["LALC_PI_BASE_URL"], "model": model["id"],
+            print(json.dumps({"pi": env["LALC_PI_VERSION"], "tested_pi_version": PI_VERSION,
+                              "base_url": env["LALC_PI_BASE_URL"], "model": model["id"],
                               "model_status": model.get("status", {}).get("value"),
                               "image": str(image), "sha256": hashlib.sha256(data).hexdigest(),
                               "prompt": prompt["message"], "max_requests": args.max_requests}, ensure_ascii=False), flush=True)

@@ -177,6 +177,10 @@ class WindowsWindowPlatform:
         u.SetForegroundWindow.restype = wintypes.BOOL
         u.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
         u.ClientToScreen.restype = wintypes.BOOL
+        u.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
+        u.ScreenToClient.restype = wintypes.BOOL
+        u.GetCursorPos.argtypes = [ctypes.POINTER(wintypes.POINT)]
+        u.GetCursorPos.restype = wintypes.BOOL
         u.PrintWindow.argtypes = [wintypes.HWND, wintypes.HDC, wintypes.UINT]
         u.PrintWindow.restype = wintypes.BOOL
         k.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
@@ -290,6 +294,15 @@ class WindowsWindowPlatform:
             if not self.user32.IsWindow(hwnd):
                 raise WindowError(f"Target Window disappeared while waiting for foreground: target_hwnd={hwnd}.")
             time.sleep(0.02)
+
+    def cursor_position(self, hwnd: int) -> dict[str, Any]:
+        """只读转换物理鼠标坐标，不要求或改变前台焦点。"""
+        point = wintypes.POINT()
+        if not self.user32.GetCursorPos(ctypes.byref(point)) or not self.user32.ScreenToClient(hwnd, ctypes.byref(point)):
+            raise WindowError("Cannot read client cursor position") from ctypes.WinError(ctypes.get_last_error())
+        info = self.window_info(hwnd)
+        return {"x": point.x, "y": point.y,
+                "inside": 0 <= point.x < info["width"] and 0 <= point.y < info["height"]}
 
     def client_to_screen(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         info = self.window_info(hwnd)

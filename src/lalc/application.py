@@ -7,6 +7,7 @@ import threading
 import time
 import uuid
 from copy import deepcopy
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -67,6 +68,7 @@ class ApplicationService:
         self._fatal = False
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
+        self._activity: str | None = None
         self._gate: RunGate | None = None
         self._trace_path: Path | None = None
         self._ledger: WorkflowRunLedger | None = None
@@ -91,7 +93,23 @@ class ApplicationService:
 
         with self._condition:
             self._state["default_manifest_id"] = self.manifest_manager.default_manifest_id()
+            self._state["activity"] = self._activity
             return deepcopy(self._state)
+
+    @contextmanager
+    def activity(self, name: str):
+        """共享宿主排他操作；暂停中的 Run 仍占用执行环境。"""
+        with self._condition:
+            if self._activity or self._state["phase"] == "running":
+                raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or 'Runner'}")
+            self._activity = name
+            self._changed_locked()
+        try:
+            yield
+        finally:
+            with self._condition:
+                self._activity = None
+                self._changed_locked()
 
     def wait_for(self, predicate: Callable[[dict[str, Any]], bool]) -> dict[str, Any]:
         """等待公共状态满足条件；等待本身不改变或终止运行。"""
@@ -108,7 +126,7 @@ class ApplicationService:
         with self._condition:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
-            if self._state["phase"] == "running":
+            if self._state["phase"] == "running" or self._activity:
                 raise StartError("run_already_active", "Another Run is already active.")
             manifest = self._loaded_manifest(manifest_id)
             component = manifest.components.get(logical_name)
@@ -138,7 +156,7 @@ class ApplicationService:
         with self._condition:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
-            if self._state["phase"] == "running":
+            if self._state["phase"] == "running" or self._activity:
                 raise StartError("run_already_active", "Another Run is already active.")
             manifest = self._loaded_manifest(manifest_id)
             try:
@@ -159,7 +177,7 @@ class ApplicationService:
         """检查唯一游戏窗口并留下截图与文字连接日志，不创建 Run。"""
 
         with self._condition:
-            if self._state["phase"] == "running":
+            if self._state["phase"] == "running" or self._activity:
                 raise WindowError("Cannot connect while a Run is active.")
             session = FocusedAutomationSession(self._window_platform(), lambda _event, _fields: None)
             window = session.connect()
@@ -193,14 +211,15 @@ class ApplicationService:
         self, name: str, region: dict[str, int], tags: list[str] | None = None,
     ) -> dict[str, Any]:
         """现场裁剪并设置标签，独立于 Developer Candidate 和 Manifest。"""
-        from .assets import asset_name
-        asset_name(name)
-        self.asset_library.tags(tags)
-        session = FocusedAutomationSession(self._window_platform(), lambda *_: None)
-        session.capture()
-        assert session.image is not None and session.size is not None
-        return self.asset_library.save_crop(name, session.image, session.size, region,
-                                           run_id=None, observation=session.observation, tags=tags)
+        with self.activity("Capture"):
+            from .assets import asset_name
+            asset_name(name)
+            self.asset_library.tags(tags)
+            session = FocusedAutomationSession(self._window_platform(), lambda *_: None)
+            session.capture()
+            assert session.image is not None and session.size is not None
+            return self.asset_library.save_crop(name, session.image, session.size, region,
+                                               run_id=None, observation=session.observation, tags=tags)
 
     def tag_asset(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
         """覆盖现有本地裁剪的标签，不连接游戏、不要求 Candidate。"""
@@ -727,6 +746,7 @@ class ApplicationService:
             raise StartError("run_id_allocation_failed", str(error)) from error
 
     def _changed_locked(self) -> None:
+        self._state["activity"] = self._activity
         self._condition.notify_all()
         if self.on_change is None:
             return

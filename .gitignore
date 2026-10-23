@@ -9,3 +9,4 @@ dist/
 .DS_Store
 *.egg-info/
 candidate/
+.candidate-baseline.json

@@ -1,15 +1,25 @@
 # Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage are implemented with Mac and pi/HTTP substitute tests; the new startup path still needs real-model evidence, and Windows DPAPI/authentication, screenshot/crop and game acceptance remain pending.
+Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) and [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) (GUI revision pending implementation); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage have automated evidence plus a developer-reported Windows native DPAPI pass. The developer approved closing #327 and deferred its new real-model startup and Windows authentication checks until the developer GUI is complete; those checks remain unverified. Windows screenshot/crop and game acceptance also remain pending.
 
 Tracking: [GitHub Issue #312](https://github.com/HSLix/LixAssistantLimbusCompany/issues/312). Confirmed implementation spec: [GitHub Issue #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323).
 
 已确认并发布的六个垂直步骤及其阻塞关系见 [Stage 3 Implementation Slices](stage-3-implementation-slices.md)。发布状态本身不表示实现或验收完成；#325 的实现与 Mac 真模型检查见 [单 Component 修复](component-repair.md)，Windows 与真实游戏验收仍属后续切片。
-本阶段以尽快验证 Agent 自主修复已有 Component 的可行性为核心。通过独立 CLI 手动启动一次修复，提供已有 Component、游戏截图、异常信息与必要上下文；Agent 优先接入 pi 阅读源码、分析问题、执行局部修改，并调用现有 Validator，根据反馈继续调整。无需先实现 Runtime Agent Session、自动异常接管或运行时恢复。
+本阶段以验证 Agent 自主修复已有 Component 的可行性为核心。原有独立 CLI 已提供单目标修复；2026-10-23 接受 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 与 [Developer GUI 设计](developer-gui-design.md)，新增 #330，四页及共享修复升级均须在 2026-10-29 前完成并阻塞 #329。
+
+## Accepted Developer GUI revision — implementation pending
+
+- Candidate 明确初始化/重建，修复和 New Conversation 不清空；Runner 的选择与 Candidate 基线、Default 独立。
+- GUI/CLI 共用多文件授权，允许选中已有文件（含候选 manifest.json、Recovery Rule），plan.json 明确只读；不提供新建/删除文件。
+- 连续对话允许纯文字和可选图片；每条用户消息触发一轮，请求上限按轮计，默认 20、最小 2，自动模型检查计入额度。每个对话一个日志目录，逐轮留存交换与产物。
+- Diff 以固定基础 Manifest 的候选物化表示和哈希源码为准，跨 New Conversation 累计。人工查看 Diff/校验、主动 Publish 和独立设置 Default，不增加运行时审批状态。
+- Capture、Runner、Agent Settings、Agent Repair 均在本期范围；互斥、人工裁剪确认、密钥边界及验收以新设计为准。Runtime Agent Recovery/Working Manifest 仍属 Stage 3.5，发布分发推迟到 Stage 4 之后。
+
+以下记录 #325–#327 的现有 CLI 基线及其历史验收范围，不将它们的单目标、自动 Default 重建、必填图片或单次调用日志规则当作新 GUI/共享修复契约。新范围的四页和共享宿主已实现，当前用法见 [修复指南](component-repair.md)，验收状态见 [GUI 设计](developer-gui-design.md#implementation-status--2026-10-23)；已完成的旧验收不等于新能力验收完成。
 
 2026-10-23 补充确认：前置接入验证 #324 仅在 CLI 展示图片、模型请求、受限读取与最终回答，不持久化交互日志或 pi 会话，也不重建或编辑 Developer Candidate。下文的完整修复日志要求从 #325 起实现；验证入口见 [pi 最小接入验证](pi-probe.md)。
 
-## Input and repair boundary
+## Existing CLI baseline — input and repair boundary
 
 - 人工指定已有 Component 的逻辑名，Stage 3 从 Default Manifest 固定本次修复的来源 Manifest / 源码版本，保留原始字节和缺陷种子，使每次评估可以从相同版本开始。没有 Default Manifest、无法加载或目标不在其中时报告错误，不启动 Agent，也不清空已有 `candidate/`；不改选其他历史 Manifest。运行中 Working Manifest 的衔接留给 Stage 3.5，本阶段的独立修复不接入正在运行的任务或 Plan。
 - 输入包括人工提供的游戏截图、异常信息（可含 traceback / Trace）及复现步骤、预期行为等必要上下文；Agent 可通过两个专用工具重新截取当前游戏或从新截图裁剪新增 Asset。只有这两个工具需要连接游戏，不要求重建暂停的 Python 调用栈；游戏状态由开发者准备或操作。
@@ -102,4 +112,4 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 
 ## Deferred to Stage 3.5
 
-完整 Runtime Agent Recovery、自动异常接管、Runtime Agent Session / Adapter / Context Builder 协调、监督运行与运行时审批、完整 Working Manifest 试运行和暂停 Step 续接、多组件编辑及相关能力演进，见 [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md)。该阶段可复用 Stage 3 的截图、受限 Asset 新增和交互日志，不再重复实现这些独立工具。完整依赖/反向查询分析和 Stagehand 研究也保留在该阶段，不作为首个修复案例的前置条件。新增目标的 Workflow Drafting、自主 Capability Expansion 与 Unattended Operation 仍无本次交付承诺。
+完整 Runtime Agent Recovery、自动异常接管、Runtime Agent Session / Adapter / Context Builder 协调、监督运行与运行时审批、完整 Working Manifest 试运行和暂停 Step 续接、运行时多组件演进，见 [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md)。该阶段可复用 Stage 3 的截图、受限 Asset 新增和交互日志，不再重复实现这些独立工具。完整依赖/反向查询分析和 Stagehand 研究也保留在该阶段，不作为首个修复案例的前置条件。新增目标的 Workflow Drafting、自主 Capability Expansion 与 Unattended Operation 仍无本次交付承诺。

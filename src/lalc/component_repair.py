@@ -1,125 +1,92 @@
-"""人工启动单 Component 修复，保留逐组交互与候选产物，不发布或运行候选。"""
+"""开发者连续修复；显式多文件授权、逐轮额度和实际交互留存。"""
 
 from __future__ import annotations
 
 import asyncio
 import base64
 from datetime import datetime, timezone
-import difflib
-import hashlib
 import json
 from pathlib import Path
-import shutil
-import tempfile
+from types import SimpleNamespace
 import uuid
 
-from .manifest import ManifestManager
-from .pi_probe import PI_VERSION, configured_pi, rpc_session
+from .pi_probe import PI_VERSION, configured_pi, rpc_event, rpc_session
+from .runtime import _exception_fields
 from .repair_tools import REPAIR_TOOLS, RepairTools
 from .agent_settings import effective_settings, resolve_key
+from .developer import candidate_files, selected_files, file_diff
 
 
-SYSTEM_PROMPT = """你是 LALC 单 Component 修复助手。必须实际 read 源码、edit 指定文件、validate 完整候选，按反馈迭代。
-源码只能读取候选目录中的文件，只能编辑指定目标；禁止修改 manifest.json、其他源码或正式发布物。
-使用 asset_tree 发现素材名称，asset_directory 查看全部文件名和原始标签，asset_images 按完整逻辑名和完整哈希查看一张或多张图片。
-action_contracts 返回应用实际动作契约，不执行动作。game_screenshot 可查看当前游戏，crop_asset 从新截图裁剪新增素材。
-每次截图/裁剪都会恢复并置前唯一游戏窗口；工具失败可再次调用，不使用旧截图替代。非 Windows 平台实时工具不可用。
-裁剪只能新增素材；同名同哈希复用原图和旧标签。不得改已有图片/标签；新增素材失败或取消后也保留。
-不运行命令、候选代码或点击/按键，不发布或设置 Default。材料不足或单文件无法解决时说明原因并结束。
-LALC 约束：Python 模块有中文职责 docstring；execute 使用一个原有的 plain @task_workflow/@sub_workflow/@step，保留角色与签名。
-Task 可通过 ctx.call 调用 Subworkflow/Step；Subworkflow 只能调用 Step；Step 不调用正式 Component。
-使用字面量 ctx.call/ctx.action 名称，不创建 Trusted Action 或 Recovery Rule。业务数据用参数、返回值和局部变量传递。
-只有 Step 可以有可选的只读 condition，签名与 execute 一致。Task 返回 JSON 兼容结果。未知状态应抛出 ExecutionFailure。
-Validator 会导入 Python，不是安全沙箱；禁止生成顶层副作用、文件操作、网络、子进程或绕过 ctx 的后台调用。
-每轮交互只有最后回答是 JSON 对象：{"revise_success": true或false, "message": "说明修改或改不了的原因"}。
-revise_success 是你对本轮修订的判断，不代表真实游戏行为已修复。中间的工具调用不要加此字段。不要 Markdown 围栏。
+SYSTEM_PROMPT = """你是 LALC Developer Candidate 修复助手。根据用户问题分析，需要修改时实际 read、edit，并 validate 完整候选。
+只能读取 Candidate 内已有文件；仅可编辑本轮开发者明确选择的已有文件，包括被选中的 manifest.json 和 Recovery Rule。
+plan.json 始终只读。不新建、删除或重命名文件，不自行扩大授权。没有选中文件时只分析，并提示需要开发者先选择编辑文件。
+校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
+asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
+game_screenshot 现场截图；crop_asset 每次从新截图裁剪新增素材，同名同哈希保留原图和原标签。非 Windows 现场工具不可用。
+截图会恢复并置前唯一游戏窗口。不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
+不运行命令、候选 Workflow、点击或按键，不 Publish、不设置 Default。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
+Validator 会导入 Python，不是安全沙箱，校验通过也不证明真实游戏行为修复。
+遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；Python 模块和关键函数用简洁中文 docstring。
+最后回答 JSON：{"revise_success": true或false, "message": "分析、修改结果或缺少的信息"}。
+revise_success 仅是本轮修订判断，不能代替校验或游戏验收；最终回答后结束本轮，不自动续跑。
 """
 
 
 class RepairLog:
-    """一次调用的独立留存；分组只在模型最终回答后结束，认证密钥不落盘。"""
+    """每对话一个交互目录；逐轮保留原始事件，认证值统一脱敏。"""
 
-    def __init__(self, data_root: Path, key: str):
-        now = datetime.now(timezone.utc)
-        self.path = data_root / "agent-interactions" / now.strftime("%Y-%m-%d") / str(uuid.uuid4())
+    def __init__(self, data_root: Path, key: str = "lalc-no-key", on_event=None):
+        self.path = data_root / "agent-interactions" / datetime.now(timezone.utc).strftime("%Y-%m-%d") / str(uuid.uuid4())
         self.path.mkdir(parents=True)
+        self.keys = set()
         self.key = key
-        self.group = 1
+        self.group = 0
         self.requests = 0
+        self.on_event = on_event
+
+    @property
+    def key(self):
+        return self._key
+
+    @key.setter
+    def key(self, value):
+        self._key = value
+        if value and value != "lalc-no-key":
+            self.keys.add(value)
 
     def clean(self, value):
         if isinstance(value, str):
-            return value.replace(self.key, "[REDACTED]") if self.key != "lalc-no-key" else value
+            for key in self.keys:
+                value = value.replace(key, "[REDACTED]")
+            return value
         if isinstance(value, list):
             return [self.clean(item) for item in value]
         if isinstance(value, dict):
             return {name: self.clean(item) for name, item in value.items()}
         return value
 
-    def record(self, value) -> None:
-        """逐事件追加，保留完整图片载荷；终端仅展示摘要。"""
+    def record(self, value):
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
-        event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "group": self.group, "event": value})
+        event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "round": self.group, "event": value})
         with (self.path / "events.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event, ensure_ascii=False) + "\n")
-        if isinstance(value, dict) and value.get("type") in {"lalc_request", "group_finished", "validation"}:
-            print(json.dumps(self.clean({name: item for name, item in value.items() if name != "payload"}),
-                             ensure_ascii=False), flush=True)
+        if self.on_event:
+            self.on_event(event)
 
-    def save_json(self, name: str, value) -> None:
+    def save_json(self, name, value):
         (self.path / name).write_text(json.dumps(self.clean(value), ensure_ascii=False, indent=2), encoding="utf-8")
 
-    def snapshot(self, name: str, source: Path, original: bytes) -> str:
-        """从真实文件保存源码和实际 Diff，不使用模型生成的差异描述。"""
-        content = source.read_bytes()
-        (self.path / f"{name}.py").write_bytes(content)
-        diff = "".join(difflib.unified_diff(original.decode("utf-8").splitlines(keepends=True),
-                                           content.decode("utf-8").splitlines(keepends=True),
-                                           fromfile="original/" + source.name, tofile="candidate/" + source.name))
-        (self.path / f"{name}.diff").write_text(self.clean(diff), encoding="utf-8")
-        return diff
+    def snapshot(self, name, files):
+        directory = self.path / name
+        directory.mkdir()
+        for relative, content in files.items():
+            path = directory / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
 
 
-def repair_baseline(manager: ManifestManager, candidate: Path, logical_name: str):
-    """在模型接入及草稿替换前检查 Default、目标和工作目录。"""
-    loaded = manager.load_default()
-    if not loaded.ok:
-        raise ValueError(json.dumps([error.as_dict() for error in loaded.errors], ensure_ascii=False))
-    baseline = loaded.loaded
-    if logical_name not in baseline.components:
-        raise ValueError(f"Target is not an existing Task Workflow, Subworkflow or Step: {logical_name}")
-    if candidate.is_symlink() or (candidate.exists() and not candidate.is_dir()):
-        raise ValueError("candidate must be a real directory, not a link or file")
-    return baseline
-
-
-def prepare_candidate(manager: ManifestManager, candidate: Path, logical_name: str, baseline):
-    """完整物化已固定的基线后替换草稿；不改变普通 init 语义。"""
-    # 先物化完整基线，避免来源文件读取失败时已清空用户草稿。
-    with tempfile.TemporaryDirectory(prefix=".lalc-repair-", dir=candidate.parent) as temporary:
-        prepared = Path(temporary) / "candidate"
-        errors = manager.initialize_candidate(prepared, manifest_id=baseline.manifest_id)
-        if errors:
-            raise ValueError(json.dumps([error.as_dict() for error in errors], ensure_ascii=False))
-        source_name = f"{logical_name}.py"
-        original = (prepared / source_name).read_bytes()
-        if candidate.exists():
-            shutil.rmtree(candidate)
-        prepared.replace(candidate)
-    return baseline.manifest_id, candidate / source_name, original
-
-
-def validate_candidate(manager: ManifestManager, candidate: Path, log: RepairLog) -> dict:
-    """沿用完整候选 Validator，向日志及模型返回实际诊断。"""
-    errors = manager.validate(candidate / "manifest.json")
-    result = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
-    log.record({"type": "validation", **result})
-    return result
-
-
-def final_answer(message: dict) -> dict:
-    """只接受最终回答中的 JSON 和真正的布尔值，不猜测自然语言。"""
+def final_answer(message):
     text = "".join(part.get("text", "") for part in message.get("content", []) if part.get("type") == "text")
     value = json.loads(text)
     if (not isinstance(value, dict) or type(value.get("revise_success")) is not bool
@@ -131,7 +98,7 @@ def final_answer(message: dict) -> dict:
 async def configure_session(send, event, log, expected_tools):
     """确认实际工具集并关闭自动重试和压缩，供预检与修复共用。"""
     while True:
-        item = await asyncio.wait_for(event(), timeout=30)
+        item = await rpc_event(event, "就绪事件 lalc_ready")
         log.record(item)
         if item.get("type") == "extension_error":
             raise RuntimeError(str(item))
@@ -142,7 +109,7 @@ async def configure_session(send, event, log, expected_tools):
     for setting in ("set_auto_retry", "set_auto_compaction"):
         await send({"id": setting, "type": setting, "enabled": False})
         while True:
-            item = await asyncio.wait_for(event(), timeout=30)
+            item = await rpc_event(event, f"配置响应 {setting}")
             log.record(item)
             if item.get("id") == setting:
                 if not item.get("success"):
@@ -154,8 +121,12 @@ async def check_model_image(command, env, temporary, image, log):
     """用真实图片执行一次无工具请求；成功前不修改候选，计数沿用到修复。"""
     checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
                 "LALC_PI_MAX_REQUESTS": "1", "LALC_PI_PAYLOAD_DIR": str(log.path.resolve())}
-    prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
-              "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
+    prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
+    if image is not None:
+        prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
+                  "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
+    if image is None:
+        prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
     last = {}
     async with rpc_session(command, checking, temporary, log.record) as (send, event):
         await configure_session(send, event, log, [])
@@ -182,134 +153,177 @@ async def check_model_image(command, env, temporary, image, log):
                 return
 
 
-async def repair_loop(command, env, temporary, prompt, manager, candidate, source, original, log):
-    """复用 pi 工具循环；格式或最终校验反馈触发下一组，不改写上一组评价。"""
-    last = {}
-    tools = RepairTools(manager.data_root, log)
-    async with rpc_session(command, env, temporary, log.record) as (send, event):
-        await configure_session(send, event, log, REPAIR_TOOLS)
-        log.record({"type": "initial_prompt", "prompt": prompt})
-        await send(prompt)
-        while True:
-            item = await event()
-            kind = item.get("type")
-            # 完整 message_end 含最终文本、工具参数及图片；无需重复存储逐 token 增量。
-            if kind == "message_update":
-                continue
-            log.record(item)
-            if kind == "lalc_request":
-                log.requests = item["requests"]
-            elif kind == "extension_error" or (kind == "response" and not item.get("success")):
-                raise RuntimeError(str(item))
-            elif kind == "extension_ui_request":
-                if item.get("method") != "input":
-                    raise RuntimeError("Unexpected interactive request")
-                title = item.get("title", "")
-                if title == "lalc.validate":
-                    result = json.dumps(log.clean(validate_candidate(manager, candidate, log)), ensure_ascii=False)
-                elif title.startswith("lalc.tool:"):
-                    request = json.loads(title.removeprefix("lalc.tool:"))
+class RepairConversation:
+    """消息主动触发一轮；实际消息/图片/工具结果留在上下文，候选不随对话清空。"""
+
+    def __init__(self, host):
+        self.host = host
+        self.log = RepairLog(host.service.data_root)
+        self.history = []
+        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform)
+
+    def add_validation(self, result):
+        self.log.record({"type": "validation", **result})
+        self.history.append({"role": "user", "content": [{"type": "text", "text":
+            "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
+
+    async def run(self, message, names, args, *, image=None, key=None, on_event=None):
+        """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
+        with self.host.service.activity("Agent"):
+            names = selected_files(self.host.candidate, names)
+            if not message.strip():
+                raise ValueError("消息不能为空。")
+            self.log.on_event = on_event
+            self.log.group += 1
+            self.log.requests = 0
+            prefix = f"round-{self.log.group}"
+            round_path = self.log.path / prefix
+            round_path.mkdir()
+            before = candidate_files(self.host.candidate)
+            baseline = self.host.baseline()
+            if not (self.log.path / "baseline").exists():
+                self.log.snapshot("baseline", baseline)
+            self.log.snapshot(f"{prefix}/original", before)
+            result = {"status": "incomplete", "reason": "setup_error"}
+            tools = self.tools
+            tools.cancelled.clear()
+            prior_history = list(self.history)
+            try:
+                settings = effective_settings(args, self.host.service.data_root)
+                options = SimpleNamespace(**vars(args))
+                for field, value in settings.items():
+                    setattr(options, field, value)
+                self.log.key = key if key is not None else resolve_key(options, settings, self.host.service.data_root)
+                if image is not None:
+                    from .recognition import decode_image
+                    if not image.startswith(b"\x89PNG\r\n\x1a\n"):
+                        raise ValueError("image must be a PNG")
+                    decode_image(image)
+                    (round_path / "input.png").write_bytes(image)
+                prompt = {"type": "prompt", "message": "本轮允许编辑的已有文件：" + json.dumps(names, ensure_ascii=False)
+                          + "\n用户消息：" + message}
+                if image is not None:
+                    prompt["images"] = [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]
+                self.history.append(self.log.clean({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
+                    "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]}))
+                input_record = {"prompt": prompt, "settings": settings,
+                                    "selected_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
+                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": SYSTEM_PROMPT}
+                self.log.save_json(f"{prefix}/input.json", input_record)
+                with configured_pi(options, self.host.candidate.resolve(), self.log.key, SYSTEM_PROMPT,
+                                   require_image=image is not None, on_warning=self.log.record) as (command, env, temporary, model):
+                    input_record["pi"] = env["LALC_PI_VERSION"]
+                    self.log.save_json(f"{prefix}/input.json", input_record)
+                    env["LALC_PI_PAYLOAD_DIR"] = str(round_path.resolve())
+                    # 预检实际请求计入本轮，历史消息不进入连接检查。
+                    old_path = self.log.path
+                    self.log.path = round_path
                     try:
-                        result = await asyncio.to_thread(tools.call, request["name"], request["arguments"])
-                    except asyncio.CancelledError:
-                        tools.cancelled.set()
-                        raise
-                else:
-                    raise RuntimeError("Unexpected interactive request")
-                await send({"type": "extension_ui_response", "id": item["id"],
-                            "value": result})
-            elif kind == "message_end" and item.get("message", {}).get("role") == "assistant":
-                last = item["message"]
-            elif kind == "agent_settled":
-                log.snapshot(f"group-{log.group}", source, original)
-                if last.get("stopReason") != "stop":
-                    reason = "request_limit" if "LALC request limit reached" in last.get("errorMessage", "") else "provider_error"
-                    log.record({"type": "group_finished", "reason": reason, "answer": last})
-                    return {"status": "incomplete", "reason": reason}
-                validation = {"performed": False}
+                        await check_model_image(command, env, temporary, image, self.log)
+                    finally:
+                        self.log.path = old_path
+                    env["LALC_PI_REQUESTS_USED"] = str(self.log.requests)
+                    env["LALC_PI_REPAIR_FILES"] = json.dumps([str((self.host.candidate / name).resolve()) for name in names])
+                    history_path = Path(temporary) / "history.json"
+                    history_path.write_text(json.dumps(self.log.clean(prior_history)), encoding="utf-8")
+                    env["LALC_PI_HISTORY"] = str(history_path)
+                    expected = [name for name in REPAIR_TOOLS if names or name != "edit"]
+                    command[command.index("--tools") + 1] = ",".join(expected)
+                    async with rpc_session(command, env, temporary, self.log.record) as (send, event):
+                        await configure_session(send, event, self.log, expected)
+                        self.log.record({"type": "round_started", "selected_files": names, "model": model["id"], "prompt": prompt})
+                        await send(prompt)
+                        last = {}
+                        while True:
+                            item = await event()
+                            kind = item.get("type")
+                            if kind == "message_update":
+                                continue
+                            self.log.record(item)
+                            if kind == "lalc_request":
+                                self.log.requests = item["requests"]
+                            elif kind == "message_end":
+                                received = item.get("message", {})
+                                if received.get("role") != "user":
+                                    self.history.append(self.log.clean(received))
+                                if received.get("role") == "assistant":
+                                    last = received
+                            elif kind == "extension_error" or (kind == "response" and not item.get("success")):
+                                raise RuntimeError(str(item))
+                            elif kind == "extension_ui_request":
+                                title = item.get("title", "")
+                                if item.get("method") != "input":
+                                    raise RuntimeError("Unexpected interactive request")
+                                if title == "lalc.validate":
+                                    errors = self.host.manager.validate(self.host.candidate / "manifest.json")
+                                    validation = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
+                                    self.log.record({"type": "validation", **validation})
+                                    value = json.dumps(self.log.clean(validation))
+                                elif title.startswith("lalc.tool:"):
+                                    request = json.loads(title.removeprefix("lalc.tool:"))
+                                    value = await asyncio.to_thread(tools.call, request["name"], request["arguments"])
+                                else:
+                                    raise RuntimeError("Unexpected interactive request")
+                                await send({"type": "extension_ui_response", "id": item["id"], "value": value})
+                            elif kind == "agent_settled":
+                                if last.get("stopReason") != "stop":
+                                    reason = "request_limit" if "LALC request limit reached" in last.get("errorMessage", "") else "provider_error"
+                                    result = {"status": "incomplete", "reason": reason, "answer": last}
+                                else:
+                                    answer = final_answer(last)
+                                    result = {"status": "completed", "reason": "answered", "answer": answer}
+                                break
+            except asyncio.CancelledError:
+                tools.cancelled.set()
+                result = {"status": "cancelled", "reason": "user_cancelled"}
+            except Exception as error:
+                result = {"status": "incomplete", "reason": "error", "error": str(error)}
+                self.log.record({"type": "repair_error", **_exception_fields(error)})
+            finally:
+                tools.cancelled.set()
                 try:
-                    answer = final_answer(last)
-                except (ValueError, TypeError) as error:
-                    log.record({"type": "group_finished", "reason": "invalid_final", "error": str(error), "answer": last})
-                    feedback = str(error) + '\n请纠正最终回答，仅输出 {"revise_success": true或false, "message": "说明"}。'
-                else:
-                    log.record({"type": "group_finished", "answer": answer})
-                    if not answer["revise_success"]:
-                        return {"status": "incomplete", "reason": "unable", "answer": answer,
-                                "validation": validate_candidate(manager, candidate, log)}
-                    validation = validate_candidate(manager, candidate, log)
-                    if validation["ok"]:
-                        return {"status": "completed", "reason": "validated_candidate", "answer": answer,
-                                "validation": validation}
-                    feedback = "最终候选校验失败，请按实际反馈继续修订：" + json.dumps(validation, ensure_ascii=False)
-                if log.requests >= int(env["LALC_PI_MAX_REQUESTS"]):
-                    return {"status": "incomplete", "reason": "request_limit", "validation": validation}
-                log.group += 1
-                last = {}
-                log.record({"type": "feedback", "message": feedback})
-                await send({"type": "prompt", "message": log.clean(feedback)})
-
-
-def run_repair(args, manager: ManifestManager, candidate: Path) -> int:
-    """独立修复入口；错误和中断保留产物，不改变 Default 或发布代码。"""
-    key = "lalc-no-key"
-    log = None
-    source = None
-    result = {"status": "incomplete", "reason": "setup_error"}
-    original = b""
-    try:
-        baseline = repair_baseline(manager, candidate, args.logical_name)
-        settings = effective_settings(args, manager.data_root)
-        if settings["model"] is None:
-            raise ValueError("Agent model is required; save it with agent-config --model or supply --model")
-        for field, value in settings.items():
-            setattr(args, field, value)
-        key = resolve_key(args, settings, manager.data_root)
-        image = args.image.read_bytes()
-        if not image.startswith(b"\x89PNG\r\n\x1a\n"):
-            raise ValueError("image must be a PNG")
-        # 模型连接、版本和输入预检先于草稿替换；这些失败无需牺牲旧草稿。
-        log = RepairLog(manager.data_root, key)
-        log.group = 0
-        print(f"Agent Interaction Log: {log.path}", flush=True)
-        log.save_json("input.json", {"source_manifest_id": baseline.manifest_id, "target": args.logical_name,
-                                    "pi": PI_VERSION, "settings": settings, "system_prompt": SYSTEM_PROMPT})
-        (log.path / "input.png").write_bytes(image)
-        with configured_pi(args, candidate.resolve(), key, SYSTEM_PROMPT) as (command, env, temporary, model):
-            asyncio.run(check_model_image(command, env, temporary, image, log))
-            env["LALC_PI_REQUESTS_USED"] = str(log.requests)
-            log.group = 1
-            manifest_id, source, original = prepare_candidate(manager, candidate, args.logical_name, baseline)
-            env["LALC_PI_REPAIR_TARGET"] = str(source.resolve())
-            env["LALC_PI_PAYLOAD_DIR"] = str(log.path.resolve())
-            command[command.index("--tools") + 1] = ",".join(REPAIR_TOOLS)
-            (log.path / "original.py").write_bytes(original)
-            (log.path / "input.png").write_bytes(image)
-            prompt = {"type": "prompt", "message": f"目标文件：{source.name}\n问题与预期：{args.problem}\n异常/复现信息：{args.exception or '未提供'}",
-                      "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
-            log.save_json("input.json", {"source_manifest_id": manifest_id, "target": args.logical_name,
-                                        "pi": PI_VERSION, "base_url": env["LALC_PI_BASE_URL"], "model": model,
-                                        "max_requests": args.max_requests, "settings": settings, "system_prompt": SYSTEM_PROMPT,
-                                        "prompt": prompt, "image_sha256": hashlib.sha256(image).hexdigest()})
-            result = asyncio.run(repair_loop(command, env, temporary, prompt, manager, candidate, source, original, log))
-    except KeyboardInterrupt:
-        result = {"status": "cancelled", "reason": "user_cancelled"}
-    except Exception as error:
-        result = {"status": "incomplete", "reason": "error", "error": str(error)}
-    finally:
-        if log is not None:
-            result.setdefault("validation", {"performed": False})
-            if source is not None:
-                try:
-                    log.snapshot("final", source, original)
-                    result.update({"source_path": str(log.path / "final.py"),
-                                   "diff_path": str(log.path / "final.diff")})
+                    after = candidate_files(self.host.candidate)
+                    self.log.snapshot(f"{prefix}/final", after)
+                    changed = [name for name in before.keys() | after.keys() if before.get(name) != after.get(name)]
+                    unauthorized = [name for name in changed if name not in names or name not in before or name not in after]
+                    if unauthorized:
+                        result.update(status="incomplete", reason="unauthorized_changes", unauthorized_files=unauthorized)
+                    diff = file_diff(baseline, after)
+                    (round_path / "cumulative.diff").write_text(self.log.clean(diff), encoding="utf-8")
                 except Exception as error:
-                    result.update({"status": "incomplete", "artifact_error": str(error)})
-            result.update({"requests": log.requests, "groups": log.group, "log_path": str(log.path)})
-            log.save_json("result.json", result)
-            log.record({"type": "repair_finished", **result})
-            print(json.dumps(log.clean(result), ensure_ascii=False), flush=True)
-        else:
-            print(json.dumps(result, ensure_ascii=False).replace(key, "[REDACTED]"), flush=True)
-    return 0 if result["status"] == "completed" else 130 if result["status"] == "cancelled" else 1
+                    result.update(status="incomplete", artifact_error=str(error))
+                result.update(requests=self.log.requests, round=self.log.group, log_path=str(self.log.path))
+                self.log.save_json(f"{prefix}/result.json", result)
+                self.log.save_json("result.json", result)
+                self.log.save_json("context.json", self.history)
+                self.log.record({"type": "round_finished", **result})
+            return self.log.clean(result)
+
+
+def run_repair(args, manager, candidate):
+    """CLI 同样使用当前 Candidate；可显式交互续聊，默认只处理一条消息。"""
+    from .application import ApplicationService
+    from .developer import DeveloperHost
+    host = DeveloperHost(ApplicationService(manager.data_root, manifest_manager=manager), candidate)
+    try:
+        names = list(args.files)
+        if args.all_files:
+            names = [name for name in candidate_files(candidate) if "plan.json" not in Path(name).parts]
+        selected_files(candidate, names)
+        conversation = host.new_conversation()
+        image = args.image.read_bytes() if args.image else None
+        message = args.problem + ("\n异常信息：" + args.exception if args.exception else "")
+        while True:
+            result = asyncio.run(conversation.run(message, names, args, image=image))
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+            if not args.chat:
+                return 0 if result["status"] == "completed" else 130 if result["status"] == "cancelled" else 1
+            message = input("消息（空行退出）：")
+            if not message.strip():
+                return 0
+            image = None
+    except (KeyboardInterrupt, EOFError):
+        return 130
+    except Exception as error:
+        print(json.dumps({"status": "incomplete", "error": str(error)}, ensure_ascii=False))
+        return 1

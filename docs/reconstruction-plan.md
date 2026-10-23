@@ -106,43 +106,42 @@ Stage 2 will not add Component Ref objects, dynamic `ctx.call()` targets, cross-
 
 The first version also does not export, inherit, migrate, or persist Task Workflow business state, Python loop positions, or entered frames. It terminates safely or restarts from an observable known point after process failure, deferring explicit Checkpoint/Resume design until cross-process or cross-implementation continuation is required.
 
-Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order without adding a Manifest field. Storage formats and failure codes follow actual implemented paths. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 independently validates single-Component repair through a manual CLI. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. ADR 0026 records the revised implementation completion boundary.
+Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order without adding a Manifest field. Storage formats and failure codes follow actual implemented paths. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 began with independent single-Component CLI repair; ADR 0029 adds Developer GUI and selected-file repair before its final demo. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. ADR 0026 records the revised implementation completion boundary.
 
 The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 began on a clean orphan branch; the old branch remains a historical reference and rollback path, not a parallel runtime. ADR 0026 replaces the original mailbox completion gate with foundation acceptance, existing single-capability evidence, crop/tag configuration and a runnable teaching sample. Coordinate display, region selection and real business authoring await GUI developer tools; #317 retains the mailbox and outstanding Windows integration acceptance.
 
 ## Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under ADR 0025, revised by ADR 0028; implementation and model-backed acceptance pending.
+Status: ADR 0025 and ADR 0028 establish the implemented CLI baseline. [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) adds the accepted Developer GUI revision; implementation and final Windows/game acceptance remain pending.
 
-- Manually start an independent CLI with one existing Component, game screenshots, exception information, and necessary context.
-- Prefer pi through a Python-hosted subprocess and dedicated restricted tools; validate the first integration on Mac, then pin the same version for Mac and Windows. Use Default Manifest to rebuild Developer Candidate before repair, replacing any existing draft only after the source and target have been checked.
-- Output complete candidate Component source, its Diff, and validation results; retain the model inputs, tool operations, and final outputs for the entire CLI invocation.
-- Reuse Developer Candidate / ManifestManager for subsequent human-reviewed Publish. Never overwrite formal Components, existing Manifests/images or old hash-to-tag entries, automatically publish, or modify Default Manifest.
-- Limit the first version to one existing Component. Permit dedicated live screenshot and fresh-crop Asset addition tools; duplicate logical-name/hash pairs retain the original image and tags. No Runtime Agent Session, automatic anomaly takeover, game controls, multi-Component editing, automatic real-game trial, or runtime continuation.
-- LALC owns saved endpoint/model configuration and a configurable request limit, default 20. Windows stores named secrets with DPAPI; Mac development uses transient in-memory secrets. Check image support, fix the selected model per invocation and do not fall back to another provider/model.
-- Retain Agent Interaction Logs in the data directory grouped by date and UUID4, including actual context/images, model and tool exchanges, final candidate/Diff/validation, effective non-secret configuration, request count and end reason. Missing information ends the invocation with an explanatory final answer; failures and cancellation retain artifacts.
-- Demonstrate at least one reproducible before/after repair case. Human-run behavior verification is separate from Validator success and from the repair CLI.
+- Deliver Capture, Runner, Agent Settings and Agent Repair before 2026-10-29 using existing PySide6, shared application services and fixed pi integration, without CLI subprocess wrappers or a second Agent loop.
+- Explicitly initialize/rebuild Candidate from an existing Manifest, confirming nonempty replacement. Repairs and New Conversation preserve Candidate; successful rebuilding starts a new conversation. Runner's persisted selection only determines its next Base Manifest, independently of Candidate and Default.
+- Upgrade shared GUI/CLI repair to developer-selected existing files, including candidate manifest.json and Recovery Rules. plan.json stays read-only; no Agent file creation/deletion. Keep bounded live screenshot/Asset tools and complete candidate validation.
+- Continuous chat accepts text with optional images. Each message starts one round, with a persisted request limit (default 20, minimum 2) including model checks; one dated UUID4 interaction log per conversation retains per-round evidence. No model/provider fallback.
+- Windows DPAPI secrets stay separate from settings/logs; Mac uses temporary memory. GUI only shows whether a key is set; blank ordinary saves preserve it.
+- Cumulative Diff compares against the fixed materialized base and hash source. Developer Publish revalidates and creates an immutable Manifest; setting Default is separate. Agent cannot Publish, run candidates or control the game.
+- Human Capture freezes the screenshot, previews the crop with logical name and zero or more tags, and saves that exact crop only after confirmation. Passive coordinates reuse Runtime physical client pixels; missing/minimized/ambiguous windows await manual refresh. Agent crops still capture anew.
+- Runner and active Agent rounds exclude each other; manual Capture screenshot/save also excludes active or paused tasks. Host enforces this and safely cancels on confirmed exit. Page changes preserve work.
+- Demonstrate a real reproducible before/after repair. Validator success is separate from human game acceptance. Runtime Agent Sessions, Working Manifest integration and recovery stay in Stage 3.5; distribution decisions wait until after Stage 4.
 
-The accepted scope and acceptance evidence are in [Stage 3 — Agent-assisted Component Repair](stage-3-agent-assisted-component-repair.md).
-
-The confirmed six implementation slices and native issue dependencies are in [Stage 3 Implementation Slices](stage-3-implementation-slices.md). Publication is complete; implementation and model-backed/Windows acceptance remain pending.
+See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](developer-gui-design.md) and [implementation slices](stage-3-implementation-slices.md). GUI issue #330 is a prerequisite of the #329 TA demo, not implementation evidence.
 
 ## Stage 3.5 — Agent Runtime Step Recovery and Maintenance
 
 Status: deferred. ADR 0025 transfers the prior Stage 3 runtime architecture here without requiring it for the Stage 3 experiment.
 
-Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Working Manifest integration and multi-Component evolution belong here. This stage reuses the independent screenshot, bounded Asset addition and interaction-log capabilities of Stage 3 (ADR 0028). The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
+Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Working Manifest integration and runtime multi-Component evolution belong here; developer-selected multi-file repair belongs to Stage 3 under ADR 0029. This stage reuses the independent screenshot, bounded Asset addition and interaction-log capabilities of Stage 3 (ADR 0028). The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
 
 ## Stage 4: Application structure, UI, and packaging
 
 Status: planned.
 
 - CLI and desktop UI call the same application and execution services;
-- TODO: a developer coordinate display shows the physical client-pixel mouse position relative to the Target Window in real time, using the same coordinate system as screenshots, crop regions, and click inputs; mark positions outside the client area explicitly. This is a future GUI aid, not a change to the current coordinate-input crop API.
+- Developer coordinates, crop preview and the four-page workbench move to Stage 3 under ADR 0029; Stage 4 builds on those shared services.
 - the UI exposes task execution, Agent configuration, supervised Step and Workflow source review, proposal review, and Manifest recovery;
 - TODO for future discussion: resource deletion, reference scanning, Component Usage Index, and cleanup UI; no maintenance policy or UI is committed for this version.
 - the UI exposes per-Workflow strict success rate, Agent-assisted completion, recovery breakdown, and average duration from the local Workflow Run Ledger;
-- a packaging spike verifies main-process immutable module loading, external assets, and Trace persistence; TODO after the first release: evaluate moving executor execution into a subprocess and the required Context transport, cancellation, and original-error propagation;
+- distribution and package variants are deferred until after Stage 4 by ADR 0029; after the first release, evaluate executor subprocess isolation with Context transport, cancellation and original-error propagation;
 - packaged formal automation must remain usable without a model.
 
 ## TODO after Stage 4

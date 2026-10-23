@@ -4,7 +4,7 @@
 
 ## 运行
 
-使用固定版本 **pi 0.86.1** 的独立二进制。Mac 当前使用 `/Users/li/.local/bin/pi`；Windows 使用同版本 `pi.exe`，可通过 `--pi` 指定路径。无需为本扩展单独安装 Node 或 npm 依赖；Windows 扩展加载和进程退出仍需实机复核。
+当前接入回归基线为 **pi 1.4.0**，但启动不再硬性锁定版本。实际版本不一致时写 WARNING 日志并在 CLI 终端提示，仍继续启动；修复 GUI 同时在对话中显示警告，交互日志保留实际与已验证版本。Mac 当前使用 `/Users/li/.local/bin/pi`；Windows 使用 `pi.exe`，可通过 `--pi` 指定路径。无需为本扩展单独安装 Node 或 npm 依赖；Windows 扩展加载和进程退出仍需实机复核。
 
 从项目根目录运行：
 
@@ -48,3 +48,5 @@ UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest --run-agent-tests -q tes
 2026-10-23 Mac 实测：上述 10 项测试通过；安装 wheel 包含 `lalc/pi_probe.ts`。真实本机 Gemma4（`HauhauCS/Gemma4-26B-A4B-QAT-Uncensored-HauhauCS-Balanced-MTP:Q4_K_M`）用 2 次请求完成样例源码读取和 `test_pi_img.png` 分析，返回右下角 Enter 按钮，收到 `agent_settled`，退出码 0。图片 SHA-256 为 `263f14295f589436c61165951355ddf4195197e05182e03cb19db60624184327`。仅保留此验证结论，模型交互本身不落盘。Windows 同版本 exe 尚未验收。
 
 同日开发者独立复测并确认符合预期：所提供终端输出为 `completed`、`requests=2`、`source_read=true`、`stop_reason=stop`、`error=null`，#324 Mac 最小接入验收通过。此确认未再次启动 Agent 测试或模型调用。
+
+2026-10-23 升级复测：pi 1.4.0 的 stdout 接管要求自定义协议事件直接按行写原始描述符；当前实现已修复，且保留 stderr 诊断。探针 8 项均通过，包含有效一像素 PNG、实际截图尺寸、权限拒绝、额度、错误无重试及取消。全套回归 258 passed、5 skipped，不使用临时超时插件；真模型和 Windows 跳过项不计通过。历史 0.86.1 的 Mac 真模型证据仍仅属于原版本。

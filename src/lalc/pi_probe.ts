@@ -1,4 +1,5 @@
 import { access, readFile, realpath, writeFile } from "node:fs/promises";
+import { writeSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { createReadTool, createEditTool } from "@earendil-works/pi-coding-agent";
 import { openAICompletionsApi, Type } from "@earendil-works/pi-ai";
@@ -15,14 +16,18 @@ export async function checkedPath(root: string, path: string) {
 
 export default async function (pi) {
   const root = await realpath(process.env.LALC_PI_SOURCE_ROOT!);
-  const repairTarget = process.env.LALC_PI_REPAIR_TARGET;
+  const repairMode = process.env.LALC_PI_REPAIR_FILES !== undefined;
+  const repairTargets: string[] = JSON.parse(process.env.LALC_PI_REPAIR_FILES || "[]");
+  const history = process.env.LALC_PI_HISTORY ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")) : [];
+  pi.on("context", async event => ({ messages: [...history, ...event.messages] }));
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
                        "action_contracts", "game_screenshot", "crop_asset"];
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
   const api = openAICompletionsApi();
-  const emit = (type, fields) => console.log(JSON.stringify({ type, ...fields }));
+  // 新版 pi 重定向 console 和 stdout.write；协议事件显式写入原始 stdout 描述符。
+  const emit = (type, fields) => writeSync(1, JSON.stringify({ type, ...fields }) + "\n");
   pi.registerProvider("lalc-probe", {
     baseUrl: process.env.LALC_PI_BASE_URL,
     apiKey: "$LALC_PI_API_KEY",
@@ -76,10 +81,11 @@ export default async function (pi) {
       return read.execute(id, { ...params, path }, signal, onUpdate);
     },
   });
-  if (repairTarget) {
+  if (repairMode) {
     const checkedEdit = async (path: string) => {
       const target = await checkedPath(root, path);
-      if (target !== repairTarget) throw new Error("Only the selected Component may be edited");
+      if (relative(root, target).split(/[\\/]/).includes("plan.json") || !repairTargets.includes(target))
+        throw new Error("Only selected existing Candidate files may be edited; plan.json is read-only");
       return target;
     };
     const edit = createEditTool(root, {
@@ -137,8 +143,8 @@ export default async function (pi) {
     }
   }
   pi.on("session_start", () => {
-    pi.setActiveTools(preflight ? [] : repairTarget ? repairTools : ["read"]);
-    emit("lalc_ready", { tools: pi.getActiveTools(), root, repairTarget,
+    pi.setActiveTools(preflight ? [] : repairMode ? repairTools.filter(name => name !== "edit" || repairTargets.length > 0) : ["read"]);
+    emit("lalc_ready", { tools: pi.getActiveTools(), root, repairTargets,
                          availableTools: pi.getAllTools().map(tool => tool.name) });
   });
 }

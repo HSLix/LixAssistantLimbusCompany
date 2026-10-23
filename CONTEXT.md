@@ -65,11 +65,11 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, containing Component source intended for validation and publication. Before Agent-assisted Component Repair, LALC replaces the draft with a complete copy of the selected Manifest's source; the Agent reads this draft and edits only the designated Component for developer review and publication. Formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the developer selects the candidate files the Agent may edit, including its Manifest draft, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A manually initiated repair of one existing Component using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads candidate source, edits only the designated Component and checks it with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
+A manually initiated repair of a Developer Candidate using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads candidate files, edits only the developer-authorized selection and checks the complete draft with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Capability Bundle**:
@@ -89,7 +89,7 @@ The executor-owned chronological record of what one real execution attempt actua
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:
-The retained record of information supplied to an Agent, its tool operations and results, and its outputs. An independent repair invocation groups all its model exchanges into one retained record; runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
+The retained record of information supplied to an Agent, its tool operations and results, and its outputs. A continuous developer conversation groups its user messages and model/tool exchanges into one record with per-round outcomes; runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
 _Avoid_: Execution Trace, Agent memory
 
 **Agent Adapter**:

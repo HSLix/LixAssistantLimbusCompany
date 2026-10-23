@@ -119,6 +119,23 @@ def resolve_key(args, settings: dict, data_root: Path) -> str:
     return dpapi(secret_path(data_root, name).read_bytes(), decrypt=True).decode("utf-8")
 
 
+def save_settings(data_root: Path, values: dict, *, secret: str = "", clear: bool = False) -> dict:
+    """GUI 普通空输入保留凭据；只有明确清除才解除引用，返回值不包含密钥。"""
+    value = load_settings(data_root, values)
+    previous = value["secret_name"]
+    if clear:
+        value["secret_name"] = None
+    elif secret and sys.platform == "win32":
+        # 新名称避免保存配置失败时覆盖仍被旧配置引用的凭据。
+        import uuid
+        value["secret_name"] = "developer-" + str(uuid.uuid4())
+        save_secret(data_root, value["secret_name"], secret)
+    atomic_write_json(data_root / "agent-settings.json", value)
+    if clear and previous:
+        secret_path(data_root, previous).unlink(missing_ok=True)
+    return value
+
+
 def settings_command(args, data_root: Path) -> int:
     """查看或显式保存当前设置；密钥只从终端输入，不回显或接受明文参数。"""
     try:
