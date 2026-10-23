@@ -4,6 +4,9 @@ status: accepted
 
 # Protect saved manifests from Agent modification and select complete working manifests
 
+Asset ownership, language selection, naming and Candidate/publication instructions in this ADR are superseded by [ADR 0027](0027-resolve-assets-independently-with-optional-priority-tags.md). Component immutability, fresh-crop provenance and the accepted stage boundaries remain in force.
+
+
 Existing Manifest and Asset files must not be modified, overwritten, renamed, or deleted by the Agent. Agent repairs create new Asset files and a new complete candidate Manifest; candidate mappings may reference different Asset files without editing existing files. Human management and modification of existing Manifest and Asset files may be provided by a future GUI; that capability and its reference/hash handling are deferred and are not implemented in this version. For Manifests and Assets, this is an Agent permission boundary, not a permanent prohibition on human edits.
 
 This restriction also applies to Agent-generated code and executor operations performed on the Agent's behalf: neither may overwrite existing Manifest or Asset files. Adapting a template means saving a new Asset file and publishing a new complete Manifest with updated path/hash mappings; existing files and their recorded mappings remain unchanged. The possibility that an Agent edits an old image and invalidates an old Manifest's hash is outside the permitted repair behavior, not a case the repair path should support. Human edits through a future GUI remain a separate deferred feature.

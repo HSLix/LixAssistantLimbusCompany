@@ -189,62 +189,22 @@ class ApplicationService:
                 raise
             return {"window": window, "image": image, "image_path": str(image_path), "log_path": str(log_path)}
 
-    def crop_candidate_asset(
-        self, candidate_dir: Path, name: str, region: dict[str, int],
-        confirm: Callable[[str], bool],
-    ) -> dict[str, Any] | None:
-        """开发者现场裁剪只更新 Candidate 库；拒绝或取消时不保存图片与映射。"""
-
+    def crop_developer_asset(
+        self, name: str, region: dict[str, int], tags: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """现场裁剪并追加标签，独立于 Developer Candidate 和 Manifest。"""
         from .assets import asset_name
-
         asset_name(name)
-        errors = self.manifest_manager.validate(candidate_dir / "manifest.json")
-        if errors:
-            raise StartError("candidate_invalid", "; ".join(error.message for error in errors), errors=errors)
-        library_path = candidate_dir / "asset-library.json"
-        mapping = self.asset_library.validate(json.loads(library_path.read_text(encoding="utf-8")))
+        self.asset_library.tags(tags)
         session = FocusedAutomationSession(self._window_platform(), lambda *_: None)
         session.capture()
         assert session.image is not None and session.size is not None
-        content, _ = self.asset_library.crop_content(session.image, session.size, region)
-        existing = mapping.get(name, {}).get(self.game_language)
-        if existing is not None:
-            if existing["sha256"] == sha256_bytes(content):
-                return {"logical_name": name, "source_language": self.game_language, **existing,
-                        "image_path": str(self.asset_library.path(existing["path"])), "unchanged": True}
-            if not confirm(f"Asset {name!r} ({self.game_language}) already has an image. Replace Candidate mapping? [y/N] "):
-                return None
-        result = self.asset_library.save_crop(
-            name, self.game_language, session.image, session.size, region,
-            run_id=None, observation=session.observation,
-        )
-        mapping.setdefault(name, {})[self.game_language] = {key: result[key] for key in ("path", "sha256")}
-        atomic_write_json(library_path, mapping)
-        return result
+        return self.asset_library.save_crop(name, session.image, session.size, region,
+                                           run_id=None, observation=session.observation, tags=tags)
 
-    def add_candidate_asset(
-        self, candidate_dir: Path, name: str, image: Path, confirm: Callable[[str], bool],
-    ) -> dict[str, Any] | None:
-        """登记已有裁剪到 Candidate；不连接游戏、不新增图片或修改已发布库。"""
-
-        entry = self.asset_library.crop_reference(name, self.game_language, image)
-        errors = self.manifest_manager.validate(candidate_dir / "manifest.json")
-        if errors:
-            raise StartError("candidate_invalid", "; ".join(error.message for error in errors), errors=errors)
-        library_path = candidate_dir / "asset-library.json"
-        mapping = self.asset_library.validate(json.loads(library_path.read_text(encoding="utf-8")))
-        existing = mapping.get(name, {}).get(self.game_language)
-        result = {"logical_name": name, "source_language": self.game_language, **entry,
-                  "image_path": str(self.asset_library.path(entry["path"]))}
-        if existing == entry:
-            return {**result, "unchanged": True}
-        if existing is not None and not confirm(
-            f"Asset {name!r} ({self.game_language}) already has an image. Replace Candidate mapping? [y/N] "
-        ):
-            return None
-        mapping.setdefault(name, {})[self.game_language] = entry
-        atomic_write_json(library_path, mapping)
-        return result
+    def add_asset(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
+        """为现有本地裁剪追加标签，不连接游戏、不要求 Candidate。"""
+        return self.asset_library.add_tags(name, image, tags)
 
     def _window_platform(self) -> Any:
         return self.window_platform if self.window_platform is not None else WindowsWindowPlatform(
@@ -272,7 +232,7 @@ class ApplicationService:
             result["evidence_id"] = evidence_id
         return result
 
-    def _match_asset(self, mapping: dict[str, Any], name: str, **options: Any) -> list[dict[str, Any]]:
+    def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]]:
         """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
 
         session = self._focused_session
@@ -286,19 +246,19 @@ class ApplicationService:
             raise
         assert session.image is not None and session.size is not None
         return self.asset_library.match(
-            mapping, name, self.game_language, session.image, session.size,
+            name, session.image, session.size,
             run_id=self._state["run_id"], observation=session.observation, emit=self._emit, **options,
         )
 
-    def _crop_asset(self, name: str, region: dict[str, int]) -> dict[str, Any]:
-        """每次请求重新截图，再保存新 Asset 及实际截图来源，不改变映射。"""
+    def _crop_asset(self, name: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
+        """每次重新截图，再保存哈希 Asset、标签和实际来源，不改 Manifest。"""
 
         observation = self._capture_screen(False)
         session = self._focused_session
         assert session is not None and session.image is not None and session.size is not None
         result = self.asset_library.save_crop(
-            name, self.game_language, session.image, session.size, region,
-            run_id=self._state["run_id"], observation=observation["observation"],
+            name, session.image, session.size, region,
+            run_id=self._state["run_id"], observation=observation["observation"], tags=tags,
         )
         self._emit("asset_created", result)
         return result
@@ -783,7 +743,6 @@ def _manifest_snapshot(manifest: LoadedManifest) -> LoadedManifest:
         deepcopy(manifest.manifest),
         dict(manifest.components),
         dict(manifest.recovery_rules),
-        deepcopy(manifest.assets),
     )
 
 

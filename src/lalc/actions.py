@@ -23,17 +23,17 @@ def capture_screen(ctx, *, save: bool = False) -> dict[str, int | str]:
     return ctx.capture_screen(save=save)
 
 
-def match_asset(ctx, *, asset: str, region: dict[str, int] | None = None,
+def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
                 threshold: float = 0.9, nms: bool = True,
-                nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | dict[str, float]]]:
+                nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | dict[str, float]]]:
     """使用当前有效截图识别模板，返回全部符合条件的目标。"""
-    return ctx.match_asset(asset, region=region, threshold=threshold, nms=nms,
+    return ctx.match_asset(asset, priority_tags=priority_tags, region=region, threshold=threshold, nms=nms,
                            nms_iou_threshold=nms_iou_threshold)
 
 
-def crop_asset(ctx, *, asset: str, region: dict[str, int]) -> dict[str, str | int | dict[str, int]]:
-    """重新截图并裁剪新模板及来源，不修改已发布映射。"""
-    return ctx.crop_asset(asset, region=region)
+def crop_asset(ctx, *, asset: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, str | int | list[str] | dict[str, int]]:
+    """重新截图并保存哈希模板、标签和来源，不修改 Manifest。"""
+    return ctx.crop_asset(asset, region=region, tags=tags)
 
 
 def click(ctx, *, x: int, y: int) -> None:

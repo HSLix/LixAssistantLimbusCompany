@@ -56,39 +56,65 @@ class AssetLibrary:
             raise ValueError(f"Asset hash mismatch: {entry['path']}")
         return content
 
-    def validate(self, mapping: dict[str, Any]) -> dict[str, Any]:
-        """校验完整映射及所有文件；技术错误交给 Manifest 层保留原始原因。"""
+    @staticmethod
+    def tags(value: list[str] | None) -> list[str]:
+        """校验标签并按输入顺序去重，None 表示空列表。"""
+        if value is None:
+            return []
+        if type(value) is not list or any(type(tag) is not str or not tag.strip() for tag in value):
+            raise ValueError("Tags must be a list of nonempty strings.")
+        return list(dict.fromkeys(value))
 
-        from .recognition import decode_image
-
+    def _tag_mapping(self, name: str) -> dict[str, list[str]]:
+        path = self.path(f"{asset_name(name)}/asset-tag.json")
+        try:
+            mapping = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {}
         if type(mapping) is not dict:
-            raise ValueError("Asset Library must be an object.")
-        result = {}
-        for name, languages in mapping.items():
-            asset_name(name)
-            if type(languages) is not dict or not languages:
-                raise ValueError("Each Asset requires at least one language mapping.")
-            result[name] = {}
-            for language, entry in languages.items():
-                game_language(language)
-                decode_image(self.read(entry))
-                result[name][language] = dict(entry)
-        return result
+            raise ValueError("asset-tag.json must map full hashes to tag lists.")
+        for digest, tags in mapping.items():
+            if not re.fullmatch(r"[0-9a-f]{64}", digest):
+                raise ValueError("Asset tag keys must be complete SHA-256 hashes.")
+            if type(tags) is not list:
+                raise ValueError("Stored Asset tags must be lists.")
+            self.tags(tags)
+        return mapping
 
-    def crop_reference(self, name: str, language: str, image: Path) -> dict[str, str]:
-        """只读取本地裁剪来源对应的图片，核对身份、完整哈希及解码，不导入外部文件。"""
+    def _merge_tags(self, name: str, digest: str, tags: list[str] | None) -> tuple[list[str], bool]:
+        """仅原子追加标签；省略标签不清空已有记录。"""
+        additions = self.tags(tags)
+        mapping = self._tag_mapping(name)
+        merged = list(dict.fromkeys([*mapping.get(digest, []), *additions]))
+        unchanged = digest in mapping and mapping[digest] == merged
+        if not unchanged:
+            mapping[digest] = merged
+            atomic_write_json(self.path(f"{name}/asset-tag.json"), mapping)
+        return merged, unchanged
 
+    def crop_reference(self, name: str, image: Path) -> dict[str, str]:
+        """核对现有本地裁剪及完整哈希，不接受外部图片导入。"""
+        from .recognition import decode_image
         asset_name(name)
-        game_language(language)
         relative = Path(image).resolve().relative_to(self.root.resolve()).as_posix()
-        self.path(relative)
+        digest = Path(relative).stem
+        if relative != f"{name}/{digest}.png":
+            raise ValueError("Crop image does not belong to this Asset logical name.")
+        entry = {"path": relative, "sha256": digest}
+        decode_image(self.read(entry))
         for source in sorted((self.data_root / "asset-provenance").glob("*.json")):
             crop = json.loads(source.read_text(encoding="utf-8"))
-            if (crop["path"] == relative and crop["logical_name"] == name
-                    and crop["source_language"] == language):
-                entry = {"path": relative, "sha256": crop["sha256"]}
-                return self.validate({name: {language: entry}})[name][language]
-        raise ValueError("No crop provenance matches this image, Asset name and language.")
+            if crop["path"] == relative and crop["logical_name"] == name and crop["sha256"] == digest:
+                return entry
+        raise ValueError("No crop provenance matches this image and Asset name.")
+
+    def add_tags(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
+        """给已有裁剪追加标签，无需 Candidate、游戏窗口或 Manifest 发布。"""
+        self.tags(tags)
+        entry = self.crop_reference(name, image)
+        merged, unchanged = self._merge_tags(name, entry["sha256"], tags)
+        return {"logical_name": name, **entry, "image_path": str(self.path(entry["path"])),
+                "tags": merged, "unchanged": unchanged}
 
     @staticmethod
     def crop_content(pixels: bytes, size: tuple[int, int], region: dict[str, int]) -> tuple[bytes, dict[str, int]]:
@@ -106,16 +132,17 @@ class AssetLibrary:
         return encoded.tobytes(), area
 
     def save_crop(
-        self, name: str, language: str, pixels: bytes, size: tuple[int, int],
+        self, name: str, pixels: bytes, size: tuple[int, int],
         region: dict[str, int], *, run_id: int | None, observation: int,
+        tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """保存现场截图的裁剪和来源；相同内容可复用，失败不删除已经保存的文件。"""
-
+        """保存哈希命名的现场裁剪和来源，追加标签而不覆盖旧图。"""
         asset_name(name)
-        game_language(language)
+        self.tags(tags)
+        self._tag_mapping(name)
         content, area = self.crop_content(pixels, size, region)
         digest = sha256_bytes(content)
-        relative = f"{name}-{language}-{digest}.png"
+        relative = f"{name}/{digest}.png"
         path = self.path(relative)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
@@ -135,8 +162,9 @@ class AssetLibrary:
                         raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
             finally:
                 Path(temporary).unlink(missing_ok=True)
+        merged, _ = self._merge_tags(name, digest, tags)
         provenance_id = uuid.uuid4().hex
-        result = {"logical_name": name, "source_language": language, "path": relative,
+        result = {"logical_name": name, "tags": merged, "path": relative,
                   "sha256": digest, "image_path": str(path), "run_id": run_id,
                   "observation": observation, "region": area,
                   "client_size": {"width": size[0], "height": size[1]},
@@ -145,50 +173,64 @@ class AssetLibrary:
         return result
 
     def match(
-        self, mapping: dict[str, Any], name: str, language: str, pixels: bytes,
-        size: tuple[int, int], *, run_id: int, observation: int,
-        emit: Callable[[str, dict[str, Any]], None], region: dict[str, int] | None = None,
+        self, name: str, pixels: bytes, size: tuple[int, int], *, run_id: int,
+        observation: int, emit: Callable[[str, dict[str, Any]], None],
+        priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
     ) -> list[dict[str, Any]]:
-        """匹配语义名；语言回退不改 Manifest，非空结果直接更新 Usage Index。"""
-
-        from .recognition import checked_region, client_image, decode_image, detect_template
-
+        """每次读取目录及标签；优先组命中则短路，否则匹配剩余模板。"""
+        import math
+        from .recognition import checked_region, client_image, decode_image, detect_template, suppress_overlaps
         asset_name(name)
-        game_language(language)
-        languages = mapping[name]
-        selected = [(language, languages[language])] if language in languages else sorted(
-            languages.items(), key=lambda item: (item[1]["path"], item[0]),
-        )
+        preferred_tags = self.tags(priority_tags)
+        for value in (threshold, nms_iou_threshold):
+            if type(value) not in (int, float) or not math.isfinite(value) or not 0 <= value <= 1:
+                raise ValueError("Detection thresholds must be finite and between 0 and 1.")
+        if type(nms) is not bool:
+            raise ValueError("nms must be bool.")
+        directory = self.path(name)
+        if not directory.is_dir():
+            raise FileNotFoundError(f"Asset logical name does not exist: {name}")
+        mapping = self._tag_mapping(name)
+        candidates = []
+        for path in sorted(directory.glob("*.png")):
+            if not re.fullmatch(r"[0-9a-f]{64}", path.stem):
+                raise ValueError(f"Asset filename must be a complete SHA-256: {path.name}")
+            candidates.append({"path": f"{name}/{path.name}", "sha256": path.stem,
+                               "tags": list(mapping.get(path.stem, []))})
         image = client_image(pixels, size)
         area = checked_region(region, *size)
-        matches = []
-        for source_language, entry in selected:
-            template = decode_image(self.read(entry))
-            detections = detect_template(image, template, region=area, threshold=threshold,
-                                         nms=nms, nms_iou_threshold=nms_iou_threshold)
-            if detections:
-                matches.append((detections[0]["score"], entry["path"], source_language, entry, detections))
-        identity = {"logical_name": name, "running_language": language, "run_id": run_id,
-                    "observation": observation, "search_region": area,
-                    "trace_path": f"traces/{run_id}.jsonl", "threshold": threshold,
-                    "nms": nms, "nms_iou_threshold": nms_iou_threshold}
-        if not matches:
-            emit("asset_matched", {**identity, "detections": []})
-            return []
-        _, _, source_language, entry, detections = min(matches, key=lambda item: (-item[0], item[1], item[2]))
+        preferred = [entry for entry in candidates if set(entry["tags"]) & set(preferred_tags)]
+        remaining = [entry for entry in candidates if not set(entry["tags"]) & set(preferred_tags)]
+        attempted = []
         output = []
-        for detection in detections:
-            normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
-                          for key, value in detection.items() if key != "score"}
-            output.append({**detection, "normalized_region": normalized, "logical_name": name,
-                           "running_language": language, "source_language": source_language, **entry,
-                           "observation": observation})
-        event = {**identity, "source_language": source_language, **entry, "detections": output}
+        batch = "remaining"
+        for label, entries in (("preferred", preferred), ("remaining", remaining)):
+            detections = []
+            for entry in entries:
+                attempted.append(entry)
+                template = decode_image(self.read({key: entry[key] for key in ("path", "sha256")}))
+                # 跨模板统一 NMS，避免先抑制同模板的框导致最终结果丢失。
+                found = detect_template(image, template, region=area, threshold=threshold, nms=False)
+                for detection in found:
+                    normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
+                                  for key, value in detection.items() if key != "score"}
+                    detections.append({**detection, **entry, "normalized_region": normalized,
+                                       "logical_name": name, "observation": observation})
+            if detections:
+                detections.sort(key=lambda d: (-d["score"], d["y"], d["x"], d["sha256"]))
+                output = suppress_overlaps(detections, nms_iou_threshold) if nms else detections
+                batch = label
+                break
+        event = {"logical_name": name, "run_id": run_id, "observation": observation,
+                 "search_region": area, "trace_path": f"traces/{run_id}.jsonl",
+                 "threshold": threshold, "nms": nms, "nms_iou_threshold": nms_iou_threshold,
+                 "priority_tags": preferred_tags, "matched_batch": batch,
+                 "templates": attempted, "detections": output}
         emit("asset_matched", event)
-        index_path = self.data_root / "asset-usage.json"
-        index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
-        key = json.dumps([name, language, entry["sha256"]], ensure_ascii=False)
-        index[key] = {**event, "last_used_at": datetime.now(UTC).isoformat()}
-        atomic_write_json(index_path, index)
+        if output:
+            index_path = self.data_root / "asset-usage.json"
+            index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
+            index[name] = {**event, "last_used_at": datetime.now(UTC).isoformat()}
+            atomic_write_json(index_path, index)
         return output

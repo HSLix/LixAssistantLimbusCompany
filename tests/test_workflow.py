@@ -82,7 +82,6 @@ def _publish(
         },
         "recovery_rules": {},
     }
-    (candidate / "asset-library.json").write_text("{}", encoding="utf-8")
     path = candidate / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     if manager is None:

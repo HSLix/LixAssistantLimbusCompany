@@ -4,7 +4,7 @@ from lalc import step
 
 
 @step
-def execute(ctx, *, asset: str, region: dict[str, int]) -> dict[str, str | int | dict[str, int]]:
-    """只新增模板，检查图片及编辑候选 Manifest 由调用方完成。"""
+def execute(ctx, *, asset: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, str | int | list[str] | dict[str, int]]:
+    """新增模板与来源，可独立追加标签，无需发布 Manifest。"""
 
-    return ctx.action("observe.crop_asset", asset=asset, region=region)
+    return ctx.action("observe.crop_asset", asset=asset, region=region, tags=tags)

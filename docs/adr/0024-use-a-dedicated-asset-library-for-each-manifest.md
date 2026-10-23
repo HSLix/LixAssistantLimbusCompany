@@ -1,8 +1,10 @@
 ---
-status: accepted
+status: superseded by ADR-0027
 ---
 
 # Use a dedicated Asset Library mapping file for each Manifest
+
+ADR 0027 supersedes this design on 2026-10-23 and is implemented in the current worktree. This document retains the prior contract as historical context; its per-Manifest library and language-selection rules no longer apply.
 
 Each Manifest has its own dedicated Asset Library mapping file, stored outside the Manifest document and hash-addressed Component source. Its content is the former `assets` object: semantic name → language → `{path, sha256}`. The actual image files remain in the existing global Asset file store and may be referenced by different Manifests without copying them.
 

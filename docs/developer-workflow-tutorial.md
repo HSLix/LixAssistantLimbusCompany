@@ -1,68 +1,58 @@
 # Developer Workflow
 
-正式 Run 要求唯一可用的 Windows 游戏窗口。Run 开始时连接、聚焦并启动物理输入监听，结束时清理。纯观察任务也遵循此规则；自动化测试提供窗口和输入替身。
+正式 Run 要求唯一可用的 Windows 游戏窗口。运行开始时连接、聚焦并启动物理输入监听，结束时清理；自动化测试提供平台替身。
 
-## 编辑与发布
+## Component 工作台与发布
 
 ```bash
 uv run lalc init
-# 编辑 candidate/manifest.json、candidate/asset-library.json 和 Component Python 源码
+# 编辑 candidate/manifest.json 和 Component Python 源码
 uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>
 uv run lalc run <logical-name> --inputs '{}'
+uv run lalc run-plan <plan.json>
 ```
 
-全新 Candidate 的 `manifest.json`：
+常规使用按 publish → set-default → run / run-plan 进行，后续省略 `--manifest`。每次发布并希望使用新代码版本时，再设置 Default；临时运行其他版本才用 `--manifest <id>`。
 
-```json
-{"schema_version": 2, "components": {}, "recovery_rules": {}}
-```
+Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 不覆盖；clear 需要确认。
 
-`candidate/asset-library.json` 初始为 `{}`。有已发布 Manifest 时，`init` 从 Default 复制 Component 源码和对应映射；`init --from <id>` 明确指定来源。已有非空 Candidate 不覆盖；`clear` 需要确认。
+源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
-旧工作台的 `assets.json` 须由开发者明确改名为 `asset-library.json`；程序不自动回退读取旧名。已发布库的 `asset-libraries/<manifest-id>.json` 不改名。
+## 独立素材与标签
 
-每个 Component 条目选择相对 `source_path` 或已有 `component_id`，不能同时提供两者。源码使用 `@task_workflow`、`@sub_workflow` 或 `@step` 标明角色；Recovery Rule 使用 `detect` 和 `recover`。跨组件使用字面量 `ctx.call()`，低层操作使用应用已注册的 `ctx.action()`，不创建 Action 源码文件或在 Manifest 注册动作。应用注册保存名称、Python callable 及 observe/control 分类；原有参数、defaults、权限、结果校验、Trace 和异常传播保留。
-
-常规使用按“publish → set-default → run / run-plan”进行；设置后运行命令省略 `--manifest`。每次重新发布并希望使用新版本时，再设置一次 Default。`--manifest <id>` 仅用于临时指定其他版本，不改变 Default。
-
-## Asset 模板
+完整逻辑名对应完整目录，例如 `ui/claim` 对应数据目录的 `assets/ui/claim/`。每张图为 `<完整SHA256>.png`，目录下 `asset-tag.json` 保存 `哈希 → tag列表`。语言只是普通可选 tag，无特殊筛选规则。所有有效图片都参与候选；缺 tag 文件或缺哈希条目时按 `[]` 处理，不需要登记白名单。
 
 ```bash
-uv run lalc crop-asset ui/claim --language zh --region '{"x":2,"y":1,"width":20,"height":20}'
-uv run lalc validate
-uv run lalc publish
-uv run lalc set-default <本次publish输出的UUID>
+uv run lalc crop-asset ui/claim --region '{"x":2,"y":1,"width":20,"height":20}' --tags zh event
+uv run lalc add-asset ui/claim --image <crop返回的image_path> --tags dark event
 ```
 
-裁剪命令针对当前 Candidate：重新连接并截图，裁剪指定客户区区域，保存 PNG 和独立来源记录，返回图片路径供检查，并更新 `candidate/asset-library.json`。同语义名同语言已有条目时明确询问替换；拒绝、EOF 或取消不改条目和图片。内容相同无需替换。文件名为 `语义名-语言-完整SHA256.png`，不覆盖旧图。
+裁剪重新连接游戏并截图，保存图片、实际观察/区域来源和标签。add-asset 仅给已有本地裁剪追加标签，核对逻辑名、来源、完整哈希及解码，不连接游戏、不接受外部 PNG、不复制图片。两个命令都无需 Candidate 或 Manifest 发布。
 
-库 JSON 直接使用 `语义名 → 语言 → {path, sha256}`，没有额外 `assets` 包装。图片路径相对于本地数据目录的 `assets/`。发布后映射存入 `asset-libraries/<manifest-id>.json`，已发布 Manifest 位于 `manifests/<manifest-id>.json`。只改模板也必须 publish 创建新的一组文件；旧 Manifest 和库不变，图片可共享。
+标签稳定去重并追加合并：原为 `["zh", "event"]`，再传 dark event 后为 `["zh", "event", "dark"]`。省略 `--tags` 或传空列表时，新条目写 `[]`，已有条目不清空。新图片和不同主题可并存；相同字节复用相同哈希图片，已有图片从不覆盖。标签更新无需重名替换确认。
 
-加载时完整校验并读取库到内存。`observe.capture_screen` 显式截图，`observe.match_asset` 使用当前截图；`observe.crop_asset` 总是重新截图，仅创建新图及来源，不修改已发布库。每次匹配验证图片完整哈希，保留语言回退、NMS、完整客户区坐标和独立 Usage Index。
+## 匹配规则
 
-### 登记已有裁剪
+Step 先 `ctx.action("observe.capture_screen")`，再执行：
 
-Workflow 的 `observe.crop_asset` 返回图片与来源，但不编辑工作台。检查返回的图片后，用语义名、语言及 `image_path` 登记，无需手写库 JSON：
-
-```bash
-uv run lalc add-asset ui/claim --language zh --image <crop返回的image_path>
-uv run lalc validate
-uv run lalc publish
-uv run lalc set-default <本次publish输出的UUID>
+```python
+ctx.action("observe.match_asset", asset="ui/claim", priority_tags=["zh", "event"])
 ```
 
-只接受当前数据目录中有对应 crop 来源记录的图片；名称和语言必须与来源一致，完整哈希和解码须通过，不支持外部 PNG 导入。登记不连接游戏、不重新截图、不复制图片，仅原子更新当前根目录的 `candidate/asset-library.json`。不同内容的同名同语言条目需确认替换，拒绝、EOF 或取消不写入；完全相同的映射直接成功且不重写。已发布库、旧图片和 Default 均不变，publish 仍是独立步骤。
+priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 tag 的模板组成优先组，组内全部匹配；有达标结果则只返回该批，不读取其余模板。优先组无结果时，剩余模板全部匹配，包括无标签图片。语言不会从 `--language` 自动转成优先 tag。
 
-`crop-asset` CLI 已自动登记，无需再执行 add-asset；重复登记已有映射也是无写入成功。
+选定批次统一 NMS（默认启用、IoU 阈值 0.5），按分数降序、同分按稳定位置和哈希返回；关闭 NMS 保留所有达标结果。结果包含模板路径、完整哈希、tag、客户区坐标、分数、归一化区域和观察 ID。未知逻辑名是错误，存在但无命中的目录返回 `[]`；哈希、解码或标签文件格式错误保留原始异常，不伪装成未找到。
 
-## 格式与执行边界
+每次匹配重新读取该逻辑名目录和标签，并固定本次候选/标签。新增图片或改标签从下一次匹配生效，包括同一 Run；不需要 publish 或 set-default，也不建立跨调用缓存。observe.crop_asset 同样可传 tags，始终重新截图，保存后立即可被后续匹配发现。
 
-schema 2 不接受旧版本、内嵌 `assets` 或 `trusted_actions`，不提供迁移工具。保存的 Manifest 多一个 UUID `manifest_id`，Component 身份仍为源码 SHA-256。validate 不写发布物、不分配 ID、不修改 Default；publish 保留 Candidate，也不修改 Default。
+## 证据和边界
 
-`run-plan <plan.json>` 读取外部编辑的有序 Task 配置，一次 Run 共用窗口会话、输入监听和 Working Manifest。物理接管暂停执行、释放输入并等待明确 Resume；不重放被中断的动作。诊断 `connect` 仍独立保存截图和文本证据，不创建 Run 或 Ledger。
+`lalc data-dir` 查看数据根。图片在 assets/，裁剪来源在 asset-provenance/。Trace 的 asset_matched 记录优先条件、实际尝试模板、所选批次和最终检测结果；asset-usage.json 按逻辑名保存最近一次非空返回及来源，空结果不更新，不等待 Step 成功，也不影响搜索区域。普通截图不落盘，显式 `save=True` 才保存证据。
 
-新的 [三层教学样例](../example/trusted-actions/README.md) 展示全部应用 Trusted Action 调用，默认只截图和等待，外部库为 `{}`，无需模板即可校验发布；实际匹配需先登记模板并重新 publish。旧 examples 不恢复，回归测试仍有自己的夹具。
+[三层教学样例](../example/trusted-actions/README.md) 不附图片或素材映射文件，默认只截图和等待。Plan 从外部 JSON 读取有序 Task，共用 Run、会话和 Working Manifest；物理接管需明确 Resume，Stop 后释放持有输入并收尾。
 
-[ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md) 取消 Stage 2 的真实邮箱验收门槛；邮箱与剩余 Windows 集成/打包验收延期保留在 #317。Windows 真机与打包验收必须单独记录，不由测试替身结果代替。
+[ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 取代旧专属库。旧 Asset 布局、Candidate 素材库及已发布专属库废弃，清理后重新准备，不做迁移或兼容；Component、Manifest、Default 和运行历史保留。相同 Manifest 的素材结果可随文件更新而变化。
+
+Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md) 收尾；邮箱和 Windows 集成/打包验收仍在 #317。Stage 3 不包含 Agent Asset 新增；未来 Stage 3.5 可新增素材，但仍不允许覆盖已有图片。

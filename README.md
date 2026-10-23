@@ -29,8 +29,8 @@ Start with:
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
-Semantic Asset template matching, explicit local detection, and fresh-screenshot
-template cropping are available through observe Trusted Actions; see
+Semantic Asset matching with optional priority tags, explicit local detection, and fresh-screenshot
+template cropping are available through observe Trusted Actions; Assets update independently of Manifests; see
 [the developer tutorial](docs/developer-workflow-tutorial.md).
 Input takeover has automated coverage and prior standalone Windows acceptance;
 current Workflow integration and Windows package acceptance remain deferred.
@@ -47,7 +47,7 @@ single Git-ignored `candidate/` directory in the current project:
 
 ```bash
 uv run lalc init
-# Edit candidate/manifest.json, candidate/asset-library.json and Component source.
+# Edit candidate/manifest.json and Component source.
 uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>

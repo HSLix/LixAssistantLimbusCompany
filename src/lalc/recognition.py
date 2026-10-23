@@ -85,3 +85,21 @@ def detect_template(
         kept.append({"x": column + x, "y": row + y, "width": tw, "height": th,
                      "score": float(scores[row, column])})
     return kept
+
+
+def suppress_overlaps(detections: list[dict], threshold: float) -> list[dict]:
+    """对已按分数排序的跨模板结果统一 NMS，允许模板矩形大小不同。"""
+    kept = []
+    for candidate in detections:
+        for previous in kept:
+            width = max(0, min(candidate["x"] + candidate["width"], previous["x"] + previous["width"])
+                        - max(candidate["x"], previous["x"]))
+            height = max(0, min(candidate["y"] + candidate["height"], previous["y"] + previous["height"])
+                         - max(candidate["y"], previous["y"]))
+            intersection = width * height
+            union = candidate["width"] * candidate["height"] + previous["width"] * previous["height"] - intersection
+            if intersection / union > threshold:
+                break
+        else:
+            kept.append(candidate)
+    return kept

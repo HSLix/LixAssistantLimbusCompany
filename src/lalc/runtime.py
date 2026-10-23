@@ -161,20 +161,20 @@ class RunContext:
         return self._executor.game_language
 
     def match_asset(
-        self, logical_name: str, *, region: dict[str, int] | None = None,
+        self, logical_name: str, *, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
     ) -> list[dict[str, Any]]:
         """仅供 observe Action 在现有内存截图中匹配语义 Asset。"""
 
         return self._executor.match_asset(logical_name, {
-            "region": region, "threshold": threshold, "nms": nms,
+            "priority_tags": priority_tags, "region": region, "threshold": threshold, "nms": nms,
             "nms_iou_threshold": nms_iou_threshold,
         })
 
-    def crop_asset(self, logical_name: str, *, region: dict[str, int]) -> dict[str, Any]:
+    def crop_asset(self, logical_name: str, *, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
         """仅供 observe Action 请求现场截图裁剪；只新增文件，不改 Manifest。"""
 
-        return self._executor.crop_asset(logical_name, region)
+        return self._executor.crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, **arguments: Any) -> None:
         """仅供 control Trusted Action 进入应用拥有的输入会话。"""
@@ -652,12 +652,12 @@ class WorkflowExecutor:
     def match_asset(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
         if self._active_action != "observe" or self._match_asset is None:
             raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
-        return self._match_asset(self.manifest.assets, logical_name, **options)
+        return self._match_asset(logical_name, **options)
 
-    def crop_asset(self, logical_name: str, region: dict[str, int]) -> dict[str, Any]:
+    def crop_asset(self, logical_name: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
         if self._active_action != "observe" or self._crop_asset is None:
             raise ExecutionFailure("execution_failed", "Asset cropping requires an observe Trusted Action.")
-        return self._crop_asset(logical_name, region)
+        return self._crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
         """运行角色校验之外，再约束原生输入只能由 control Trusted Action 发起。"""

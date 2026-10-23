@@ -1,4 +1,4 @@
-"""覆盖新三层样例的发布、动作调用、裁剪登记再匹配以及持久执行证据。
+"""覆盖三层样例发布、动作调用、裁剪追加标签后直接匹配，以及持久执行证据。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_example_workflow.py
@@ -23,7 +23,6 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
     original = published.loaded
-    assert original.assets == {}
     traces = []
     def run(entry, inputs, manifest=original.manifest_id):
         service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=Window(), game_language="zh")
@@ -52,10 +51,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
         assert any(e["event"] == "input_released" for e in state["trace"])
     crop = run("steps.crop", {"asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2}})["result"]["output"]
     service = ApplicationService(manager.data_root, manifest_manager=manager, game_language="zh")
-    assert service.add_candidate_asset(candidate, "ui/claim", Path(crop["image_path"]), lambda _: True)
-    second = manager.publish(candidate / "manifest.json")
-    assert second.ok, second.errors
-    assert manager.load(original.manifest_id).loaded.assets == {}
-    detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999}, second.loaded.manifest_id)["result"]["output"]
+    assert service.add_asset("ui/claim", Path(crop["image_path"]), ["zh"])["tags"] == ["zh"]
+    detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())

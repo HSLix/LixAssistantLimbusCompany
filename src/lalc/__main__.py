@@ -35,11 +35,11 @@ def _parser() -> argparse.ArgumentParser:
     commands.add_parser("connect")
     crop = commands.add_parser("crop-asset")
     crop.add_argument("asset")
-    crop.add_argument("--language", default="en")
+    crop.add_argument("--tags", nargs="*", default=None)
     crop.add_argument("--region", required=True, help="JSON client-pixel rectangle")
     add = commands.add_parser("add-asset")
     add.add_argument("asset")
-    add.add_argument("--language", default="en")
+    add.add_argument("--tags", nargs="*", default=None)
     add.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
     commands.add_parser("data-dir")
     run = commands.add_parser("run")
@@ -181,23 +181,14 @@ def _dispatch(args: argparse.Namespace) -> int:
     manifest_path = candidate / "manifest.json"
 
     if args.command in {"crop-asset", "add-asset"}:
-        def confirm(prompt: str) -> bool:
-            try:
-                return input(prompt).strip().lower() in {"y", "yes"}
-            except (EOFError, KeyboardInterrupt):
-                return False
-
-        service = ApplicationService(data_root, manifest_manager=manager, game_language=args.language)
+        service = ApplicationService(data_root, manifest_manager=manager)
         try:
             if args.command == "crop-asset":
-                result = service.crop_candidate_asset(candidate, args.asset, json.loads(args.region), confirm)
+                result = service.crop_developer_asset(args.asset, json.loads(args.region), args.tags)
             else:
-                result = service.add_candidate_asset(candidate, args.asset, args.image, confirm)
+                result = service.add_asset(args.asset, args.image, args.tags)
         except (ValueError, StartError) as error:
             _print_exception(error)
-            return 1
-        if result is None:
-            print("Candidate Asset replacement cancelled.", file=sys.stderr)
             return 1
         print(json.dumps(result, ensure_ascii=False))
         return 0

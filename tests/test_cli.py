@@ -142,4 +142,4 @@ def test_complete_developer_cli_lifecycle(
     assert cli.main(["clear"]) == 0
     assert cli.main(["init", "--from", manifest_id]) == 0
     assert not (candidate / "actions.name_ready.py").exists()
-    assert (candidate / "asset-library.json").read_text(encoding="utf-8").strip() == "{}"
+    assert not (candidate / "asset-library.json").exists()

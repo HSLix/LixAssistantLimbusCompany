@@ -4,6 +4,9 @@ status: accepted
 
 # Close Stage 2 without requiring a real game Workflow
 
+Asset ownership, language selection, naming and Candidate/publication instructions in this ADR are superseded by [ADR 0027](0027-resolve-assets-independently-with-optional-priority-tags.md). Component immutability, fresh-crop provenance and the accepted stage boundaries remain in force.
+
+
 开发者于 2026-10-22 确认：Stage 2 按确定性执行与基础交互能力收尾，取消以邮箱真实端到端任务作为完成门槛。截图、输入及 Asset 已有各自验收，真实业务编写又依赖尚不完善的 GUI 开发工具，例如坐标显示和区域选择；继续强制邮箱验收会把开发工具的手工成本纳入当前阶段。
 
 Stage 2 保留完整 Manifest/Component 校验与发布、三层调用、确定性 Step Recovery、Working Manifest、Automation Plan、Trace/Ledger、前台观察、控制接管与释放、Asset 匹配/裁剪的既有要求和证据。#310、#311、#313 须按现行契约完成核对。增加已有裁剪的 `add-asset` 登记和教学样例，验证开发闭环后收尾 #307；不接入模型或重开执行器架构。

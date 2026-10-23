@@ -70,7 +70,6 @@ def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) 
         },
         "recovery_rules": {"recovery.dismiss": {"source_path": "recovery.py"}},
     }
-    (directory / "asset-library.json").write_text("{}", encoding="utf-8")
     path = directory / "candidate.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     return path
@@ -249,7 +248,6 @@ def test_validation_collects_independent_manifest_errors_without_switching(tmp_p
     assert {
         "field_unknown",
         "schema_version_unsupported",
-        "manifest_unreadable",
         "logical_name_invalid",
         "logical_name_duplicate",
         "source_path_escape",

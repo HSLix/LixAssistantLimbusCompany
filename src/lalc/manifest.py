@@ -17,7 +17,6 @@ from types import MappingProxyType
 
 from .actions import TrustedAction, application_actions
 from .runtime import _exception_fields, atomic_write_json, sha256_bytes
-from .assets import AssetLibrary
 
 SCHEMA_VERSION = 2
 SECTIONS = ("components", "recovery_rules")
@@ -61,7 +60,6 @@ class LoadedManifest:
     manifest: dict[str, Any]
     components: dict[str, LoadedComponent]
     recovery_rules: dict[str, LoadedComponent]
-    assets: dict[str, Any]
 
     @property
     def manifest_id(self) -> str:
@@ -98,7 +96,6 @@ class _Prepared:
     sources: dict[str, _Source] = field(default_factory=dict)
     roles: dict[str, str] = field(default_factory=dict)
     errors: list[ValidationError] = field(default_factory=list)
-    assets: dict[str, Any] = field(default_factory=dict)
 
 
 # 同一内容在不同存储根目录加载时，源码位置也必须对应各自的哈希文件。
@@ -120,7 +117,6 @@ class ManifestManager:
         self.manifests_dir = self.data_root / "manifests"
         self.logger = logger or logging.getLogger(__name__)
         self.actions = MappingProxyType(dict(application_actions() if actions is None else actions))
-        self.asset_libraries_dir = self.data_root / "asset-libraries"
         self.default: LoadedManifest | None = None
 
     def publish(self, candidate_path: Path) -> ManifestResult:
@@ -152,10 +148,6 @@ class ManifestManager:
             manifest_path = self.manifests_dir / f"{manifest_id}.json"
             if manifest_path.exists():
                 raise FileExistsError(manifest_path)
-            library_path = self.asset_libraries_dir / f"{manifest_id}.json"
-            if library_path.exists():
-                raise FileExistsError(library_path)
-            atomic_write_json(library_path, prepared.assets)
             atomic_write_json(manifest_path, manifest)
             return ManifestResult(loaded=loaded)
         except Exception as error:
@@ -303,7 +295,6 @@ class ManifestManager:
                 ),
             )
 
-        assets: dict[str, Any] = {}
         if manifest_id is None:
             retained = any(
                 path.name != "default.json" for path in self.manifests_dir.glob("*.json")
@@ -320,14 +311,12 @@ class ManifestManager:
                     return result.errors
                 assert result.loaded is not None
                 manifest = result.loaded.manifest
-                assets = result.loaded.assets
         else:
             result = self.load(manifest_id)
             if not result.ok:
                 return result.errors
             assert result.loaded is not None
             manifest = result.loaded.manifest
-            assets = result.loaded.assets
 
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
@@ -347,7 +336,6 @@ class ManifestManager:
                     )
                     candidate_entry = {"source_path": filename}
                     candidate[section][logical_name] = candidate_entry
-            atomic_write_json(temporary / "asset-library.json", assets)
             atomic_write_json(temporary / "manifest.json", candidate)
             if target.exists():
                 target.rmdir()
@@ -423,18 +411,6 @@ class ManifestManager:
         }
         if saved and isinstance(data.get("manifest_id"), str):
             normalized["manifest_id"] = data["manifest_id"]
-
-        if not any(error.code == "manifest_id_invalid" for error in prepared.errors):
-            library_path = (self.asset_libraries_dir / f"{data.get('manifest_id')}.json"
-                            if saved else manifest_path.parent / "asset-library.json")
-            mapping, errors = self._read_json(library_path)
-            prepared.errors.extend(errors)
-            if not errors:
-                try:
-                    prepared.assets = AssetLibrary(self.data_root).validate(mapping)
-                except Exception as error:
-                    self.logger.exception("Asset Library validation failed")
-                    prepared.errors.append(ValidationError("asset_invalid", str(error), cause=error))
 
         for section in SECTIONS:
             for logical_name, entry in data[section].items():
@@ -962,7 +938,6 @@ class ManifestManager:
                 manifest,
                 loaded_sections["components"],
                 loaded_sections["recovery_rules"],
-                prepared.assets,
             ),
             [],
         )

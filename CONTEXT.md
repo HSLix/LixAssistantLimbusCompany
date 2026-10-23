@@ -53,15 +53,15 @@ A shipped or human-approved low-level Python operation registered by the applica
 _Avoid_: Step, Agent-generated function, unrestricted Python call
 
 **Asset**:
-A stable semantic resource name resolved by game language through the current Manifest's dedicated Asset Library mapping to a relative file path and complete content hash. It is not a Component, has no Component ID, and has no language or file extension in its logical name.
+A stable semantic resource name identifying a group of template images in the shared Asset Library, independent of a Component Manifest. Images have complete content hashes and optional descriptive tags; language is an ordinary optional tag. It is not a Component and has no Component ID, language or file extension in its logical name.
 _Avoid_: Asset Component, image version, absolute resource path
 
 **Asset Library**:
-The collection of semantic-name/language mappings dedicated to one Manifest, referencing globally shared Asset files. A published library stays unchanged; developers edit the Developer Candidate library and publish a new Manifest/library pair. Different Manifests reuse image files independently; duplicates require both semantic name and language to match.
+The shared collection of template images grouped by Asset logical name, with optional hash-to-tag metadata for each group. Every image in a group is a matching candidate; absent metadata means an empty tag list, not an unavailable image. Optional priority tags select a preferred group by any-tag overlap; a match in that group excludes the remaining templates, otherwise all remaining templates are considered. Changes become visible to the next matching invocation, including within the same Run, without publishing or selecting a Manifest.
 _Avoid_: Manifest attachment, staging library
 
 **Asset Usage Index**:
-Mutable local Asset metadata keyed by logical name, running game language, and complete content hash. It summarizes the latest non-empty detection results and their evidence references for developer and Agent inspection, independently of the Manifest and execution logs, without determining future search regions.
+Mutable local Asset metadata summarizing the latest non-empty detection results, actual template identities and evidence references for developer and Agent inspection, independently of the Manifest and execution logs, without determining future search regions.
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
@@ -73,7 +73,7 @@ A manually initiated repair of one existing Component using supplied screenshots
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Capability Bundle**:
-The transport-neutral software-release data package containing one complete retained Component Manifest, its dedicated Asset Library mapping, and every immutable Component and referenced Asset file. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.
+The transport-neutral software-release data package containing one complete retained Component Manifest, immutable Component source and the Asset metadata and images needed by the distributed capabilities. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.
 _Avoid_: Developer Candidate, application binary, single-Component package
 
 **Recovery Ladder**:
@@ -208,7 +208,7 @@ The stable dotted lookup key used by a Manifest, such as `steps.enter_stage`, to
 _Avoid_: Component ID, version chain
 
 **Component Manifest**:
-The sole saved version unit: a validated complete document protected from Agent modification identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs, while its dedicated Asset Library is maintained separately from the document and Trusted Actions are registered by the application. Every Manifest used for an execution attempt is saved by Manifest ID; reusing that Manifest records another attempt in Trace under the same ID. Any saved Manifest, including an intermediate attempt, may be explicitly selected for a later execution regardless of its permanent approval status. Intermediate attempts are not separately offered for post-execution approval; the current Working Manifest is offered only when its ID has not already received permanent approval. Choosing whether to set an approved current Working Manifest as Default is a separate decision.
+The saved version unit for formal Components: a validated complete document protected from Agent modification identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs. Assets are resolved independently through the shared Asset Library, and Trusted Actions are registered by the application. Every Manifest used for an execution attempt is saved by Manifest ID; reusing that Manifest records another attempt in Trace under the same ID. Any saved Manifest, including an intermediate attempt, may be explicitly selected for a later execution regardless of its permanent approval status. Intermediate attempts are not separately offered for post-execution approval; the current Working Manifest is offered only when its ID has not already received permanent approval. Choosing whether to set an approved current Working Manifest as Default is a separate decision.
 _Avoid_: Approval history, mutable component list
 
 **Default Manifest**:

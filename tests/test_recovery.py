@@ -96,7 +96,6 @@ def _publish(
             name: {"source_path": f"{name}.py"} for name in (rules or {})
         },
     }
-    (folder / "asset-library.json").write_text("{}", encoding="utf-8")
     path = folder / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     result = manager.publish(path)

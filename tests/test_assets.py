@@ -1,4 +1,4 @@
-"""覆盖模板检测、Asset 文件约束、语言选择、使用索引、现场裁剪及恢复切换。
+"""覆盖模板检测、文件约束、优先标签分组、使用索引、现场裁剪及同 Run 可见性。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen --extra automation pytest -q tests/test_assets.py
@@ -38,12 +38,13 @@ def pixels(image: np.ndarray) -> bytes:
 
 
 def entry(root: Path, name: str, image: np.ndarray | None = None) -> dict[str, str]:
-    path = root / "assets" / name
-    path.parent.mkdir(parents=True, exist_ok=True)
     ok, data = cv2.imencode(".png", template() if image is None else image)
     assert ok
+    digest = sha256_bytes(data.tobytes())
+    path = root / "assets" / name / f"{digest}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data.tobytes())
-    return {"path": name, "sha256": sha256_bytes(data.tobytes())}
+    return {"path": f"{name}/{digest}.png", "sha256": digest}
 
 
 def test_local_detection_and_empty_results() -> None:
@@ -77,51 +78,6 @@ def test_invalid_detection_inputs_are_errors(options) -> None:
         detect_template(screenshot(), template(), **options)
 
 
-def test_language_selection_index_and_no_automatic_mapping(tmp_path: Path) -> None:
-    library = AssetLibrary(tmp_path)
-    first = entry(tmp_path, "a.png")
-    second = entry(tmp_path, "b.png")
-    bad = entry(tmp_path, "bad.png", np.full((2, 2, 3), 255, dtype=np.uint8))
-    mapping = {"ui/claim": {"zh": second, "en": first}}
-    original = json.loads(json.dumps(mapping))
-    events = []
-    options = {"run_id": 3, "observation": 7, "emit": lambda event, fields: events.append((event, fields)),
-               "threshold": 0.999}
-    found = library.match(mapping, "ui/claim", "ja", pixels(screenshot()), (12, 8), **options)
-    assert len(found) == 2
-    assert all(d["source_language"] == "en" for d in found)
-    assert found[0]["normalized_region"]["x"] == 2 / 12
-    assert mapping == original
-    assert not (tmp_path / "evidence").exists()
-    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8")).values()))
-    assert stored["detections"] == found
-    assert stored["observation"] == 7 and stored["trace_path"] == "traces/3.jsonl"
-    before = (tmp_path / "asset-usage.json").read_bytes()
-    mapping["ui/claim"]["ja"] = bad
-    assert library.match(mapping, "ui/claim", "ja", pixels(screenshot()), (12, 8), **options) == []
-    assert (tmp_path / "asset-usage.json").read_bytes() == before
-    assert events[-1][1]["detections"] == []
-
-
-def test_hash_decode_and_path_errors_remain_errors(tmp_path: Path) -> None:
-    library = AssetLibrary(tmp_path)
-    saved = entry(tmp_path, "a.png")
-    (tmp_path / "assets" / "a.png").write_bytes(b"broken")
-    with pytest.raises(ValueError, match="hash mismatch"):
-        library.validate({"ui/claim": {"en": saved}})
-    saved["sha256"] = sha256_bytes(b"broken")
-    with pytest.raises(ValueError, match="decoded"):
-        library.validate({"ui/claim": {"en": saved}})
-    for path in ("../outside.png", "/outside.png", "C:/outside.png", "..\\outside.png"):
-        with pytest.raises(ValueError):
-            library.path(path)
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (tmp_path / "assets" / "link").symlink_to(outside, target_is_directory=True)
-    with pytest.raises(ValueError, match="escapes"):
-        library.path("link/image.png")
-
-
 class Window:
     """固定客户区图像，可在下一次截图时替换内容。"""
 
@@ -150,247 +106,239 @@ class Window:
         return pixels(self.image)
 
 
-ACTION = '''"""语义匹配和现场裁剪观察动作。"""
-import json
 
-def execute(ctx, *, crop: bool = False) -> str:
-    if crop:
-        return json.dumps(ctx.crop_asset("ui/claim", region={"x": 2, "y": 1, "width": 2, "height": 2}))
-    return json.dumps(ctx.match_asset("ui/claim", threshold=0.999))
-'''
-STEP = '''"""在同一截图内识别多个按钮。"""
+def matching(library, *, image=None, **options):
+    events = []
+    found = library.match("ui/claim", pixels(screenshot() if image is None else image), (12, 8),
+                          run_id=3, observation=7, emit=lambda event, fields: events.append((event, fields)),
+                          threshold=0.999, **options)
+    return found, events
+
+
+def test_tags_are_optional_and_all_templates_are_candidates(tmp_path):
+    library = AssetLibrary(tmp_path)
+    saved = entry(tmp_path, "ui/claim")
+    found, events = matching(library)
+    assert [(d["x"], d["y"], d["tags"]) for d in found] == [(2, 1, []), (8, 5, [])]
+    assert events[-1][1]["templates"][0]["sha256"] == saved["sha256"]
+    tags_path = tmp_path / "assets/ui/claim/asset-tag.json"
+    tags_path.write_text("{}", encoding="utf-8")
+    assert matching(library)[0] == found
+    index = json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8"))
+    assert index["ui/claim"]["detections"] == found
+
+
+def test_priority_group_short_circuits_remaining_image_reads(tmp_path):
+    library = AssetLibrary(tmp_path)
+    first = entry(tmp_path, "ui/claim")
+    # 不同尺寸模板也有命中，优先组应返回两者而非只选最高分模板。
+    second = entry(tmp_path, "ui/claim", screenshot()[0:4, 1:5])
+    third = entry(tmp_path, "ui/claim", np.full((2, 2, 3), 255, dtype=np.uint8))
+    tags = {first["sha256"]: ["zh"], second["sha256"]: ["event"], third["sha256"]: []}
+    (tmp_path / "assets/ui/claim/asset-tag.json").write_text(json.dumps(tags), encoding="utf-8")
+    (tmp_path / "assets" / third["path"]).write_bytes(b"remaining must not be read")
+    found, events = matching(library, priority_tags=["zh", "event"], nms=False)
+    assert {d["sha256"] for d in found} == {first["sha256"], second["sha256"]}
+    assert events[-1][1]["matched_batch"] == "preferred"
+    assert len(events[-1][1]["templates"]) == 2
+    assert [d["score"] for d in found] == sorted((d["score"] for d in found), reverse=True)
+
+
+def test_priority_failure_falls_back_to_untagged_templates(tmp_path):
+    library = AssetLibrary(tmp_path)
+    bad = entry(tmp_path, "ui/claim", np.full((2, 2, 3), 255, dtype=np.uint8))
+    good = entry(tmp_path, "ui/claim")
+    (tmp_path / "assets/ui/claim/asset-tag.json").write_text(json.dumps({bad["sha256"]: ["zh"]}), encoding="utf-8")
+    found, events = matching(library, priority_tags=["zh"])
+    assert {d["sha256"] for d in found} == {good["sha256"]}
+    assert events[-1][1]["matched_batch"] == "remaining"
+    assert len(events[-1][1]["templates"]) == 2
+    assert matching(library, priority_tags=None)[0] == matching(library, priority_tags=[])[0]
+    before = (tmp_path / "asset-usage.json").read_bytes()
+    assert matching(library, image=np.zeros((8, 12, 3), dtype=np.uint8))[0] == []
+    assert (tmp_path / "asset-usage.json").read_bytes() == before
+
+
+def test_cross_template_nms_uses_actual_sizes_and_stable_order(tmp_path):
+    library = AssetLibrary(tmp_path)
+    entry(tmp_path, "ui/claim")
+    entry(tmp_path, "ui/claim", screenshot()[0:4, 1:5])
+    unfiltered, _ = matching(library, nms=False)
+    filtered, _ = matching(library, nms_iou_threshold=0.1)
+    assert len(unfiltered) > len(filtered)
+    assert filtered == matching(library, nms_iou_threshold=0.1)[0]
+    assert {d["sha256"] for d in unfiltered} != set()
+
+
+def test_hash_decode_and_path_errors_remain_errors(tmp_path):
+    library = AssetLibrary(tmp_path)
+    saved = entry(tmp_path, "ui/claim")
+    path = tmp_path / "assets" / saved["path"]
+    path.write_bytes(b"broken")
+    with pytest.raises(ValueError, match="hash mismatch"):
+        matching(library)
+    path.unlink()
+    digest = sha256_bytes(b"broken")
+    (path.parent / f"{digest}.png").write_bytes(b"broken")
+    with pytest.raises(ValueError, match="decoded"):
+        matching(library)
+    for path in ("../outside.png", "/outside.png", "C:/outside.png", "..\\outside.png"):
+        with pytest.raises(ValueError):
+            library.path(path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "assets/link").symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ValueError, match="escapes"):
+        library.path("link/image.png")
+
+
+@pytest.mark.parametrize("bad_tags", [None, "zh", [1], [""]])
+def test_malformed_tag_metadata_is_not_a_missing_tag(tmp_path, bad_tags):
+    library = AssetLibrary(tmp_path)
+    saved = entry(tmp_path, "ui/claim")
+    (tmp_path / "assets/ui/claim/asset-tag.json").write_text(json.dumps({saved["sha256"]: bad_tags}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        matching(library)
+
+
+def test_missing_logical_name_is_distinct_from_empty_directory(tmp_path):
+    library = AssetLibrary(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        matching(library)
+    (tmp_path / "assets/ui/claim").mkdir(parents=True)
+    assert matching(library)[0] == []
+
+
+def test_full_hash_path_never_overwrites_different_bytes(tmp_path):
+    library = AssetLibrary(tmp_path)
+    content, _ = library.crop_content(pixels(screenshot()), (12, 8), {"x": 2, "y": 1, "width": 2, "height": 2})
+    path = library.path(f"ui/claim/{sha256_bytes(content)}.png")
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"old content")
+    with pytest.raises(FileExistsError):
+        library.save_crop("ui/claim", pixels(screenshot()), (12, 8),
+                          {"x": 2, "y": 1, "width": 2, "height": 2}, run_id=1, observation=1)
+    assert path.read_bytes() == b"old content"
+
+
+def finish(service, run_id):
+    return service.wait_for(lambda state: state["run_id"] == run_id and state["phase"] == "finished")
+
+
+def test_same_run_sees_new_crops_tags_and_preserves_manifest(tmp_path):
+    """同一正式 Step 内裁剪后立即匹配，再追加标签；无需 publish 或切换 Manifest。"""
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    (candidate / "step.py").write_text('''"""新素材的立即可见性与标签更新。"""
 from lalc import step
 
 @step
 def execute(ctx) -> str:
-    ctx.action("observe.capture")
-    return ctx.action("observe.match")
-'''
-
-
-def publish(folder: Path, manager: ManifestManager, mapping: dict, source: str = STEP) -> str:
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / "step.py").write_text(source, encoding="utf-8")
-    capture = '''"""刷新内存截图。"""
-def execute(ctx) -> int:
-    return ctx.capture_screen()["observation"]
-'''
-    candidate = {"schema_version": 2, "components": {"steps.find": {"source_path": "step.py"}},
-                 "recovery_rules": {}}
-    from runtime_support import register_sources
-    register_sources(manager, {"observe.match": (ACTION, "observe"), "observe.capture": (capture, "observe")})
-    (folder / "asset-library.json").write_text(json.dumps(mapping), encoding="utf-8")
-    path = folder / "manifest.json"
-    path.write_text(json.dumps(candidate), encoding="utf-8")
-    result = manager.publish(path)
-    assert result.ok, result.errors
-    return result.loaded.manifest_id
-
-
-def finish(service: ApplicationService, run_id: int) -> dict:
-    return service.wait_for(lambda s: s["run_id"] == run_id and s["phase"] == "finished")
-
-
-def test_formal_run_trace_index_and_original_errors(tmp_path: Path) -> None:
+    ctx.action("observe.crop_asset", asset="ui/claim", region={"x":2,"y":1,"width":2,"height":2})
+    ctx.action("observe.capture_screen", save=True)
+    first = ctx.action("observe.match_asset", asset="ui/claim", threshold=0.999)
+    ctx.action("observe.crop_asset", asset="ui/claim", region={"x":2,"y":1,"width":2,"height":2}, tags=["event"])
+    second = ctx.action("observe.match_asset", asset="ui/claim", priority_tags=["event"], threshold=0.999)
+    return str([first[0]["tags"], second[0]["tags"]])
+''', encoding="utf-8")
+    (candidate / "manifest.json").write_text(json.dumps({"schema_version":2,"components":{"steps.find":{"source_path":"step.py"}},"recovery_rules":{}}), encoding="utf-8")
     manager = ManifestManager(tmp_path)
-    saved = entry(tmp_path, "a.png")
-    manifest = publish(tmp_path / "draft", manager, {"ui/claim": {"zh": saved}})
-    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window(), game_language="ja")
-    state = finish(service, service.start("steps.find", {}, manifest_id=manifest))
-    assert state["result"]["status"] == "success"
-    assert len(json.loads(state["result"]["output"])) == 2
-    match = next(e for e in state["trace"] if e["event"] == "asset_matched")
-    assert match["source_language"] == "zh" and match["running_language"] == "ja"
-    assert not (tmp_path / "evidence").exists()
-    assert manager.load(manifest).loaded.assets == {"ui/claim": {"zh": saved}}
-    # 在成功加载之后破坏文件，必须由运行时报告原始错误而非空匹配。
-    window = Window()
-    original_capture = window.capture
-    def damage(*args):
-        (tmp_path / "assets" / "a.png").write_bytes(b"corrupted")
-        return original_capture(*args)
-    window.capture = damage
-    service.window_platform = window
-    failed = finish(service, service.start("steps.find", {}, manifest_id=manifest))
-    assert failed["result"]["status"] == "failure"
-    assert "Asset hash mismatch" in failed["result"]["traceback"]
-    assert "assets.py" in failed["result"]["traceback"]
-
-
-def test_crop_refreshes_and_retains_existing_files(tmp_path: Path) -> None:
-    manager = ManifestManager(tmp_path)
-    source = STEP.replace('return ctx.action("observe.match")', 'return ctx.action("observe.match", crop=True)')
-    manifest = publish(tmp_path / "draft", manager, {}, source)
-    original_manifest = (tmp_path / "manifests" / f"{manifest}.json").read_bytes()
-    window = Window()
-    original_capture = window.capture
-    def changing(*args):
-        if window.captures:
-            window.image[1:3, 2:4] = 177
-        return original_capture(*args)
-    window.capture = changing
-    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=window)
-    state = finish(service, service.start("steps.find", {}, manifest_id=manifest))
-    crop = json.loads(state["result"]["output"])
-    assert window.captures == 2 and crop["observation"] == 2
-    assert np.all(decode_image(Path(crop["image_path"]).read_bytes()) == 177)
-    assert crop["sha256"] == sha256_bytes(Path(crop["image_path"]).read_bytes())
-    assert (tmp_path / "asset-provenance" / f"{crop['provenance_id']}.json").exists()
-    assert not (tmp_path / "evidence").exists()
-    assert (tmp_path / "manifests" / f"{manifest}.json").read_bytes() == original_manifest
-    before = Path(crop["image_path"]).read_bytes()
-    finish(service, service.start("steps.find", {}, manifest_id=manifest))
-    assert Path(crop["image_path"]).read_bytes() == before
-
-
-def test_candidate_condition_uses_new_asset_mapping(tmp_path: Path) -> None:
-    manager = ManifestManager(tmp_path)
-    old = entry(tmp_path, "old.png", np.full((2, 2, 3), 255, dtype=np.uint8))
-    new = entry(tmp_path, "new.png")
-    base_source = STEP.replace('return ctx.action("observe.match")', 'raise ValueError("needs new template")')
-    base = publish(tmp_path / "base", manager, {"ui/claim": {"en": old}}, base_source)
-    replacement_source = STEP + '''
-def condition(ctx) -> bool:
-    return ctx.action("observe.match") != "[]"
-'''
-    replacement = publish(tmp_path / "replacement", manager, {"ui/claim": {"en": new}}, replacement_source)
-    before = (tmp_path / "manifests" / f"{base}.json").read_bytes()
-    choices = iter([replacement, None])
-    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window(),
-                                 recovery_choice=lambda *_: next(choices))
-    state = finish(service, service.start("steps.find", {}, manifest_id=base))
-    assert state["result"]["status"] == "success"
-    assert state["working_manifest_id"] == replacement
-    assert state["attempted_manifest_ids"] == [base, replacement]
-    assert (tmp_path / "manifests" / f"{base}.json").read_bytes() == before
-    assert (tmp_path / "assets" / "old.png").exists()
-    assert all(e["path"] == "new.png" for e in state["trace"] if e["event"] == "asset_matched")
-
-
-def test_step_failure_keeps_successful_match_index(tmp_path: Path) -> None:
-    manager = ManifestManager(tmp_path)
-    mapping = {"ui/claim": {"en": entry(tmp_path, "a.png")}}
-    source = STEP.replace('return ctx.action("observe.match")',
-                          'ctx.action("observe.match")\n    raise ValueError("later business failure")')
-    manifest = publish(tmp_path / "draft", manager, mapping, source)
+    published = manager.publish(candidate / "manifest.json")
+    assert published.ok, published.errors
+    manifest = published.loaded.manifest_id
+    before = (tmp_path / "manifests" / f"{manifest}.json").read_bytes()
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window())
     state = finish(service, service.start("steps.find", {}, manifest_id=manifest))
+    assert state["result"]["output"] == "[[], ['event']]"
+    assert state["working_manifest_id"] == manifest
+    assert state["attempted_manifest_ids"] == [manifest]
+    assert len(manager.list_manifests()) == 1
+    assert (tmp_path / "manifests" / f"{manifest}.json").read_bytes() == before
+    matches = [e for e in state["trace"] if e["event"] == "asset_matched"]
+    assert len(matches) == 2 and matches[1]["priority_tags"] == ["event"]
+    saved = [e for e in state["trace"] if e["event"] == "screenshot_saved"]
+    assert saved and Path(saved[0]["path"]).is_file()
+    assert all(e["detections"][0]["observation"] == e["observation"] for e in matches)
+
+
+def test_formal_error_keeps_original_stack_and_trusted_action_boundary(tmp_path):
+    fixture = Path(__file__).resolve().parent / "fixtures/asset-recognition"
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(fixture / "manifest.json")
+    assert published.ok
+    saved = entry(tmp_path, "ui/claim")
+    (tmp_path / "assets" / saved["path"]).write_bytes(b"changed")
+    state = finish(service := ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window()),
+                   service.start("steps.detect", {"asset":"ui/claim"}, manifest_id=published.loaded.manifest_id))
     assert state["result"]["status"] == "failure"
-    stored = next(iter(json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8")).values()))
+    assert "Asset hash mismatch" in state["result"]["traceback"]
+    assert "assets.py" in state["result"]["traceback"]
+
+
+def test_each_match_freezes_tags_but_next_call_observes_updates(tmp_path, monkeypatch):
+    import lalc.recognition as recognition
+    library = AssetLibrary(tmp_path)
+    first = entry(tmp_path, "ui/claim")
+    second = entry(tmp_path, "ui/claim", screenshot()[0:4, 1:5])
+    path = library.path("ui/claim/asset-tag.json")
+    detect = recognition.detect_template
+    def change_tags(*args, **kwargs):
+        path.write_text(json.dumps({first["sha256"]:["new"],second["sha256"]:["new"]}), encoding="utf-8")
+        return detect(*args, **kwargs)
+    monkeypatch.setattr(recognition, "detect_template", change_tags)
+    found, _ = matching(library, nms=False)
+    assert all(d["tags"] == [] for d in found)
+    assert all(d["tags"] == ["new"] for d in matching(library, nms=False)[0])
+
+
+def test_usage_index_survives_later_step_failure(tmp_path):
+    fixture = Path(__file__).resolve().parent / "fixtures/asset-recognition"
+    candidate = tmp_path / "candidate"
+    shutil.copytree(fixture, candidate)
+    path = candidate / "steps.detect.py"
+    path.write_text(path.read_text(encoding="utf-8").replace('return ctx.action("observe.match_asset"', 'result = ctx.action("observe.match_asset"') + '\n    raise ValueError("business check failed")\n', encoding="utf-8")
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(candidate / "manifest.json")
+    assert published.ok, published.errors
+    entry(tmp_path, "ui/claim")
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window())
+    state = finish(service, service.start("steps.detect", {"asset":"ui/claim"}, manifest_id=published.loaded.manifest_id))
+    assert state["result"]["status"] == "failure"
+    stored = json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8"))["ui/claim"]
     assert len(stored["detections"]) == 2
 
 
-def test_crop_hash_prefix_collision_does_not_overwrite(tmp_path: Path) -> None:
-    library = AssetLibrary(tmp_path)
-    image = screenshot()
-    content = cv2.imencode(".png", image[1:3, 2:4])[1].tobytes()
-    digest = sha256_bytes(content)
-    collision = tmp_path / "assets" / f"ui/claim-en-{digest[:12]}.png"
-    collision.parent.mkdir(parents=True)
-    collision.write_bytes(b"existing file")
-    result = library.save_crop("ui/claim", "en", pixels(image), (12, 8),
-                               {"x": 2, "y": 1, "width": 2, "height": 2}, run_id=1, observation=1)
-    assert result["path"].endswith(f"-{digest}.png")
-    assert collision.read_bytes() == b"existing file"
-    assert Path(result["image_path"]).read_bytes() == content
-
-
-def test_assets_incomplete_or_corrupt_manifest_never_publishes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["match", "crop"])
+def test_components_cannot_bypass_asset_trusted_action_gate(tmp_path, operation):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    call = 'str(ctx.match_asset("ui/claim"))' if operation == "match" else 'str(ctx.crop_asset("ui/claim", region={"x":2,"y":1,"width":2,"height":2}))'
+    (candidate / "step.py").write_text('"""验证素材调用权限。"""\nfrom lalc import step\n@step\ndef execute(ctx) -> str:\n    return '+call+'\n', encoding="utf-8")
+    (candidate / "manifest.json").write_text(json.dumps({"schema_version":2,"components":{"steps.find":{"source_path":"step.py"}},"recovery_rules":{}}), encoding="utf-8")
     manager = ManifestManager(tmp_path)
-    saved = entry(tmp_path, "a.png")
-    manifest = publish(tmp_path / "draft", manager, {"ui/claim": {"en": saved}})
-    assert manager.set_default(manifest).ok
-    path = tmp_path / "draft" / "manifest.json"
-    data = json.loads(path.read_text(encoding="utf-8"))
-    library = path.parent / "asset-library.json"
-    mapping = json.loads(library.read_text(encoding="utf-8"))
-    mapping["ui/claim"]["en"]["sha256"] = "0" * 64
-    library.write_text(json.dumps(mapping), encoding="utf-8")
-    path.write_text(json.dumps(data), encoding="utf-8")
-    result = manager.publish(path)
-    assert not result.ok
-    error = next(e for e in result.errors if e.code == "asset_invalid")
-    assert "hash mismatch" in error.as_dict()["traceback"]
-    assert manager.default_manifest_id() == manifest
-    assert len(manager.list_manifests()) == 1
-
-
-def test_candidate_condition_rejection_keeps_base(tmp_path: Path) -> None:
-    manager = ManifestManager(tmp_path)
-    old = entry(tmp_path, "old.png")
-    new = entry(tmp_path, "new.png", np.full((2, 2, 3), 255, dtype=np.uint8))
-    source = STEP.replace('return ctx.action("observe.match")', 'raise ValueError("needs repair")')
-    base = publish(tmp_path / "base", manager, {"ui/claim": {"en": old}}, source)
-    candidate = publish(tmp_path / "candidate", manager, {"ui/claim": {"en": new}},
-                        STEP + '\ndef condition(ctx) -> bool:\n    return ctx.action("observe.match") != "[]"\n')
-    choices = iter([candidate, None])
-    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window(),
-                                 recovery_choice=lambda *_: next(choices))
-    state = finish(service, service.start("steps.find", {}, manifest_id=base))
-    assert state["working_manifest_id"] == base
-    assert state["attempted_manifest_ids"] == [base]
-
-
-def test_asset_fixture_publishes_and_runs_with_typed_results(tmp_path: Path) -> None:
-    fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "asset-recognition"
-    manager = ManifestManager(tmp_path)
-    result = manager.publish(fixture / "manifest.json")
-    assert result.ok, result.errors
-    manifest = result.loaded.manifest_id
-    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window(), game_language="zh")
-    state = finish(service, service.start("steps.crop", {
-        "asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2},
-    }, manifest_id=manifest))
-    assert state["result"]["status"] == "success"
-    crop = state["result"]["output"]
-    assert crop["source_language"] == "zh" and crop["observation"] == 1
-    # 新建候选引用裁剪文件，通过正式加载、Plan 入口检测，不改原 Manifest。
-    draft = tmp_path / "new"
-    shutil.copytree(fixture, draft)
-    data = json.loads((draft / "manifest.json").read_text(encoding="utf-8"))
-    (draft / "asset-library.json").write_text(json.dumps({"ui/claim": {"zh": {key: crop[key] for key in ("path", "sha256")}}}), encoding="utf-8")
-    data["components"]["tasks.detect"] = {"source_path": "task.py"}
-    (draft / "task.py").write_text('''"""识别任务。"""
-from lalc import task_workflow
-@task_workflow
-def execute(ctx) -> int:
-    return len(ctx.call("steps.detect", asset="ui/claim", threshold=0.999))
-''', encoding="utf-8")
-    (draft / "manifest.json").write_text(json.dumps(data), encoding="utf-8")
-    published = manager.publish(draft / "manifest.json")
+    published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
-    plan = draft / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.detect", "inputs": {}}]}), encoding="utf-8")
-    state = finish(service, service.start_plan(plan, manifest_id=published.loaded.manifest_id))
-    assert state["result"]["status"] == "completed"
-    task = next(e for e in state["trace"] if e["event"] == "component_returned" and e["logical_name"] == "tasks.detect")
-    assert task["return_value"] == 2
-    assert manager.load(manifest).loaded.assets == {}
-
-
-def test_matching_cannot_bypass_trusted_action_gate(tmp_path: Path) -> None:
-    manager = ManifestManager(tmp_path)
-    source = STEP.replace('return ctx.action("observe.match")', 'return str(ctx.match_asset("ui/claim"))')
-    manifest = publish(tmp_path / "draft", manager, {"ui/claim": {"en": entry(tmp_path, "a.png")}}, source)
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window())
-    state = finish(service, service.start("steps.find", {}, manifest_id=manifest))
+    state = finish(service, service.start("steps.find", {}, manifest_id=published.loaded.manifest_id))
     assert state["result"]["status"] == "failure"
     assert "requires an observe Trusted Action" in state["result"]["traceback"]
 
 
-def test_cli_carries_running_language_to_crop(tmp_path: Path, monkeypatch, capsys) -> None:
-    import lalc.__main__ as cli
-
+def test_crop_is_fresh_and_keeps_original_pixels_and_provenance(tmp_path):
+    fixture = Path(__file__).resolve().parent / "fixtures/asset-recognition"
     manager = ManifestManager(tmp_path)
-    fixture = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "asset-recognition"
     published = manager.publish(fixture / "manifest.json")
     assert published.ok
-    monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
-    monkeypatch.setattr(cli, "ApplicationService", lambda root, **kwargs: ApplicationService(
-        root, window_platform=Window(), **kwargs,
-    ))
-    inputs = json.dumps({"asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2}})
-    assert cli.main(["run", "steps.crop", "--manifest", published.loaded.manifest_id,
-                     "--language", "ja", "--inputs", inputs]) == 0
-    result = json.loads(capsys.readouterr().out)
-    assert result["output"]["source_language"] == "ja"
+    window = Window()
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=window)
+    inputs = {"asset":"ui/claim","region":{"x":2,"y":1,"width":2,"height":2}}
+    first = finish(service, service.start("steps.crop", inputs, manifest_id=published.loaded.manifest_id))["result"]["output"]
+    original = Path(first["image_path"]).read_bytes()
+    window.image[1:3,2:4] = 177
+    second = finish(service, service.start("steps.crop", inputs, manifest_id=published.loaded.manifest_id))["result"]["output"]
+    assert first["sha256"] != second["sha256"] and window.captures == 2
+    assert np.all(decode_image(Path(second["image_path"]).read_bytes()) == 177)
+    assert Path(first["image_path"]).read_bytes() == original
+    for crop in (first, second):
+        record = json.loads((tmp_path / "asset-provenance" / f"{crop['provenance_id']}.json").read_text(encoding="utf-8"))
+        assert record["sha256"] == crop["sha256"] and record["region"] == inputs["region"]

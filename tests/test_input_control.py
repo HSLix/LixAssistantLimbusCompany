@@ -116,7 +116,6 @@ def fast_quiet(monkeypatch):
 def service_for(tmp_path: Path, *, condition: str = ""):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
-    (candidate / "asset-library.json").write_text("{}", encoding="utf-8")
     for path in FIXTURE.glob("*.py"):
         (candidate / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     step = (candidate / "steps.control.py").read_text(encoding="utf-8")
