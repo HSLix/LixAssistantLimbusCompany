@@ -1,7 +1,7 @@
-import { access, readFile, realpath } from "node:fs/promises";
-import { isAbsolute, relative, resolve } from "node:path";
-import { createReadTool } from "@earendil-works/pi-coding-agent";
-import { openAICompletionsApi } from "@earendil-works/pi-ai";
+import { access, readFile, realpath, writeFile } from "node:fs/promises";
+import { isAbsolute, join, relative, resolve } from "node:path";
+import { createReadTool, createEditTool } from "@earendil-works/pi-coding-agent";
+import { openAICompletionsApi, Type } from "@earendil-works/pi-ai";
 
 // 每次实际文件访问都检查解析后的路径，不能只检查模型提供的字符串。
 export async function checkedPath(root: string, path: string) {
@@ -15,6 +15,7 @@ export async function checkedPath(root: string, path: string) {
 
 export default async function (pi) {
   const root = await realpath(process.env.LALC_PI_SOURCE_ROOT!);
+  const repairTarget = process.env.LALC_PI_REPAIR_TARGET;
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = 0;
   const api = openAICompletionsApi();
@@ -43,7 +44,16 @@ export default async function (pi) {
           const shown = JSON.parse(JSON.stringify(payload, (_key, value) =>
             typeof value === "string" && value.startsWith("data:image/")
               ? `[image data URL: ${value.length} characters]` : value));
-          emit("lalc_request", { requests, payload: shown });
+          if (repairTarget) {
+            // 大图请求不能与 RPC 事件并发倾倒到 stdout；独立保存完整载荷后只发送引用。
+            const payloadPath = join(process.env.LALC_PI_PAYLOAD_DIR!, `request-${requests}.json`);
+            const key = process.env.LALC_PI_API_KEY!;
+            await writeFile(payloadPath, JSON.stringify(payload, (_name, value) =>
+              typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
+            emit("lalc_request", { requests, payload_path: payloadPath });
+          } else {
+            emit("lalc_request", { requests, payload: shown });
+          }
           return options?.onPayload ? await options.onPayload(payload, model) : payload;
         },
       });
@@ -63,8 +73,41 @@ export default async function (pi) {
       return read.execute(id, { ...params, path }, signal, onUpdate);
     },
   });
+  if (repairTarget) {
+    const checkedEdit = async (path: string) => {
+      const target = await checkedPath(root, path);
+      if (target !== repairTarget) throw new Error("Only the selected Component may be edited");
+      return target;
+    };
+    const edit = createEditTool(root, {
+      operations: {
+        access: async path => access(await checkedEdit(path)),
+        readFile: async path => readFile(await checkedEdit(path)),
+        writeFile: async (path, content) => writeFile(await checkedEdit(path), content),
+      },
+    });
+    pi.registerTool({
+      ...edit,
+      async execute(id, params, signal, onUpdate) {
+        const path = await checkedEdit(params.path);
+        return edit.execute(id, { ...params, path }, signal, onUpdate);
+      },
+    });
+    pi.registerTool({
+      name: "validate", label: "Validate Developer Candidate",
+      description: "Validate the complete current candidate Manifest and return actual errors. Does not run the workflow or publish.",
+      parameters: Type.Object({}),
+      async execute(_id, _params, _signal, _update, ctx) {
+        // 复用 RPC 已有请求/响应通道，由 Python 宿主校验；不会向用户交互提问。
+        const value = await ctx.ui.input("lalc.validate");
+        if (value === undefined) throw new Error("Validation cancelled");
+        return { content: [{ type: "text", text: value }], details: JSON.parse(value) };
+      },
+    });
+  }
   pi.on("session_start", () => {
-    pi.setActiveTools(["read"]);
-    emit("lalc_ready", { tools: pi.getActiveTools(), root });
+    pi.setActiveTools(repairTarget ? ["read", "edit", "validate"] : ["read"]);
+    emit("lalc_ready", { tools: pi.getActiveTools(), root, repairTarget,
+                         availableTools: pi.getAllTools().map(tool => tool.name) });
   });
 }

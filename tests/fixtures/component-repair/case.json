@@ -1,0 +1,10 @@
+{
+  "target": "steps.total",
+  "problem": "steps.total 的返回值错误：输入 [7, -4, 2] 得到 9，预期 5。应返回所有整数之和，包括负数和零；空列表返回 0。只修改该 Component，保留 execute 的角色、签名和返回类型。先 read，再 edit，再 validate；只有源码修改并校验通过后才能报告 revise_success=true。随附图片只验证输入传输，不需要从图推断计算规则。",
+  "checks": [
+    {"values": [7, -4, 2], "expected": 5},
+    {"values": [-9, -2], "expected": -11},
+    {"values": [], "expected": 0},
+    {"values": [0, 3, -3, 8], "expected": 8}
+  ]
+}

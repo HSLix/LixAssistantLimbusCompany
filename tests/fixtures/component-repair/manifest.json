@@ -1,0 +1,8 @@
+{
+  "schema_version": 2,
+  "components": {
+    "steps.total": {"source_path": "steps.total.py"},
+    "steps.unchanged": {"source_path": "steps.unchanged.py"}
+  },
+  "recovery_rules": {}
+}

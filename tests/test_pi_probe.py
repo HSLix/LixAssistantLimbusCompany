@@ -67,7 +67,9 @@ def probe(tmp_path):
                 if state["status"] != 200:
                     self.wfile.write(b'{"error":{"message":"test provider unavailable"}}')
                     return
-                if len(state["calls"]) == 1:
+                if "respond" in state:
+                    delta, finish = state["respond"](body)
+                elif len(state["calls"]) == 1:
                     delta = {"role": "assistant", "tool_calls": [{"index": 0, "id": "read-1", "type": "function",
                              "function": {"name": "read", "arguments": json.dumps({"path": state["path"]})}}]}
                     finish = "tool_calls"

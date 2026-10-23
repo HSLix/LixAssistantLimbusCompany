@@ -37,6 +37,16 @@ def _parser() -> argparse.ArgumentParser:
     probe.add_argument("--max-requests", type=int, default=20)
     probe.add_argument("--pi", default="pi", help="Path to the fixed-version pi executable")
     probe.add_argument("--ask-api-key", action="store_true", help="Read an optional key without echo")
+    repair = commands.add_parser("repair", help="Repair one existing Component from Default; replaces candidate")
+    repair.add_argument("logical_name")
+    repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
+    repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
+    repair.add_argument("--image", type=Path, required=True)
+    repair.add_argument("--base-url", default="http://localhost:12138")
+    repair.add_argument("--model")
+    repair.add_argument("--max-requests", type=int, default=20)
+    repair.add_argument("--pi", default="pi")
+    repair.add_argument("--ask-api-key", action="store_true")
     init = commands.add_parser("init")
     init.add_argument("--from", dest="manifest_id")
     commands.add_parser("validate")
@@ -193,6 +203,11 @@ def _dispatch(args: argparse.Namespace) -> int:
     manager = ManifestManager(data_root)
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"
+
+    if args.command == "repair":
+        from .component_repair import run_repair
+
+        return run_repair(args, manager, candidate)
 
     if args.command in {"crop-asset", "tag-asset"}:
         service = ApplicationService(data_root, manifest_manager=manager)

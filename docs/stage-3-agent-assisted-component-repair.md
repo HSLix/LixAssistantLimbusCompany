@@ -1,10 +1,10 @@
 # Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md); implementation and model-backed acceptance remain to be completed.
+Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md); the #325 repair CLI is implemented and verified with automated checks and a Mac model-backed pure-computation case; later tools and Windows/game acceptance remain to be completed.
 
 Tracking: [GitHub Issue #312](https://github.com/HSLix/LixAssistantLimbusCompany/issues/312). Confirmed implementation spec: [GitHub Issue #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323).
 
-已确认并发布的六个垂直步骤及其阻塞关系见 [Stage 3 Implementation Slices](stage-3-implementation-slices.md)。当前发布完成不表示实现或真实模型/Windows 验收完成。
+已确认并发布的六个垂直步骤及其阻塞关系见 [Stage 3 Implementation Slices](stage-3-implementation-slices.md)。发布状态本身不表示实现或验收完成；#325 的实现与 Mac 真模型检查见 [单 Component 修复](component-repair.md)，Windows 与真实游戏验收仍属后续切片。
 本阶段以尽快验证 Agent 自主修复已有 Component 的可行性为核心。通过独立 CLI 手动启动一次修复，提供已有 Component、游戏截图、异常信息与必要上下文；Agent 优先接入 pi 阅读源码、分析问题、执行局部修改，并调用现有 Validator，根据反馈继续调整。无需先实现 Runtime Agent Session、自动异常接管或运行时恢复。
 
 2026-10-23 补充确认：前置接入验证 #324 仅在 CLI 展示图片、模型请求、受限读取与最终回答，不持久化交互日志或 pi 会话，也不重建或编辑 Developer Candidate。下文的完整修复日志要求从 #325 起实现；验证入口见 [pi 最小接入验证](pi-probe.md)。
@@ -43,7 +43,7 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 
 ### Framework selection
 
-2026-10-23 确认以 pi 为首选，接入方向为 LALC Python CLI 通过 RPC 启动 pi 子进程，以 LALC 专用扩展提供上述受限工具。先在 macOS 验证最小接入，再固定同一 pi 版本供 macOS 和 Windows 使用；不自行重写模型与工具循环。本机已确认 pi 0.86.1 可以输出版本与命令帮助，但模型调用、RPC、扩展加载、日志完整性及限制尚未实际验证，不据此宣称接入完成。最小接入验证应作为后续实施的第一个步骤。
+2026-10-23 确认以 pi 为首选，接入方向为 LALC Python CLI 通过 RPC 启动 pi 子进程，以 LALC 专用扩展提供上述受限工具。先在 macOS 验证最小接入，再固定同一 pi 版本供 macOS 和 Windows 使用；不自行重写模型与工具循环。#324 已以 pi 0.86.1 完成 Mac 图片/RPC/受限读取接入并经开发者复测；#325 继续复用该版本，已检查受限编辑、Validator 反馈、逐组 JSON 和完整修复日志，并通过真模型纯计算修复案例。Windows 与真实游戏行为验收仍待后续切片。
 
 候选源码读取与修改优先复用 pi 的 `read` / `edit` 工具及其编辑、反馈能力，通过扩展或可替换的文件操作接口加上候选目录/指定文件的权限检查，不自行实现文本替换或编辑引擎。仅设置工作目录不是访问限制；必须核对实际读取/写入目标，拒绝越界及指向候选外部的链接。无需新增文件，不开放通用 `write` 或终端工具；具体所选版本的工厂/扩展接口在最小接入实验中确认。
 
@@ -56,9 +56,11 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 
 ### Repair completion and interruption
 
+- 2026-10-23 补充确认（#325）：以模型一轮交互的最终回答为一组；该轮中的源码读取、编辑、Validator 工具调用及反馈归入同组，不能按每次模型请求或工具调用单独定性。最终回答必须为 JSON，使用布尔字段 `revise_success` 区分“完成修订”（`true`）与“改不了”（`false`），并包含说明；中间的工具调用与反馈不携带该结束标记。不新增结束工具，不通过自然语言关键词猜测结果。每组保留 Agent 当时的原始报告，实际校验及后续行为验收独立记录，不反向改写该组评价。最终校验失败也应将实际反馈交回 Agent 继续修订；由此产生的新一轮另记一组，仍归属于同一次 CLI 修复调用并共用请求上限。这里的分组不是 Stage 3.5 的 Agent Turn 或 Runtime Agent Session。
+- 最终回答不是合法 JSON、缺少 `revise_success` 或其值不是布尔值时，把具体格式错误反馈给模型纠正；不猜测或强制转换结果。纠正仍计入同一次 CLI 调用的模型请求上限，保留原始回答及格式错误。
 - 每次修复的模型请求上限默认 20 次，可在启动时设置；它约束独立修复调用，不复用 Stage 3.5 Runtime Agent Session 的协议。
 - 请求上限保存在 LALC 普通本地配置中，未配置时为 20；保存设置后供后续调用沿用，单次启动可临时覆盖而不修改已保存值。服务地址和模型标识也属于普通本地配置；每次修复开始时固定实际使用的上限并记入日志，密钥另行存储。
-- Agent 主动结束后，对最终候选源码再次调用现有 Validator。通过仅表示候选符合执行契约，不代表游戏行为已修复；行为修复仍以人工真实游戏验收为准。
+- Agent 一轮交互结束后，对其声称完成修订的最终候选源码再次调用现有 Validator；失败时反馈给 Agent 开始下一轮，受同一次调用的请求上限约束。通过仅表示候选符合执行契约，不代表游戏行为已修复；行为修复仍以人工真实游戏验收为准。
 - 达到请求上限时结束并标记未完成；用户取消或模型服务报错时停止，不自动重启修复。上述路径均保留已有候选与日志，不将失败或中断报告为成功。
 - 信息不足时，Agent 结束本次调用，最终回答明确说明缺少的截图、异常、复现信息或其他必要材料；结果记为未完成并保留候选和日志。不增加交互追问工具，不等待开发者回复或在本次调用中补充附件后续接。
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from contextlib import asynccontextmanager, contextmanager
 import getpass
 import hashlib
 import json
@@ -25,31 +26,14 @@ def _models(base_url: str, key: str) -> list[dict]:
         return json.load(response)["data"]
 
 
-async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str) -> int:
-    """等待 RPC 确认和最终停止事件；取消时先 abort，再回收子进程。"""
+@asynccontextmanager
+async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
+    """共享 pi RPC 传输；调用者负责事件含义，取消时回收子进程。"""
     process = await asyncio.create_subprocess_exec(
         *command, env=env, cwd=cwd,
         stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         limit=16 * 1024 * 1024,
     )
-    requests = 0
-    read_ok = False
-    last_message = {}
-
-    def show(value) -> None:
-        def clean(item):
-            if isinstance(item, dict):
-                return {name: ("[image base64 omitted]" if name == "data" and item.get("type") == "image"
-                               else clean(content)) for name, content in item.items()}
-            if isinstance(item, list):
-                return [clean(content) for content in item]
-            if isinstance(item, str) and key != "lalc-no-key":
-                return item.replace(key, "[REDACTED]")
-            return item
-
-        shown = clean(value)
-        print(shown if isinstance(shown, str) else json.dumps(shown, ensure_ascii=False), flush=True)
-
     async def send(value) -> None:
         process.stdin.write((json.dumps(value) + "\n").encode())
         await process.stdin.drain()
@@ -64,61 +48,10 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
             raise RuntimeError(f"pi exited before completion (exit={await process.wait()})")
         return json.loads(line)
 
-    async def configure(kind: str) -> None:
-        await send({"id": kind, "type": kind, "enabled": False})
-        while True:
-            item = await event()
-            show(item)
-            if item.get("id") == kind:
-                if not item.get("success"):
-                    raise RuntimeError(f"pi rejected {kind}")
-                return
-
     errors = asyncio.create_task(stderr())
     try:
-        while True:
-            item = await asyncio.wait_for(event(), timeout=30)
-            show(item)
-            if item.get("type") == "lalc_ready":
-                if item.get("tools") != ["read"]:
-                    raise RuntimeError("Unexpected active tools")
-                break
-            if item.get("type") == "extension_error":
-                raise RuntimeError("pi extension failed")
-        await configure("set_auto_retry")
-        await configure("set_auto_compaction")
-        await send(prompt)
-        while True:
-            item = await event()
-            kind = item.get("type")
-            # 图片以文件、哈希和请求中的图片标记展示，不在终端倾倒 base64。
-            if kind == "message_update":
-                # 完整响应由 message_end 展示，避免逐 token 重复和刷屏。
-                continue
-            elif kind in {"message_start", "message_end"} and item.get("message", {}).get("role") == "user":
-                show({"type": kind, "role": "user", "image": "supplied PNG"})
-            else:
-                show(item)
-            if kind == "response" and not item.get("success"):
-                raise RuntimeError("pi rejected RPC command")
-            if kind == "lalc_request":
-                requests = item["requests"]
-            if kind == "tool_execution_end" and item.get("toolName") == "read" and not item.get("isError"):
-                read_ok = True
-            if kind == "message_end" and item.get("message", {}).get("role") == "assistant":
-                last_message = item["message"]
-            if kind == "extension_error":
-                raise RuntimeError("pi extension failed")
-            if kind == "agent_settled":
-                success = (requests > 0 and read_ok and last_message.get("stopReason") == "stop"
-                           and any(part.get("type") == "text" and part.get("text", "").strip()
-                                   for part in last_message.get("content", [])))
-                show({"result": "completed" if success else "incomplete", "requests": requests,
-                      "source_read": read_ok, "stop_reason": last_message.get("stopReason"),
-                      "error": last_message.get("errorMessage")})
-                return 0 if success else 1
+        yield send, event
     except asyncio.CancelledError:
-        show({"result": "cancelled", "requests": requests})
         if process.returncode is None:
             await send({"type": "abort"})
         raise
@@ -137,6 +70,127 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
         await errors
 
 
+async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str) -> int:
+    """验证受限读取并展示事件；完整修复复用 RPC 传输而非此成功判据。"""
+    requests = 0
+    read_ok = False
+    last_message = {}
+    def show(value) -> None:
+        def clean(item):
+            if isinstance(item, dict):
+                return {name: ("[image base64 omitted]" if name == "data" and item.get("type") == "image"
+                               else clean(content)) for name, content in item.items()}
+            if isinstance(item, list):
+                return [clean(content) for content in item]
+            if isinstance(item, str) and key != "lalc-no-key":
+                return item.replace(key, "[REDACTED]")
+            return item
+
+        shown = clean(value)
+        print(shown if isinstance(shown, str) else json.dumps(shown, ensure_ascii=False), flush=True)
+
+    async with rpc_session(command, env, cwd, show) as (send, event):
+        async def configure(kind: str) -> None:
+            await send({"id": kind, "type": kind, "enabled": False})
+            while True:
+                item = await event()
+                show(item)
+                if item.get("id") == kind:
+                    if not item.get("success"):
+                        raise RuntimeError(f"pi rejected {kind}")
+                    return
+
+        try:
+            while True:
+                item = await asyncio.wait_for(event(), timeout=30)
+                show(item)
+                if item.get("type") == "lalc_ready":
+                    if item.get("tools") != ["read"]:
+                        raise RuntimeError("Unexpected active tools")
+                    break
+                if item.get("type") == "extension_error":
+                    raise RuntimeError("pi extension failed")
+            await configure("set_auto_retry")
+            await configure("set_auto_compaction")
+            await send(prompt)
+            while True:
+                item = await event()
+                kind = item.get("type")
+                # 图片以文件、哈希和请求中的图片标记展示，不在终端倾倒 base64。
+                if kind == "message_update":
+                    # 完整响应由 message_end 展示，避免逐 token 重复和刷屏。
+                    continue
+                elif kind in {"message_start", "message_end"} and item.get("message", {}).get("role") == "user":
+                    show({"type": kind, "role": "user", "image": "supplied PNG"})
+                else:
+                    show(item)
+                if kind == "response" and not item.get("success"):
+                    raise RuntimeError("pi rejected RPC command")
+                if kind == "lalc_request":
+                    requests = item["requests"]
+                if kind == "tool_execution_end" and item.get("toolName") == "read" and not item.get("isError"):
+                    read_ok = True
+                if kind == "message_end" and item.get("message", {}).get("role") == "assistant":
+                    last_message = item["message"]
+                if kind == "extension_error":
+                    raise RuntimeError("pi extension failed")
+                if kind == "agent_settled":
+                    success = (requests > 0 and read_ok and last_message.get("stopReason") == "stop"
+                               and any(part.get("type") == "text" and part.get("text", "").strip()
+                                       for part in last_message.get("content", [])))
+                    show({"result": "completed" if success else "incomplete", "requests": requests,
+                          "source_read": read_ok, "stop_reason": last_message.get("stopReason"),
+                          "error": last_message.get("errorMessage")})
+                    return 0 if success else 1
+        except asyncio.CancelledError:
+            show({"result": "cancelled", "requests": requests})
+            raise
+
+
+@contextmanager
+def configured_pi(args, root: Path, key: str, system_prompt: str):
+    """固定服务、版本和请求上限，隔离 pi 配置且不持久化密钥。"""
+    executable = shutil.which(args.pi)
+    if executable is None:
+        raise ValueError(f"pi executable not found: {args.pi}")
+    base = args.base_url.rstrip("/")
+    if not base.endswith("/v1"):
+        base += "/v1"
+    models = _models(base, key)
+    matching = [m for m in models if m["id"] == args.model] if args.model else [
+        m for m in models if "gemma4" in m["id"].lower()]
+    if len(matching) != 1:
+        raise ValueError("Select exactly one model with --model")
+    model = matching[0]
+    if "image" not in model.get("architecture", {}).get("input_modalities", []):
+        raise ValueError("Selected service model does not declare image input support")
+    with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
+        agent_dir = Path(temporary) / "agent"
+        agent_dir.mkdir()
+        (agent_dir / "settings.json").write_text(json.dumps({
+            "retry": {"enabled": False, "maxRetries": 0},
+            "compaction": {"enabled": False}, "cacheWarming": "off",
+            "enableInstallTelemetry": False, "enableAnalytics": False,
+        }), encoding="utf-8")
+        env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "PI_OFFLINE": "1",
+               "PI_TELEMETRY": "0", "LALC_PI_API_KEY": key, "LALC_PI_BASE_URL": base,
+               "LALC_PI_MODEL": model["id"], "LALC_PI_SOURCE_ROOT": str(root),
+               "LALC_PI_MAX_REQUESTS": str(args.max_requests)}
+        env.pop("LALC_PI_REPAIR_TARGET", None)
+        env.pop("LALC_PI_PAYLOAD_DIR", None)
+        version = subprocess.run([executable, "--version"], env=env, cwd=temporary,
+                                 check=True, capture_output=True, text=True).stdout.strip()
+        if version != PI_VERSION:
+            raise ValueError(f"Expected pi {PI_VERSION}, got {version}")
+        command = [executable, "--mode", "rpc", "--no-session", "--no-extensions",
+                   "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes",
+                   "--no-approve", "--offline", "--no-builtin-tools", "--tools", "read",
+                   "--extension", str(Path(__file__).with_suffix(".ts")),
+                   "--provider", "lalc-probe", "--model", model["id"], "--thinking", "off",
+                   "--system-prompt", system_prompt]
+        yield command, env, temporary, model
+
+
 def run_probe(args) -> int:
     """固定版本及临时配置，仅允许模型通过 read 读取显式指定目录。"""
     key = "lalc-no-key"
@@ -145,9 +199,6 @@ def run_probe(args) -> int:
             key = getpass.getpass("API key（无需认证时留空）: ") or key
         if args.max_requests < 1:
             raise ValueError("max-requests must be positive")
-        executable = shutil.which(args.pi)
-        if executable is None:
-            raise ValueError(f"pi executable not found: {args.pi}")
         root = args.source_root.resolve(strict=True)
         source = (root / args.source).resolve(strict=True)
         if not root.is_dir() or not source.is_file() or not source.is_relative_to(root):
@@ -156,49 +207,17 @@ def run_probe(args) -> int:
         data = image.read_bytes()
         if not data.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError("image must be a PNG")
-        base = args.base_url.rstrip("/")
-        if not base.endswith("/v1"):
-            base += "/v1"
-        models = _models(base, key)
-        matching = [m for m in models if m["id"] == args.model] if args.model else [
-            m for m in models if "gemma4" in m["id"].lower()]
-        if len(matching) != 1:
-            raise ValueError("Select exactly one model with --model")
-        model = matching[0]
-        if "image" not in model.get("architecture", {}).get("input_modalities", []):
-            raise ValueError("Selected service model does not declare image input support")
         prompt = {
             "type": "prompt", "id": "probe",
             "message": (f"先调用 read 工具读取 {source.relative_to(root).as_posix()}，简述该源码的职责；"
                         f"然后根据随附图片回答：{args.prompt}\n必须实际读取源码，不能只提出读取计划。"),
             "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(data).decode()}],
         }
-        with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
-            agent_dir = Path(temporary) / "agent"
-            agent_dir.mkdir()
-            (agent_dir / "settings.json").write_text(json.dumps({
-                "retry": {"enabled": False, "maxRetries": 0},
-                "compaction": {"enabled": False}, "cacheWarming": "off",
-                "enableInstallTelemetry": False, "enableAnalytics": False,
-            }), encoding="utf-8")
-            env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "PI_OFFLINE": "1",
-                   "PI_TELEMETRY": "0", "LALC_PI_API_KEY": key, "LALC_PI_BASE_URL": base,
-                   "LALC_PI_MODEL": model["id"], "LALC_PI_SOURCE_ROOT": str(root),
-                   "LALC_PI_MAX_REQUESTS": str(args.max_requests)}
-            version = subprocess.run([executable, "--version"], env=env, cwd=temporary,
-                                     check=True, capture_output=True, text=True).stdout.strip()
-            if version != PI_VERSION:
-                raise ValueError(f"Expected pi {PI_VERSION}, got {version}")
-            print(json.dumps({"pi": version, "base_url": base, "model": model["id"],
+        with configured_pi(args, root, key, "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。") as (command, env, temporary, model):
+            print(json.dumps({"pi": PI_VERSION, "base_url": env["LALC_PI_BASE_URL"], "model": model["id"],
                               "model_status": model.get("status", {}).get("value"),
                               "image": str(image), "sha256": hashlib.sha256(data).hexdigest(),
                               "prompt": prompt["message"], "max_requests": args.max_requests}, ensure_ascii=False), flush=True)
-            command = [executable, "--mode", "rpc", "--no-session", "--no-extensions",
-                       "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes",
-                       "--no-approve", "--offline", "--no-builtin-tools", "--tools", "read",
-                       "--extension", str(Path(__file__).with_suffix(".ts")),
-                       "--provider", "lalc-probe", "--model", model["id"], "--thinking", "off",
-                       "--system-prompt", "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。"]
             return asyncio.run(_interact(command, env, temporary, prompt, key))
     except KeyboardInterrupt:
         return 130
