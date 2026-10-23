@@ -1,0 +1,67 @@
+{
+  "tickets": [
+    {
+      "step": 1,
+      "number": 324,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/324",
+      "blocked_by": [],
+      "label": "ready-for-agent",
+      "body_verified": true
+    },
+    {
+      "step": 2,
+      "number": 325,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/325",
+      "blocked_by": [
+        324
+      ],
+      "label": "ready-for-agent",
+      "body_verified": true
+    },
+    {
+      "step": 3,
+      "number": 326,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/326",
+      "blocked_by": [
+        325
+      ],
+      "label": "ready-for-agent",
+      "body_verified": true
+    },
+    {
+      "step": 4,
+      "number": 327,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/327",
+      "blocked_by": [
+        325
+      ],
+      "label": "ready-for-agent",
+      "body_verified": true
+    },
+    {
+      "step": 5,
+      "number": 328,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/328",
+      "blocked_by": [],
+      "label": "ready-for-agent",
+      "body_verified": true
+    },
+    {
+      "step": 6,
+      "number": 329,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/329",
+      "blocked_by": [
+        326,
+        327,
+        328
+      ],
+      "label": "ready-for-agent",
+      "body_verified": true
+    }
+  ],
+  "parent_issues_unchanged": [
+    323,
+    312
+  ],
+  "native_dependency_count": 6
+}

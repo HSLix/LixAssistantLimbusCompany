@@ -1,0 +1,108 @@
+{
+  "repo": "HSLix/LixAssistantLimbusCompany",
+  "parent": 323,
+  "parent_snapshots": [
+    {
+      "number": 323,
+      "title": "Stage 3 Spec：基于 pi 的受限 Component 修复与完整交互留存",
+      "state": "open",
+      "body_sha256": "c32033c1846fcd970ea32c0b1f5f405eacfda143d91b57dc555b4e23dcb325c0",
+      "labels": [
+        "ready-for-agent"
+      ]
+    },
+    {
+      "number": 312,
+      "title": "Stage 3：通过独立 CLI 验证 Agent-assisted Component Repair",
+      "state": "open",
+      "body_sha256": "93a4080b9dbd9e725d08681d8be88ddad329e43846e511ca007952c48a5d32dc",
+      "labels": []
+    }
+  ],
+  "tickets": {
+    "1": {
+      "number": 324,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/324",
+      "title": "Stage 3：Mac 贯通 pi、图片与受限工具的最小调用",
+      "blocked_by_positions": [],
+      "body_file": ".scratch/stage-3/issues/01-pi-integration.md",
+      "id": 5993510427
+    },
+    "2": {
+      "number": 325,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/325",
+      "title": "Stage 3：从 Default Manifest 完成受限单 Component 修复",
+      "blocked_by_positions": [
+        1
+      ],
+      "body_file": ".scratch/stage-3/issues/02-component-repair.md",
+      "id": 5993510965
+    },
+    "3": {
+      "number": 326,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/326",
+      "title": "Stage 3：Agent 使用完整的 Asset、Trusted Action 与游戏观察工具集",
+      "blocked_by_positions": [
+        2
+      ],
+      "body_file": ".scratch/stage-3/issues/03-agent-tools.md",
+      "id": 5993511512
+    },
+    "4": {
+      "number": 327,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/327",
+      "title": "Stage 3：持久模型设置与 Windows DPAPI 命名密钥用于修复",
+      "blocked_by_positions": [
+        2
+      ],
+      "body_file": ".scratch/stage-3/issues/04-settings-and-secrets.md",
+      "id": 5993512005
+    },
+    "5": {
+      "number": 328,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/328",
+      "title": "Stage 3：开发者准备真实单 Component 缺陷与复现材料",
+      "blocked_by_positions": [],
+      "body_file": ".scratch/stage-3/issues/05-demo-case.md",
+      "id": 5993512442
+    },
+    "6": {
+      "number": 329,
+      "url": "https://github.com/HSLix/LixAssistantLimbusCompany/issues/329",
+      "title": "Stage 3：Windows 集成验收并交付 TA demo",
+      "blocked_by_positions": [
+        3,
+        4,
+        5
+      ],
+      "body_file": ".scratch/stage-3/issues/06-demo-acceptance.md",
+      "id": 5993512920
+    }
+  },
+  "native_dependencies": [
+    [
+      325,
+      324
+    ],
+    [
+      326,
+      325
+    ],
+    [
+      327,
+      325
+    ],
+    [
+      329,
+      326
+    ],
+    [
+      329,
+      327
+    ],
+    [
+      329,
+      328
+    ]
+  ]
+}

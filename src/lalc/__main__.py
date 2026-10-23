@@ -27,6 +27,16 @@ class _Parser(argparse.ArgumentParser):
 def _parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="lalc")
     commands = parser.add_subparsers(dest="command", required=True)
+    probe = commands.add_parser("pi-probe", help="Verify pi image input and restricted source reading")
+    probe.add_argument("--base-url", default="http://localhost:12138")
+    probe.add_argument("--model")
+    probe.add_argument("--image", type=Path, required=True)
+    probe.add_argument("--source-root", type=Path, required=True)
+    probe.add_argument("--source", required=True)
+    probe.add_argument("--prompt", default="识别图片中的游戏界面，并分析要进入关卡，下一个步骤应点击哪里。说明按钮文字和大致位置，不执行点击。")
+    probe.add_argument("--max-requests", type=int, default=20)
+    probe.add_argument("--pi", default="pi", help="Path to the fixed-version pi executable")
+    probe.add_argument("--ask-api-key", action="store_true", help="Read an optional key without echo")
     init = commands.add_parser("init")
     init.add_argument("--from", dest="manifest_id")
     commands.add_parser("validate")
@@ -172,6 +182,10 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
 
 
 def _dispatch(args: argparse.Namespace) -> int:
+    if args.command == "pi-probe":
+        from .pi_probe import run_probe
+
+        return run_probe(args)
     data_root = default_data_root()
     if args.command == "data-dir":
         print(data_root)
@@ -266,7 +280,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_application()
     try:
-        if args[0] != "data-dir":
+        if args[0] not in {"data-dir", "pi-probe"}:
             configure_logging(default_data_root())
         return _dispatch(_parser().parse_args(args))
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:

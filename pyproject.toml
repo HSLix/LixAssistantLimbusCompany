@@ -31,5 +31,9 @@ default-groups = ["dev"]
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+lalc = ["pi_probe.ts"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["agent: opt-in pi/Agent integration tests; requires --run-agent-tests"]

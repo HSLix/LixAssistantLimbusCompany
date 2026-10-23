@@ -21,7 +21,7 @@ status: accepted
 
 ## Scope and implementation status
 
-本决定取代 ADR 0024 的每 Manifest 专属库、语言单图选择和随发布冻结素材的规则，也修订 ADR 0026 中相关工作台库名及登记步骤；Stage 2 的既定收尾范围不重新打开。当前 Stage 3 独立 Component 修复不因此获得 Asset 新增权限，未来 Agent Asset 新增仍属于 Stage 3.5。
+本决定取代 ADR 0024 的每 Manifest 专属库、语言单图选择和随发布冻结素材的规则，也修订 ADR 0026 中相关工作台库名及登记步骤；Stage 2 的既定收尾范围不重新打开。本决定本身不授予 Agent 写入权限；后续 ADR 0028 已允许 Stage 3 通过专用现场裁剪工具新增 Asset，并要求同名同哈希复用原图与原标签，不能覆盖旧标签。开发者工具的标签整体替换规则不变。
 
 开发者明确选择重新准备素材：旧 Asset 图片布局、旧 Candidate `asset-library.json` 及已发布专属库废弃，清理后重新裁剪、配置，不提供数据迁移、旧格式回退或长期兼容路径。该清理范围只涉及旧 Asset 及其专属库数据，不因此删除 Component 源码、Manifest、Default 选择或运行历史。历史记录保留事实引用，不保证清理后的旧图片仍可打开。
 

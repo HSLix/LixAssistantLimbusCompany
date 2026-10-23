@@ -3,6 +3,10 @@
 Status: deferred from Stage 3 by ADR 0025. The prior runtime architecture, including the #310 and #311 decisions, is retained as the Stage 3.5 design baseline; implementation and the recovery-ladder discussion remain future work. Stage 3.5 is not a prerequisite for the Stage 3 repair experiment.
 
 Tracking: [GitHub Issue #322](https://github.com/HSLix/LixAssistantLimbusCompany/issues/322).
+2026-10-23 阶段边界确认：Stage 3 的独立修复仅从 Default Manifest 初始化 Developer Candidate；读取运行中任务或 Plan 的 Working Manifest 并衔接修复属于 Stage 3.5，不要求 Stage 3 独立 CLI 发现或接入另一个执行中的 Run。
+
+ADR 0028 后续确认：实时截图、受限现场裁剪新增 Asset 和按日期/UUID4 留存的独立 Agent Interaction Log 已纳入 Stage 3 的待实现范围。本阶段复用这些工具并增加运行时关联；这不表示 Stage 3 工具已完成或具备 Runtime Agent Recovery。
+
 An Agent may help an existing supported Task Workflow only after an Execution Anomaly leaves its current Step wrapper paused. It may propose changes to Steps, Task Workflows, and Subworkflows in one complete Manifest, with reasons for the changes. Trusted Actions and Recovery Rules are outside this Agent modification scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files. Normal supported execution remains deterministic and model-free.
 
 ```text

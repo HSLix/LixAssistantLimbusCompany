@@ -65,11 +65,11 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, containing developer-authored Component source intended for validation and publication. Agent-assisted Component Repair produces isolated candidate source for developer review and publication through this same path; it does not overwrite an existing developer draft or formal source. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in a project checkout, containing Component source intended for validation and publication. Before Agent-assisted Component Repair, LALC replaces the draft with a complete copy of the selected Manifest's source; the Agent reads this draft and edits only the designated Component for developer review and publication. Formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A manually initiated repair of one existing Component using supplied screenshots, exception information and context. The Agent reads source, makes local candidate edits and checks them with the existing Validator, yielding complete candidate source, a Diff and validation results for subsequent developer review and Publish. It retains the model inputs, tool operations and final outputs of the invocation and neither takes over a running Workflow nor changes formal source or the Default Manifest.
+A manually initiated repair of one existing Component using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads candidate source, edits only the designated Component and checks it with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Capability Bundle**:

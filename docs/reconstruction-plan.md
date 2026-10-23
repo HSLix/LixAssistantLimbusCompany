@@ -112,22 +112,26 @@ The accepted implementation baseline is maintained in [Stage 2 Minimum Implement
 
 ## Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under ADR 0025; implementation and model-backed acceptance pending.
+Status: accepted scope under ADR 0025, revised by ADR 0028; implementation and model-backed acceptance pending.
 
 - Manually start an independent CLI with one existing Component, game screenshots, exception information, and necessary context.
-- Use Deep Agents or a similar SDK to inspect source, make local edits, invoke the existing Validator, and revise from validation feedback.
+- Prefer pi through a Python-hosted subprocess and dedicated restricted tools; validate the first integration on Mac, then pin the same version for Mac and Windows. Use Default Manifest to rebuild Developer Candidate before repair, replacing any existing draft only after the source and target have been checked.
 - Output complete candidate Component source, its Diff, and validation results; retain the model inputs, tool operations, and final outputs for the entire CLI invocation.
-- Reuse Developer Candidate / ManifestManager for subsequent human-reviewed Publish. Never overwrite formal Components or existing Manifests/Assets, automatically publish, or modify Default Manifest.
-- Limit the first version to one existing Component. No Runtime Agent Session, automatic anomaly takeover, new Asset, multi-Component editing, automatic real-game trial, or runtime continuation.
+- Reuse Developer Candidate / ManifestManager for subsequent human-reviewed Publish. Never overwrite formal Components, existing Manifests/images or old hash-to-tag entries, automatically publish, or modify Default Manifest.
+- Limit the first version to one existing Component. Permit dedicated live screenshot and fresh-crop Asset addition tools; duplicate logical-name/hash pairs retain the original image and tags. No Runtime Agent Session, automatic anomaly takeover, game controls, multi-Component editing, automatic real-game trial, or runtime continuation.
+- LALC owns saved endpoint/model configuration and a configurable request limit, default 20. Windows stores named secrets with DPAPI; Mac development uses transient in-memory secrets. Check image support, fix the selected model per invocation and do not fall back to another provider/model.
+- Retain Agent Interaction Logs in the data directory grouped by date and UUID4, including actual context/images, model and tool exchanges, final candidate/Diff/validation, effective non-secret configuration, request count and end reason. Missing information ends the invocation with an explanatory final answer; failures and cancellation retain artifacts.
 - Demonstrate at least one reproducible before/after repair case. Human-run behavior verification is separate from Validator success and from the repair CLI.
 
 The accepted scope and acceptance evidence are in [Stage 3 — Agent-assisted Component Repair](stage-3-agent-assisted-component-repair.md).
+
+The confirmed six implementation slices and native issue dependencies are in [Stage 3 Implementation Slices](stage-3-implementation-slices.md). Publication is complete; implementation and model-backed/Windows acceptance remain pending.
 
 ## Stage 3.5 — Agent Runtime Step Recovery and Maintenance
 
 Status: deferred. ADR 0025 transfers the prior Stage 3 runtime architecture here without requiring it for the Stage 3 experiment.
 
-Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Agent Asset creation, and multi-Component evolution belong here. The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
+Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Working Manifest integration and multi-Component evolution belong here. This stage reuses the independent screenshot, bounded Asset addition and interaction-log capabilities of Stage 3 (ADR 0028). The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
 
 ## Stage 4: Application structure, UI, and packaging
 
