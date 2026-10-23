@@ -192,7 +192,7 @@ class ApplicationService:
     def crop_developer_asset(
         self, name: str, region: dict[str, int], tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """现场裁剪并追加标签，独立于 Developer Candidate 和 Manifest。"""
+        """现场裁剪并设置标签，独立于 Developer Candidate 和 Manifest。"""
         from .assets import asset_name
         asset_name(name)
         self.asset_library.tags(tags)
@@ -202,9 +202,9 @@ class ApplicationService:
         return self.asset_library.save_crop(name, session.image, session.size, region,
                                            run_id=None, observation=session.observation, tags=tags)
 
-    def add_asset(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
-        """为现有本地裁剪追加标签，不连接游戏、不要求 Candidate。"""
-        return self.asset_library.add_tags(name, image, tags)
+    def tag_asset(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
+        """覆盖现有本地裁剪的标签，不连接游戏、不要求 Candidate。"""
+        return self.asset_library.set_tags(name, image, tags)
 
     def _window_platform(self) -> Any:
         return self.window_platform if self.window_platform is not None else WindowsWindowPlatform(

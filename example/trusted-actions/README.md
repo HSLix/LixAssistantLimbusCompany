@@ -47,13 +47,13 @@ Run Result 的 `output` 含观察标识及证据路径；详细记录保存在�
 
 ## 裁剪、标签、匹配
 
-未准备模板时可直接运行 `steps.crop`，它会重新截图并返回 image_path、完整哈希和来源。可选 tags 默认为空列表；图片保存后就参与匹配。检查裁剪图后，可继续追加标签：
+未准备模板时可直接运行 `steps.crop`，它会重新截图并返回 image_path、完整哈希和来源。可选 tags 默认为空列表；图片保存后就参与匹配。检查裁剪图后，可继续设置标签：
 
 ```bash
-uv run lalc add-asset ui/claim --image <crop返回的image_path> --tags zh event
+uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags zh event
 ```
 
-无需 Candidate、publish 或重新 set-default。标签追加合并去重，省略标签不清空已有列表。图片使用 `assets/ui/claim/<完整哈希>.png`，标签位于同目录的 asset-tag.json；缺记录也按无标签参与匹配，不接受任意外部 PNG 导入。
+无需 Candidate、publish 或重新 set-default。标签用新列表整体覆盖，保留输入顺序及重复项；省略标签或传空列表将清空已有标签。图片使用 `assets/ui/claim/<完整哈希>.png`，标签位于同目录的 asset-tag.json；缺记录也按无标签参与匹配，不接受任意外部 PNG 导入。
 
 直接运行 steps.match，输入文件可为 `{"asset":"ui/claim","priority_tags":["zh"],"threshold":0.9}`。优先组内全部模板匹配，命中则不匹配其余组；未命中才尝试剩余全部模板。priority_tags 默认为 None，无优先条件时全部匹配。结果统一 NMS 和分数排序，标签是普通描述，不自动根据游戏语言选择。
 

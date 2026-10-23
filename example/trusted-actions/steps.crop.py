@@ -4,5 +4,5 @@ from lalc import step
 
 @step
 def execute(ctx, *, asset: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, str | int | list[str] | dict[str, int]]:
-    """检查返回的图片后，可用 add-asset 继续追加标签。"""
+    """检查返回的图片后，可用 tag-asset 重新设置完整标签。"""
     return ctx.action("observe.crop_asset", asset=asset, region=region, tags=tags)

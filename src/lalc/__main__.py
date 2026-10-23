@@ -37,10 +37,10 @@ def _parser() -> argparse.ArgumentParser:
     crop.add_argument("asset")
     crop.add_argument("--tags", nargs="*", default=None)
     crop.add_argument("--region", required=True, help="JSON client-pixel rectangle")
-    add = commands.add_parser("add-asset")
-    add.add_argument("asset")
-    add.add_argument("--tags", nargs="*", default=None)
-    add.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
+    tag = commands.add_parser("tag-asset", help="Replace all tags on an existing crop")
+    tag.add_argument("asset")
+    tag.add_argument("--tags", nargs="*", default=None, help="Complete replacement list; omit to clear")
+    tag.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
     commands.add_parser("data-dir")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
@@ -180,13 +180,13 @@ def _dispatch(args: argparse.Namespace) -> int:
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"
 
-    if args.command in {"crop-asset", "add-asset"}:
+    if args.command in {"crop-asset", "tag-asset"}:
         service = ApplicationService(data_root, manifest_manager=manager)
         try:
             if args.command == "crop-asset":
                 result = service.crop_developer_asset(args.asset, json.loads(args.region), args.tags)
             else:
-                result = service.add_asset(args.asset, args.image, args.tags)
+                result = service.tag_asset(args.asset, args.image, args.tags)
         except (ValueError, StartError) as error:
             _print_exception(error)
             return 1

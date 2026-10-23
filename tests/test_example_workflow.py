@@ -1,4 +1,4 @@
-"""覆盖三层样例发布、动作调用、裁剪追加标签后直接匹配，以及持久执行证据。
+"""覆盖三层样例发布、动作调用、裁剪设置标签后直接匹配，以及持久执行证据。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_example_workflow.py
@@ -51,7 +51,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
         assert any(e["event"] == "input_released" for e in state["trace"])
     crop = run("steps.crop", {"asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2}})["result"]["output"]
     service = ApplicationService(manager.data_root, manifest_manager=manager, game_language="zh")
-    assert service.add_asset("ui/claim", Path(crop["image_path"]), ["zh"])["tags"] == ["zh"]
+    assert service.tag_asset("ui/claim", Path(crop["image_path"]), ["zh"])["tags"] == ["zh"]
     detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())

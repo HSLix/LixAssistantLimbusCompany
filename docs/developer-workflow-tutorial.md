@@ -26,12 +26,12 @@ Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另�
 
 ```bash
 uv run lalc crop-asset ui/claim --region '{"x":2,"y":1,"width":20,"height":20}' --tags zh event
-uv run lalc add-asset ui/claim --image <crop返回的image_path> --tags dark event
+uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags dark event
 ```
 
-裁剪重新连接游戏并截图，保存图片、实际观察/区域来源和标签。add-asset 仅给已有本地裁剪追加标签，核对逻辑名、来源、完整哈希及解码，不连接游戏、不接受外部 PNG、不复制图片。两个命令都无需 Candidate 或 Manifest 发布。
+裁剪重新连接游戏并截图，保存图片、实际观察/区域来源和标签。tag-asset 仅给已有本地裁剪设置标签，核对逻辑名、来源、完整哈希及解码，不连接游戏、不接受外部 PNG、不复制图片。两个命令都无需 Candidate 或 Manifest 发布。
 
-标签稳定去重并追加合并：原为 `["zh", "event"]`，再传 dark event 后为 `["zh", "event", "dark"]`。省略 `--tags` 或传空列表时，新条目写 `[]`，已有条目不清空。新图片和不同主题可并存；相同字节复用相同哈希图片，已有图片从不覆盖。标签更新无需重名替换确认。
+标签按本次输入整体覆盖：原为 `["zh", "event"]`，再传 `--tags dark event` 后为 `["dark", "event"]`。不追加、不合并、不去重，输入顺序与重复项原样保留。省略 `--tags` 或传空列表会写入 `[]`，清空已有标签。新图片和不同主题可并存；相同字节复用同一哈希图片，图片字节从不覆盖。重复裁剪相同图片时也按本次 tags 替换标签列表。标签更新无需确认，不改变其他哈希的标签。
 
 ## 匹配规则
 

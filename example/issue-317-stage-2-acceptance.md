@@ -14,11 +14,11 @@ Stage 2 按确定性执行与基础交互能力完成，不再以邮箱业务端
 
 [ADR 0027](../docs/adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 已取代旧专属 Asset Library：Candidate 和发布物不再需要素材映射文件。完整逻辑名对应目录，图片仅以完整哈希命名，asset-tag.json 保存可选标签；缺标签的图片也参与匹配。旧素材数据废弃，清理后重新裁剪，不做迁移或兼容。
 
-crop/add-asset 只处理共享目录内的图片、标签与来源，无需 publish 或重新 set-default。标签追加合并去重，省略时新条目写 []、已有条目保留。每次匹配按优先组→剩余组读取当前目录，素材更新在同一 Run 的下一次匹配生效。
+crop/tag-asset 只处理共享目录内的图片、标签与来源，无需 publish 或重新 set-default。标签列表整体覆盖，省略或传空列表时写 []、清空旧标签。每次匹配按优先组→剩余组读取当前目录，素材更新在同一 Run 的下一次匹配生效。
 
 ## 验证与证据边界
 
-本轮自动化验证覆盖：Manifest 无素材依赖；crop 离线标签配置与稳定合并、空标签、缺标签候选；优先组短路与回退、跨模板排序/NMS、同 Run 更新可见；外部图片、缺来源、哈希/解码错误；旧发布库及 Default 保留；新样例校验发布、三层应用服务调用、全部七个生产动作、裁剪→追加标签→直接匹配、Trace/Ledger 与证据保存。
+本轮自动化验证覆盖：Manifest 无素材依赖；crop 离线标签配置与整体覆盖、空标签、缺标签候选；优先组短路与回退、跨模板排序/NMS、同 Run 更新可见；外部图片、缺来源、哈希/解码错误；旧发布库及 Default 保留；新样例校验发布、三层应用服务调用、全部七个生产动作、裁剪→设置标签→直接匹配、Trace/Ledger 与证据保存。
 
 ```bash
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q
@@ -35,7 +35,7 @@ git diff --check
 
 独立保留 #321 移交的验收：
 
-- Windows 游戏新格式裁剪→配置/追加标签→优先匹配与回退，证明无需再次 publish，旧图片及 Component Manifest 不变。
+- Windows 游戏新格式裁剪→配置/设置标签→优先匹配与回退，证明无需再次 publish，旧图片及 Component Manifest 不变。
 - 当前真实 Workflow 从 Run 启动开始监听，验证物理接管、输入释放、无重放、显式 Resume、新观察和 Stop。
 - Windows onedir 在无系统 Python、无旧 runtime 的环境执行正式用户路径；验证统一动作注册与 NumPy/OpenCV。当前 `console=False` 对 CLI 确认/恢复交互的影响仍须实机检查。
 

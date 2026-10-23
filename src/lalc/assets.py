@@ -58,12 +58,12 @@ class AssetLibrary:
 
     @staticmethod
     def tags(value: list[str] | None) -> list[str]:
-        """校验标签并按输入顺序去重，None 表示空列表。"""
+        """校验并复制标签列表，保留输入顺序及重复项；None 表示空列表。"""
         if value is None:
             return []
         if type(value) is not list or any(type(tag) is not str or not tag.strip() for tag in value):
             raise ValueError("Tags must be a list of nonempty strings.")
-        return list(dict.fromkeys(value))
+        return list(value)
 
     def _tag_mapping(self, name: str) -> dict[str, list[str]]:
         path = self.path(f"{asset_name(name)}/asset-tag.json")
@@ -81,16 +81,15 @@ class AssetLibrary:
             self.tags(tags)
         return mapping
 
-    def _merge_tags(self, name: str, digest: str, tags: list[str] | None) -> tuple[list[str], bool]:
-        """仅原子追加标签；省略标签不清空已有记录。"""
-        additions = self.tags(tags)
+    def _set_tags(self, name: str, digest: str, tags: list[str] | None) -> tuple[list[str], bool]:
+        """原子替换完整标签列表；省略标签将其清空。"""
+        replacement = self.tags(tags)
         mapping = self._tag_mapping(name)
-        merged = list(dict.fromkeys([*mapping.get(digest, []), *additions]))
-        unchanged = digest in mapping and mapping[digest] == merged
+        unchanged = digest in mapping and mapping[digest] == replacement
         if not unchanged:
-            mapping[digest] = merged
+            mapping[digest] = replacement
             atomic_write_json(self.path(f"{name}/asset-tag.json"), mapping)
-        return merged, unchanged
+        return replacement, unchanged
 
     def crop_reference(self, name: str, image: Path) -> dict[str, str]:
         """核对现有本地裁剪及完整哈希，不接受外部图片导入。"""
@@ -108,13 +107,13 @@ class AssetLibrary:
                 return entry
         raise ValueError("No crop provenance matches this image and Asset name.")
 
-    def add_tags(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
-        """给已有裁剪追加标签，无需 Candidate、游戏窗口或 Manifest 发布。"""
+    def set_tags(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
+        """覆盖已有裁剪的标签，无需 Candidate、游戏窗口或 Manifest 发布。"""
         self.tags(tags)
         entry = self.crop_reference(name, image)
-        merged, unchanged = self._merge_tags(name, entry["sha256"], tags)
+        replacement, unchanged = self._set_tags(name, entry["sha256"], tags)
         return {"logical_name": name, **entry, "image_path": str(self.path(entry["path"])),
-                "tags": merged, "unchanged": unchanged}
+                "tags": replacement, "unchanged": unchanged}
 
     @staticmethod
     def crop_content(pixels: bytes, size: tuple[int, int], region: dict[str, int]) -> tuple[bytes, dict[str, int]]:
@@ -136,7 +135,7 @@ class AssetLibrary:
         region: dict[str, int], *, run_id: int | None, observation: int,
         tags: list[str] | None = None,
     ) -> dict[str, Any]:
-        """保存哈希命名的现场裁剪和来源，追加标签而不覆盖旧图。"""
+        """保存哈希命名的现场裁剪和来源，替换标签而不覆盖旧图。"""
         asset_name(name)
         self.tags(tags)
         self._tag_mapping(name)
@@ -162,9 +161,9 @@ class AssetLibrary:
                         raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
             finally:
                 Path(temporary).unlink(missing_ok=True)
-        merged, _ = self._merge_tags(name, digest, tags)
+        replacement, _ = self._set_tags(name, digest, tags)
         provenance_id = uuid.uuid4().hex
-        result = {"logical_name": name, "tags": merged, "path": relative,
+        result = {"logical_name": name, "tags": replacement, "path": relative,
                   "sha256": digest, "image_path": str(path), "run_id": run_id,
                   "observation": observation, "region": area,
                   "client_size": {"width": size[0], "height": size[1]},
