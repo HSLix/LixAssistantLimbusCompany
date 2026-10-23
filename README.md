@@ -8,7 +8,7 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 
 - Stage 1 product and Agent boundaries: accepted.
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
-- Stage 2 implementation: Component Manifest loading and the model-free formal Workflow execution loop are implemented.
+- Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
 - Stage 3 Agent-assisted Component Repair: scope accepted; independent CLI repair implementation and reproducible acceptance pending.
 - Stage 3.5 Agent Runtime Step Recovery and Maintenance: prior runtime architecture retained; implementation deferred.
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
@@ -20,6 +20,7 @@ Start with:
 - [Reconstruction plan](docs/reconstruction-plan.md)
 - [Stage 2 implementation slices](docs/stage-2-implementation-slices.md)
 - [Developer Workflow tutorial](docs/developer-workflow-tutorial.md)
+- [Three-level Workflow and all Trusted Actions sample](example/trusted-actions/README.md)
 - [Stage 3 Agent-assisted Component Repair](docs/stage-3-agent-assisted-component-repair.md)
 - [Stage 3.5 Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
 - [Architecture decisions](docs/adr/)
@@ -31,8 +32,9 @@ Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
 Semantic Asset template matching, explicit local detection, and fresh-screenshot
 template cropping are available through observe Trusted Actions; see
 [the developer tutorial](docs/developer-workflow-tutorial.md).
-Input takeover has automated regression coverage and still requires supervised
-Windows game acceptance. OCR and model calls are not implemented yet.
+Input takeover has automated coverage and prior standalone Windows acceptance;
+current Workflow integration and Windows package acceptance remain deferred.
+OCR and model calls are not implemented yet.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
@@ -45,14 +47,13 @@ single Git-ignored `candidate/` directory in the current project:
 
 ```bash
 uv run lalc init
-# Edit candidate/manifest.json, candidate/assets.json and Component source.
+# Edit candidate/manifest.json, candidate/asset-library.json and Component source.
 uv run lalc validate
 uv run lalc publish
-uv run lalc list-manifests
-uv run lalc run <logical-name> --manifest <manifest-id> --inputs '{}'
-uv run lalc set-default <manifest-id>
-uv run lalc run <logical-name>
+uv run lalc set-default <publish输出的UUID>
+uv run lalc run <logical-name> --inputs '{}'
 uv run lalc run-plan <plan.json>
+uv run lalc list-manifests
 uv run lalc clear
 uv run lalc data-dir
 ```
@@ -74,6 +75,8 @@ checks the Step's optional condition, and invokes that same Step from its entryp
 it never replays the interrupted action. GUI notices appear once and remain movable;
 CLI Runs offer an explicit resume/stop prompt. Release failure terminates the Run
 and skips later Plan tasks. Reported errors retain the complete original traceback.
+
+Use `publish` → `set-default` → `run` / `run-plan` for normal development. After selecting the Default, omit `--manifest`; reserve it for temporarily running another retained version.
 
 `publish` keeps the editable candidate and does not change the Default
 Manifest. `clear` is the only command that removes it and asks for confirmation.

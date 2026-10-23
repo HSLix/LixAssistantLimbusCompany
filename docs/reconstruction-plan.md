@@ -18,7 +18,7 @@ Locked contracts:
 
 ## Stage 2: Python-first Workflow and deterministic execution
 
-Status: accepted and complete. Further changes require explicitly reopening the Stage 2 contract.
+Status: architecture and implementation complete under the revised acceptance scope of ADR 0026 (2026-10-22). A real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317; completion does not claim those scenarios passed.
 
 Confirmed contracts:
 
@@ -106,9 +106,9 @@ Stage 2 will not add Component Ref objects, dynamic `ctx.call()` targets, cross-
 
 The first version also does not export, inherit, migrate, or persist Task Workflow business state, Python loop positions, or entered frames. It terminates safely or restarts from an observable known point after process failure, deferring explicit Checkpoint/Resume design until cross-process or cross-implementation continuation is required.
 
-Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order in implementation without adding a Manifest field. Storage layout and formats use the most direct local representation when implementation reaches them; failure codes are added only for real execution paths; each vertical slice supplies the concrete safe action appropriate to its supported game state. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 independently validates single-Component repair through a manual CLI. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. The immediate next activity is planning the minimum implementation slices and their acceptance order.
+Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order without adding a Manifest field. Storage formats and failure codes follow actual implemented paths. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 independently validates single-Component repair through a manual CLI. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. ADR 0026 records the revised implementation completion boundary.
 
-The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 begins on a clean orphan branch in this repository; the old branch remains the historical reference and rollback path rather than a runtime that the new code must coexist with. The first real Task Workflow is selected when that slice begins, using mailbox collection as the initial smallest candidate.
+The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 began on a clean orphan branch; the old branch remains a historical reference and rollback path, not a parallel runtime. ADR 0026 replaces the original mailbox completion gate with foundation acceptance, existing single-capability evidence, crop registration and a runnable teaching sample. Coordinate display, region selection and real business authoring await GUI developer tools; #317 retains the mailbox and outstanding Windows integration acceptance.
 
 ## Stage 3 — Agent-assisted Component Repair
 

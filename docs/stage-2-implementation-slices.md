@@ -2,7 +2,7 @@
 
 Status: accepted baseline.
 
-Workflow 2.0 starts from a clean orphan branch in this repository. The old branch remains intact as historical reference and emergency rollback; the new branch does not run beside, wrap, or remain compatible with the legacy runtime. This plan implements the accepted Stage 2 contract without reopening storage formats, exhaustively designing failure codes, or generalizing game-specific termination. Each slice must pass its acceptance checks before the next slice begins.
+Workflow 2.0 starts from a clean orphan branch in this repository. The old branch remains intact as historical reference and emergency rollback; the new branch does not run beside, wrap, or remain compatible with the legacy runtime. This plan implements the accepted Stage 2 contract without reopening storage formats, exhaustively designing failure codes, or generalizing game-specific termination. The original dependency order is retained; ADR 0026 revises the final completion gate below.
 
 ## Migration boundary
 
@@ -67,7 +67,7 @@ For this slice, `start()` captures either the explicitly selected retained Manif
 
 Production code implements only the common Trusted Action dispatch boundary behind `ctx.action()`: application registration lookup and classification checks, role authorization, copied arguments, invocation, and Trace recording. The concrete `fake_*` names, callables, and behavior used by this slice live only in the test fixture. Real shipped Trusted Actions are added with their actual observation and control slices rather than preserving Demo-only fake actions.
 
-The same slice supplies the minimum developer loop required to author this model-free Workflow rather than relying on hand-built storage internals. Each project checkout has one fixed, Git-ignored `candidate/` Developer Candidate containing one complete editable `manifest.json` draft and its developer-authored Component source. The directory is flat in this slice: generated source uses `<logical_name>.py` beside `manifest.json`, and the Manifest records that relative filename without inferring identity or role from it. The globally unique logical-name rule prevents generated filename collisions. `candidate/assets.json` holds the independently editable library, initially `{}`.
+The same slice supplies the minimum developer loop required to author this model-free Workflow rather than relying on hand-built storage internals. Each project checkout has one fixed, Git-ignored `candidate/` Developer Candidate containing one complete editable `manifest.json` draft and its developer-authored Component source. The directory is flat in this slice: generated source uses `<logical_name>.py` beside `manifest.json`, and the Manifest records that relative filename without inferring identity or role from it. The globally unique logical-name rule prevents generated filename collisions. `candidate/asset-library.json` holds the independently editable library, initially `{}`.
 
 The existing services provide the developer loop without a separate `DeveloperService`. `ManifestManager` initializes, validates, publishes, lists, loads, and selects the Default Manifest; `ApplicationService.start(..., manifest_id=None)` runs an entry from the Default or an explicitly selected Base Manifest. The CLI only parses arguments, formats results, and owns the interactive `clear` confirmation. GUI and tests reuse those same services rather than a parallel facade.
 
@@ -75,7 +75,7 @@ Initialization materializes every executable entry from the selected retained Ma
 
 The Developer Candidate and runtime proposals share Manifest formats and validation rules but do not share editable storage. Agent-created immutable Component source is stored directly in the Component Library; complete attempted Manifests remain durable by Manifest ID. Approval and rejection retain those files without cleanup (ADR 0021). A later explicit operation may materialize an ended Run's proposal into an empty Developer Candidate for human revision; it never merges with or overwrites an existing developer draft. Issue #309 implements only the Developer Candidate boundary. The Agent never receives the full developer interface and cannot use developer cleanup to affect runtime files.
 
-The existing `lalc` executable is the sole human entrypoint. With no arguments it continues to start the GUI; developer operations use only the flat subcommands `init`, `validate`, `publish`, `clear`, `run`, `run-plan`, `connect`, `data-dir`, `list-manifests`, and `set-default`. `init`, `validate`, `publish`, and `clear` are the entire Developer Candidate lifecycle; there are no `add`, `update`, `remove`, `rename`, `list-actions`, or `describe-action` commands. A project checkout uses them from the project root through `uv run lalc ...`, while an installed package uses `lalc ...`. There is no separate developer executable, nested command framework, HTTP service, plugin layer, Manifest editor, or capability-discovery API. Each subcommand delegates to the same ordinary Python services used by the GUI and tests.
+The existing `lalc` executable is the sole human entrypoint. With no arguments it continues to start the GUI; developer operations use only the flat subcommands `init`, `validate`, `publish`, `clear`, `run`, `run-plan`, `connect`, `crop-asset`, `add-asset`, `data-dir`, `list-manifests`, and `set-default`. `init`, `validate`, `publish`, and `clear` are the entire Developer Candidate lifecycle; there are no `add`, `update`, `remove`, `rename`, `list-actions`, or `describe-action` commands. A project checkout uses them from the project root through `uv run lalc ...`, while an installed package uses `lalc ...`. There is no separate developer executable, nested command framework, HTTP service, plugin layer, Manifest editor, or capability-discovery API. Each subcommand delegates to the same ordinary Python services used by the GUI and tests.
 
 `init` creates `candidate/` only when that fixed directory is absent or empty; existing contents reject initialization without overwrite or merge and the error points to `lalc clear`. By default it materializes the Default Manifest; `--from <manifest-id>` selects another retained Manifest without changing the Default. If no Manifest has ever been published, plain `init` creates an empty complete schema-2 draft and its empty library. If retained Manifests exist but the Default pointer is missing, malformed, or unresolved, `init` creates nothing, lists the available retained Manifest IDs, and tells the developer to run `lalc set-default <manifest-id>` before retrying. It never repairs or changes the Default itself.
 
@@ -186,34 +186,21 @@ Acceptance:
 - cross-language matches record their source language but never automatically add language mappings or change the Working Manifest;
 - approval or rejection retains stored Manifests, source, and Assets; no Batch, run-end deletion, or resource-maintenance module is implemented in this slice (ADR 0021).
 
-## Slice 8: First real game task
+## Revised Stage 2 completion — ADR 0026
 
-Select the smallest existing objective that still proves independent end-to-end automation. The initial candidate is mailbox collection because it exercises entry preparation, observation, repeated claiming, completion recognition, exit, ordinary returns, and final verification without first importing Luxcavation combat or Mirror Dungeon complexity. Its old implementation supplies behavior and state knowledge only.
+The original Slice 8 required a real mailbox Task Workflow. The developer explicitly removed that completion gate on 2026-10-22: real business authoring depends on GUI development tools such as client-coordinate display and region selection. The mailbox and remaining Windows integration/package acceptance are deferred in #317, not reported as passed.
 
-Acceptance:
+Stage 2 completes with Slice 1–7 implementation and evidence, including #310 Step Recovery, #311 Working Manifest and #313 Automation Plan/Ledger acceptance, plus:
 
-- recorded or fake observations cover the task's normal, already-completed, expected-transition, and unknown-state paths without real input;
-- a supervised Windows run completes the supported objective, returns to its accepted end state, produces a trustworthy JSON result, and passes its explicit business checking Steps without Agent involvement;
-- interruption preserves evidence and follows the Stage 2 recovery boundary rather than recreating the legacy global error-node path;
-- the new project completes the task independently; rollback means returning to the preserved old branch, not invoking a legacy runtime from the new branch.
+- `add-asset` registers an existing local crop in `candidate/asset-library.json`, checking provenance, identity, hash and image decoding; it does not connect to the game or import external images. Explicit duplicate confirmation and immutable published libraries remain required.
+- Candidate and sample libraries use `asset-library.json`; old `assets.json` drafts need explicit developer renaming and are not read through a fallback. Published `asset-libraries/<Manifest ID>.json` files keep their names.
+- `example/trusted-actions/` supplies a complete schema-2 Manifest, an empty external library, three Component levels and all seven application action calls. The default task captures and waits; controls have explicit independent entrypoints, and matching requires a registered and newly published template.
+- Regression runs through the public application service and checks Trace/Ledger, crop registration, re-publication and detection. Existing separate Windows observation/control/Asset evidence stays attributed to its actual scope; platform doubles do not prove remaining Windows integration.
 
-## Order and completion rule
-
-```text
-clean project skeleton
-→ Component and Manifest loading
-→ complete Task Workflow with fake Trusted Actions
-→ Step recovery closure
-→ Working Manifest
-→ Automation Plan and Ledger
-→ Asset capability
-→ first real game task
-```
-
-Stage 2 implementation is complete only after Slice 8 passes its pure tests and supervised Windows acceptance. A real Agent Adapter, Runtime Exception Handling orchestration, paused-Step recovery, and Workflow Maintenance remain Stage 3.5 work. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred.
+The original dependency order remains skeleton → Manifest → fake Workflow → Step Recovery → Working Manifest → Plan/Ledger → Assets. A real Agent Adapter and runtime recovery remain Stage 3.5 work; Stage 3 independently validates Component repair. No GUI developer tools, mailbox implementation or Windows package acceptance are added to this revised completion gate.
 
 ## Current format and lifecycle
 
 Use schema version 2: Candidate Manifest fields are `schema_version`, `components`, and `recovery_rules`; saved Manifests also contain UUID `manifest_id`. Embedded Asset and Trusted Action mappings and old versions are rejected without migration. Application registration owns Trusted Actions; each Manifest owns a separately published Asset Library loaded in full alongside its Components. Developers edit only the Candidate library and publish a new Manifest/library pair. Images use complete SHA-256 filenames and are never overwritten. Every formal Run connects and focuses the Target Window and starts input monitoring before execution; one Plan shares the session until cleanup.
 
-See the Stage 2 execution contract's current Manifest, Asset and Run boundaries, ADR 0023 and ADR 0024 for storage, confirmation and publication details. Existing repository examples are removed; tests own their Component fixtures and action callables.
+See the Stage 2 execution contract's current Manifest, Asset and Run boundaries, ADR 0023 and ADR 0024 for storage, confirmation and publication details. Old repository examples were removed; tests own their fixtures and action callables. ADR 0026 adds the new teaching sample under `example/trusted-actions/`.

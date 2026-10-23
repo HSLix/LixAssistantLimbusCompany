@@ -75,6 +75,21 @@ class AssetLibrary:
                 result[name][language] = dict(entry)
         return result
 
+    def crop_reference(self, name: str, language: str, image: Path) -> dict[str, str]:
+        """只读取本地裁剪来源对应的图片，核对身份、完整哈希及解码，不导入外部文件。"""
+
+        asset_name(name)
+        game_language(language)
+        relative = Path(image).resolve().relative_to(self.root.resolve()).as_posix()
+        self.path(relative)
+        for source in sorted((self.data_root / "asset-provenance").glob("*.json")):
+            crop = json.loads(source.read_text(encoding="utf-8"))
+            if (crop["path"] == relative and crop["logical_name"] == name
+                    and crop["source_language"] == language):
+                entry = {"path": relative, "sha256": crop["sha256"]}
+                return self.validate({name: {language: entry}})[name][language]
+        raise ValueError("No crop provenance matches this image, Asset name and language.")
+
     @staticmethod
     def crop_content(pixels: bytes, size: tuple[int, int], region: dict[str, int]) -> tuple[bytes, dict[str, int]]:
         """在内存编码现场裁剪，确认前不创建文件或来源记录。"""

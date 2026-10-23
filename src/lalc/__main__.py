@@ -37,6 +37,10 @@ def _parser() -> argparse.ArgumentParser:
     crop.add_argument("asset")
     crop.add_argument("--language", default="en")
     crop.add_argument("--region", required=True, help="JSON client-pixel rectangle")
+    add = commands.add_parser("add-asset")
+    add.add_argument("asset")
+    add.add_argument("--language", default="en")
+    add.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
     commands.add_parser("data-dir")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
@@ -176,16 +180,22 @@ def _dispatch(args: argparse.Namespace) -> int:
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"
 
-    if args.command == "crop-asset":
+    if args.command in {"crop-asset", "add-asset"}:
         def confirm(prompt: str) -> bool:
             try:
                 return input(prompt).strip().lower() in {"y", "yes"}
             except (EOFError, KeyboardInterrupt):
                 return False
 
-        result = ApplicationService(data_root, manifest_manager=manager, game_language=args.language).crop_candidate_asset(
-            candidate, args.asset, json.loads(args.region), confirm,
-        )
+        service = ApplicationService(data_root, manifest_manager=manager, game_language=args.language)
+        try:
+            if args.command == "crop-asset":
+                result = service.crop_candidate_asset(candidate, args.asset, json.loads(args.region), confirm)
+            else:
+                result = service.add_candidate_asset(candidate, args.asset, args.image, confirm)
+        except (ValueError, StartError) as error:
+            _print_exception(error)
+            return 1
         if result is None:
             print("Candidate Asset replacement cancelled.", file=sys.stderr)
             return 1
@@ -219,8 +229,8 @@ def _dispatch(args: argparse.Namespace) -> int:
             return 1
         manifest_id = result.loaded.manifest_id
         print(f"Published: {manifest_id}")
-        print(f"Run: lalc run <logical-name> --manifest {manifest_id}")
         print(f"Set as default: lalc set-default {manifest_id}")
+        print("Run after setting default: lalc run <logical-name>")
         print("Remove developer candidate: lalc clear")
         return 0
     if args.command == "clear":

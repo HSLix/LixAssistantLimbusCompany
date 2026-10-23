@@ -347,7 +347,7 @@ class ManifestManager:
                     )
                     candidate_entry = {"source_path": filename}
                     candidate[section][logical_name] = candidate_entry
-            atomic_write_json(temporary / "assets.json", assets)
+            atomic_write_json(temporary / "asset-library.json", assets)
             atomic_write_json(temporary / "manifest.json", candidate)
             if target.exists():
                 target.rmdir()
@@ -426,7 +426,7 @@ class ManifestManager:
 
         if not any(error.code == "manifest_id_invalid" for error in prepared.errors):
             library_path = (self.asset_libraries_dir / f"{data.get('manifest_id')}.json"
-                            if saved else manifest_path.parent / "assets.json")
+                            if saved else manifest_path.parent / "asset-library.json")
             mapping, errors = self._read_json(library_path)
             prepared.errors.extend(errors)
             if not errors:

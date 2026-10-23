@@ -34,14 +34,14 @@ def test_asset_only_publish_creates_independent_complete_libraries(tmp_path):
     manager = ManifestManager(tmp_path / "data")
     candidate = draft(tmp_path, manager)
     shared = entry(manager.data_root, "shared.png")
-    (candidate / "assets.json").write_text(json.dumps({"ui/claim": {"en": shared}}), encoding="utf-8")
+    (candidate / "asset-library.json").write_text(json.dumps({"ui/claim": {"en": shared}}), encoding="utf-8")
     first = manager.publish(candidate / "manifest.json")
     assert first.ok
     first_id = first.loaded.manifest_id
     assert manager.set_default(first_id).ok
     second_candidate = tmp_path / "second"
     assert not manager.initialize_candidate(second_candidate)
-    assert mapping(second_candidate / "assets.json") == first.loaded.assets
+    assert mapping(second_candidate / "asset-library.json") == first.loaded.assets
     second = manager.publish(second_candidate / "manifest.json")
     assert second.ok and second.loaded.manifest_id != first_id
     assert second.loaded.assets == first.loaded.assets
@@ -49,7 +49,7 @@ def test_asset_only_publish_creates_independent_complete_libraries(tmp_path):
     assert not manager.validate(second_candidate / "manifest.json")
     assert set(mapping(second_candidate / "manifest.json")) == {"schema_version", "components", "recovery_rules"}
     # 仅修改草稿库再发布，不修改任何已保存库或 Component 映射。
-    (second_candidate / "assets.json").write_text("{}", encoding="utf-8")
+    (second_candidate / "asset-library.json").write_text("{}", encoding="utf-8")
     third = manager.publish(second_candidate / "manifest.json")
     assert third.ok and third.loaded.assets == {}
     assert manager.load(first_id).loaded.assets == first.loaded.assets
@@ -91,7 +91,7 @@ def test_cli_duplicate_refusal_changes_no_files(tmp_path, monkeypatch, capsys, a
     manager = ManifestManager(tmp_path / "data")
     candidate = draft(tmp_path, manager)
     old = entry(manager.data_root, "old.png")
-    (candidate / "assets.json").write_text(json.dumps({"ui/claim": {"en": old}}), encoding="utf-8")
+    (candidate / "asset-library.json").write_text(json.dumps({"ui/claim": {"en": old}}), encoding="utf-8")
     window = Window()
     window.image = screenshot().copy()
     window.image[1:3, 2:4] = 255
@@ -139,7 +139,7 @@ def test_candidate_crop_replacement_language_and_identical_reuse(tmp_path):
     service.game_language = "zh"
     other = service.crop_candidate_asset(candidate, "ui/claim", REGION, lambda _: pytest.fail("another language"))
     assert other["source_language"] == "zh"
-    assert set(mapping(candidate / "assets.json")["ui/claim"]) == {"en", "zh"}
+    assert set(mapping(candidate / "asset-library.json")["ui/claim"]) == {"en", "zh"}
     assert window.captures == 4
 
 
@@ -158,7 +158,7 @@ def test_published_library_is_loaded_as_an_independent_memory_mapping(tmp_path):
     manager = ManifestManager(tmp_path / "data")
     candidate = draft(tmp_path, manager)
     saved = entry(manager.data_root, "a.png")
-    (candidate / "assets.json").write_text(json.dumps({"ui/claim": {"en": saved}}), encoding="utf-8")
+    (candidate / "asset-library.json").write_text(json.dumps({"ui/claim": {"en": saved}}), encoding="utf-8")
     published = manager.publish(candidate / "manifest.json").loaded
     loaded = manager.load(published.manifest_id).loaded
     loaded.assets["ui/claim"]["en"]["path"] = "memory-only.png"

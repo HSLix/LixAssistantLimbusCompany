@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "components": {
+    "tasks.example": {
+      "source_path": "tasks.example.py"
+    },
+    "subworkflows.observe": {
+      "source_path": "subworkflows.observe.py"
+    },
+    "steps.capture": {
+      "source_path": "steps.capture.py"
+    },
+    "steps.wait": {
+      "source_path": "steps.wait.py"
+    },
+    "steps.click": {
+      "source_path": "steps.click.py"
+    },
+    "steps.key_press": {
+      "source_path": "steps.key_press.py"
+    },
+    "steps.drag": {
+      "source_path": "steps.drag.py"
+    },
+    "steps.crop": {
+      "source_path": "steps.crop.py"
+    },
+    "steps.match": {
+      "source_path": "steps.match.py"
+    }
+  },
+  "recovery_rules": {}
+}

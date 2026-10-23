@@ -201,7 +201,7 @@ class ApplicationService:
         errors = self.manifest_manager.validate(candidate_dir / "manifest.json")
         if errors:
             raise StartError("candidate_invalid", "; ".join(error.message for error in errors), errors=errors)
-        library_path = candidate_dir / "assets.json"
+        library_path = candidate_dir / "asset-library.json"
         mapping = self.asset_library.validate(json.loads(library_path.read_text(encoding="utf-8")))
         session = FocusedAutomationSession(self._window_platform(), lambda *_: None)
         session.capture()
@@ -219,6 +219,30 @@ class ApplicationService:
             run_id=None, observation=session.observation,
         )
         mapping.setdefault(name, {})[self.game_language] = {key: result[key] for key in ("path", "sha256")}
+        atomic_write_json(library_path, mapping)
+        return result
+
+    def add_candidate_asset(
+        self, candidate_dir: Path, name: str, image: Path, confirm: Callable[[str], bool],
+    ) -> dict[str, Any] | None:
+        """登记已有裁剪到 Candidate；不连接游戏、不新增图片或修改已发布库。"""
+
+        entry = self.asset_library.crop_reference(name, self.game_language, image)
+        errors = self.manifest_manager.validate(candidate_dir / "manifest.json")
+        if errors:
+            raise StartError("candidate_invalid", "; ".join(error.message for error in errors), errors=errors)
+        library_path = candidate_dir / "asset-library.json"
+        mapping = self.asset_library.validate(json.loads(library_path.read_text(encoding="utf-8")))
+        existing = mapping.get(name, {}).get(self.game_language)
+        result = {"logical_name": name, "source_language": self.game_language, **entry,
+                  "image_path": str(self.asset_library.path(entry["path"]))}
+        if existing == entry:
+            return {**result, "unchanged": True}
+        if existing is not None and not confirm(
+            f"Asset {name!r} ({self.game_language}) already has an image. Replace Candidate mapping? [y/N] "
+        ):
+            return None
+        mapping.setdefault(name, {})[self.game_language] = entry
         atomic_write_json(library_path, mapping)
         return result
 

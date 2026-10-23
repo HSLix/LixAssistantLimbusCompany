@@ -179,7 +179,7 @@ def execute(ctx) -> int:
                  "recovery_rules": {}}
     from runtime_support import register_sources
     register_sources(manager, {"observe.match": (ACTION, "observe"), "observe.capture": (capture, "observe")})
-    (folder / "assets.json").write_text(json.dumps(mapping), encoding="utf-8")
+    (folder / "asset-library.json").write_text(json.dumps(mapping), encoding="utf-8")
     path = folder / "manifest.json"
     path.write_text(json.dumps(candidate), encoding="utf-8")
     result = manager.publish(path)
@@ -302,7 +302,7 @@ def test_assets_incomplete_or_corrupt_manifest_never_publishes(tmp_path: Path) -
     assert manager.set_default(manifest).ok
     path = tmp_path / "draft" / "manifest.json"
     data = json.loads(path.read_text(encoding="utf-8"))
-    library = path.parent / "assets.json"
+    library = path.parent / "asset-library.json"
     mapping = json.loads(library.read_text(encoding="utf-8"))
     mapping["ui/claim"]["en"]["sha256"] = "0" * 64
     library.write_text(json.dumps(mapping), encoding="utf-8")
@@ -348,7 +348,7 @@ def test_asset_fixture_publishes_and_runs_with_typed_results(tmp_path: Path) -> 
     draft = tmp_path / "new"
     shutil.copytree(fixture, draft)
     data = json.loads((draft / "manifest.json").read_text(encoding="utf-8"))
-    (draft / "assets.json").write_text(json.dumps({"ui/claim": {"zh": {key: crop[key] for key in ("path", "sha256")}}}), encoding="utf-8")
+    (draft / "asset-library.json").write_text(json.dumps({"ui/claim": {"zh": {key: crop[key] for key in ("path", "sha256")}}}), encoding="utf-8")
     data["components"]["tasks.detect"] = {"source_path": "task.py"}
     (draft / "task.py").write_text('''"""识别任务。"""
 from lalc import task_workflow

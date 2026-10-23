@@ -70,7 +70,7 @@ def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) 
         },
         "recovery_rules": {"recovery.dismiss": {"source_path": "recovery.py"}},
     }
-    (directory / "assets.json").write_text("{}", encoding="utf-8")
+    (directory / "asset-library.json").write_text("{}", encoding="utf-8")
     path = directory / "candidate.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
     return path

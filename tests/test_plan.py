@@ -54,7 +54,7 @@ def _publish(
     candidate.mkdir(parents=True)
     for name, source in {"task.py": task_source, "sub.py": SUB, "step.py": step_source}.items():
         (candidate / name).write_text(source, encoding="utf-8")
-    (candidate / "assets.json").write_text("{}", encoding="utf-8")
+    (candidate / "asset-library.json").write_text("{}", encoding="utf-8")
     (candidate / "manifest.json").write_text(json.dumps({
         "schema_version": 2,
         "components": {
