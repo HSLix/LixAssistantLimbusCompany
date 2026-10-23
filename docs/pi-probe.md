@@ -12,10 +12,11 @@
 uv run --frozen lalc pi-probe \
   --image test_pi_img.png \
   --source-root tests/fixtures/virtual-workflow \
-  --source steps.say_hello.py
+  --source steps.say_hello.py \
+  --model YOUR_MODEL_ID
 ```
 
-默认连接 `http://localhost:12138/v1`，从 `/models` 选择唯一的 Gemma4 模型，要求服务声明支持图片。也可以用 `--base-url`、`--model` 明确指定。未加载状态会原样展示，不冒充不支持图片；首次请求是否成功由真实服务决定，不自动换模型。
+默认连接 `http://localhost:12138/v1`；必须使用 `--model` 显式指定模型，不再自动寻找 Gemma4。`--base-url` 要求完整 API 基础路径，不自动追加 `/v1`。要求服务声明支持图片，明确报告非 loaded 状态，不自动加载或换模型；实际图片输入由真实请求验证。`pi-probe` 继续使用临时参数，不读取修复的持久设置；请求上限必须至少为 2。
 
 `--source-root` 是允许读取的完整目录，`--source` 指定首次必须读取的样例；模型仍可只读该目录内的其他文件。路径解析后必须留在此目录内，包括符号链接；这不是操作系统安全沙箱。不要把含凭据的目录作为读取范围。
 

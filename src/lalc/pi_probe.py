@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import tempfile
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 
 PI_VERSION = "0.86.1"
@@ -21,9 +22,15 @@ PI_VERSION = "0.86.1"
 
 def _models(base_url: str, key: str) -> list[dict]:
     """读取指定服务的模型声明，不触发加载或自动改选供应商。"""
-    request = Request(base_url + "/models", headers={"Authorization": f"Bearer {key}"})
-    with urlopen(request, timeout=10) as response:
-        return json.load(response)["data"]
+    request = Request(base_url + "/models", headers={} if key == "lalc-no-key" else {"Authorization": f"Bearer {key}"})
+    try:
+        with urlopen(request, timeout=10) as response:
+            return json.load(response)["data"]
+    except HTTPError as error:
+        reason = "authentication failed" if error.code in {401, 403} else "service check failed"
+        raise ValueError(f"Model {reason} (HTTP {error.code})") from None
+    except URLError:
+        raise ValueError("Model service is unreachable") from None
 
 
 @asynccontextmanager
@@ -154,14 +161,16 @@ def configured_pi(args, root: Path, key: str, system_prompt: str):
     if executable is None:
         raise ValueError(f"pi executable not found: {args.pi}")
     base = args.base_url.rstrip("/")
-    if not base.endswith("/v1"):
-        base += "/v1"
+    if not args.model:
+        raise ValueError("Agent model is required; supply --model")
     models = _models(base, key)
-    matching = [m for m in models if m["id"] == args.model] if args.model else [
-        m for m in models if "gemma4" in m["id"].lower()]
+    matching = [m for m in models if m["id"] == args.model]
     if len(matching) != 1:
         raise ValueError("Select exactly one model with --model")
     model = matching[0]
+    status = model.get("status", {}).get("value")
+    if status is not None and status != "loaded":
+        raise ValueError(f"Selected model is not loaded (status={status}); load it on the server first")
     if "image" not in model.get("architecture", {}).get("input_modalities", []):
         raise ValueError("Selected service model does not declare image input support")
     with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
@@ -178,6 +187,8 @@ def configured_pi(args, root: Path, key: str, system_prompt: str):
                "LALC_PI_MAX_REQUESTS": str(args.max_requests)}
         env.pop("LALC_PI_REPAIR_TARGET", None)
         env.pop("LALC_PI_PAYLOAD_DIR", None)
+        env.pop("LALC_PI_PREFLIGHT", None)
+        env.pop("LALC_PI_REQUESTS_USED", None)
         version = subprocess.run([executable, "--version"], env=env, cwd=temporary,
                                  check=True, capture_output=True, text=True).stdout.strip()
         if version != PI_VERSION:
@@ -197,8 +208,8 @@ def run_probe(args) -> int:
     try:
         if args.ask_api_key:
             key = getpass.getpass("API key（无需认证时留空）: ") or key
-        if args.max_requests < 1:
-            raise ValueError("max-requests must be positive")
+        if args.max_requests < 2:
+            raise ValueError("max-requests must be at least 2; reset the request limit")
         root = args.source_root.resolve(strict=True)
         source = (root / args.source).resolve(strict=True)
         if not root.is_dir() or not source.is_file() or not source.is_relative_to(root):

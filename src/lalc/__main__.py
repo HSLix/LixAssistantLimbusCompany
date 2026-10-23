@@ -28,7 +28,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="lalc")
     commands = parser.add_subparsers(dest="command", required=True)
     probe = commands.add_parser("pi-probe", help="Verify pi image input and restricted source reading")
-    probe.add_argument("--base-url", default="http://localhost:12138")
+    probe.add_argument("--base-url", default="http://localhost:12138/v1")
     probe.add_argument("--model")
     probe.add_argument("--image", type=Path, required=True)
     probe.add_argument("--source-root", type=Path, required=True)
@@ -42,11 +42,21 @@ def _parser() -> argparse.ArgumentParser:
     repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
     repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
     repair.add_argument("--image", type=Path, required=True)
-    repair.add_argument("--base-url", default="http://localhost:12138")
+    repair.add_argument("--base-url")
     repair.add_argument("--model")
-    repair.add_argument("--max-requests", type=int, default=20)
+    repair.add_argument("--max-requests", type=int)
     repair.add_argument("--pi", default="pi")
     repair.add_argument("--ask-api-key", action="store_true")
+    repair.add_argument("--secret-name", help="Windows DPAPI secret name for this invocation")
+    settings = commands.add_parser("agent-config", help="Show or update the single saved Agent connection")
+    settings.add_argument("--base-url", help="Complete API base URL; no path is appended")
+    settings.add_argument("--model")
+    settings.add_argument("--max-requests", type=int)
+    secret = settings.add_mutually_exclusive_group()
+    secret.add_argument("--secret-name")
+    secret.add_argument("--clear-secret", action="store_true")
+    secrets = commands.add_parser("secret-set", help="Save a named secret using Windows current-user DPAPI")
+    secrets.add_argument("name")
     init = commands.add_parser("init")
     init.add_argument("--from", dest="manifest_id")
     commands.add_parser("validate")
@@ -200,6 +210,10 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "data-dir":
         print(data_root)
         return 0
+    if args.command in {"agent-config", "secret-set"}:
+        from .agent_settings import settings_command
+
+        return settings_command(args, data_root)
     manager = ManifestManager(data_root)
     candidate = Path.cwd() / "candidate"
     manifest_path = candidate / "manifest.json"

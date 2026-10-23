@@ -134,8 +134,9 @@ class AssetLibrary:
         self, name: str, pixels: bytes, size: tuple[int, int],
         region: dict[str, int], *, run_id: int | None, observation: int,
         tags: list[str] | None = None,
+        preserve_existing_tags: bool = False,
     ) -> dict[str, Any]:
-        """保存哈希命名的现场裁剪和来源，替换标签而不覆盖旧图。"""
+        """保存现场裁剪和来源；开发者替换标签，Agent 可要求保留已有图的标签。"""
         asset_name(name)
         self.tags(tags)
         self._tag_mapping(name)
@@ -144,7 +145,8 @@ class AssetLibrary:
         relative = f"{name}/{digest}.png"
         path = self.path(relative)
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.exists():
+        existed = path.exists()
+        if existed:
             if path.read_bytes() != content:
                 raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
         else:
@@ -159,15 +161,22 @@ class AssetLibrary:
                 except FileExistsError:
                     if path.read_bytes() != content:
                         raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
+                    existed = True
             finally:
                 Path(temporary).unlink(missing_ok=True)
-        replacement, _ = self._set_tags(name, digest, tags)
+        mapping = self._tag_mapping(name)
+        if preserve_existing_tags and (existed or digest in mapping):
+            replacement = list(mapping.get(digest, []))
+        else:
+            replacement, _ = self._set_tags(name, digest, tags)
         provenance_id = uuid.uuid4().hex
         result = {"logical_name": name, "tags": replacement, "path": relative,
                   "sha256": digest, "image_path": str(path), "run_id": run_id,
                   "observation": observation, "region": area,
                   "client_size": {"width": size[0], "height": size[1]},
                   "provenance_id": provenance_id, "created_at": datetime.now(UTC).isoformat()}
+        if preserve_existing_tags:
+            result["existed"] = existed
         atomic_write_json(self.data_root / "asset-provenance" / f"{provenance_id}.json", result)
         return result
 

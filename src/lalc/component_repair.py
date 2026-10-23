@@ -6,7 +6,6 @@ import asyncio
 import base64
 from datetime import datetime, timezone
 import difflib
-import getpass
 import hashlib
 import json
 from pathlib import Path
@@ -16,11 +15,17 @@ import uuid
 
 from .manifest import ManifestManager
 from .pi_probe import PI_VERSION, configured_pi, rpc_session
+from .repair_tools import REPAIR_TOOLS, RepairTools
+from .agent_settings import effective_settings, resolve_key
 
 
 SYSTEM_PROMPT = """你是 LALC 单 Component 修复助手。必须实际 read 源码、edit 指定文件、validate 完整候选，按反馈迭代。
-只能读取候选目录中的文件，只能编辑指定目标；禁止修改 manifest.json、其他源码、正式发布物或 Asset。
-不运行命令、候选代码或游戏操作，不发布或设置 Default。材料不足或单文件无法解决时说明原因并结束。
+源码只能读取候选目录中的文件，只能编辑指定目标；禁止修改 manifest.json、其他源码或正式发布物。
+使用 asset_tree 发现素材名称，asset_directory 查看全部文件名和原始标签，asset_images 按完整逻辑名和完整哈希查看一张或多张图片。
+action_contracts 返回应用实际动作契约，不执行动作。game_screenshot 可查看当前游戏，crop_asset 从新截图裁剪新增素材。
+每次截图/裁剪都会恢复并置前唯一游戏窗口；工具失败可再次调用，不使用旧截图替代。非 Windows 平台实时工具不可用。
+裁剪只能新增素材；同名同哈希复用原图和旧标签。不得改已有图片/标签；新增素材失败或取消后也保留。
+不运行命令、候选代码或点击/按键，不发布或设置 Default。材料不足或单文件无法解决时说明原因并结束。
 LALC 约束：Python 模块有中文职责 docstring；execute 使用一个原有的 plain @task_workflow/@sub_workflow/@step，保留角色与签名。
 Task 可通过 ctx.call 调用 Subworkflow/Step；Subworkflow 只能调用 Step；Step 不调用正式 Component。
 使用字面量 ctx.call/ctx.action 名称，不创建 Trusted Action 或 Recovery Rule。业务数据用参数、返回值和局部变量传递。
@@ -123,28 +128,66 @@ def final_answer(message: dict) -> dict:
     return value
 
 
-async def repair_loop(command, env, temporary, prompt, manager, candidate, source, original, log):
-    """复用 pi 工具循环；格式或最终校验反馈触发下一组，不改写上一组评价。"""
-    last = {}
-    async with rpc_session(command, env, temporary, log.record) as (send, event):
+async def configure_session(send, event, log, expected_tools):
+    """确认实际工具集并关闭自动重试和压缩，供预检与修复共用。"""
+    while True:
+        item = await asyncio.wait_for(event(), timeout=30)
+        log.record(item)
+        if item.get("type") == "extension_error":
+            raise RuntimeError(str(item))
+        if item.get("type") == "lalc_ready":
+            if item.get("tools") != expected_tools:
+                raise RuntimeError("Unexpected repair tools")
+            break
+    for setting in ("set_auto_retry", "set_auto_compaction"):
+        await send({"id": setting, "type": setting, "enabled": False})
         while True:
             item = await asyncio.wait_for(event(), timeout=30)
             log.record(item)
-            if item.get("type") == "extension_error":
-                raise RuntimeError(str(item))
-            if item.get("type") == "lalc_ready":
-                if item.get("tools") != ["read", "edit", "validate"]:
-                    raise RuntimeError("Unexpected repair tools")
+            if item.get("id") == setting:
+                if not item.get("success"):
+                    raise RuntimeError(f"pi rejected {setting}")
                 break
-        for setting in ("set_auto_retry", "set_auto_compaction"):
-            await send({"id": setting, "type": setting, "enabled": False})
-            while True:
-                item = await event()
-                log.record(item)
-                if item.get("id") == setting:
-                    if not item.get("success"):
-                        raise RuntimeError(f"pi rejected {setting}")
-                    break
+
+
+async def check_model_image(command, env, temporary, image, log):
+    """用真实图片执行一次无工具请求；成功前不修改候选，计数沿用到修复。"""
+    checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
+                "LALC_PI_MAX_REQUESTS": "1", "LALC_PI_PAYLOAD_DIR": str(log.path.resolve())}
+    prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
+              "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
+    last = {}
+    async with rpc_session(command, checking, temporary, log.record) as (send, event):
+        await configure_session(send, event, log, [])
+        log.record({"type": "model_check_started", "prompt": prompt})
+        await send(prompt)
+        while True:
+            item = await event()
+            kind = item.get("type")
+            if kind == "message_update":
+                continue
+            log.record(item)
+            if kind == "lalc_request":
+                log.requests = item["requests"]
+            elif kind == "message_end" and item.get("message", {}).get("role") == "assistant":
+                last = item["message"]
+            elif kind == "extension_error" or (kind == "response" and not item.get("success")):
+                raise RuntimeError("Model image check failed: " + str(item))
+            elif kind == "agent_settled":
+                if (log.requests != 1 or last.get("stopReason") != "stop"
+                        or not any(part.get("type") == "text" and part.get("text", "").strip()
+                                   for part in last.get("content", []))):
+                    raise RuntimeError("Model image check failed: " + str(last.get("errorMessage") or last))
+                log.record({"type": "model_check_passed", "requests": log.requests})
+                return
+
+
+async def repair_loop(command, env, temporary, prompt, manager, candidate, source, original, log):
+    """复用 pi 工具循环；格式或最终校验反馈触发下一组，不改写上一组评价。"""
+    last = {}
+    tools = RepairTools(manager.data_root, log)
+    async with rpc_session(command, env, temporary, log.record) as (send, event):
+        await configure_session(send, event, log, REPAIR_TOOLS)
         log.record({"type": "initial_prompt", "prompt": prompt})
         await send(prompt)
         while True:
@@ -159,11 +202,22 @@ async def repair_loop(command, env, temporary, prompt, manager, candidate, sourc
             elif kind == "extension_error" or (kind == "response" and not item.get("success")):
                 raise RuntimeError(str(item))
             elif kind == "extension_ui_request":
-                if item.get("method") != "input" or item.get("title") != "lalc.validate":
+                if item.get("method") != "input":
                     raise RuntimeError("Unexpected interactive request")
-                result = validate_candidate(manager, candidate, log)
+                title = item.get("title", "")
+                if title == "lalc.validate":
+                    result = json.dumps(log.clean(validate_candidate(manager, candidate, log)), ensure_ascii=False)
+                elif title.startswith("lalc.tool:"):
+                    request = json.loads(title.removeprefix("lalc.tool:"))
+                    try:
+                        result = await asyncio.to_thread(tools.call, request["name"], request["arguments"])
+                    except asyncio.CancelledError:
+                        tools.cancelled.set()
+                        raise
+                else:
+                    raise RuntimeError("Unexpected interactive request")
                 await send({"type": "extension_ui_response", "id": item["id"],
-                            "value": json.dumps(log.clean(result), ensure_ascii=False)})
+                            "value": result})
             elif kind == "message_end" and item.get("message", {}).get("role") == "assistant":
                 last = item["message"]
             elif kind == "agent_settled":
@@ -204,30 +258,39 @@ def run_repair(args, manager: ManifestManager, candidate: Path) -> int:
     result = {"status": "incomplete", "reason": "setup_error"}
     original = b""
     try:
-        if args.max_requests < 1:
-            raise ValueError("max-requests must be positive")
         baseline = repair_baseline(manager, candidate, args.logical_name)
-        if args.ask_api_key:
-            key = getpass.getpass("API key（无需认证时留空）: ") or key
+        settings = effective_settings(args, manager.data_root)
+        if settings["model"] is None:
+            raise ValueError("Agent model is required; save it with agent-config --model or supply --model")
+        for field, value in settings.items():
+            setattr(args, field, value)
+        key = resolve_key(args, settings, manager.data_root)
         image = args.image.read_bytes()
         if not image.startswith(b"\x89PNG\r\n\x1a\n"):
             raise ValueError("image must be a PNG")
         # 模型连接、版本和输入预检先于草稿替换；这些失败无需牺牲旧草稿。
+        log = RepairLog(manager.data_root, key)
+        log.group = 0
+        print(f"Agent Interaction Log: {log.path}", flush=True)
+        log.save_json("input.json", {"source_manifest_id": baseline.manifest_id, "target": args.logical_name,
+                                    "pi": PI_VERSION, "settings": settings, "system_prompt": SYSTEM_PROMPT})
+        (log.path / "input.png").write_bytes(image)
         with configured_pi(args, candidate.resolve(), key, SYSTEM_PROMPT) as (command, env, temporary, model):
-            log = RepairLog(manager.data_root, key)
+            asyncio.run(check_model_image(command, env, temporary, image, log))
+            env["LALC_PI_REQUESTS_USED"] = str(log.requests)
+            log.group = 1
             manifest_id, source, original = prepare_candidate(manager, candidate, args.logical_name, baseline)
             env["LALC_PI_REPAIR_TARGET"] = str(source.resolve())
             env["LALC_PI_PAYLOAD_DIR"] = str(log.path.resolve())
-            command[command.index("--tools") + 1] = "read,edit,validate"
+            command[command.index("--tools") + 1] = ",".join(REPAIR_TOOLS)
             (log.path / "original.py").write_bytes(original)
             (log.path / "input.png").write_bytes(image)
             prompt = {"type": "prompt", "message": f"目标文件：{source.name}\n问题与预期：{args.problem}\n异常/复现信息：{args.exception or '未提供'}",
                       "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
             log.save_json("input.json", {"source_manifest_id": manifest_id, "target": args.logical_name,
                                         "pi": PI_VERSION, "base_url": env["LALC_PI_BASE_URL"], "model": model,
-                                        "max_requests": args.max_requests, "system_prompt": SYSTEM_PROMPT,
+                                        "max_requests": args.max_requests, "settings": settings, "system_prompt": SYSTEM_PROMPT,
                                         "prompt": prompt, "image_sha256": hashlib.sha256(image).hexdigest()})
-            print(f"Agent Interaction Log: {log.path}", flush=True)
             result = asyncio.run(repair_loop(command, env, temporary, prompt, manager, candidate, source, original, log))
     except KeyboardInterrupt:
         result = {"status": "cancelled", "reason": "user_cancelled"}

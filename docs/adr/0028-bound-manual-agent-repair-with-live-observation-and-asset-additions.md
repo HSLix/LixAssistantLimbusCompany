@@ -12,3 +12,5 @@ supersedes: 0025 (Stage 3 workspace and Agent Asset creation limits only)
 这不是运行时 Agent Recovery：没有自动异常接管、游戏点击/按键、候选自动试跑、自动 Publish、交互追问或运行续接。运行中 Working Manifest 的衔接、多组件修改及 Runtime Agent Session 仍属 Stage 3.5。pi 为首选接入，先在 Mac 验证模型、图片和受限工具循环，再固定跨平台版本；真实截图、裁剪、DPAPI 和游戏行为在 Windows 验收。工具限制与现有 Validator 均不构成操作系统安全沙箱。
 
 详见 [Stage 3](../stage-3-agent-assisted-component-repair.md)。
+
+2026-10-23 #326 实践边界补充：每次 Agent 截图或裁剪请求均允许重新恢复并置前唯一 Target Window，复用现有聚焦确认与取消边界；失败返回明确错误，Agent 可以再次调用，工具内部不自动重试或沿用旧截图。多图读取先校验全部请求，任何一项失败则整次失败，不返回部分图片。

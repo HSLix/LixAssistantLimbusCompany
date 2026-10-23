@@ -1,6 +1,6 @@
 # Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md); the #325 repair CLI is implemented and verified with automated checks and a Mac model-backed pure-computation case; later tools and Windows/game acceptance remain to be completed.
+Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage are implemented with Mac and pi/HTTP substitute tests; the new startup path still needs real-model evidence, and Windows DPAPI/authentication, screenshot/crop and game acceptance remain pending.
 
 Tracking: [GitHub Issue #312](https://github.com/HSLix/LixAssistantLimbusCompany/issues/312). Confirmed implementation spec: [GitHub Issue #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323).
 
@@ -27,7 +27,7 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 2. 逻辑名目录查看：输入一个完整 Asset 逻辑名，列出该目录内所有文件名，并返回 `asset-tag.json` 内容。标签文件缺失时明确报告缺失，沿用 ADR 0027 的未配置标签按空列表处理，不自动创建或修正文件。
 3. 图片查看：以完整逻辑名与完整 SHA-256 哈希标识图片；一次调用支持查看一张或多张。向模型返回实际图片内容，并逐张关联逻辑名与哈希，不只返回本机路径或文件名。
 
-工具复用现有逻辑名校验、库内路径约束及图片哈希校验，不接受任意绝对路径、相对越界路径或哈希前缀，不提供 Asset 写入能力。多图请求的具体参数结构在接入实现中确定。
+工具复用现有逻辑名校验、库内路径约束及图片哈希校验，不接受任意绝对路径、相对越界路径或哈希前缀，不提供 Asset 写入能力。多图请求使用逻辑名与完整哈希的列表；先核对整个批次，任一图片不存在、越界、哈希不符或无法解码时整次失败，不返回部分图片，由 Agent 修正后重新调用。
 
 ### Trusted Action inspection tool
 
@@ -36,6 +36,7 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 ### Live screenshot and Asset crop tools
 
 - 当前游戏截图：每次调用重新截取唯一 Target Window 的客户区，复用现有窗口与焦点检查，向模型返回实际图片和尺寸，并将本次截图保留在交互日志中。不执行点击、按键或候选代码，不把旧截图冒充当前截图。
+- 每次截图或裁剪请求均允许恢复并置前唯一 Target Window，不限于首次调用。每次只发起一次置前请求并等待真实焦点，等待可取消；失效或截图失败返回明确错误，不自动重试、不返回旧图，Agent 可在请求上限内再次调用。
 - 现场裁剪新增 Asset：输入完整逻辑名、客户区像素区域及可选标签，每次重新截图后裁剪，不从保存的截图或前次观察裁剪。复用现有区域、图片和完整哈希校验，保存新图片及裁剪来源，返回实际裁剪图片、完整哈希、标签及新增/复用结果。工具不开放任意文件导入或输出路径。
 - 同逻辑名同哈希已存在时直接复用图片，保留旧标签并明确返回已存在；即使请求提供不同标签也不覆盖。新增哈希按 ADR 0027 保存标签，未提供标签明确写入 `[]`；保留同目录其他哈希的原标签。此为 Agent 工具的限制，不修改开发者裁剪/标签管理工具整体替换标签的既定语义。
 - 新 Asset 进入共享库，无需候选 Manifest 映射或 Publish，下一次读取/匹配即可看到。失败、取消、信息不足或人工拒绝不删除已新增的图片和记录，不引入资源回收流程。
@@ -50,8 +51,11 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 ### Model connection and secrets
 
 - LALC 显式管理模型服务地址（包括协议、IP/主机名、端口和 API 基础路径）、模型标识及所需的 API key，不以用户预先维护 pi 的模型与认证配置为前提。首个接入目标是另一台设备上的 llama.cpp 服务。
+- 2026-10-23 #327 确认：现有 LALC 用户数据目录只保存一套当前连接设置，不引入项目配置或多套档案。本次 CLI 参数优先于保存值，不回写；合并后没有显式模型标识就禁止启动 Agent，不再自动寻找 Gemma4。地址必须填写完整 API 基础路径，原样使用，不自动追加 `/v1`。
 - 使用指定模型前检查图片输入支持，不能只因配置标注支持图片就视为已验证；具体能力查询及实际请求验证在最小接入实验中确定。一次修复不自动切换模型或供应商，失败时保留候选与诊断日志。
+- 启动修复前先检查模型加载状态；服务报告未加载、加载中或其他非 loaded 状态时立即报错，不主动加载。没有状态字段的单模型服务由实际图片请求确认可用性。再通过固定版本 pi 发送本次初始截图执行一次无工具图片请求；失败不重建候选，通过才进入单 Component 修复。图片检查请求计入同一次 `lalc repair` 的上限，不按 Automation Plan 周期计数；检查本身不是行为修复验收。
 - Windows 持久化密钥使用 DPAPI。密钥存储与模型连接配置分离，以命名引用关联；不限定只能保存模型 API key，未来其他密钥复用同一存储边界，但本阶段不预建其他业务集成。
+- Windows 默认读取当前设置引用的命名密钥；引用缺失或解密失败直接停止。CLI 临时输入优先，仅覆盖本次；不配置密钥可连接无认证服务，认证失败由预检报告。Mac 只允许临时输入；遇到命名引用时要求使用临时输入，不静默忽略。
 - 密钥不进入 Agent 可读材料、模型上下文、调用日志或候选输出，不以明文写入 pi 的持久化认证/模型配置。运行时供模型客户端认证使用的传递方式须在接入实验中验证。macOS 首版开发环境临时输入密钥，仅在进程内存中使用，不持久化；每次启动重新提供。Windows 正式交付仍要求 DPAPI 持久化。
 
 ### Repair completion and interruption
@@ -59,6 +63,7 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 - 2026-10-23 补充确认（#325）：以模型一轮交互的最终回答为一组；该轮中的源码读取、编辑、Validator 工具调用及反馈归入同组，不能按每次模型请求或工具调用单独定性。最终回答必须为 JSON，使用布尔字段 `revise_success` 区分“完成修订”（`true`）与“改不了”（`false`），并包含说明；中间的工具调用与反馈不携带该结束标记。不新增结束工具，不通过自然语言关键词猜测结果。每组保留 Agent 当时的原始报告，实际校验及后续行为验收独立记录，不反向改写该组评价。最终校验失败也应将实际反馈交回 Agent 继续修订；由此产生的新一轮另记一组，仍归属于同一次 CLI 修复调用并共用请求上限。这里的分组不是 Stage 3.5 的 Agent Turn 或 Runtime Agent Session。
 - 最终回答不是合法 JSON、缺少 `revise_success` 或其值不是布尔值时，把具体格式错误反馈给模型纠正；不猜测或强制转换结果。纠正仍计入同一次 CLI 调用的模型请求上限，保留原始回答及格式错误。
 - 每次修复的模型请求上限默认 20 次，可在启动时设置；它约束独立修复调用，不复用 Stage 3.5 Runtime Agent Session 的协议。
+- 请求上限必须至少为 2，否则保存或启动时报错，要求重新设置；一次启动图片检查占 1 次，剩余请求供实际修复，所有请求共用上限。
 - 请求上限保存在 LALC 普通本地配置中，未配置时为 20；保存设置后供后续调用沿用，单次启动可临时覆盖而不修改已保存值。服务地址和模型标识也属于普通本地配置；每次修复开始时固定实际使用的上限并记入日志，密钥另行存储。
 - Agent 一轮交互结束后，对其声称完成修订的最终候选源码再次调用现有 Validator；失败时反馈给 Agent 开始下一轮，受同一次调用的请求上限约束。通过仅表示候选符合执行契约，不代表游戏行为已修复；行为修复仍以人工真实游戏验收为准。
 - 达到请求上限时结束并标记未完成；用户取消或模型服务报错时停止，不自动重启修复。上述路径均保留已有候选与日志，不将失败或中断报告为成功。

@@ -47,13 +47,15 @@ def probe(tmp_path):
             pass
 
         def do_GET(self):
-            body = json.dumps({"data": [{"id": "gemma4-test", "architecture": {
-                "input_modalities": ["text", "image"]}}]}).encode()
-            self.send_response(200)
+            state.setdefault("get_paths", []).append(self.path)
+            body = json.dumps({"data": state.get("models", [{"id": "gemma4-test", "status": {"value": "loaded"},
+                                "architecture": {"input_modalities": ["text", "image"]}}])}).encode()
+            self.send_response(state.get("get_status", 200))
             self.end_headers()
             self.wfile.write(body)
 
         def do_POST(self):
+            state.setdefault("post_paths", []).append(self.path)
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             state["authorization"] = self.headers.get("Authorization")
             state["calls"].append(body)
@@ -65,9 +67,11 @@ def probe(tmp_path):
             self.end_headers()
             try:
                 if state["status"] != 200:
-                    self.wfile.write(b'{"error":{"message":"test provider unavailable"}}')
+                    self.wfile.write(json.dumps({"error": {"message": state.get("error_message", "test provider unavailable")}}).encode())
                     return
-                if "respond" in state:
+                if state.get("repair_check") and not body.get("tools"):
+                    delta, finish = {"role": "assistant", "content": "Image received."}, "stop"
+                elif "respond" in state:
                     delta, finish = state["respond"](body)
                 elif len(state["calls"]) == 1:
                     delta = {"role": "assistant", "tool_calls": [{"index": 0, "id": "read-1", "type": "function",
@@ -87,7 +91,8 @@ def probe(tmp_path):
     server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
     worker = Thread(target=server.serve_forever, daemon=True)
     worker.start()
-    command = [sys.executable, "-m", "lalc", "pi-probe", "--base-url", f"http://127.0.0.1:{server.server_port}",
+    command = [sys.executable, "-m", "lalc", "pi-probe", "--base-url", f"http://127.0.0.1:{server.server_port}/v1",
+               "--model", "gemma4-test",
                "--image", str(image), "--source-root", str(root), "--source", "sample.py"]
     try:
         yield command, state, tmp_path
@@ -144,12 +149,12 @@ def test_actual_read_rejects_escape(probe, path):
     assert "PRIVATE_OUTSIDE_CONTENT" not in json.dumps(state["calls"])
 
 
-def test_limit_rejects_next_request_before_http(probe):
+def test_invalid_limit_rejected_before_http(probe):
     command, state, _ = probe
     result = subprocess.run(command + ["--max-requests", "1"], capture_output=True, text=True, timeout=40)
     assert result.returncode == 1, result.stdout
-    assert len(state["calls"]) == 1
-    assert "LALC request limit reached" in result.stdout
+    assert not state["calls"]
+    assert "at least 2" in result.stdout
 
 
 def test_provider_error_has_no_hidden_retries(probe):
