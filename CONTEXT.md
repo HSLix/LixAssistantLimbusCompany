@@ -65,7 +65,7 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the developer selects the candidate files the Agent may edit, including its Manifest draft, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing files, including its Manifest draft, with plan.json read-only, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:

@@ -11,7 +11,7 @@
 
 ## “缺少真模型配置”的准确含义
 
-`tests/test_component_repair_agent.py::live_conversation` 在任何连接请求前检查两个专用环境变量：
+`tests/test_agent_repair_agent.py::live_conversation` 在任何连接请求前检查两个专用环境变量：
 
 | 变量 | 含义 |
 | --- | --- |
@@ -32,7 +32,7 @@
 
 直接影响：
 
-- `component_repair.py::configure_session`：连接预检和正式修复共用的就绪/工具集合确认。
+- `agent_repair.py::configure_session`：连接预检和正式修复共用的就绪/工具集合确认。
 - `pi_probe.py::_interact`：独立图片/只读探针的就绪等待。
 - CLI `repair`、GUI Agent Repair、独立 `pi-probe` 都复用上述路径，不应分别补丁。
 - 同一个 `emit()` 还发送 `lalc_request`。虽然此次未进入模型请求，修复时必须连同计数与 payload 引用验证，不能只让 `lalc_ready` 通过。
@@ -47,7 +47,7 @@
 
 ### 3. 取消测试没有等待失败的退出条件
 
-`tests/test_component_repair_agent.py::test_cancel_reaps_process_and_keeps_candidate_and_log` 在发出取消前一直等待 HTTP 替身的 `started`。当启动任务已经失败且未发模型请求时，等待仍不结束；本轮由外部 60 秒截止终止。
+`tests/test_agent_repair_agent.py::test_cancel_reaps_process_and_keeps_candidate_and_log` 在发出取消前一直等待 HTTP 替身的 `started`。当启动任务已经失败且未发模型请求时，等待仍不结束；本轮由外部 60 秒截止终止。
 
 修复范围：等待有明确截止，且发现任务已结束时报告其实际失败；失败路径也回收任务/子进程。不能通过跳过或放宽断言隐藏取消功能的问题。
 
@@ -55,10 +55,10 @@
 
 1. 修复公共事件发送通道，覆盖就绪事件、工具集合、模型请求计数与 payload 引用；修复可读超时诊断。
 2. 修正上述取消测试的等待/清理，确保正常取消仍在真实请求开始后进行，不依赖本轮临时插件才能结束。
-3. 用 pi 1.4.0 显式运行 `tests/test_pi_probe.py`、`tests/test_component_repair_agent.py` 的 Agent 集成检查，再跑全套测试；保留版本差异 warning，不恢复硬锁。
+3. 用 pi 1.4.0 显式运行 `tests/test_pi_probe.py`、`tests/test_agent_repair_agent.py` 的 Agent 集成检查，再跑全套测试；保留版本差异 warning，不恢复硬锁。
 4. 检查 CLI/GUI：就绪、实际工具/计数、超时错误和取消日志可见。源码与测试定义应覆盖多文件授权、plan.json 拒写、零选择、跨轮历史/图片、素材旧标签保护与进程回收。
 5. 在显式提供真实服务地址与模型 ID 后运行两项真模型验收；Windows 三项保持独立实机验收，不能用 Mac/HTTP 替身替代。
-6. 更新 `docs/pi-probe.md`、`docs/component-repair.md`、Developer GUI 实施状态和新的测试证据；只有实际验证后才调整“已验证 pi 版本”记录。
+6. 更新 `docs/pi-probe.md`、`docs/agent-repair.md`、Developer GUI 实施状态和新的测试证据；只有实际验证后才调整“已验证 pi 版本”记录。
 
 ## 修复前结论的边界
 

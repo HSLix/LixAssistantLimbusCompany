@@ -10,6 +10,7 @@ import threading
 from .actions import application_actions
 from .assets import AssetLibrary, asset_name
 from .focused import FocusedAutomationSession, WindowsWindowPlatform
+from .agent_diagnostics import error_details
 
 
 REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
@@ -40,8 +41,12 @@ class RepairTools:
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset}
             result = methods[name](**arguments)
         except Exception as error:
-            result = {"content": [{"type": "text", "text": str(error)}],
-                      "details": {"error": str(error)}, "isError": True}
+            details = error_details(error, "tool:" + name,
+                                    {"log_path": str(self.log.path), "round": self.log.group}, self.log.keys)
+            result = {"content": [{"type": "text", "text": details["message"]}],
+                      "details": {"error": details["message"], **details}, "isError": True}
+            import logging
+            logging.getLogger(__name__).error("Agent 工具错误：%s", details)
         self.log.record({"type": "repair_tool", "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         self.log.save_json(filename, result)

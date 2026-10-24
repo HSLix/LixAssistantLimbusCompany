@@ -26,7 +26,7 @@ def test_saved_settings_and_per_call_overrides(tmp_path, monkeypatch, capsys):
     saved = (tmp_path / "agent-settings.json").read_bytes()
     assert settings.effective_settings(arguments(model="temporary", max_requests=2), tmp_path) == {
         "base_url": "http://example.test/custom/api", "model": "temporary", "max_requests": 2,
-        "secret_name": "service-token"}
+        "secret_name": "service-token", "provider": "llama.cpp", "output_limit": "server_default"}
     assert (tmp_path / "agent-settings.json").read_bytes() == saved
     assert cli.main(["agent-config"]) == 0
     assert "chosen" in capsys.readouterr().out
@@ -55,6 +55,12 @@ def test_corrupt_settings_are_not_ignored(tmp_path):
         settings.load_settings(tmp_path)
 
 
+def test_output_limit_only_supports_server_default_and_legacy_settings(tmp_path):
+    assert settings.load_settings(tmp_path)["output_limit"] == "server_default"
+    with pytest.raises(ValueError, match="服务端默认值"):
+        settings.validate_settings({"output_limit": 4096})
+
+
 def test_invalid_saved_limit_can_be_explicitly_reset(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
     (tmp_path / "agent-settings.json").write_text('{"max_requests":1,"model":"chosen"}')
@@ -78,9 +84,11 @@ def test_full_api_path_and_explicit_loaded_model(monkeypatch, tmp_path):
     assert observed == ["http://host:80/full/api"]
     models[0]["status"]["value"] = "unloaded"
     models[0].pop("architecture")
-    with pytest.raises(ValueError, match="not loaded"):
+    with configured_pi(args, tmp_path, "memory-secret", "prompt", require_image=False):
+        pass  # 不触发模型请求；仅验证 unloaded 不再被启动配置拦截。
+    with pytest.raises(ValueError, match="image input support"):
         with configured_pi(args, tmp_path, "memory-secret", "prompt"):
-            pytest.fail("unloaded model accepted")
+            pytest.fail("missing image capability accepted")
     args.model = None
     with pytest.raises(ValueError, match="model is required"):
         with configured_pi(args, tmp_path, "memory-secret", "prompt"):
@@ -131,7 +139,7 @@ def test_pi_version_mismatch_warns_and_continues(monkeypatch, tmp_path, caplog, 
     """版本差异不阻止启动；日志、终端及 GUI 共用事件包含实际版本。"""
     import logging
     import lalc.pi_probe as probe
-    from lalc.component_repair import RepairLog
+    from lalc.agent_repair import RepairLog
     monkeypatch.setattr(probe.shutil, "which", lambda _: "/pi")
     monkeypatch.setattr(probe.subprocess, "run", lambda *args, **kwargs: argparse.Namespace(stdout=version))
     monkeypatch.setattr(probe, "_models", lambda *args: [{"id": "test", "architecture": {"input_modalities": ["image"]}}])

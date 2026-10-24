@@ -26,17 +26,9 @@ def candidate_files(candidate: Path) -> dict[str, bytes]:
     return result
 
 
-def selected_files(candidate: Path, names) -> tuple[str, ...]:
-    """冻结本轮授权；校验结果不参与权限判断，plan.json 始终只读。"""
-    files = candidate_files(candidate)
-    result = []
-    for name in names:
-        path = candidate / name
-        if (name not in files or path.resolve() == (candidate / "plan.json").resolve()
-                or "plan.json" in path.parts or name in result):
-            raise ValueError(f"不可编辑的 Candidate 文件：{name}")
-        result.append(name)
-    return tuple(result)
+def editable_files(candidate: Path) -> tuple[str, ...]:
+    """冻结本轮全部已有文件；不按校验或 Manifest 引用过滤，plan.json 只读。"""
+    return tuple(name for name in candidate_files(candidate) if "plan.json" not in Path(name).parts)
 
 
 def file_diff(original: dict[str, bytes], current: dict[str, bytes]) -> str:
@@ -89,7 +81,7 @@ class DeveloperHost:
                 source = manifest_id if manifest_id is not None else self.manager.default_manifest_id()
                 metadata = {"manifest_id": source, "files": {
                     name: base64.b64encode(value).decode() for name, value in candidate_files(prepared).items()}}
-                from .component_repair import RepairConversation
+                from .agent_repair import RepairConversation
                 conversation = RepairConversation(self)
                 existed = self.candidate.exists()
                 if existed:
@@ -129,7 +121,7 @@ class DeveloperHost:
 
     def new_conversation(self):
         with self.service.activity("新对话"):
-            from .component_repair import RepairConversation
+            from .agent_repair import RepairConversation
             candidate_files(self.candidate)
             if not self.metadata.exists():
                 raise ValueError("请先明确初始化 Candidate，保存固定基线。")

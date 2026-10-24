@@ -143,3 +143,26 @@ def test_complete_developer_cli_lifecycle(
     assert cli.main(["init", "--from", manifest_id]) == 0
     assert not (candidate / "actions.name_ready.py").exists()
     assert not (candidate / "asset-library.json").exists()
+
+
+def test_repair_cli_has_no_file_selection_and_dispatches_to_shared_host(tmp_path, monkeypatch):
+    import lalc.agent_repair as repair
+    received = []
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path / "data")
+    def run(args, manager, candidate):
+        received.append((args, candidate))
+        return 0
+    monkeypatch.setattr(repair, "run_repair", run)
+    assert cli.main(["repair", "--chat", "--problem", "按需修改多个文件"]) == 0
+    args, candidate = received[0]
+    assert args.chat and candidate == tmp_path / "candidate"
+    assert not hasattr(args, "files") and not hasattr(args, "all_files")
+    for obsolete in ("steps.total.py", "--all"):
+        try:
+            cli._parser().parse_args(["repair", obsolete, "--problem", "test"])
+        except SystemExit as error:
+            assert error.code == 1
+        else:
+            raise AssertionError("旧文件选择参数应被拒绝")
+    assert len(received) == 1

@@ -1,21 +1,21 @@
 # Stage 3 — Agent-assisted Component Repair
 
-Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) and [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) (GUI revision pending implementation); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage have automated evidence plus a developer-reported Windows native DPAPI pass. The developer approved closing #327 and deferred its new real-model startup and Windows authentication checks until the developer GUI is complete; those checks remain unverified. Windows screenshot/crop and game acceptance also remain pending.
+Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) and [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) (shared GUI/CLI implementation and automated checks complete; Windows/game acceptance pending); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage have automated evidence plus a developer-reported Windows native DPAPI pass. The developer approved closing #327 and deferred its new real-model startup and Windows authentication checks until the developer GUI is complete; those checks remain unverified. Windows screenshot/crop and game acceptance also remain pending.
 
 Tracking: [GitHub Issue #312](https://github.com/HSLix/LixAssistantLimbusCompany/issues/312). Confirmed implementation spec: [GitHub Issue #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323).
 
-已确认并发布的六个垂直步骤及其阻塞关系见 [Stage 3 Implementation Slices](stage-3-implementation-slices.md)。发布状态本身不表示实现或验收完成；#325 的实现与 Mac 真模型检查见 [单 Component 修复](component-repair.md)，Windows 与真实游戏验收仍属后续切片。
+已确认并发布的六个垂直步骤及其阻塞关系见 [Stage 3 Implementation Slices](stage-3-implementation-slices.md)。发布状态本身不表示实现或验收完成；#325 的实现与 Mac 真模型检查见 [单 Component 修复](agent-repair.md)，Windows 与真实游戏验收仍属后续切片。
 本阶段以验证 Agent 自主修复已有 Component 的可行性为核心。原有独立 CLI 已提供单目标修复；2026-10-23 接受 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 与 [Developer GUI 设计](developer-gui-design.md)，新增 #330，四页及共享修复升级均须在 2026-10-29 前完成并阻塞 #329。
 
-## Accepted Developer GUI revision — implementation pending
+## Accepted Developer GUI revision — implementation and acceptance
 
 - Candidate 明确初始化/重建，修复和 New Conversation 不清空；Runner 的选择与 Candidate 基线、Default 独立。
-- GUI/CLI 共用多文件授权，允许选中已有文件（含候选 manifest.json、Recovery Rule），plan.json 明确只读；不提供新建/删除文件。
+- GUI/CLI 可修改全部已有 Candidate 文件（含候选 manifest.json、Recovery Rule 和未引用临时文件），无需选择文件；plan.json 明确只读，不提供新建/删除文件。手动 Validate 立即保存对话上下文且只显示一次。2026-10-24 自动化结果见 [Developer GUI 实施记录](developer-gui-design.md)。
 - 连续对话允许纯文字和可选图片；每条用户消息触发一轮，请求上限按轮计，默认 20、最小 2，自动模型检查计入额度。每个对话一个日志目录，逐轮留存交换与产物。
 - Diff 以固定基础 Manifest 的候选物化表示和哈希源码为准，跨 New Conversation 累计。人工查看 Diff/校验、主动 Publish 和独立设置 Default，不增加运行时审批状态。
 - Capture、Runner、Agent Settings、Agent Repair 均在本期范围；互斥、人工裁剪确认、密钥边界及验收以新设计为准。Runtime Agent Recovery/Working Manifest 仍属 Stage 3.5，发布分发推迟到 Stage 4 之后。
 
-以下记录 #325–#327 的现有 CLI 基线及其历史验收范围，不将它们的单目标、自动 Default 重建、必填图片或单次调用日志规则当作新 GUI/共享修复契约。新范围的四页和共享宿主已实现，当前用法见 [修复指南](component-repair.md)，验收状态见 [GUI 设计](developer-gui-design.md#implementation-status--2026-10-23)；已完成的旧验收不等于新能力验收完成。
+以下记录 #325–#327 的现有 CLI 基线及其历史验收范围，不将它们的单目标、自动 Default 重建、必填图片或单次调用日志规则当作新 GUI/共享修复契约。新范围的四页和共享宿主已实现，当前用法见 [修复指南](agent-repair.md)，验收状态见 [GUI 设计](developer-gui-design.md)；已完成的旧验收不等于新能力验收完成。
 
 2026-10-23 补充确认：前置接入验证 #324 仅在 CLI 展示图片、模型请求、受限读取与最终回答，不持久化交互日志或 pi 会话，也不重建或编辑 Developer Candidate。下文的完整修复日志要求从 #325 起实现；验证入口见 [pi 最小接入验证](pi-probe.md)。
 
@@ -63,7 +63,7 @@ Agent 通过三个专用只读工具查看共享 Asset Library，不获得任意
 - LALC 显式管理模型服务地址（包括协议、IP/主机名、端口和 API 基础路径）、模型标识及所需的 API key，不以用户预先维护 pi 的模型与认证配置为前提。首个接入目标是另一台设备上的 llama.cpp 服务。
 - 2026-10-23 #327 确认：现有 LALC 用户数据目录只保存一套当前连接设置，不引入项目配置或多套档案。本次 CLI 参数优先于保存值，不回写；合并后没有显式模型标识就禁止启动 Agent，不再自动寻找 Gemma4。地址必须填写完整 API 基础路径，原样使用，不自动追加 `/v1`。
 - 使用指定模型前检查图片输入支持，不能只因配置标注支持图片就视为已验证；具体能力查询及实际请求验证在最小接入实验中确定。一次修复不自动切换模型或供应商，失败时保留候选与诊断日志。
-- 启动修复前先检查模型加载状态；服务报告未加载、加载中或其他非 loaded 状态时立即报错，不主动加载。没有状态字段的单模型服务由实际图片请求确认可用性。再通过固定版本 pi 发送本次初始截图执行一次无工具图片请求；失败不重建候选，通过才进入单 Component 修复。图片检查请求计入同一次 `lalc repair` 的上限，不按 Automation Plan 周期计数；检查本身不是行为修复验收。
+- 2026-10-24 修订：Settings 按 provider 展示当前连接，当前仅适配 llama.cpp，旧配置缺省为该 provider。测试连接与检查加载状态只查询当前表单，不触发加载/推理、不保存配置，并独立留存脱敏诊断。正常 Agent 请求不再要求预先 loaded，允许请求触发 router 的按需加载；客户端不调用加载管理接口或修改 router 参数。每轮通过 pi 发送一次无工具文字或可选图片请求确认实际可用性；失败保留 Candidate，通过后进入本轮修复。预检计入本轮请求上限，不是行为修复验收。详见 [错误呈现与设置诊断](agent-repair-error-reporting.md)。
 - Windows 持久化密钥使用 DPAPI。密钥存储与模型连接配置分离，以命名引用关联；不限定只能保存模型 API key，未来其他密钥复用同一存储边界，但本阶段不预建其他业务集成。
 - Windows 默认读取当前设置引用的命名密钥；引用缺失或解密失败直接停止。CLI 临时输入优先，仅覆盖本次；不配置密钥可连接无认证服务，认证失败由预检报告。Mac 只允许临时输入；遇到命名引用时要求使用临时输入，不静默忽略。
 - 密钥不进入 Agent 可读材料、模型上下文、调用日志或候选输出，不以明文写入 pi 的持久化认证/模型配置。运行时供模型客户端认证使用的传递方式须在接入实验中验证。macOS 首版开发环境临时输入密钥，仅在进程内存中使用，不持久化；每次启动重新提供。Windows 正式交付仍要求 DPAPI 持久化。

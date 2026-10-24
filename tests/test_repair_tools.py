@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from lalc.actions import application_actions
-from lalc.component_repair import RepairLog
+from lalc.agent_repair import RepairLog
 from lalc.repair_tools import RepairTools
 from test_assets import entry
 from test_focused_observation import FakeWindowPlatform

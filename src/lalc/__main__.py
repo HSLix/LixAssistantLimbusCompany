@@ -37,9 +37,7 @@ def _parser() -> argparse.ArgumentParser:
     probe.add_argument("--max-requests", type=int, default=20)
     probe.add_argument("--pi", default="pi", help="Path to the fixed-version pi executable")
     probe.add_argument("--ask-api-key", action="store_true", help="Read an optional key without echo")
-    repair = commands.add_parser("repair", help="Analyze or repair selected existing Candidate files")
-    repair.add_argument("files", nargs="*", help="Existing Candidate file paths; omit for analysis")
-    repair.add_argument("--all", dest="all_files", action="store_true", help="Select all existing files except plan.json")
+    repair = commands.add_parser("repair", help="Analyze or repair existing Candidate files")
     repair.add_argument("--chat", action="store_true", help="Continue the conversation with further messages")
     repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
     repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
@@ -222,7 +220,7 @@ def _dispatch(args: argparse.Namespace) -> int:
     manifest_path = candidate / "manifest.json"
 
     if args.command == "repair":
-        from .component_repair import run_repair
+        from .agent_repair import run_repair
 
         return run_repair(args, manager, candidate)
 

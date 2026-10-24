@@ -20,11 +20,19 @@ export default async function (pi) {
   const repairTargets: string[] = JSON.parse(process.env.LALC_PI_REPAIR_FILES || "[]");
   const history = process.env.LALC_PI_HISTORY ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")) : [];
   pi.on("context", async event => ({ messages: [...history, ...event.messages] }));
+  pi.on("before_agent_start", async event => {
+    // 格式纠正只重发最终回答，禁止重新调用工具或重复修改候选。
+    if (repairMode && event.messageType === "user" && event.prompt.startsWith("LALC_FINAL_FORMAT_CORRECTION\n")) {
+      pi.setActiveTools([]);
+    }
+  });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
                        "action_contracts", "game_screenshot", "crop_asset"];
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
+  const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
+  const roundLimit = Number(process.env.LALC_PI_ROUND_REQUEST_LIMIT || limit);
   const api = openAICompletionsApi();
   // 新版 pi 重定向 console 和 stdout.write；协议事件显式写入原始 stdout 描述符。
   const emit = (type, fields) => writeSync(1, JSON.stringify({ type, ...fields }) + "\n");
@@ -39,16 +47,30 @@ export default async function (pi) {
       input: ["text", "image"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 65536,
-      maxTokens: 4096,
+      // pi 必须有数值型模型元数据；实际请求在下方移除客户端输出预算。
+      maxTokens: 0,
     }],
     streamSimple(model, context, options) {
       return api.streamSimple(model, context, {
         ...options,
         maxRetries: 0,
         async onPayload(payload, model) {
+          payload = options?.onPayload ? (await options.onPayload(payload, model)) ?? payload : payload;
+          // pi 会按模型元数据补预算；最终发送前移除，明确使用服务端默认值。
+          delete payload.max_tokens;
+          delete payload.max_completion_tokens;
+          delete payload.max_output_tokens;
           // 扩展事件中的异常会被 pi 捕获；上限必须在客户端回调里拒绝发送。
           if (requests >= limit) throw new Error("LALC request limit reached");
           requests++;
+          if (conversationRound) {
+            // 在最终载荷注入当前额度，避免 SDK 丢弃上下文字段；不改长期历史。
+            const budget = `当前对话第 ${conversationRound} 轮；本轮模型请求第 ${requests}/${roundLimit} 次（包含本次，还可请求 ${Math.max(0, roundLimit - requests)} 次）。`
+              + "每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。";
+            const system = payload.messages.find(message => message.role === "system" || message.role === "developer");
+            if (system) system.content += "\n\n" + budget;
+            else payload.messages.unshift({ role: "system", content: budget });
+          }
           const shown = JSON.parse(JSON.stringify(payload, (_key, value) =>
             typeof value === "string" && value.startsWith("data:image/")
               ? `[image data URL: ${value.length} characters]` : value));
@@ -58,11 +80,11 @@ export default async function (pi) {
             const key = process.env.LALC_PI_API_KEY!;
             await writeFile(payloadPath, JSON.stringify(payload, (_name, value) =>
               typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
-            emit("lalc_request", { requests, payload_path: payloadPath });
+            emit("lalc_request", { requests, request_limit: roundLimit, payload_path: payloadPath });
           } else {
-            emit("lalc_request", { requests, payload: shown });
+            emit("lalc_request", { requests, request_limit: roundLimit, payload: shown });
           }
-          return options?.onPayload ? await options.onPayload(payload, model) : payload;
+          return payload;
         },
       });
     },
@@ -85,7 +107,7 @@ export default async function (pi) {
     const checkedEdit = async (path: string) => {
       const target = await checkedPath(root, path);
       if (relative(root, target).split(/[\\/]/).includes("plan.json") || !repairTargets.includes(target))
-        throw new Error("Only selected existing Candidate files may be edited; plan.json is read-only");
+        throw new Error("Only existing Candidate files may be edited; plan.json is read-only");
       return target;
     };
     const edit = createEditTool(root, {
@@ -143,7 +165,7 @@ export default async function (pi) {
     }
   }
   pi.on("session_start", () => {
-    pi.setActiveTools(preflight ? [] : repairMode ? repairTools.filter(name => name !== "edit" || repairTargets.length > 0) : ["read"]);
+    pi.setActiveTools(preflight ? [] : repairMode ? repairTools : ["read"]);
     emit("lalc_ready", { tools: pi.getActiveTools(), root, repairTargets,
                          availableTools: pi.getAllTools().map(tool => tool.name) });
   });

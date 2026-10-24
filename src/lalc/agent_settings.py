@@ -14,9 +14,9 @@ from urllib.parse import urlsplit
 from .runtime import atomic_write_json
 
 
-FIELDS = ("base_url", "model", "max_requests", "secret_name")
-DEFAULTS = {"base_url": "http://localhost:12138/v1", "model": None,
-            "max_requests": 20, "secret_name": None}
+FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit")
+DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "model": None,
+            "max_requests": 20, "secret_name": None, "output_limit": "server_default"}
 
 
 def validate_settings(value: dict) -> dict:
@@ -24,6 +24,10 @@ def validate_settings(value: dict) -> dict:
     if not isinstance(value, dict) or value.keys() - set(FIELDS):
         raise ValueError("Invalid Agent settings fields")
     result = {**DEFAULTS, **value}
+    if result["provider"] != "llama.cpp":
+        raise ValueError("当前仅支持 llama.cpp provider")
+    if result["output_limit"] != "server_default":
+        raise ValueError("单次输出上限当前仅支持使用服务端默认值")
     address = result["base_url"]
     if not isinstance(address, str):
         raise ValueError("base-url must be a complete HTTP(S) API base URL")
@@ -148,7 +152,7 @@ def settings_command(args, data_root: Path) -> int:
             value = effective_settings(args, data_root)
             if args.clear_secret:
                 value["secret_name"] = None
-            if args.clear_secret or any(getattr(args, field) is not None for field in FIELDS):
+            if args.clear_secret or any(getattr(args, field, None) is not None for field in FIELDS):
                 atomic_write_json(data_root / "agent-settings.json", value)
             print(json.dumps(value, ensure_ascii=False, indent=2))
         return 0

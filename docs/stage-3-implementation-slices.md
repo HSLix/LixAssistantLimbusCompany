@@ -28,7 +28,7 @@
 - [x] 默认 20 次请求并支持本次设置；超限、模型错误和取消停止并保留产物，信息不足时最终回答说明缺少什么并结束。
 - [x] 完整日志和原始/最终产物在数据目录留存，后续重建候选不会抹掉前次记录；错误、取消与校验失败也有明确结束原因。
 
-2026-10-23 实现证据：入口为 `lalc repair`，用法与可重复检查见 [单 Component 修复](component-repair.md)。真实 pi + HTTP 替身验证受限编辑、实际 Validator 反馈、最终 JSON 分组、取消、错误、上限和日志保留；Mac Gemma4 用 4 次请求、1 组交互将固定纯计算缺陷修为 `sum(values)`，通过四组独立输入输出断言。此结果不代表 Windows 或游戏行为验收完成，未替代步骤 5/6。
+2026-10-23 实现证据：入口为 `lalc repair`，用法与可重复检查见 [单 Component 修复](agent-repair.md)。真实 pi + HTTP 替身验证受限编辑、实际 Validator 反馈、最终 JSON 分组、取消、错误、上限和日志保留；Mac Gemma4 用 4 次请求、1 组交互将固定纯计算缺陷修为 `sum(values)`，通过四组独立输入输出断言。此结果不代表 Windows 或游戏行为验收完成，未替代步骤 5/6。
 
 ## 3 — [Agent 使用完整的 Asset、Trusted Action 与游戏观察工具集](https://github.com/HSLix/LixAssistantLimbusCompany/issues/326)
 
@@ -49,7 +49,7 @@
 - [x] 不增加点击、按键、候选执行或运行中 Working Manifest 接入；不支持的平台如实报告工具不可用。
 - Windows 真模型截图、裁剪及重复裁剪的旧标签保护移至步骤 6（#329），结合步骤 5（#328）的真实样例综合验收，不再作为 #326 关闭前置。
 
-2026-10-23：六个工具已接入公开修复 CLI，权限、图片回传及现场工具通过自动化契约检查；Mac Gemma4 以 6 次请求实际读取多图、动作契约并收到越界拒绝，基线与素材不变。每次截图/裁剪均可恢复并置前唯一窗口，多图任一项失败则整次失败。开发者确认按已通过的实现与测试关闭 #326；Windows 实机综合验证结合 #328 的真实样例在 #329 中完成，不计为本步骤已通过的实测；复现入口见 [工具验收](component-repair.md#326-工具验收)。
+2026-10-23：六个工具已接入公开修复 CLI，权限、图片回传及现场工具通过自动化契约检查；Mac Gemma4 以 6 次请求实际读取多图、动作契约并收到越界拒绝，基线与素材不变。每次截图/裁剪均可恢复并置前唯一窗口，多图任一项失败则整次失败。开发者确认按已通过的实现与测试关闭 #326；Windows 实机综合验证结合 #328 的真实样例在 #329 中完成，不计为本步骤已通过的实测；复现入口见 [工具验收](agent-repair.md#326-工具验收)。
 
 ## 4 — [持久模型设置与 Windows DPAPI 命名密钥用于修复](https://github.com/HSLix/LixAssistantLimbusCompany/issues/327)
 
@@ -64,7 +64,7 @@
 - [x] Windows 原生 DPAPI 存取和损坏密文检查：开发者回报 `test_windows_native_dpapi_roundtrip_and_corruption` 为 `1 passed in 2.43s`。
 - [ ] Windows 实际模型认证及新启动流程的真模型检查：开发者确认延期至开发者 GUI 完成后验收，不作为 #327 关闭前置，未计为通过。
 
-2026-10-23 #327 确认并实现：现有用户数据目录一套当前设置，CLI 单次覆盖优先；没有显式模型禁止启动。完整 API 基础路径不追加 `/v1`。加载状态检查及一次无工具图片请求先于候选重建；该请求计入同一次 repair 上限，最低上限为 2。入口为 `agent-config`、`secret-set` 和既有 `repair`，用法及 Windows 验收见 [配置与认证验收](component-repair.md#327-配置与认证验收)。本次非 Agent 回归 229 passed、35 skipped；相关配置与真实 pi/HTTP 替身测试合计 62 passed、5 skipped（当时未运行的 Windows 与真模型检查不计为通过），报告在 `.generated/issue-327-tests.xml`。随后开发者补充 Windows 原生 DPAPI `1 passed in 2.43s`，确认按已完成实现与检查关闭 #327；新启动流程的真模型及 Windows 实际认证留待开发者 GUI 完成后验收，不以替身结果代替。
+2026-10-23 #327 确认并实现：现有用户数据目录一套当前设置，CLI 单次覆盖优先；没有显式模型禁止启动。完整 API 基础路径不追加 `/v1`。加载状态检查及一次无工具图片请求先于候选重建；该请求计入同一次 repair 上限，最低上限为 2。入口为 `agent-config`、`secret-set` 和既有 `repair`，用法及 Windows 验收见 [配置与认证验收](agent-repair.md#327-配置与认证验收)。本次非 Agent 回归 229 passed、35 skipped；相关配置与真实 pi/HTTP 替身测试合计 62 passed、5 skipped（当时未运行的 Windows 与真模型检查不计为通过），报告在 `.generated/issue-327-tests.xml`。随后开发者补充 Windows 原生 DPAPI `1 passed in 2.43s`，确认按已完成实现与检查关闭 #327；新启动流程的真模型及 Windows 实际认证留待开发者 GUI 完成后验收，不以替身结果代替。
 
 ## 5 — [开发者准备真实单 Component 缺陷与复现材料](https://github.com/HSLix/LixAssistantLimbusCompany/issues/328)
 

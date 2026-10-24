@@ -18,6 +18,8 @@ import tempfile
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
+from .agent_diagnostics import AgentDiagnosticError, redact, error_details
+
 
 PI_VERSION = "1.4.0"
 
@@ -27,22 +29,40 @@ def _models(base_url: str, key: str) -> list[dict]:
     request = Request(base_url + "/models", headers={} if key == "lalc-no-key" else {"Authorization": f"Bearer {key}"})
     try:
         with urlopen(request, timeout=10) as response:
-            return json.load(response)["data"]
+            value = json.load(response)
+            models = value.get("data") if isinstance(value, dict) else None
+            if not isinstance(models, list) or any(not isinstance(m, dict) or not isinstance(m.get("id"), str) for m in models):
+                raise ValueError("响应必须包含 data 模型列表，每项必须有字符串 id")
+            return models
     except HTTPError as error:
         reason = "authentication failed" if error.code in {401, 403} else "service check failed"
-        raise ValueError(f"Model {reason} (HTTP {error.code})") from None
-    except URLError:
-        raise ValueError("Model service is unreachable") from None
+        with error:
+            body = error.read(65536).decode("utf-8", errors="replace")
+        raise AgentDiagnosticError(f"Model {reason} (HTTP {error.code})，请查看错误详情。", "service_check",
+                                   url=request.full_url, http_status=error.code,
+                                   response_body=redact(body, [key]),
+                                   hint="检查 API Key 和服务权限。" if error.code in {401, 403} else
+                                   "检查模型服务或代理日志；HTTP 状态码不能单独确定故障来源。") from error
+    except (URLError, TimeoutError, ConnectionError) as error:
+        raise AgentDiagnosticError("模型服务无法连接或连接超时，请查看错误详情。", "service_check",
+                                   url=request.full_url, cause=redact(str(error) or type(error).__name__, [key]),
+                                   hint="检查服务是否启动、客户端网络/Tailscale、地址和代理设置。") from error
+    except (ValueError, UnicodeError) as error:
+        raise AgentDiagnosticError("模型列表响应格式不正确，请检查 Base URL 和服务响应。", "service_check",
+                                   url=request.full_url, cause=redact(str(error), [key])) from error
 
 
 @asynccontextmanager
 async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
     """共享 pi RPC 传输；调用者负责事件含义，取消时回收子进程。"""
-    process = await asyncio.create_subprocess_exec(
-        *command, env=env, cwd=cwd,
-        stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-        limit=16 * 1024 * 1024,
-    )
+    try:
+        process = await asyncio.create_subprocess_exec(
+            *command, env=env, cwd=cwd,
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            limit=16 * 1024 * 1024,
+        )
+    except OSError as error:
+        raise AgentDiagnosticError("pi 进程启动失败，请查看错误详情。", "pi_start") from error
     async def send(value) -> None:
         process.stdin.write((json.dumps(value) + "\n").encode())
         await process.stdin.drain()
@@ -58,25 +78,34 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
         return json.loads(line)
 
     errors = asyncio.create_task(stderr())
+    cancelling = False
     try:
         yield send, event
     except asyncio.CancelledError:
+        cancelling = True
         if process.returncode is None:
-            await send({"type": "abort"})
+            try:
+                await send({"type": "abort"})
+            except Exception as error:
+                raise AgentDiagnosticError("取消 pi 请求失败，请查看清理详情。", "cancel_cleanup") from error
         raise
     finally:
-        if process.returncode is None:
-            process.stdin.close()
-            try:
-                await asyncio.wait_for(process.wait(), timeout=3)
-            except asyncio.TimeoutError:
-                process.terminate()
+        try:
+            if process.returncode is None:
+                process.stdin.close()
                 try:
                     await asyncio.wait_for(process.wait(), timeout=3)
                 except asyncio.TimeoutError:
-                    process.kill()
-                    await process.wait()
-        await errors
+                    process.terminate()
+                    try:
+                        await asyncio.wait_for(process.wait(), timeout=3)
+                    except asyncio.TimeoutError:
+                        process.kill()
+                        await process.wait()
+            await errors
+        except Exception as error:
+            raise AgentDiagnosticError("pi 进程清理失败，请查看错误详情。",
+                                       "cancel_cleanup" if cancelling else "pi_cleanup") from error
 
 
 async def rpc_event(event, waiting_for: str) -> dict:
@@ -103,7 +132,7 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
                 return item.replace(key, "[REDACTED]")
             return item
 
-        shown = clean(value)
+        shown = redact(clean(value), [key])
         print(shown if isinstance(shown, str) else json.dumps(shown, ensure_ascii=False), flush=True)
 
     async with rpc_session(command, env, cwd, show) as (send, event):
@@ -169,20 +198,20 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
     """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
     executable = shutil.which(args.pi)
     if executable is None:
-        raise ValueError(f"pi executable not found: {args.pi}")
+        raise AgentDiagnosticError(f"pi executable not found: {args.pi}", "pi_start")
     base = args.base_url.rstrip("/")
     if not args.model:
-        raise ValueError("Agent model is required; supply --model")
+        raise AgentDiagnosticError("Agent model is required; supply --model 或在 Agent Settings 中填写模型。", "settings")
     models = _models(base, key)
     matching = [m for m in models if m["id"] == args.model]
     if len(matching) != 1:
-        raise ValueError("Select exactly one model with --model")
+        raise AgentDiagnosticError("Select exactly one model with --model：模型不存在或 ID 不唯一。", "model_status")
     model = matching[0]
     status = model.get("status", {}).get("value")
     if status is not None and status != "loaded":
-        raise ValueError(f"Selected model is not loaded (status={status}); load it on the server first")
+        logging.getLogger(__name__).info("模型状态 %s，继续请求，由服务端决定加载策略。", status)
     if require_image and "image" not in model.get("architecture", {}).get("input_modalities", []):
-        raise ValueError("Selected service model does not declare image input support")
+        raise AgentDiagnosticError("Selected service model does not declare image input support", "model_preflight")
     with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
         agent_dir = Path(temporary) / "agent"
         agent_dir.mkdir()
@@ -252,5 +281,7 @@ def run_probe(args) -> int:
     except KeyboardInterrupt:
         return 130
     except Exception as error:
-        print(f"pi probe failed: {error}".replace(key, "[REDACTED]"), flush=True)
+        details = error_details(error, "pi_probe", keys=[key])
+        logging.getLogger(__name__).error("pi probe failed: %s", details)
+        print(json.dumps({"error": details["message"], "diagnostics": details}, ensure_ascii=False), flush=True)
         return 1

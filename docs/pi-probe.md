@@ -1,6 +1,6 @@
 # pi 最小接入验证（#324）
 
-此命令只验证 Python → 独立 pi 二进制 → 图片模型 → 受限源码读取 → 最终回答，不创建 Workflow Run，不重建 Developer Candidate，不编辑源码、不执行游戏点击。仅终端展示过程，不保存 Agent Interaction Log 或 pi 会话；#325 的正式修复入口与日志见 [单 Component 修复](component-repair.md)。
+此命令只验证 Python → 独立 pi 二进制 → 图片模型 → 受限源码读取 → 最终回答，不创建 Workflow Run，不重建 Developer Candidate，不编辑源码、不执行游戏点击。仅终端展示过程，不保存 Agent Interaction Log 或 pi 会话；#325 的正式修复入口与日志见 [单 Component 修复](agent-repair.md)。
 
 ## 运行
 
@@ -16,7 +16,7 @@ uv run --frozen lalc pi-probe \
   --model YOUR_MODEL_ID
 ```
 
-默认连接 `http://localhost:12138/v1`；必须使用 `--model` 显式指定模型，不再自动寻找 Gemma4。`--base-url` 要求完整 API 基础路径，不自动追加 `/v1`。要求服务声明支持图片，明确报告非 loaded 状态，不自动加载或换模型；实际图片输入由真实请求验证。`pi-probe` 继续使用临时参数，不读取修复的持久设置；请求上限必须至少为 2。
+默认连接 `http://localhost:12138/v1`；必须使用 `--model` 显式指定模型，不再自动寻找 Gemma4。`--base-url` 要求完整 API 基础路径，不自动追加 `/v1`。要求服务声明支持图片；非 loaded 状态不阻止正常请求，由服务端的按需加载策略处理，客户端不调用加载/卸载接口或切换模型。实际图片输入由真实请求验证。`pi-probe` 继续使用临时参数，不读取修复的持久设置；请求上限必须至少为 2。失败输出脱敏诊断，包括实际 URL、HTTP 状态/正文与原始异常链。
 
 `--source-root` 是允许读取的完整目录，`--source` 指定首次必须读取的样例；模型仍可只读该目录内的其他文件。路径解析后必须留在此目录内，包括符号链接；这不是操作系统安全沙箱。不要把含凭据的目录作为读取范围。
 
@@ -25,6 +25,8 @@ uv run --frozen lalc pi-probe \
 需要认证时加 `--ask-api-key`，在终端临时输入；密钥仅供本次服务认证，不放在命令参数、提示词、持久配置或输出中。本机无认证服务可直接省略。
 
 ## 请求与结束
+
+- 单次输出采用服务端默认值，不发送 `max_tokens`、`max_completion_tokens` 或 `max_output_tokens`；流式输出及独立的请求次数限制继续保留。
 
 - 临时空目录承载 pi 工作目录与配置；关闭个人扩展、技能、提示模板及 AGENTS/CLAUDE 上下文发现，只加载 LALC 指定扩展，只启用受限 `read`。终端、PowerShell、edit、write 均不开放。
 - 关闭会话重试、自动压缩、缓存预热及启动联网；现成 pi 模型客户端设置 `maxRetries: 0`，避免内部 HTTP 重试绕过计数。

@@ -16,7 +16,7 @@ uv run lalc run-plan <plan.json>
 
 常规使用按 publish → set-default → run / run-plan 进行，后续省略 `--manifest`。每次发布并希望使用新代码版本时，再设置 Default；临时运行其他版本才用 `--manifest <id>`。
 
-Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 仅在明确使用 `init --replace` 或 GUI 确认后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。GUI 四页和多文件连续修复见 [修复指南](component-repair.md)。
+Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 仅在明确使用 `init --replace` 或 GUI 确认后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。GUI 四页和多文件连续修复见 [修复指南](agent-repair.md)。
 
 源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 

@@ -69,7 +69,10 @@ def probe(tmp_path):
                 if state["status"] != 200:
                     self.wfile.write(json.dumps({"error": {"message": state.get("error_message", "test provider unavailable")}}).encode())
                     return
-                if state.get("repair_check") and not body.get("tools"):
+                content = body["messages"][-1].get("content", "")
+                text = content if isinstance(content, str) else "".join(p.get("text", "") for p in content)
+                if (state.get("repair_check") and not body.get("tools")
+                        and text.startswith(("连接检查：", "简短描述随附图片"))):
                     delta, finish = {"role": "assistant", "content": "Image received."}, "stop"
                 elif "respond" in state:
                     delta, finish = state["respond"](body)
@@ -126,6 +129,8 @@ def test_image_and_restricted_read_with_real_pi(probe, full_screenshot):
                             env={**os.environ, "PI_CODING_AGENT_DIR": str(private)})
     assert result.returncode == 0, result.stdout + result.stderr
     assert len(state["calls"]) == 2
+    assert all(not ({"max_tokens", "max_completion_tokens", "max_output_tokens"} & body.keys())
+               for body in state["calls"])
     first, second = state["calls"]
     assert [tool["function"]["name"] for tool in first["tools"]] == ["read"]
     assert any(part["type"] == "image_url" for message in first["messages"]

@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 )
 
 from .application import ApplicationService, StartError, default_data_root
-from .runtime import _exception_fields
 from .errors import result_diagnostics
 from .lifecycle import ApplicationLifecycle, run_application
 
@@ -281,11 +280,30 @@ class MainWindow(QMainWindow):
         try:
             operation()
         except Exception as error:
-            self.service.logger.exception("Interaction failed")
-            details = _exception_fields(error)["traceback"]
+            from .agent_diagnostics import error_details, details_text
+            from .agent_repair import RepairLog
+            settings_page = getattr(self, "settings_page", None)
+            keys = {self.host.secret, settings_page.key.text() if settings_page else None} - {None, ""}
+            conversation = self.host.conversation
+            if conversation:
+                keys.update(conversation.log.keys)
+            page = self.tabs.currentWidget()
+            panel = getattr(page, "diagnostics", None)
+            log = conversation.log if page is getattr(self, "repair_page", None) and conversation else None
+            if panel and log is None:
+                log = RepairLog(self.service.data_root, category="agent-diagnostics")
+                log.keys.update(keys)
+            context = {"log_path": str(log.path)} if log else {}
+            value = error_details(error, "interaction", context, keys)
             if isinstance(error, StartError):
-                details += "".join(item.get("traceback", "") for item in error.errors[1:])
-            ErrorDialog(str(error), details, parent=self).open()
+                from .agent_diagnostics import redact
+                value["related_errors"] = redact(error.errors, keys)
+            self.service.logger.error("Interaction failed: %s", value)
+            if log:
+                log.record({"type": "gui_error", **value})
+            if panel:
+                panel.add_error(value)
+            ErrorDialog(value["message"], details_text(value), parent=self).open()
 
     def _start(self) -> None:
         self._interact(self._start_run)
