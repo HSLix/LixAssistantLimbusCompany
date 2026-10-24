@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import base64
 import difflib
 import json
@@ -97,6 +98,67 @@ class DeveloperHost:
                     raise
             self.conversation = conversation
 
+    def add_source(self, section, filename, logical_name, source, checkpoint):
+        """专用新增：先检查源码，再提交文件与登记；提交前失败回退，不导入候选。"""
+        files = candidate_files(self.candidate)
+        path = Path(filename)
+        if (not isinstance(filename, str) or not filename or "\\" in filename or ":" in filename
+                or path.is_absolute() or path.as_posix() != filename or ".." in path.parts
+                or "plan.json" in path.parts or path.suffix != ".py" or filename in files):
+            raise ValueError("新增文件必须是未占用的 Candidate 内相对 .py 路径。")
+        if section not in {"components", "recovery_rules"}:
+            raise ValueError("未知 Manifest 分区。")
+        if not isinstance(logical_name, str) or not self.manager._valid_logical_name(logical_name):
+            raise ValueError("逻辑名必须由点分隔的 Python 标识符组成。")
+        manifest_path = self.candidate / "manifest.json"
+        manifest = json.loads(manifest_path.read_bytes())
+        if (not isinstance(manifest, dict) or manifest.get("schema_version") != 2
+                or any(not isinstance(manifest.get(key), dict) for key in ("components", "recovery_rules"))):
+            raise ValueError("Candidate Manifest 必须包含 components 和 recovery_rules 对象。")
+        if any(logical_name in manifest[key] for key in ("components", "recovery_rules")):
+            raise ValueError("逻辑名已存在，不能覆盖。")
+        if not isinstance(source, str) or not source.strip():
+            raise ValueError("必须提供完整 Python 源码。")
+        tree = ast.parse(source, filename=filename)
+        errors = []
+        if section == "components":
+            self.manager._validate_component_source(tree, logical_name, errors)
+        else:
+            self.manager._validate_recovery_source(tree, logical_name, errors)
+        self.manager._validate_source_structure(tree, [(section, logical_name)], errors)
+        if errors:
+            raise ValueError(json.dumps([error.as_dict() for error in errors], ensure_ascii=False))
+        target = self.candidate / path
+        if not target.resolve().is_relative_to(self.candidate.resolve()):
+            raise ValueError("新增文件不能越出 Candidate。")
+        manifest[section][logical_name] = {"source_path": filename}
+        directories = []
+        parent = target.parent
+        while not parent.exists():
+            directories.append(parent)
+            parent = parent.parent
+        created = False
+        # Manifest 临时文件放在 Candidate 外，失败不会污染快照；replace 是提交点。
+        with tempfile.TemporaryDirectory(dir=self.candidate.parent, prefix=".lalc-add-") as directory:
+            prepared = Path(directory) / "manifest.json"
+            prepared.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+            try:
+                checkpoint()
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("x", encoding="utf-8", newline="") as stream:
+                    created = True
+                    stream.write(source)
+                checkpoint()
+                prepared.replace(manifest_path)
+            except BaseException:
+                if created:
+                    target.unlink()
+                for folder in directories:
+                    if folder.exists():
+                        folder.rmdir()
+                raise
+        return {"filename": filename, "logical_name": logical_name, "section": section}
+
     def baseline(self) -> dict[str, bytes]:
         metadata = json.loads(self.metadata.read_text(encoding="utf-8"))
         return {name: base64.b64decode(content) for name, content in metadata["files"].items()}
@@ -151,6 +213,15 @@ class DeveloperHost:
             session.capture()
             self.preview = (session.image, session.size, session.observation)
             return self.preview
+
+    def resize_window(self, width=1280, height=720):
+        """人工尺寸调整与 Run/Agent 互斥；不重截或替换已固定的预览。"""
+        with self.service.activity("Capture 调整窗口尺寸"):
+            platform = self.service._window_platform()
+            windows = platform.find_windows()
+            if len(windows) != 1:
+                raise WindowError(f"Expected one Limbus Company window, found {len(windows)}.")
+            return platform.resize_client(windows[0], width, height)
 
     def save_crop(self, name, region, tags, *, preview=None):
         with self.service.activity("Capture 保存"):

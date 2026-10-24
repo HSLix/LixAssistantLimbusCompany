@@ -14,13 +14,15 @@ from .agent_diagnostics import error_details
 
 
 REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                "action_contracts", "game_screenshot", "crop_asset"]
+                "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule"]
 
 
 class RepairTools:
     """通过宿主实现固定工具集；图片与返回值独立留存在本次交互目录。"""
 
-    def __init__(self, data_root, log, *, platform=None):
+    def __init__(self, data_root, log, *, platform=None, host=None):
+        self.host = host
+        self.created_files = set()
         self.library = AssetLibrary(data_root)
         self.log = log
         self.platform = platform
@@ -38,7 +40,8 @@ class RepairTools:
         try:
             methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
-                       "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset}
+                       "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
+                       "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule}
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -51,6 +54,21 @@ class RepairTools:
         filename = f"tool-{self.sequence}.json"
         self.log.save_json(filename, result)
         return str(self.log.path / filename)
+
+    def add_component(self, filename, logical_name, source):
+        """创建普通 Component 并登记；角色由实际源码决定。"""
+        return self.add_source("components", filename, logical_name, source)
+
+    def add_recovery_rule(self, filename, logical_name, source):
+        """创建 Recovery Rule 并登记，不赋予通用写入权限。"""
+        return self.add_source("recovery_rules", filename, logical_name, source)
+
+    def add_source(self, section, filename, logical_name, source):
+        if self.host is None:
+            raise ValueError("新增源码需要已初始化的 Developer Candidate。")
+        result = self.host.add_source(section, filename, logical_name, source, self.checkpoint)
+        self.created_files.add(filename)
+        return self.text(result)
 
     @staticmethod
     def text(value):

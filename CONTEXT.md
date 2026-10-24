@@ -65,11 +65,11 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing files, including its Manifest draft, with plan.json read-only, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its files and register new Component or Recovery Rule source through dedicated additions, with plan.json read-only, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A manually initiated repair of a Developer Candidate using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads candidate files, edits only the developer-authorized selection and checks the complete draft with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
+A manually initiated repair of a Developer Candidate using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads and edits Candidate files, adds explicitly registered Component and Recovery Rule source, and checks the complete draft with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Capability Bundle**:

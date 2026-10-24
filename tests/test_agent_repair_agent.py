@@ -155,9 +155,9 @@ def test_real_model_repairs_fixed_pure_case(tmp_path):
     import runpy
     chat, options = live_conversation(tmp_path)
     before = {p: p.read_bytes() for p in chat.host.service.data_root.rglob("*") if p.is_file()}
-    image = (Path(__file__).resolve().parents[1] / "test_pi_img.png").read_bytes()
+    image = Path(__file__).resolve().parents[1] / "test_pi_img.png"
     result = asyncio.run(chat.run("修复 steps.total.py：输入 values 的所有数值都应计入总和，包含负数；请实际 read、edit、validate。",
-                                 options, image=image))
+                                 options, images=[image]))
     print(f"Real model repair evidence: {chat.log.path}")
     assert result["status"] == "completed", result
     assert chat.host.validate()["ok"]
@@ -363,3 +363,116 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
         assert f"当前对话第 2 轮；本轮模型请求第 {index}/2 次" in system
         assert "当前对话第 1 轮" not in system
     assert "当前对话第" not in json.dumps(chat.history, ensure_ascii=False)
+
+
+def test_add_both_source_kinds_then_edit_new_files_in_same_round(conversation):
+    from test_add_source import COMPONENT, RULE
+    chat, options, state = conversation
+    script(state, [
+        tool("add_component", {"filename": "new/step.py", "logical_name": "steps.new", "source": COMPONENT}),
+        tool("add_recovery_rule", {"filename": "new/rule.py", "logical_name": "rules.new", "source": RULE}),
+        tool("edit", {"path": "new/step.py", "oldText": 'return "new"', "newText": 'return "edited"'}),
+        tool("edit", {"path": "new/rule.py", "oldText": "return False", "newText": "return True"}),
+        tool("validate", {}), answer("created and edited")])
+    result = asyncio.run(chat.run("add both kinds", options))
+    assert result["status"] == "completed", result
+    assert 'return "edited"' in (chat.host.candidate / "new/step.py").read_text()
+    assert "return True" in (chat.host.candidate / "new/rule.py").read_text()
+    assert chat.host.validate()["ok"]
+    assert (chat.log.path / "round-1/final/new/step.py").exists()
+    assert "new/step.py" in (chat.log.path / "round-1/cumulative.diff").read_text()
+    assert any(message.get("toolName") == "add_component" for message in chat.history)
+
+
+def test_multiple_image_formats_are_forwarded_without_conversion_and_retained(conversation, tmp_path):
+    from test_image_attachments import make_images
+    import base64
+    chat, options, state = conversation
+    paths = make_images(tmp_path)
+    expected = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif"]
+    result = asyncio.run(chat.run("inspect all images", options, images=paths))
+    assert result["status"] == "completed", result
+    assert result["requests"] == 2
+    for payload in state["calls"]:
+        urls = [part["image_url"]["url"] for message in payload["messages"] if isinstance(message.get("content"), list)
+                for part in message["content"] if part["type"] == "image_url"]
+        assert len(urls) == len(paths)
+        for url, mime, path in zip(urls, expected, paths):
+            prefix, data = url.split(",", 1)
+            assert prefix == f"data:{mime};base64"
+            assert base64.b64decode(data) == path.read_bytes()
+    files = json.loads((chat.log.path / "round-1/input.json").read_text())["attachments"]
+    assert len(files) == len(paths)
+    originals = {path: path.read_bytes() for path in (chat.log.path / "round-1").glob("input-*.*")}
+    result = asyncio.run(chat.run("remember images from previous message", options))
+    assert result["status"] == "completed", result
+    urls = [part["image_url"]["url"] for message in state["calls"][-1]["messages"] if isinstance(message.get("content"), list)
+            for part in message["content"] if part["type"] == "image_url"]
+    assert len(urls) == len(paths)
+    assert all(path.read_bytes() == value for path, value in originals.items())
+
+
+def test_image_batch_service_rejection_keeps_details_and_no_automatic_retry(conversation, tmp_path):
+    from test_image_attachments import make_images
+    chat, options, state = conversation
+    paths = make_images(tmp_path, ("PNG", "JPEG"))
+    state["status"], state["error_message"] = 413, "too many image bytes"
+    result = asyncio.run(chat.run("send images", options, images=paths))
+    assert result["status"] == "incomplete" and result["requests"] == 1
+    assert "too many image bytes" in result["error"]
+    assert len(state["calls"]) == 1
+    assert len(json.loads((chat.log.path / "round-1/input.json").read_text())["attachments"]) == 2
+
+
+def test_images_stay_original_during_format_correction(conversation, tmp_path):
+    from test_image_attachments import make_images
+    import base64
+    chat, options, state = conversation
+    paths = make_images(tmp_path, ("JPEG", "BMP"))
+    script(state, [({"role": "assistant", "content": "not json"}, "stop"), answer()])
+    result = asyncio.run(chat.run("inspect then answer as JSON", options, images=paths))
+    assert result["status"] == "completed" and result["requests"] == 3, result
+    for payload in state["calls"]:
+        urls = [part["image_url"]["url"] for message in payload["messages"] if isinstance(message.get("content"), list)
+                for part in message["content"] if part["type"] == "image_url"]
+        assert len(urls) == 2
+        assert [base64.b64decode(url.split(",", 1)[1]) for url in urls] == [path.read_bytes() for path in paths]
+
+
+def test_cancel_waits_for_new_source_rollback_before_final_snapshot(conversation, monkeypatch):
+    import threading
+    from lalc.developer import candidate_files
+    from test_add_source import COMPONENT
+    chat, options, state = conversation
+    before = candidate_files(chat.host.candidate)
+    original = chat.host.add_source
+    entered = threading.Event()
+    def slow_add(section, filename, logical_name, source, checkpoint):
+        def pause_after_write():
+            if (chat.host.candidate / filename).exists():
+                entered.set()
+                if not chat.tools.cancelled.wait(10):
+                    raise TimeoutError("test cancellation did not arrive")
+            checkpoint()
+        return original(section, filename, logical_name, source, pause_after_write)
+    monkeypatch.setattr(chat.host, "add_source", slow_add)
+    state["respond"] = lambda _: tool("add_component", {"filename": "new/cancel.py", "logical_name": "steps.new", "source": COMPONENT})
+    async def exercise():
+        task = asyncio.create_task(chat.run("cancel new source transaction", options))
+        try:
+            async with asyncio.timeout(15):
+                while not entered.is_set():
+                    if task.done():
+                        pytest.fail(str(task.result()))
+                    await asyncio.sleep(.01)
+            task.cancel()
+            return await task
+        finally:
+            chat.tools.cancelled.set()
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+    result = asyncio.run(exercise())
+    assert result["status"] == "cancelled", result
+    assert candidate_files(chat.host.candidate) == before
+    assert not (chat.host.candidate / "new").exists()
+    assert not (chat.log.path / "round-1/final/new/cancel.py").exists()

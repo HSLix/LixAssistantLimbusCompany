@@ -5,7 +5,7 @@
 ## Confirmed decisions
 
 - Candidate 由开发者明确初始化或重建，选择已有 Manifest 作为基线；非空时需确认替换。修复使用当前已初始化的 Candidate，没有时提示先初始化。不按 Candidate 或单个文件是否通过校验区分修复权限；历史校验结果可从对话上下文查阅，校验失败不阻止继续编辑。发送消息、开始修复或 New Conversation 均不隐式清空 Candidate。该决定取代此前每次独立修复从 Default 自动重建 Candidate 的设计，需要 GUI 与 CLI 共用的修复入口同步调整；现由 GUI/CLI 共享宿主实现。
-- 2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），`plan.json` 始终只读；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
+- 2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），`plan.json` 始终只读；新增仅允许下述 add_component / add_recovery_rule 专用路径，不开放通用新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component；新增源码只由专用工具创建并登记。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
 - Agent Repair 采用连续对话：同一对话保留此前消息、图片和工具结果，每次用户发送消息启动一轮处理，Agent 最终回答后结束本轮并等待下一次主动发送。允许纯文字发送，图片作为可选附件；共享入口和模型预检不得继续强制要求用户提供 PNG。信息不足时说明缺少什么并结束本轮，不阻塞等待补充；后续用户可主动发送新消息继续。New Conversation 清空聊天上下文但保留 Candidate。
 - 人工审批直接通过三个操作完成：查看实际 Diff／校验结果；开发者主动 Publish，由既有服务重新校验并生成新的不可变 Manifest，不自动运行；另行显式设置 Default，不随发布执行。GUI 不增加 `Awaiting Approval → Applied` 状态或独立运行时审批流程。未发布的 Candidate 本身不阻止 New Conversation；正在处理时禁止开启新对话。
 - 模型请求上限按每次用户发送消息触发的一轮处理独立计算，下一轮重新计数并保留聊天上下文。GUI 提供持久设置，默认 20、最小 2，复用现有设置校验；自动模型检查消耗的实际请求计入本轮额度。超限结束本轮并保留候选与日志，等待用户主动发送下一条消息，不自动续跑。
@@ -100,3 +100,77 @@
 模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求的 system prompt 含最新计数、总额度和停止说明，包含预检及最终格式纠正；计数不追加进长期历史。
 
 首次实际载荷测试发现 SDK 未保留上下文字段中的动态提示，已按失败即停流程改为最终载荷注入，单项重测通过后继续。相关普通检查 **89 passed**；全量普通回归 **304 passed, 30 skipped**（29 项 Agent 默认跳过、1 项 Windows DPAPI）；显式 Agent 回归 **25 passed, 4 skipped**，使用真实 pi + 本机 HTTP 替身，跳过 2 项真模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图。命令：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra`；`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`。`git diff --check` 通过，未重新调用真实模型或执行 Windows 实机验收，#330 保持打开。
+
+
+## 2026-10-24 增量需求：窗口尺寸、新增源码工具、多图片与恢复示例（实现与验收）
+
+需求与影响范围已评估。开发者确认两个新增工具均由 Agent 提供文件名、逻辑名和完整源码，不采用先生成骨架的方式。本节是已确认并实现的需求，自动化与 Windows/真模型/真实游戏验收状态分别见实施记录；优先于此前“禁止新建文件”“新增 Component 接口留待后续”及单张 PNG 附件的旧范围。删除、重命名、目录外写入、正式源码写入、自动执行及自动发布仍不开放。
+
+### Capture：重置窗口宽高
+
+- 增加宽、高两个独立数值输入及“重置窗口宽高”按钮，默认宽 1280、高 720，单位为客户区物理像素，不是包含边框的外框尺寸。
+- 复用唯一游戏窗口定位与 DPI 感知平台。按开发者已在 Windows 验证的方法读取外框与客户区尺寸，补偿边框后调用 SetWindowPos，保持窗口位置、层叠顺序和焦点（SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE，0x0016）。不通过会恢复并置前窗口的截图操作调整尺寸。
+- 无法唯一定位、窗口失效或最小化时明确报错；最小化时提示先恢复。操作受共享活动互斥约束，Runner（包括暂停）或 Agent 活动中不可调整。
+- 后台等待窗口尺寸更新并读取实际客户区宽高，显示目标与实际结果；未达到目标不显示成功，Win32 错误保留详情。跨 DPI、游戏拒绝尺寸、焦点及位置保持须 Windows 实机验收。
+- 已固定的截图与框选继续使用原图像素，不把新窗口尺寸套到旧截图；新的截图和坐标观察使用调整后的实际尺寸。
+
+### Capture：框选放大预览
+
+- 截图预览区框选时，增加小窗放大显示鼠标指针附近区域，便于裁剪小模板时精细定位；拖拽过程中持续跟随指针对应的原图位置更新。
+- 放大内容取自当前固定截图的原始像素，而不是屏幕二次截图或游戏实时画面；复用截图缩放与留白的坐标映射，以十字标记指针对应的原图像素，采用清晰的像素放大显示。
+- 小窗不遮挡指针附近的裁剪位置，不截获框选鼠标事件或抢焦点；不改变原有按下、拖拽、释放及重新框选语义，也不改变最终裁剪坐标或保存内容。
+- 没有截图或指针位于有效图像范围外时不显示放大内容；图像边缘不得越界取样或显示过时像素。重新截图、清空预览及离开截图区域时同步更新或隐藏。
+- 验收覆盖缩放/留白到原图像素的映射、拖动更新、边缘取样、隐藏与重置、放大窗不拦截拖拽，以及启用放大预览前后实际保存的裁剪像素一致。不同 DPI 下的清晰度与指针定位另做实机核验，平台替身不能替代。
+
+### Agent：新增并登记源码
+
+- 增加 `add_component(filename, logical_name, source)` 和 `add_recovery_rule(filename, logical_name, source)` 两个专用工具，三个参数均必填。Agent 提供完整 Python 源码；普通 Component 的角色由已有装饰器与接口契约确定，不按文件名或逻辑名前缀猜测。
+- 文件名是 Candidate 内的相对 `.py` 路径，逻辑名遵循现有 Manifest 规则。拒绝目录越界、符号链接、受保护路径、已有文件覆盖，以及在 components / recovery_rules 任一区域已存在的逻辑名。
+- `add_component` 创建源码并向候选 manifest.json 的 `components` 登记 `logical_name: {"source_path": filename}`；`add_recovery_rule` 向 `recovery_rules` 登记同样形式。Recovery Rule 沿用 detect(ctx) -> bool / recover(ctx) -> None 契约，不加角色装饰器。
+- 创建文件和登记 Manifest 为一次完整操作；失败或取消不得留下仅有文件或仅有登记的半成品，保留原文件与原 Manifest，并记录可检查的工具错误。Manifest 无法解析时明确失败，不猜测或重建其内容。
+- 按现有源码及 Manifest 契约检查新增内容；不因其他已有文件校验失败一概禁止开发。完整候选继续由独立 Validator 检查，新增成功不等于校验、游戏验收或发布成功。
+- 成功创建的文件立即加入本轮允许编辑的清单，可在同一轮 read/edit/validate，进入真实快照、累计 Diff、工具事件与上下文。宿主结束检查只认可工具实际成功创建的文件，不泛化放开其他新建文件。
+- 不自动登记开发者此前随手添加的未引用文件；不自动 Publish、设置 Default、执行候选或创建 Trusted Actions。新增操作仅作用于 Developer Candidate，不接入运行中的 Working Manifest。
+
+### Agent：任意数量图片附件
+
+- GUI 可选择和附加多张图片，能查看所选文件、清除附件；CLI repair 可重复提供 `--image`，与 GUI 共用附件处理。纯文字仍可发送。
+- 取消应用层单张限制和 PNG 专属限制；不新增固定数量上限。识别实际图片内容与 MIME，不仅看扩展名，不把原图强制转换成 PNG。非图片或损坏文件通过既有错误详情呈现。
+- 共享入口、模型预检、实际请求及连续上下文均处理整组图片，独立保存各附件及其类型/顺序，避免日志覆盖；原始图片不倾倒到 RPC stdout。
+- 预检使用本次整组附件，按既有规则消耗一次实际模型请求，计入本轮共享额度，不按图片张数重复计数。服务端拒绝格式、数量或载荷时走既有正常错误流程，保留实际失败证据，不自动删图、分批或降质重发。
+- 必须用真实 pi + HTTP 替身核对实际发出的图片数量、MIME 及跨轮保留，不能仅凭文件选择框放开就声称完成。pi/服务对格式或载荷的限制仍可能报错。
+- 本需求针对用户附件；Asset Library、现场截图与裁剪工具当前的 PNG 存储契约不随之改动，独立 pi-probe 不因此扩展为多附件产品入口。
+
+### example：Recovery Rule 示例
+
+- 新增 `example/recovery-rule/`，包含独立 manifest.json、触发恢复路径的 Step、Recovery Rule 源码及 README，展示 Step 失败后 detect、recover、重试当前 Step 的完整路径与 Trace 定位。
+- 展示 detect 仅观察、recover 使用既有控制动作、两者均不调用其他正式 Component 的契约；沿用执行器最多重试当前 Step 一次、多个规则匹配时报错的既有语义。
+- README 给出素材/窗口准备、导入 Candidate、校验/发布和显式运行步骤。复用现有应用动作，不为演示新增业务专属 Trusted Action 或运行时 Agent Recovery。
+- 自动化可以使用平台替身验证控制流及失败分支，必须区分这些证据与 Windows/真实游戏验收。
+
+### 影响与验收顺序
+
+1. 先同步 ADR 0029、领域边界、GUI 需求、使用指南与 #330，明确新建文件的专用工具例外；实现状态单列。
+2. 共享宿主与窗口平台增加尺寸操作，再接 Capture 控件与框选放大预览；覆盖默认值、互斥、Win32 失败、实际尺寸不符及原图像素映射/裁剪一致性。
+3. 共享新增工具、pi 工具定义与提示词同步，覆盖跨分区重名、已有文件、路径边界、失败回滚、同轮继续编辑及结束快照授权。
+4. GUI/CLI、预检、MIME、实际请求、日志和历史同步迁移为多附件；验证多格式、纯文字、服务拒绝及请求额度不按图片数增长。
+5. 新增 Recovery Rule 示例及完整恢复路径回归；再执行普通回归和显式选择的 Agent 接入测试。失败即停，修复并重测后继续。Windows、真实模型和真实游戏结果分别记录，不用替身通过替代。
+
+
+## 2026-10-24 当前增量实施与验证
+
+- Capture 增加宽/高输入（默认 1280×720 客户区物理像素）及“重置窗口宽高”。Win32 按实测边框补偿调整，保持位置/层叠顺序/焦点，核对实际尺寸；最小化、窗口失效、Win32 调用失败及目标尺寸不符报错，受共享活动互斥约束，不覆盖旧截图。
+- 框选提供 5× 原图像素放大窗及中心十字，跟随鼠标更新，在边缘补底色，离开或换图隐藏；鼠标事件穿透，不改变框选和保存像素。Capture 已做 offscreen 渲染检查，示意产物位于本次本机 `/tmp/lalc-capture-increment.png`，不计 Windows 实机证据。
+- add_component / add_recovery_rule 接收 filename、logical_name、source；复用源码结构检查，不导入新源码。新建文件与 Manifest 登记以替换 Manifest 为提交点，失败/提交前取消会清理文件和新增目录。拒绝覆盖、跨分区重名、越界与符号链接；仅工具成功创建的文件可同轮继续编辑，进入快照和累计 Diff。取消时等待工具线程完成或回退再保存最终快照。
+- GUI 可累计多选图片，按钮显示数量和文件路径，清除整组；CLI 重复 --image。新增 Pillow 到 automation 依赖及 uv.lock，按实际内容识别 MIME 并校验图片，不自建格式白名单、转码或设置附件数量上限；纯文字不导入可选图片解码依赖。预检整组只计一次请求。原图通过 context hook 注入，跳过 pi RPC 的转码/静默丢图；日志独立保存附件名称/类型/顺序/原字节，格式纠正及后续消息沿用原图。服务拒绝走既有错误路径，不自动删图或重发。
+- 新增 example/recovery-rule/（独立 Manifest、Step、规则和 README），复用生产 observe/control 动作及确定性恢复；覆盖无弹窗、唯一目标恢复、点击无效、目标不唯一与多规则匹配。不新增运行时 Agent 或专属 Trusted Action。
+
+验证：
+
+- 普通全量回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra`，**335 passed, 35 skipped**。跳过 34 项 Agent 测试及 1 项 Windows 原生 DPAPI。
+- 显式 Agent 回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`，**30 passed, 4 skipped**。通过项使用真实 pi + 本机 HTTP 替身；2 项真实模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图因环境条件跳过。
+- 实际请求逐项验证 PNG/JPEG/WebP/GIF/BMP/TIFF/AVIF 的 MIME、数量及字节原样到达，预检、正常消息、格式纠正和跨轮历史均检查；服务 413 保留正文且仅发送一次。新增文件工具的同轮编辑、完整校验、快照及线程取消回退通过。
+- 第一处失败为 pi 转码/丢弃附件，已停止并改为 context hook 原图注入，单项重测通过后继续；随后恢复示例测试误用输入事件元组末项统计点击，已更正并重测。未跳过失败项继续宣称成功。
+- `git diff --check`、`uv lock --check --offline` 通过。新增 Pillow 后应同步依赖（例如 `uv sync --frozen --extra gui --extra automation`）。本机原有构建依赖已保留。
+
+Windows 实机尺寸、DPI、焦点、放大定位及真实游戏恢复仍待独立验收，未重新调用真实模型。本记录不将替身/offscreen 当作实机通过，#330 保持打开，#329 继续承担真实游戏与最终交付验收。

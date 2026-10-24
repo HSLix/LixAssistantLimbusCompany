@@ -67,11 +67,17 @@ class CropView(QWidget):
         self.image = QImage()
         self.region = None
         self.anchor = None
+        self.setMouseTracking(True)
+        self.magnifier = QLabel(self)
+        self.magnifier.setFixedSize(165, 187)
+        self.magnifier.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.magnifier.hide()
         self.setMinimumSize(320, 180)
         self.setAutoFillBackground(True)
         self.setCursor(Qt.CursorShape.CrossCursor)
 
     def set_image(self, pixels, size):
+        self.magnifier.hide()
         self.image = QImage(pixels, size[0], size[1], size[0] * 4, QImage.Format.Format_ARGB32).copy()
         self.region = None
         self.anchor = None
@@ -91,7 +97,40 @@ class CropView(QWidget):
         y = max(0, min(self.image.height(), int((point.y() - rect.y()) * self.image.height() / rect.height())))
         return x, y
 
+    def update_magnifier(self, point):
+        """原图像素邻域按最近邻放大；边缘补底色，指针像素始终对准十字。"""
+        if self.image.isNull() or not self.image_rect().contains(point.toPoint()):
+            self.magnifier.hide()
+            return
+        x, y = self.pixel(point)
+        x, y = min(x, self.image.width() - 1), min(y, self.image.height() - 1)
+        area = QRect(x - 16, y - 16, 33, 33).intersected(self.image.rect())
+        canvas = QPixmap(165, 187)
+        canvas.fill(Qt.GlobalColor.black)
+        painter = QPainter(canvas)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
+        painter.drawImage(QRect((area.x() - x + 16) * 5, (area.y() - y + 16) * 5,
+                                area.width() * 5, area.height() * 5), self.image, area)
+        painter.setPen(QPen(Qt.GlobalColor.yellow, 1))
+        painter.drawRect(80, 80, 5, 5)
+        painter.drawLine(82, 0, 82, 77)
+        painter.drawLine(0, 82, 77, 82)
+        painter.drawLine(87, 82, 164, 82)
+        painter.drawLine(82, 87, 82, 164)
+        painter.drawText(QRect(0, 165, 165, 22), Qt.AlignmentFlag.AlignCenter, f"({x}, {y}) · 5×")
+        painter.end()
+        self.magnifier.setPixmap(canvas)
+        self.magnifier.move(0 if point.x() > self.width() / 2 else self.width() - 165,
+                            0 if point.y() > self.height() / 2 else max(0, self.height() - 187))
+        self.magnifier.show()
+        self.magnifier.raise_()
+
+    def leaveEvent(self, event):
+        self.magnifier.hide()
+        super().leaveEvent(event)
+
     def mousePressEvent(self, event):
+        self.update_magnifier(event.position())
         if event.button() == Qt.MouseButton.LeftButton and self.image_rect().contains(event.position().toPoint()):
             self.region = None
             self.anchor = self.pixel(event.position())
@@ -99,6 +138,7 @@ class CropView(QWidget):
             self.update()
 
     def mouseMoveEvent(self, event):
+        self.update_magnifier(event.position())
         if self.anchor is None or self.image.isNull():
             return
         x, y = self.pixel(event.position())
@@ -177,6 +217,19 @@ class CapturePage(QWidget):
         button("刷新坐标监测", self.refresh, controls)
         button("打开 Asset 目录", self.open_assets, controls)
         layout.addLayout(controls)
+        sizing = QHBoxLayout()
+        self.window_width, self.window_height = QSpinBox(), QSpinBox()
+        for label, control, value in (("客户区宽（px）", self.window_width, 1280),
+                                      ("高（px）", self.window_height, 720)):
+            control.setRange(1, 32768)
+            control.setValue(value)
+            sizing.addWidget(QLabel(label))
+            sizing.addWidget(control)
+        self.resize_button = button("重置窗口宽高", self.resize_window, sizing)
+        layout.addLayout(sizing)
+        self.resize_result = QLabel("保持窗口位置、层叠顺序和焦点；调整后请重新截图观察。")
+        self.resize_result.setWordWrap(True)
+        layout.addWidget(self.resize_result)
         self.coordinates = QLabel("请刷新窗口以监测坐标。")
         layout.addWidget(self.coordinates)
         self.instructions = QLabel("① 点击截图　② 在图上按住鼠标左键拖动框选（再次拖动会替换旧框）　③ 填写名称与标签，预览并保存")
@@ -201,6 +254,14 @@ class CapturePage(QWidget):
         self.timer = QTimer(self)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self.poll)
+
+    def resize_window(self):
+        width, height = self.window_width.value(), self.window_height.value()
+        def done(result):
+            before, after = result["before"], result["after"]
+            self.resize_result.setText(f"目标：{width} × {height}；调整前：{before['width']} × {before['height']}；"
+                                       f"实际：{after['width']} × {after['height']} px")
+        self.window.launch(lambda: self.host.resize_window(width, height), done)
 
     def capture(self):
         def shown(preview):
@@ -263,7 +324,7 @@ class CapturePage(QWidget):
         self.window._interact(preview)
 
     def render(self, busy):
-        for control in (self.capture_button, self.save_button):
+        for control in (self.capture_button, self.save_button, self.resize_button, self.window_width, self.window_height):
             control.setEnabled(not busy)
             control.setToolTip("Runner、Agent 或其他操作尚未结束" if busy else "")
 
@@ -451,7 +512,7 @@ class RepairPage(QWidget):
     def __init__(self, window):
         super().__init__()
         self.window, self.host = window, window.host
-        self.image = None
+        self.images = []
         self.controls = []
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
@@ -480,7 +541,7 @@ class RepairPage(QWidget):
         self.message.setMaximumHeight(85)
         layout.addWidget(self.message)
         row = QHBoxLayout()
-        self.attach = button("附加 PNG", self.attach_image, row)
+        self.attach = button("附加图片", self.attach_image, row)
         self.controls.append(self.attach)
         self.controls.append(button("清除附件", self.clear_image, row))
         self.controls.append(button("发送", self.send, row))
@@ -561,14 +622,16 @@ class RepairPage(QWidget):
         self.window._interact(action)
 
     def attach_image(self):
-        name, _ = QFileDialog.getOpenFileName(self, "选择 PNG", "", "PNG (*.png)")
-        if name:
-            self.image = Path(name)
-            self.attach.setText(self.image.name)
+        names, _ = QFileDialog.getOpenFileNames(self, "选择图片（可多选）", "", "所有文件 (*)")
+        if names:
+            self.images.extend(Path(name) for name in names)
+            self.attach.setText(f"已附加 {len(self.images)} 张图片")
+            self.attach.setToolTip("\n".join(str(path) for path in self.images))
 
     def clear_image(self):
-        self.image = None
-        self.attach.setText("附加 PNG")
+        self.images = []
+        self.attach.setText("附加图片")
+        self.attach.setToolTip("")
 
     def send(self):
         def action():
@@ -579,7 +642,7 @@ class RepairPage(QWidget):
                 self.host.new_conversation()
             conversation = self.host.conversation
             self.diagnostics.set_path(conversation.log.path)
-            image = self.image.read_bytes() if self.image else None
+            images = list(self.images)
             args = SimpleNamespace(pi="pi", ask_api_key=False)
             limit = load_settings(self.host.service.data_root)["max_requests"]
             self.request_progress.setText(f"对话轮次：{conversation.log.group + 1}；本轮模型请求：0/{limit}")
@@ -588,7 +651,7 @@ class RepairPage(QWidget):
             self.message.clear()
             self.clear_image()
             def operation():
-                return conversation.run(message, args, image=image, key=self.host.secret,
+                return conversation.run(message, args, images=images, key=self.host.secret,
                                         on_event=self.window.operation_event.emit)
             self.window.launch(operation, self.answered)
         self.window._interact(action)

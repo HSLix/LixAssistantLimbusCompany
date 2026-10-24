@@ -169,6 +169,11 @@ class WindowsWindowPlatform:
             getattr(u, name).argtypes = [wintypes.HWND]
             getattr(u, name).restype = wintypes.BOOL
         u.GetForegroundWindow.restype = wintypes.HWND
+        u.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
+        u.GetWindowRect.restype = wintypes.BOOL
+        u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                  ctypes.c_int, ctypes.c_int, wintypes.UINT]
+        u.SetWindowPos.restype = wintypes.BOOL
         u.GetClientRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
         u.GetClientRect.restype = wintypes.BOOL
         u.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
@@ -275,6 +280,33 @@ class WindowsWindowPlatform:
             "foreground": foreground_hwnd == hwnd, "foreground_hwnd": foreground_hwnd,
             "width": width, "height": height,
         }
+
+    def resize_client(self, hwnd: int, width: int, height: int) -> dict[str, Any]:
+        """只调整客户区物理尺寸，保留窗口位置、层叠顺序及焦点，并核对实际结果。"""
+        if any(type(value) is not int or not 0 < value <= 32768 for value in (width, height)):
+            raise ValueError("客户区宽高必须为 1–32768 的整数。")
+        before = self.window_info(hwnd)
+        if not before["valid"] or not before["visible"] or before["minimized"]:
+            raise WindowError("窗口无效或已最小化，请先恢复游戏窗口。")
+        rect = wintypes.RECT()
+        if not self.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        outer_width = width + rect.right - rect.left - before["width"]
+        outer_height = height + rect.bottom - rect.top - before["height"]
+        if not self.user32.SetWindowPos(hwnd, None, 0, 0, outer_width, outer_height, 0x0016):
+            raise ctypes.WinError(ctypes.get_last_error())
+        deadline = time.monotonic() + 1.0
+        while True:
+            if self.checkpoint:
+                self.checkpoint()
+            after = self.window_info(hwnd)
+            if (not after["valid"] or after["minimized"] or after["process_id"] != before["process_id"]):
+                raise WindowError("调整尺寸时游戏窗口已失效。")
+            if (after["width"], after["height"]) == (width, height):
+                return {"before": before, "after": after, "target": {"width": width, "height": height}}
+            if time.monotonic() >= deadline:
+                raise WindowError(f"窗口尺寸未达到目标 {width} × {height}；实际 {after['width']} × {after['height']} px。")
+            time.sleep(.05)
 
     def focus(self, hwnd: int) -> None:
         """只请求置前一次，等待异步激活；不以等待时长报错，允许用户取消。"""

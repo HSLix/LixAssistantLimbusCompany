@@ -1,0 +1,9 @@
+{
+  "schema_version": 2,
+  "components": {
+    "steps.check_popup": {"source_path": "steps.check_popup.py"}
+  },
+  "recovery_rules": {
+    "recovery.close_popup": {"source_path": "recovery.close_popup.py"}
+  }
+}

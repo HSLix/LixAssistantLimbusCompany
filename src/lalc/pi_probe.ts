@@ -19,7 +19,20 @@ export default async function (pi) {
   const repairMode = process.env.LALC_PI_REPAIR_FILES !== undefined;
   const repairTargets: string[] = JSON.parse(process.env.LALC_PI_REPAIR_FILES || "[]");
   const history = process.env.LALC_PI_HISTORY ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")) : [];
-  pi.on("context", async event => ({ messages: [...history, ...event.messages] }));
+  const inputImages = process.env.LALC_PI_INPUT_IMAGES
+    ? JSON.parse(await readFile(process.env.LALC_PI_INPUT_IMAGES, "utf8")) : [];
+  pi.on("context", async event => {
+    const messages = [...history, ...event.messages];
+    if (inputImages.length) {
+      // RPC 图片预处理会转码或丢弃部分格式；原图只经 context hook 注入。
+      const userIndex = event.messages.findIndex(message => message.role === "user");
+      if (userIndex < 0) throw new Error("Original image message not found");
+      const index = history.length + userIndex;
+      messages[index] = { ...messages[index], content: [
+        { type: "text", text: process.env.LALC_PI_INPUT_MESSAGE }, ...inputImages] };
+    }
+    return { messages };
+  });
   pi.on("before_agent_start", async event => {
     // 格式纠正只重发最终回答，禁止重新调用工具或重复修改候选。
     if (repairMode && event.messageType === "user" && event.prompt.startsWith("LALC_FINAL_FORMAT_CORRECTION\n")) {
@@ -28,7 +41,7 @@ export default async function (pi) {
   });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                       "action_contracts", "game_screenshot", "crop_asset"];
+                       "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule"];
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
   const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
@@ -136,7 +149,10 @@ export default async function (pi) {
       },
     });
     const logicalName = Type.String({ description: "Complete Asset logical name, e.g. ui/claim" });
+    const sourceParameters = Type.Object({ filename: Type.String(), logical_name: Type.String(), source: Type.String() });
     const tools = [
+      { name: "add_component", description: "Create a new Candidate Python Component from complete source and register its logical name in components. No overwrite. The created file may be edited in this round.", parameters: sourceParameters },
+      { name: "add_recovery_rule", description: "Create a new Candidate Recovery Rule from complete detect/recover source and register in recovery_rules. No overwrite. The created file may be edited in this round.", parameters: sourceParameters },
       { name: "asset_tree", description: "Read the global Asset logical-name text tree without loading images.",
         parameters: Type.Object({}) },
       { name: "asset_directory", description: "List all filenames and raw tag metadata for one complete Asset name; missing tags are reported without writing.",
@@ -159,7 +175,11 @@ export default async function (pi) {
           // 图片走独立返回文件，避免大载荷与 RPC 事件竞争 stdout/stdin。
           const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name: tool.name, arguments: params }));
           if (path === undefined) throw new Error("Repair tool cancelled");
-          return JSON.parse(await readFile(path, "utf8"));
+          const result = JSON.parse(await readFile(path, "utf8"));
+          if (!result.isError && (tool.name === "add_component" || tool.name === "add_recovery_rule")) {
+            repairTargets.push(await checkedPath(root, result.details.filename));
+          }
+          return result;
         },
       });
     }

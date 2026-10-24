@@ -19,7 +19,9 @@ from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 
 SYSTEM_PROMPT = """你是 LALC Developer Candidate 修复助手。根据用户问题分析，需要修改时实际 read、edit，并 validate 完整候选。
 只能读取 Candidate 内已有文件；可按需修改多个已有文件，包括 manifest.json、Recovery Rule 和未被 Manifest 引用的文件。
-plan.json 始终只读。不新建、删除或重命名文件，不访问目录外文件。
+plan.json 始终只读。不通用新建、删除或重命名文件，不访问目录外文件。
+新增源码仅用 add_component / add_recovery_rule，提供 filename、logical_name、source 完整源码，工具同时创建并登记 Manifest。
+新增成功后同轮可 read/edit/validate；不自动登记已有未引用文件，不把工具成功当作完整校验通过。
 校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
 asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
 game_screenshot 现场截图；crop_asset 每次从新截图裁剪新增素材，同名同哈希保留原图和原标签。非 Windows 现场工具不可用。
@@ -150,21 +152,44 @@ async def configure_session(send, event, log, expected_tools):
                 break
 
 
-async def check_model_image(command, env, temporary, image, log):
-    """用真实图片执行一次无工具请求；成功前不修改候选，计数沿用到修复。"""
+def image_attachments(paths, directory):
+    """按实际内容识别图片并原样留存整组附件；不按扩展名过滤或转码。"""
+    if not paths:
+        return [], []
+    from io import BytesIO
+    from PIL import Image
+    result, records = [], []
+    for index, path in enumerate(paths, 1):
+        path = Path(path)
+        content = path.read_bytes()
+        try:
+            with Image.open(BytesIO(content)) as image:
+                kind = image.format.lower()
+                mime = Image.MIME.get(image.format, "image/" + kind)
+                image.verify()
+        except (OSError, ValueError) as error:
+            raise ValueError(f"附件不是有效图片：{path.name}：{error}") from error
+        filename = f"input-{index}.{kind}"
+        (directory / filename).write_bytes(content)
+        result.append({"type": "image", "mimeType": mime, "data": base64.b64encode(content).decode()})
+        records.append({"filename": filename, "original_name": path.name, "mime_type": mime})
+    return result, records
+
+
+async def check_model_image(command, env, temporary, images, log):
+    """整组图片只预检一次；成功前不修改候选，计数沿用到修复。"""
     checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
                 "LALC_PI_MAX_REQUESTS": "1", "LALC_PI_PAYLOAD_DIR": str(log.path.resolve())}
     prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
-    if image is not None:
+    if images:
         prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
-                  "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]}
-    if image is None:
-        prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
+                  "images": images}
+    checking["LALC_PI_INPUT_MESSAGE"] = prompt["message"]
     last = {}
     async with rpc_session(command, checking, temporary, log.record) as (send, event):
         await configure_session(send, event, log, [])
         log.record({"type": "model_check_started", "prompt": prompt})
-        await send(prompt)
+        await send({key: value for key, value in prompt.items() if key != "images"})
         while True:
             item = await event()
             kind = item.get("type")
@@ -194,7 +219,7 @@ class RepairConversation:
         self.host = host
         self.log = RepairLog(host.service.data_root)
         self.history = []
-        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform)
+        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform, host=host)
 
     def add_validation(self, result):
         """手动校验立即落盘；来源标记避免 GUI 同时显示日志事件与完成回调。"""
@@ -203,7 +228,7 @@ class RepairConversation:
             "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
         self.log.save_json("context.json", self.history)
 
-    async def run(self, message, args, *, image=None, key=None, on_event=None):
+    async def run(self, message, args, *, images=(), key=None, on_event=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
         with self.host.service.activity("Agent"):
             names = editable_files(self.host.candidate)
@@ -223,6 +248,7 @@ class RepairConversation:
             result = {"status": "incomplete", "reason": "setup_error"}
             tools = self.tools
             tools.cancelled.clear()
+            tools.created_files.clear()
             prior_history = list(self.history)
             stage = "settings"
             context = {"conversation": self.log.path.name, "round": self.log.group,
@@ -241,28 +267,28 @@ class RepairConversation:
                 for field, value in settings.items():
                     setattr(options, field, value)
                 self.log.key = key if key is not None else resolve_key(options, settings, self.host.service.data_root)
-                if image is not None:
-                    from .recognition import decode_image
-                    if not image.startswith(b"\x89PNG\r\n\x1a\n"):
-                        raise ValueError("image must be a PNG")
-                    decode_image(image)
-                    (round_path / "input.png").write_bytes(image)
+                stage = "attachments"
+                attachments, attachment_records = image_attachments(images, round_path)
                 prompt = {"type": "prompt", "message": "本轮允许编辑的已有文件：" + json.dumps(names, ensure_ascii=False)
                           + "\n用户消息：" + message}
-                if image is not None:
-                    prompt["images"] = [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(image).decode()}]
+                if attachments:
+                    prompt["images"] = attachments
                 self.history.append(self.log.clean({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                     "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]}))
                 input_record = {"prompt": prompt, "settings": settings,
-                                    "editable_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
+                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": SYSTEM_PROMPT}
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
                 with configured_pi(options, self.host.candidate.resolve(), self.log.key, SYSTEM_PROMPT,
-                                   require_image=image is not None, on_warning=self.log.record) as (command, env, temporary, model):
+                                   require_image=bool(attachments), on_warning=self.log.record) as (command, env, temporary, model):
                     input_record["pi"] = env["LALC_PI_VERSION"]
                     context["pi_version"] = env["LALC_PI_VERSION"]
                     self.log.save_json(f"{prefix}/input.json", input_record)
+                    image_path = Path(temporary) / "input-images.json"
+                    image_path.write_text(json.dumps(attachments), encoding="utf-8")
+                    env["LALC_PI_INPUT_IMAGES"] = str(image_path)
+                    env["LALC_PI_INPUT_MESSAGE"] = prompt["message"]
                     env["LALC_PI_PAYLOAD_DIR"] = str(round_path.resolve())
                     env["LALC_PI_CONVERSATION_ROUND"] = str(self.log.group)
                     env["LALC_PI_ROUND_REQUEST_LIMIT"] = str(settings["max_requests"])
@@ -271,7 +297,7 @@ class RepairConversation:
                     self.log.path = round_path
                     try:
                         stage = "model_preflight"
-                        await check_model_image(command, env, temporary, image, self.log)
+                        await check_model_image(command, env, temporary, attachments, self.log)
                     finally:
                         self.log.path = old_path
                     env["LALC_PI_REQUESTS_USED"] = str(self.log.requests)
@@ -286,7 +312,8 @@ class RepairConversation:
                         await configure_session(send, event, self.log, expected)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
-                        await send(prompt)
+                        # 原图经 context hook 注入，不进入 pi 的 RPC 图片转码流程。
+                        await send({key: value for key, value in prompt.items() if key != "images"})
                         last = {}
                         while True:
                             item = await event()
@@ -317,7 +344,13 @@ class RepairConversation:
                                 elif title.startswith("lalc.tool:"):
                                     request = json.loads(title.removeprefix("lalc.tool:"))
                                     stage = "tool:" + request["name"]
-                                    value = await asyncio.to_thread(tools.call, request["name"], request["arguments"])
+                                    pending = asyncio.create_task(asyncio.to_thread(tools.call, request["name"], request["arguments"]))
+                                    try:
+                                        value = await asyncio.shield(pending)
+                                    except asyncio.CancelledError:
+                                        tools.cancelled.set()
+                                        await asyncio.gather(pending, return_exceptions=True)
+                                        raise
                                 else:
                                     raise RuntimeError("Unexpected interactive request")
                                 await send({"type": "extension_ui_response", "id": item["id"], "value": value})
@@ -370,7 +403,8 @@ class RepairConversation:
                     after = candidate_files(self.host.candidate)
                     self.log.snapshot(f"{prefix}/final", after)
                     changed = [name for name in before.keys() | after.keys() if before.get(name) != after.get(name)]
-                    unauthorized = [name for name in changed if name not in names or name not in before or name not in after]
+                    unauthorized = [name for name in changed if name not in set(names) | tools.created_files
+                                    or name not in after or name not in before and name not in tools.created_files]
                     if unauthorized:
                         result.update(status="incomplete", reason="unauthorized_changes", unauthorized_files=unauthorized)
                         result["error"] = "发现未授权文件变更：" + ", ".join(unauthorized)
@@ -396,17 +430,17 @@ def run_repair(args, manager, candidate):
     host = DeveloperHost(ApplicationService(manager.data_root, manifest_manager=manager), candidate)
     try:
         conversation = host.new_conversation()
-        image = args.image.read_bytes() if args.image else None
+        images = args.image or []
         message = args.problem + ("\n异常信息：" + args.exception if args.exception else "")
         while True:
-            result = asyncio.run(conversation.run(message, args, image=image))
+            result = asyncio.run(conversation.run(message, args, images=images))
             print(json.dumps(result, ensure_ascii=False), flush=True)
             if not args.chat:
                 return 0 if result["status"] == "completed" else 130 if result["status"] == "cancelled" else 1
             message = input("消息（空行退出）：")
             if not message.strip():
                 return 0
-            image = None
+            images = []
     except (KeyboardInterrupt, EOFError):
         return 130
     except Exception as error:

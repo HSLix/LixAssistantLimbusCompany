@@ -41,7 +41,7 @@ def _parser() -> argparse.ArgumentParser:
     repair.add_argument("--chat", action="store_true", help="Continue the conversation with further messages")
     repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
     repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
-    repair.add_argument("--image", type=Path)
+    repair.add_argument("--image", type=Path, action="append", help="Attach an image; repeat for multiple images")
     repair.add_argument("--base-url")
     repair.add_argument("--model")
     repair.add_argument("--max-requests", type=int)
