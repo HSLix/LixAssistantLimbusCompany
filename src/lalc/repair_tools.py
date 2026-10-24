@@ -33,7 +33,7 @@ class RepairTools:
         if self.cancelled.is_set():
             raise RuntimeError("Repair tool cancelled")
 
-    def call(self, name, arguments):
+    def call(self, name, arguments, *, tool_call_id=None):
         """工具错误原样反馈模型；不把工具失败当作整个修复进程失败。"""
         self.sequence += 1
         self.checkpoint()
@@ -50,7 +50,8 @@ class RepairTools:
                       "details": {"error": details["message"], **details}, "isError": True}
             import logging
             logging.getLogger(__name__).error("Agent 工具错误：%s", details)
-        self.log.record({"type": "repair_tool", "name": name, "arguments": arguments, "result": result})
+        self.log.record({"type": "repair_tool", "toolCallId": tool_call_id or f"host-{self.sequence}",
+                         "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         self.log.save_json(filename, result)
         return str(self.log.path / filename)

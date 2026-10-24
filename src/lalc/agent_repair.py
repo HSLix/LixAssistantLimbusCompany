@@ -335,16 +335,18 @@ class RepairConversation:
                                 title = item.get("title", "")
                                 if item.get("method") != "input":
                                     raise RuntimeError("Unexpected interactive request")
-                                if title == "lalc.validate":
+                                if title.startswith("lalc.validate:"):
                                     stage = "validation"
                                     errors = self.host.manager.validate(self.host.candidate / "manifest.json")
                                     validation = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
-                                    self.log.record({"type": "validation", **validation})
+                                    self.log.record({"type": "validation", "toolCallId": title.removeprefix("lalc.validate:"), **validation})
                                     value = json.dumps(self.log.clean(validation))
                                 elif title.startswith("lalc.tool:"):
                                     request = json.loads(title.removeprefix("lalc.tool:"))
                                     stage = "tool:" + request["name"]
-                                    pending = asyncio.create_task(asyncio.to_thread(tools.call, request["name"], request["arguments"]))
+                                    pending = asyncio.create_task(asyncio.to_thread(
+                                        tools.call, request["name"], request["arguments"],
+                                        tool_call_id=request.get("tool_call_id")))
                                     try:
                                         value = await asyncio.shield(pending)
                                     except asyncio.CancelledError:
