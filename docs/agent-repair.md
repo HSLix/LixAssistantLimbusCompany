@@ -157,3 +157,46 @@ Windows 实机尺寸、DPI、焦点、放大定位及真实游戏恢复仍待独
 - 已核对 offscreen 页面及 Diff 窗口渲染：本机 `/tmp/lalc-repair-chat.png`、`/tmp/lalc-repair-diff.png` 为示意内容的布局检查，不是实际模型运行证据。`git diff --check` 通过。
 
 未重新调用真实模型，2 项真实模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图因环境条件跳过；Windows 实机交互/DPI 验收仍待独立完成。#330 保持打开，不将 offscreen/HTTP 替身当作 Windows 或真实游戏通过。
+
+
+## DeepSeek and platform credentials — 2026-10-24
+
+Agent Settings supports `llama.cpp` and `deepseek`. The llama.cpp form and request behavior remain
+unchanged. Selecting DeepSeek defaults to `https://api.deepseek.com` and the only supported model,
+`deepseek-flash`; additional controls select thinking enabled/disabled and effort `low/high/max`.
+Defaults are enabled and `high`. Disabling thinking retains the chosen effort but disables its control.
+The saved current connection remains one configuration; API Key references are independently retained
+in `provider_secrets` by platform, never by model. Existing `secret_name` migrates to its original
+platform. Switching, testing, sending, replacing or clearing uses only the selected platform's key.
+Windows retains DPAPI storage; macOS retains separate platform keys only in the current GUI's memory,
+never after restart. Empty API Key input preserves the selected platform's key; clear removes only it.
+
+```bash
+uv run lalc agent-config --provider deepseek --thinking --reasoning-effort high
+# Windows: first save a named key using secret-set, then reference it:
+uv run lalc agent-config --secret-name deepseek-service
+# macOS: use the GUI's temporary platform key, or prompt in the CLI:
+uv run lalc repair --problem "检查候选流程" --ask-api-key
+```
+
+CLI repair overrides `--provider`, `--thinking/--no-thinking` and `--reasoning-effort` affect only the
+current invocation. Full API base paths remain unchanged (no automatic `/v1`). Standard DeepSeek model
+list metadata is sufficient for availability checks; actual image preflight remains a real request and
+counts toward the round's budget. pi explicitly uses DeepSeek's thinking format and preserves streamed
+`reasoning_content` across tool calls and subsequent conversation rounds. Original tool permissions,
+request caps, cancellation, disabled automatic retry and candidate review/Publish boundaries remain.
+
+Workflow source may use `ctx.log("语义说明", screenshot=True)` to attach its current screenshot without
+recapturing. Matched targets provide `centerxy` tuples for `control.click`; see the execution contract.
+
+本次增量自动化验证（2026-10-24）：普通回归
+`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x` 为 **381 passed, 40 skipped**；
+相关 Agent 回归
+`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`
+为 **35 passed, 4 skipped**。通过项使用真实 pi 1.4.0 + 本机 HTTP 替身，覆盖 DeepSeek 图片预检、
+思考开关及 low/high/max 参数、连续工具调用和跨轮 reasoning_content；4 项跳过为 2 项真模型、
+1 项 Windows DPAPI 真实认证及 1 项 Windows 游戏窗口。平台密钥加密替身检查不能代替 Windows
+原生验收。普通回归同时覆盖中心元组与点击互斥、直接 Run/Plan 语义日志的原图内容与截图次数、
+平台 Key 隔离、旧配置迁移及生成声明/Pyright。已检查 offscreen 的 llama.cpp/DeepSeek 设置页，
+未重新调用真实模型或执行 Windows/真实游戏验收。探针的大图测试改为生成测试自有截图，不依赖
+仓库外的个人图片。`git diff --check` 通过。

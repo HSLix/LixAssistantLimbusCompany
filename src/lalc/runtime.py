@@ -8,6 +8,7 @@ import threading
 import time
 import traceback
 import types
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
@@ -167,10 +168,12 @@ class WorkflowExecutor:
         game_language: str = "en",
         match_asset: Callable[..., list[dict[str, Any]]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
+        save_screenshot: Callable[[], dict[str, Any]] | None = None,
     ) -> None:
         self.manifest = manifest
         self.gate = gate
         self.emit = emit
+        self._save_screenshot = save_screenshot
         self._capture_screen = capture_screen
         self._control_input = control_input
         self._check_input = check_input
@@ -578,7 +581,7 @@ class WorkflowExecutor:
         def invoke() -> Any:
             self._active_action = action.classification
             try:
-                result = action.execute(self.context, **_json_copy(inputs))
+                result = action.execute(self.context, **deepcopy(inputs))
                 return _normalize_output(result, get_type_hints(
                     action.execute, globalns=action.execute.__globals__
                 )["return"])
@@ -598,6 +601,23 @@ class WorkflowExecutor:
                 self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
                 fields = {**fields, "call_id": self._allocate_call_id()}
 
+
+    def log(self, message: str, *, screenshot: bool = False) -> None:
+        """将语义和可选截图引用写入当前正式调用的 Trace。"""
+        if type(message) is not str or type(screenshot) is not bool:
+            raise ValueError("log requires a string message and a bool screenshot")
+        if not self._frames or self._active_action is not None:
+            raise ExecutionFailure("execution_failed", "ctx.log requires a Component invocation")
+        self.gate.checkpoint()
+        frame = self._frames[-1]
+        fields = {"logical_name": frame.logical_name, "component_id": frame.component_id,
+                  "call_id": frame.call_id, "role": frame.role, "phase": frame.phase,
+                  "manifest_id": self.manifest.manifest_id, "message": message}
+        if screenshot:
+            if self._save_screenshot is None:
+                raise ExecutionFailure("execution_failed", "No current screenshot to attach")
+            fields.update(self._save_screenshot())
+        self.emit("component_log", fields)
 
     def capture_screen(self, save: bool) -> dict[str, Any]:
         """将原始像素留在会话中，仅返回可写入 Trace 的信息。"""
@@ -761,6 +781,9 @@ def _normalize_value(value: Any, annotation: Any, path: str) -> Any:
                 pass
     elif origin is list and type(value) is list:
         return [_normalize_value(item, arguments[0], f"{path}[{index}]") for index, item in enumerate(value)]
+    elif origin is tuple and type(value) is tuple and len(value) == len(arguments):
+        return tuple(_normalize_value(item, item_type, f"{path}[{index}]")
+                     for index, (item, item_type) in enumerate(zip(value, arguments)))
     elif origin is dict and type(value) is dict and all(type(key) is str for key in value):
         return {
             key: _normalize_value(item, arguments[1], f"{path}.{key}")

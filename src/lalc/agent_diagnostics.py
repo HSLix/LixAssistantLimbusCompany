@@ -75,9 +75,15 @@ def check_settings(data_root: Path, values: dict, *, key=None, check_model=False
             matches = [item for item in models if item["id"] == settings["model"]]
             if len(matches) != 1:
                 raise AgentDiagnosticError(f"模型不存在或 ID 不唯一：{settings['model']}", "model_status")
-            status = matches[0].get("status", {}).get("value", "unknown")
+            if settings["provider"] == "deepseek":
+                result.update(message="deepseek-flash 可用；支持图片输入，未测试推理。")
+                status = "unknown"
+            else:
+                status = matches[0].get("status", {}).get("value", "unknown")
             labels = {"loaded": "已加载", "unloaded": "未加载", "loading": "加载中", "unknown": "服务未提供状态"}
-            result.update(model_status=status, message=f"模型状态：{labels.get(status, status)}（{status}）；未测试推理。")
+            result["model_status"] = status
+            if settings["provider"] != "deepseek":
+                result["message"] = f"模型状态：{labels.get(status, status)}（{status}）；未测试推理。"
     except Exception as error:
         result = {"ok": False, "error": error_details(error, "settings", context, log.keys)}
         result["message"] = result["error"]["message"]

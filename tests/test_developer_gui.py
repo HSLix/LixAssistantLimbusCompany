@@ -319,7 +319,7 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     import threading
     app, window = gui
     page = window.settings_page
-    assert page.provider.currentData() == "llama.cpp" and page.provider.count() == 1
+    assert page.provider.currentData() == "llama.cpp" and page.provider.count() == 2
     assert page.output_limit.count() == 1
     assert page.output_limit.currentText() == "使用服务端默认值"
     assert page.values()["output_limit"] == "server_default"
@@ -462,3 +462,47 @@ def test_request_progress_keeps_round_and_limit_through_tool_events_and_resets(g
     assert page.request_progress.text() == "对话轮次：尚未开始；本轮模型请求：0"
     page.show_event({"round": 1, "event": {"type": "lalc_request", "requests": 1, "request_limit": 3}})
     assert page.request_progress.text() == "对话轮次：1；本轮模型请求：1/3"
+
+
+def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypatch):
+    monkeypatch.setattr('lalc.developer_gui.sys.platform', 'darwin')
+    app, window = gui
+    page = window.settings_page
+    assert page.deepseek_options.isHidden()
+    page.url.setText('http://local/custom/api')
+    page.model.setText('local-model')
+    page.key.setText('local-temporary-key')
+    page.save()
+    wait_jobs(app, window)
+    assert window.host.secret == 'local-temporary-key'
+    page.provider.setCurrentIndex(page.provider.findData('deepseek'))
+    assert not page.deepseek_options.isHidden()
+    assert page.model.text() == 'deepseek-flash' and page.model.isReadOnly()
+    assert page.url.text() == 'https://api.deepseek.com'
+    assert page.thinking.isChecked() and page.effort.currentData() == 'high'
+    assert page.key.text() == '' and page.secret_state.text() == 'API Key：未设置'
+    page.thinking.setChecked(False)
+    assert not page.effort.isEnabled()
+    page.key.setText('cloud-temporary-key')
+    page.save()
+    wait_jobs(app, window)
+    assert window.host.secret == 'cloud-temporary-key'
+    saved = json.loads((window.service.data_root / 'agent-settings.json').read_text())
+    assert saved['thinking'] is False and saved['reasoning_effort'] == 'high'
+    assert 'cloud-temporary-key' not in json.dumps(saved)
+    assert 'local-temporary-key' not in json.dumps(saved)
+    page.provider.setCurrentIndex(page.provider.findData('llama.cpp'))
+    assert page.deepseek_options.isHidden() and not page.model.isReadOnly()
+    assert page.url.text() == 'http://local/custom/api' and page.model.text() == 'local-model'
+    assert page.secret_state.text() == 'API Key：已设置'
+    page.save(clear=True)
+    wait_jobs(app, window)
+    assert 'llama.cpp' not in window.host.secrets
+    assert window.host.secrets['deepseek'] == 'cloud-temporary-key'
+    page.provider.setCurrentIndex(page.provider.findData('deepseek'))
+    page.thinking.setChecked(True)
+    page.effort.setCurrentIndex(page.effort.findData('max'))
+    page.save()
+    wait_jobs(app, window)
+    page.reload()
+    assert page.thinking.isChecked() and page.effort.currentData() == 'max'

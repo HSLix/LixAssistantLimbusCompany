@@ -460,3 +460,34 @@ Every formal Run connects and focuses the Target Window and starts physical inpu
 ADR 0026 closes Stage 2 around deterministic foundations and existing single-capability evidence, plus crop/tag configuration and the teaching sample. The mailbox Workflow and outstanding Windows integration/package checks remain deferred in #317. Stage completion does not imply those checks passed.
 
 `tag-asset <name> --image <crop-image-path> [--tags tag ...]` replaces all tags on a verified local crop. It does not connect to the game, require Candidate, publish or change Default. With no tag input or an empty list, the stored tags become [], clearing any prior labels. crop-asset independently captures and stores an image with optional tags. No candidate/asset-library.json or asset-libraries/<Manifest ID>.json is created or read.
+
+
+## Developer coordinates and semantic logs — 2026-10-24
+
+`observe.match_asset` retains its complete sorted result list and rectangle fields. Each detection adds
+`centerxy: tuple[int, int]`, computed as `(x + width // 2, y + height // 2)` in full client-area
+physical pixels. `control.click` accepts either `centerxy=(cx, cy)` or complete `x=..., y=...`,
+never both. Tuple elements must be integers (not bool); missing, mixed or malformed coordinates fail
+before input injection. Both forms use the existing focus, input ownership and bounds checks.
+Python Action inputs/outputs preserve this tuple; JSON Trace and Asset Usage Index encode it as an array.
+Task Workflow input/result annotations retain their directly JSON-compatible contract.
+Steps that return matching results include `tuple[int, int]` in their result value annotation;
+public Run Results and persisted Trace still encode tuples as arrays.
+
+`ctx.log(message: str, *, screenshot: bool = False) -> None` appends a `component_log` event to
+Execution Trace during a formal Component invocation, including condition/detect/recover. It includes
+current logical name, Component ID, call ID, role, phase, Manifest ID, Run ID and timestamp. Logging
+neither determines task success nor adds Ledger records. `screenshot=True` saves the existing valid
+in-memory screenshot under `evidence/<run_id>/<observation>.png`, recording its observation and evidence
+references; it never captures again. Multiple references to one observation use the same path. Missing
+or invalid screenshots and evidence/Trace write failures propagate through the existing failure boundary.
+Plain text logs require no screenshot. Direct entry and all tasks in a Plan share their Run Trace.
+
+```python
+ctx.action("observe.capture_screen")
+if matches := ctx.action("observe.match_asset", asset="main/drive_unselected"):
+    ctx.action("control.click", centerxy=matches[0]["centerxy"])
+    ctx.log("已点击 Drive")
+else:
+    ctx.log("未找到未选中的 Drive 标识", screenshot=True)
+```

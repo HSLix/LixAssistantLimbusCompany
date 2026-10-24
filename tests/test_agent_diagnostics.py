@@ -26,7 +26,7 @@ def test_old_settings_keep_complete_path_and_secret_reference(tmp_path):
     assert settings["base_url"] == "http://host/custom/api" and settings["secret_name"] == "old"
     assert before == path.read_bytes()
     with pytest.raises(ValueError, match="provider"):
-        validate_settings({"provider": "deepseek"})
+        validate_settings({"provider": "unsupported"})
 
 
 @pytest.mark.parametrize("status", ["loaded", "unloaded", "loading", "failed", None])

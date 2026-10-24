@@ -223,7 +223,10 @@ class AssetLibrary:
                 for detection in found:
                     normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
                                   for key, value in detection.items() if key != "score"}
-                    detections.append({**detection, **entry, "normalized_region": normalized,
+                    detections.append({**detection, **entry,
+                                       "centerxy": (detection["x"] + detection["width"] // 2,
+                                                    detection["y"] + detection["height"] // 2),
+                                       "normalized_region": normalized,
                                        "logical_name": name, "observation": observation})
             if detections:
                 detections.sort(key=lambda d: (-d["score"], d["y"], d["x"], d["sha256"]))

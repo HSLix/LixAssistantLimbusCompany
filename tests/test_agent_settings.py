@@ -26,7 +26,8 @@ def test_saved_settings_and_per_call_overrides(tmp_path, monkeypatch, capsys):
     saved = (tmp_path / "agent-settings.json").read_bytes()
     assert settings.effective_settings(arguments(model="temporary", max_requests=2), tmp_path) == {
         "base_url": "http://example.test/custom/api", "model": "temporary", "max_requests": 2,
-        "secret_name": "service-token", "provider": "llama.cpp", "output_limit": "server_default"}
+        "secret_name": "service-token", "provider": "llama.cpp", "output_limit": "server_default",
+        "thinking": False, "reasoning_effort": "high", "provider_secrets": {"llama.cpp": "service-token"}}
     assert (tmp_path / "agent-settings.json").read_bytes() == saved
     assert cli.main(["agent-config"]) == 0
     assert "chosen" in capsys.readouterr().out
@@ -160,3 +161,63 @@ def test_pi_version_mismatch_warns_and_continues(monkeypatch, tmp_path, caplog, 
         assert event["actual_version"] == version and event["expected_version"] == probe.PI_VERSION
         assert caplog.records[0].levelno == logging.WARNING
         assert version in (log.path / "events.jsonl").read_text()
+
+
+def test_provider_keys_migrate_and_clear_independently(tmp_path):
+    path = tmp_path / 'agent-settings.json'
+    path.write_text(json.dumps({'secret_name': 'local-key', 'model': 'local-model'}))
+    local = settings.load_settings(tmp_path)
+    assert local['provider_secrets'] == {'llama.cpp': 'local-key'}
+    cloud = settings.save_settings(tmp_path, {'provider': 'deepseek', 'secret_name': 'cloud-key'})
+    assert cloud['model'] == 'deepseek-flash' and cloud['thinking'] is True
+    assert cloud['reasoning_effort'] == 'high'
+    assert cloud['provider_secrets'] == {'llama.cpp': 'local-key', 'deepseek': 'cloud-key'}
+    assert settings.load_settings(tmp_path, {'provider': 'llama.cpp'})['secret_name'] == 'local-key'
+    settings.save_settings(tmp_path, {'provider': 'llama.cpp'})
+    assert settings.load_settings(tmp_path, {'provider': 'deepseek'})['secret_name'] == 'cloud-key'
+    cleared = settings.save_settings(tmp_path, {'provider': 'deepseek'}, clear=True)
+    assert cleared['secret_name'] is None and cleared['provider_secrets'] == {'llama.cpp': 'local-key'}
+    assert 'cloud-key' not in path.read_text()
+
+
+@pytest.mark.parametrize('values', [
+    {'model': 'deepseek-v4-pro'}, {'thinking': 1}, {'reasoning_effort': 'medium'},
+])
+def test_deepseek_rejects_unsupported_configuration(values):
+    with pytest.raises(ValueError):
+        settings.validate_settings({'provider': 'deepseek', **values})
+
+
+def test_deepseek_preflight_accepts_standard_model_metadata(tmp_path, monkeypatch):
+    import lalc.pi_probe as probe
+    monkeypatch.setattr(probe.shutil, 'which', lambda _: '/pi')
+    monkeypatch.setattr(probe.subprocess, 'run', lambda *a, **kw: argparse.Namespace(stdout=probe.PI_VERSION))
+    monkeypatch.setattr(probe, '_models', lambda *_: [{'id': 'deepseek-flash'}])
+    args = arguments(provider='deepseek', model='deepseek-flash', base_url='https://api.deepseek.com',
+                     max_requests=3, pi='pi', thinking=True, reasoning_effort='high')
+    with configured_pi(args, tmp_path, 'temporary-key', 'prompt') as (command, env, _, _):
+        assert command[command.index('--thinking') + 1] == 'high'
+        assert env['LALC_PI_PROVIDER'] == 'deepseek'
+        assert env['LALC_PI_BASE_URL'] == 'https://api.deepseek.com'
+
+
+def test_platform_secret_replacement_and_clear_preserve_other_key(tmp_path, monkeypatch):
+    """使用加密替身检查引用隔离，不冒充 Windows DPAPI 原生验收。"""
+    monkeypatch.setattr(settings.sys, 'platform', 'win32')
+    monkeypatch.setattr(settings, 'dpapi', lambda data, decrypt=False: data[4:][::-1] if decrypt else b'test' + data[::-1])
+    local = settings.save_settings(tmp_path, {'model': 'local'}, secret='local-api-key')
+    local_name = local['secret_name']
+    cloud = settings.save_settings(tmp_path, {'provider': 'deepseek'}, secret='cloud-api-key')
+    cloud_name = cloud['secret_name']
+    assert local_name != cloud_name
+    args = arguments()
+    assert settings.resolve_key(args, cloud, tmp_path) == 'cloud-api-key'
+    assert settings.resolve_key(args, settings.load_settings(tmp_path, {'provider': 'llama.cpp'}), tmp_path) == 'local-api-key'
+    replaced = settings.save_settings(tmp_path, {}, secret='new-cloud-api-key')
+    assert replaced['provider_secrets']['llama.cpp'] == local_name
+    settings.save_settings(tmp_path, {}, clear=True)
+    assert settings.secret_path(tmp_path, local_name).is_file()
+    assert not settings.secret_path(tmp_path, replaced['secret_name']).exists()
+    assert settings.resolve_key(args, settings.load_settings(tmp_path, {'provider': 'llama.cpp'}), tmp_path) == 'local-api-key'
+    text = (tmp_path / 'agent-settings.json').read_text()
+    assert 'local-api-key' not in text and 'cloud-api-key' not in text

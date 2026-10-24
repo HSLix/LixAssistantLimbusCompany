@@ -52,6 +52,11 @@ def _parser() -> argparse.ArgumentParser:
     settings.add_argument("--base-url", help="Complete API base URL; no path is appended")
     settings.add_argument("--model")
     settings.add_argument("--max-requests", type=int)
+    for command in (probe, repair, settings):
+        command.add_argument("--provider", choices=("llama.cpp", "deepseek"),
+                             default="llama.cpp" if command is probe else None)
+        command.add_argument("--thinking", action=argparse.BooleanOptionalAction, default=None)
+        command.add_argument("--reasoning-effort", choices=("low", "high", "max"))
     secret = settings.add_mutually_exclusive_group()
     secret.add_argument("--secret-name")
     secret.add_argument("--clear-secret", action="store_true")

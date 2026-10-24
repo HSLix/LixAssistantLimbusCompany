@@ -22,6 +22,10 @@ class RunContext:
     def action(self, logical_name: str, **arguments: Any) -> Any:
         return self._executor.trusted_action(logical_name, arguments)
 
+    def log(self, message: str, *, screenshot: bool = False) -> None:
+        """记录当前调用的语义日志；可附上已有截图，不重新截图。"""
+        self._executor.log(message, screenshot=screenshot)
+
     def capture_screen(self, *, save: bool = False) -> dict[str, Any]:
         """只供正在执行的 observe Trusted Action 刷新本次 Run 的截图。"""
 

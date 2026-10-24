@@ -56,10 +56,15 @@ export default async function (pi) {
     models: [{
       id: process.env.LALC_PI_MODEL,
       name: process.env.LALC_PI_MODEL,
-      reasoning: false,
+      reasoning: process.env.LALC_PI_PROVIDER === "deepseek",
+      ...(process.env.LALC_PI_PROVIDER === "deepseek" ? {
+        compat: { thinkingFormat: "deepseek", supportsDeveloperRole: false,
+                  supportsReasoningEffort: true, requiresReasoningContentOnAssistantMessages: true },
+        thinkingLevelMap: { off: "off", low: "low", high: "high", max: "max" },
+      } : {}),
       input: ["text", "image"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 65536,
+      contextWindow: process.env.LALC_PI_PROVIDER === "deepseek" ? 1000000 : 65536,
       // pi 必须有数值型模型元数据；实际请求在下方移除客户端输出预算。
       maxTokens: 0,
     }],

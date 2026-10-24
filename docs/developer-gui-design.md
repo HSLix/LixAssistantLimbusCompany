@@ -205,3 +205,13 @@ Windows 实机尺寸、DPI、焦点、放大定位及真实游戏恢复仍待独
 - 已核对 offscreen 页面及 Diff 窗口渲染：本机 `/tmp/lalc-repair-chat.png`、`/tmp/lalc-repair-diff.png` 为示意内容的布局检查，不是实际模型运行证据。`git diff --check` 通过。
 
 未重新调用真实模型，2 项真实模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图因环境条件跳过；Windows 实机交互/DPI 验收仍待独立完成。#330 保持打开，不将 offscreen/HTTP 替身当作 Windows 或真实游戏通过。
+
+
+## Agent Settings 平台与推理选项 — 2026-10-24
+
+新增 DeepSeek 平台，仅使用 deepseek-flash，默认完整地址 https://api.deepseek.com。
+llama.cpp 原表单保持不变；DeepSeek 下显示思考开关和 low/high/max 强度，默认开启/high。
+关闭时禁用强度选择并保留其值。切换平台保留本次表单草稿，密钥输入、已设置状态、连接检查、
+消息发送及清除按平台隔离，不按模型保存密钥。Windows 各平台使用独立 DPAPI 引用；macOS
+各平台仅在本次 GUI 内存中保留，不新增系统钥匙串或持久密钥。旧 secret_name 归到原平台。
+DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/architecture 字段。

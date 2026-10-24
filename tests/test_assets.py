@@ -125,7 +125,7 @@ def test_tags_are_optional_and_all_templates_are_candidates(tmp_path):
     tags_path.write_text("{}", encoding="utf-8")
     assert matching(library)[0] == found
     index = json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8"))
-    assert index["ui/claim"]["detections"] == found
+    assert index["ui/claim"]["detections"] == json.loads(json.dumps(found))
 
 
 def test_priority_group_short_circuits_remaining_image_reads(tmp_path):

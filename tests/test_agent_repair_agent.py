@@ -505,3 +505,40 @@ def test_host_and_pi_events_share_call_ids_without_removing_raw_logs(conversatio
     validation = next(event for event in events if event["type"] == "validation")
     assert completed[validation["toolCallId"]]["toolName"] == "validate"
     assert {"read", "edit"} <= {event["toolName"] for event in completed.values()}
+
+
+@pytest.mark.parametrize('thinking,effort', [(True, 'high'), (True, 'low'), (True, 'max'), (False, 'high')])
+def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, thinking, effort):
+    chat, options, state = conversation
+    options.provider, options.model = 'deepseek', 'deepseek-flash'
+    options.thinking, options.reasoning_effort = thinking, effort
+    state['models'] = [{'id': 'deepseek-flash'}]
+    first, finish_reason = tool('read', {'path': 'steps.total.py'})
+    first['reasoning_content'] = 'Inspect source before answering.'
+    second, stop = answer('first deepseek result')
+    second['reasoning_content'] = 'Source inspection completed.'
+    third, third_reason = tool('action_contracts', {})
+    third['reasoning_content'] = 'Check available actions too.'
+    script(state, [(first, finish_reason), (third, third_reason), (second, stop)])
+    result = asyncio.run(chat.run('inspect with deepseek', options, key='deepseek-test-key',
+                                 images=[probe[2] / 'image.png']))
+    assert result['status'] == 'completed', result
+    assert result['requests'] == 4
+    state['respond'] = lambda body: answer('second deepseek result')
+    result = asyncio.run(chat.run('continue deepseek discussion', options, key='deepseek-test-key'))
+    assert result['status'] == 'completed', result
+    payload = state['calls'][-1]
+    assistant = [m for m in payload['messages'] if m['role'] == 'assistant']
+    assert [m['reasoning_content'] for m in assistant] == [
+        'Inspect source before answering.', 'Check available actions too.', 'Source inspection completed.']
+    for payload in state['calls']:
+        assert payload['model'] == 'deepseek-flash'
+        assert payload['thinking'] == {'type': 'enabled' if thinking else 'disabled'}
+        if thinking:
+            assert payload['reasoning_effort'] == effort
+        else:
+            assert 'reasoning_effort' not in payload
+        assert all(m['role'] != 'developer' for m in payload['messages'])
+    assert state['authorization'] == 'Bearer deepseek-test-key'
+    assert all(b'deepseek-test-key' not in path.read_bytes()
+               for path in chat.log.path.rglob('*') if path.is_file())

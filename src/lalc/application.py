@@ -242,14 +242,21 @@ class ApplicationService:
                 self._input_session.check()
             raise
         if save:
-            run_id = self._state["run_id"]
-            assert run_id is not None
-            path = self.data_root / "evidence" / str(run_id) / f"{result['observation']}.png"
-            evidence_id = f"{run_id}/{result['observation']}"
-            saved = self._focused_session.save(path, evidence_id=evidence_id)
-            result["evidence_path"] = saved["path"]
-            result["evidence_id"] = evidence_id
+            result.update(self._save_screenshot())
         return result
+
+    def _save_screenshot(self) -> dict[str, Any]:
+        """保存当前内存截图作为 Run 证据，不重新捕获或改变 observation。"""
+        session = self._focused_session
+        if session is None or session.image is None:
+            raise WindowError("No current screenshot to attach; capture explicitly first.")
+        run_id = self._state["run_id"]
+        assert run_id is not None
+        observation = session.observation
+        path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
+        evidence_id = f"{run_id}/{observation}"
+        saved = session.save(path, evidence_id=evidence_id)
+        return {"observation": observation, "evidence_path": saved["path"], "evidence_id": evidence_id}
 
     def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]]:
         """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
@@ -475,7 +482,7 @@ class ApplicationService:
         assert component.component_id == component_id
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
-            capture_screen=self._capture_screen,
+            capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
             control_input=self._control_input, check_input=self._check_input,
             prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
@@ -540,7 +547,7 @@ class ApplicationService:
 
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
-            capture_screen=self._capture_screen,
+            capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
             control_input=self._control_input, check_input=self._check_input,
             prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
@@ -704,7 +711,9 @@ class ApplicationService:
         try:
             self._trace_path.parent.mkdir(parents=True, exist_ok=True)
             with self._trace_path.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(record, ensure_ascii=False, allow_nan=False) + "\n")
+                encoded = json.dumps(record, ensure_ascii=False, allow_nan=False)
+                stream.write(encoded + "\n")
+            record = json.loads(encoded)
         except (OSError, TypeError, ValueError) as error:
             raise TraceWriteError(str(error)) from error
         self._state["trace"].append(record)

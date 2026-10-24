@@ -52,3 +52,12 @@ UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest --run-agent-tests -q tes
 同日开发者独立复测并确认符合预期：所提供终端输出为 `completed`、`requests=2`、`source_read=true`、`stop_reason=stop`、`error=null`，#324 Mac 最小接入验收通过。此确认未再次启动 Agent 测试或模型调用。
 
 2026-10-23 升级复测：pi 1.4.0 的 stdout 接管要求自定义协议事件直接按行写原始描述符；当前实现已修复，且保留 stderr 诊断。探针 8 项均通过，包含有效一像素 PNG、实际截图尺寸、权限拒绝、额度、错误无重试及取消。全套回归 258 passed、5 skipped，不使用临时超时插件；真模型和 Windows 跳过项不计通过。历史 0.86.1 的 Mac 真模型证据仍仅属于原版本。
+
+
+## DeepSeek 探针选项 — 2026-10-24
+
+探针仍不读取持久 Agent Settings。可显式指定 `--provider deepseek --base-url
+https://api.deepseek.com --model deepseek-flash --thinking --reasoning-effort high --ask-api-key`，
+同时提供原有 image/source 参数；默认思考开启/high，`--no-thinking` 显式关闭。
+标准模型列表不要求 architecture 字段；实际图片请求、受限工具读取和请求计数仍须验证。
+DeepSeek 的 reasoning_content 由 pi 原生兼容层接收并回传，不转换为用户可见的最终回答。

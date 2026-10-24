@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from functools import reduce
 from operator import or_
 from pathlib import Path
-from typing import Any, Literal, Union, get_args, get_origin
+from typing import Any, Literal, Union, get_args, get_origin, get_overloads
 
 from .actions import TrustedAction, application_actions
 from .run_context import RunContext
@@ -26,7 +26,7 @@ def _annotation(annotation):
     if annotation in {str, int, float, bool, type(None), None, Any}:
         return annotation
     origin, arguments = get_origin(annotation), get_args(annotation)
-    if origin in {list, dict} and arguments:
+    if origin in {list, dict, tuple} and arguments:
         return origin[tuple(_annotation(item) for item in arguments)]
     if origin in {types.UnionType, Union}:
         return reduce(or_, (_annotation(item) for item in arguments))
@@ -35,9 +35,9 @@ def _annotation(annotation):
     raise ValueError(f"Unsupported Action annotation: {annotation!r}")
 
 
-def _action_signature(name: str, action: TrustedAction) -> inspect.Signature:
+def _action_signature(name: str, execute) -> inspect.Signature:
     """移除执行器注入参数，将公开输入约束为 ctx.action 支持的关键字参数。"""
-    signature = _signature(action.execute)
+    signature = _signature(execute)
     parameters = list(signature.parameters.values())
     if not parameters or parameters[0].kind not in {
         inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD,
@@ -86,12 +86,14 @@ def render_stubs(actions: Mapping[str, TrustedAction] | None = None) -> str:
         if name == 'action':
             for logical_name, action in sorted(actions.items()):
                 try:
-                    signature = _action_signature(logical_name, action)
+                    signatures = [_action_signature(logical_name, execute)
+                                  for execute in get_overloads(action.execute) or [action.execute]]
                 except (ValueError, TypeError, NameError) as error:
                     raise ValueError(f"Cannot generate {logical_name}: {error}") from error
-                if len(actions) > 1:
-                    lines.append('    @typing.overload')
-                lines.append(f'    def action{signature}: ...')
+                for signature in signatures:
+                    if len(actions) > 1 or len(signatures) > 1:
+                        lines.append('    @typing.overload')
+                    lines.append(f'    def action{signature}: ...')
         else:
             if isinstance(member, property):
                 lines.append('    @property')

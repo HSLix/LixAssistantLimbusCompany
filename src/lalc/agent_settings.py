@@ -14,18 +14,29 @@ from urllib.parse import urlsplit
 from .runtime import atomic_write_json
 
 
-FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit")
+FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit",
+          "thinking", "reasoning_effort")
 DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "model": None,
-            "max_requests": 20, "secret_name": None, "output_limit": "server_default"}
+            "max_requests": 20, "secret_name": None, "output_limit": "server_default",
+            "thinking": False, "reasoning_effort": "high"}
+PROVIDERS = {"llama.cpp", "deepseek"}
+
+
+def provider_defaults(provider: str) -> dict:
+    """仅为 DeepSeek 提供固定模型与默认推理选项，保留本地服务原行为。"""
+    return ({"base_url": "https://api.deepseek.com", "model": "deepseek-flash", "thinking": True,
+             "reasoning_effort": "high"} if provider == "deepseek" else
+            {key: DEFAULTS[key] for key in ("base_url", "model", "thinking", "reasoning_effort")})
 
 
 def validate_settings(value: dict) -> dict:
-    """校验已保存或本次合并的设置，不补写 API 路径，也不要求保存时模型已可用。"""
-    if not isinstance(value, dict) or value.keys() - set(FIELDS):
+    """校验当前连接及平台密钥引用；不补写 API 路径，不进行网络检查。"""
+    if not isinstance(value, dict) or value.keys() - set(FIELDS) - {"provider_secrets"}:
         raise ValueError("Invalid Agent settings fields")
-    result = {**DEFAULTS, **value}
-    if result["provider"] != "llama.cpp":
-        raise ValueError("当前仅支持 llama.cpp provider")
+    provider = value.get("provider", "llama.cpp")
+    if provider not in PROVIDERS:
+        raise ValueError("仅支持 llama.cpp 或 deepseek provider")
+    result = {**DEFAULTS, **provider_defaults(provider), **value}
     if result["output_limit"] != "server_default":
         raise ValueError("单次输出上限当前仅支持使用服务端默认值")
     address = result["base_url"]
@@ -40,16 +51,40 @@ def validate_settings(value: dict) -> dict:
     for field in ("model", "secret_name"):
         if result[field] is not None and (not isinstance(result[field], str) or not result[field].strip()):
             raise ValueError(f"{field} must be a non-empty string or null")
+    if type(result["thinking"]) is not bool or result["reasoning_effort"] not in {"low", "high", "max"}:
+        raise ValueError("Invalid thinking switch or reasoning effort")
+    if provider == "deepseek" and result["model"] != "deepseek-flash":
+        raise ValueError("DeepSeek 当前仅支持 deepseek-flash")
+    secrets = value.get("provider_secrets", {})
+    if (not isinstance(secrets, dict) or secrets.keys() - PROVIDERS or
+            any(not isinstance(name, str) or not name.strip() for name in secrets.values())):
+        raise ValueError("Invalid provider secret references")
+    result["provider_secrets"] = dict(secrets)
+    if result["secret_name"]:
+        result["provider_secrets"][provider] = result["secret_name"]
     return result
 
 
 def load_settings(data_root: Path, overrides: dict | None = None) -> dict:
-    """只读当前设置；不存在时采用缺省值，损坏配置不会静默回退。"""
+    """兼容旧单平台凭据；切换平台不继承另一平台的连接或密钥。"""
     path = data_root / "agent-settings.json"
     saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     if not isinstance(saved, dict):
         raise ValueError("Agent settings must be a JSON object")
-    return validate_settings({**saved, **(overrides or {})})
+    overrides = dict(overrides or {})
+    old_provider = saved.get("provider", "llama.cpp")
+    secrets = saved.get("provider_secrets", {})
+    if not isinstance(secrets, dict):
+        raise ValueError("Invalid provider secret references")
+    secrets = dict(secrets)
+    if saved.get("secret_name"):
+        secrets[old_provider] = saved["secret_name"]
+    saved["provider_secrets"] = secrets
+    provider = overrides.get("provider", old_provider)
+    if provider != old_provider:
+        saved.update(provider_defaults(provider))
+        saved["secret_name"] = secrets.get(provider)
+    return validate_settings({**saved, **overrides})
 
 
 def effective_settings(args, data_root: Path) -> dict:
@@ -134,8 +169,12 @@ def save_settings(data_root: Path, values: dict, *, secret: str = "", clear: boo
         import uuid
         value["secret_name"] = "developer-" + str(uuid.uuid4())
         save_secret(data_root, value["secret_name"], secret)
+    if value["secret_name"]:
+        value["provider_secrets"][value["provider"]] = value["secret_name"]
+    else:
+        value["provider_secrets"].pop(value["provider"], None)
     atomic_write_json(data_root / "agent-settings.json", value)
-    if clear and previous:
+    if clear and previous and previous not in value["provider_secrets"].values():
         secret_path(data_root, previous).unlink(missing_ok=True)
     return value
 
@@ -150,10 +189,8 @@ def settings_command(args, data_root: Path) -> int:
             print("Secret saved with Windows DPAPI.")
         else:
             value = effective_settings(args, data_root)
-            if args.clear_secret:
-                value["secret_name"] = None
             if args.clear_secret or any(getattr(args, field, None) is not None for field in FIELDS):
-                atomic_write_json(data_root / "agent-settings.json", value)
+                value = save_settings(data_root, value, clear=args.clear_secret)
             print(json.dumps(value, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, OSError, UnicodeError) as error:

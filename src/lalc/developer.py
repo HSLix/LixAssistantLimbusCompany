@@ -64,7 +64,22 @@ class DeveloperHost:
         self.conversation = None
         self.preview = None
         self.monitored_window = None
-        self.secret = None
+        self.secrets = {}
+
+    @property
+    def secret(self):
+        """当前已保存平台的临时凭据，不跨平台复用。"""
+        from .agent_settings import load_settings
+        return self.secrets.get(load_settings(self.service.data_root)["provider"])
+
+    @secret.setter
+    def secret(self, value):
+        from .agent_settings import load_settings
+        provider = load_settings(self.service.data_root)["provider"]
+        if value is None:
+            self.secrets.pop(provider, None)
+        else:
+            self.secrets[provider] = value
 
     def initialize(self, manifest_id: str | None, *, replace: bool = False) -> None:
         """先完整物化；替换或元数据保存失败时恢复原 Candidate 和基线。"""

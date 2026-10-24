@@ -117,7 +117,10 @@ def test_cli_probe_skips_persistent_logging(monkeypatch, tmp_path):
 def test_image_and_restricted_read_with_real_pi(probe, full_screenshot):
     command, state, directory = probe
     if full_screenshot:
-        command[command.index("--image") + 1] = str(Path(__file__).resolve().parents[1] / "test_pi_img.png")
+        from PIL import Image
+        image = directory / "full-screenshot.png"
+        Image.new("RGB", (1280, 720), (32, 64, 96)).save(image)
+        command[command.index("--image") + 1] = str(image)
     # 私人上下文与扩展发现必须被关闭，即使进程继承了已有配置路径。
     private = directory / "personal"
     private.mkdir()

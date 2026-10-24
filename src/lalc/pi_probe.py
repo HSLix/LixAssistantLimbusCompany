@@ -210,7 +210,10 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
     status = model.get("status", {}).get("value")
     if status is not None and status != "loaded":
         logging.getLogger(__name__).info("模型状态 %s，继续请求，由服务端决定加载策略。", status)
-    if require_image and "image" not in model.get("architecture", {}).get("input_modalities", []):
+    provider = getattr(args, "provider", None) or "llama.cpp"
+    if provider == "deepseek" and args.model != "deepseek-flash":
+        raise AgentDiagnosticError("DeepSeek 当前仅支持 deepseek-flash", "settings")
+    if require_image and provider != "deepseek" and "image" not in model.get("architecture", {}).get("input_modalities", []):
         raise AgentDiagnosticError("Selected service model does not declare image input support", "model_preflight")
     with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
         agent_dir = Path(temporary) / "agent"
@@ -223,7 +226,8 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
         env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "PI_OFFLINE": "1",
                "PI_TELEMETRY": "0", "LALC_PI_API_KEY": key, "LALC_PI_BASE_URL": base,
                "LALC_PI_MODEL": model["id"], "LALC_PI_SOURCE_ROOT": str(root),
-               "LALC_PI_MAX_REQUESTS": str(args.max_requests)}
+               "LALC_PI_MAX_REQUESTS": str(args.max_requests), "LALC_PI_PROVIDER": provider,
+               "LALC_PI_THINKING": "1" if provider == "deepseek" and getattr(args, "thinking", None) is not False else "0"}
         env.pop("LALC_PI_REPAIR_TARGET", None)
         env.pop("LALC_PI_PAYLOAD_DIR", None)
         env.pop("LALC_PI_PREFLIGHT", None)
@@ -244,7 +248,8 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
                    "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes",
                    "--no-approve", "--offline", "--no-builtin-tools", "--tools", "read",
                    "--extension", str(Path(__file__).with_suffix(".ts")),
-                   "--provider", "lalc-probe", "--model", model["id"], "--thinking", "off",
+                   "--provider", "lalc-probe", "--model", model["id"], "--thinking",
+                   (getattr(args, "reasoning_effort", None) or "high") if env["LALC_PI_THINKING"] == "1" else "off",
                    "--system-prompt", system_prompt]
         yield command, env, temporary, model
 

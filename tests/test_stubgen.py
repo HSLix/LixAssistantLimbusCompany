@@ -32,11 +32,13 @@ def test_generated_stub_matches_registration_and_all_public_members():
         name for name in vars(RunContext) if not name.startswith('_') or name == '__init__'
     }
     actions = [node for node in methods if node.name == 'action']
-    assert [node.args.args[1].annotation.slice.value for node in actions] == sorted(application_actions())
+    assert [node.args.args[1].annotation.slice.value for node in actions] == [
+        'control.click', *sorted(application_actions())]
     for node in actions:
         name = node.args.args[1].annotation.slice.value
         signature = inspect.signature(application_actions()[name].execute)
-        assert [arg.arg for arg in node.args.kwonlyargs] == list(signature.parameters)[1:]
+        assert [arg.arg for arg in node.args.kwonlyargs] in (
+            [['x', 'y'], ['centerxy']] if name == 'control.click' else [list(signature.parameters)[1:]])
         assert ast.unparse(node.returns) == inspect.formatannotation(
             inspect.signature(application_actions()[name].execute, eval_str=True).return_annotation
         )
@@ -114,8 +116,10 @@ from lalc import RunContext, step
 @step
 def execute(ctx: RunContext) -> None:
     assert_type(ctx.action("control.click", x=1, y=2), None)
+    assert_type(ctx.action("control.click", centerxy=(1, 2)), None)
+    ctx.log("已到达 Drive", screenshot=True)
     assert_type(ctx.action("observe.capture_screen"), dict[str, int | str])
-    assert_type(ctx.action("observe.match_asset", asset="ui/claim"), list[dict[str, str | int | float | list[str] | dict[str, float]]])
+    assert_type(ctx.action("observe.match_asset", asset="ui/claim"), list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]])
     ctx.action("control.drag", x=1, y=2, end_x=3, end_y=4)
     ctx.action(logical_name="control.wait", seconds=0.1)
     assert_type(ctx.call("steps.example", value=1), Any)
@@ -126,6 +130,8 @@ def execute(ctx: RunContext) -> None:
     assert_type(ctx.control_input("wait", seconds=0.1), None)
     ctx.action("control.unknown")  # error
     ctx.action("control.click", x=1)  # error
+    ctx.action("control.click", x=1, y=2, centerxy=(1, 2))  # error
+    ctx.action("control.click", centerxy=(1,))  # error
     ctx.action("control.click", x=1, y=2, typo=3)  # error
     ctx.action("control.click", x="wrong", y=2)  # error
     ctx.action("control.click", 1, 2)  # error

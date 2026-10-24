@@ -12,12 +12,12 @@ from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QPlainTextEdit,
-    QSpinBox, QComboBox, QFileDialog,
+    QSpinBox, QComboBox, QCheckBox, QFileDialog,
     QMessageBox, QDialog, QDialogButtonBox,
 )
 
 from .repair_chat import RepairChat
-from .agent_settings import load_settings, save_settings
+from .agent_settings import load_settings, save_settings, provider_defaults
 from .agent_diagnostics import check_settings, details_text
 
 
@@ -403,6 +403,9 @@ class SettingsPage(QWidget):
         layout = QVBoxLayout(self)
         self.provider = QComboBox()
         self.provider.addItem("llama.cpp", "llama.cpp")
+        self.provider.addItem("DeepSeek", "deepseek")
+        self.provider_drafts = {}
+        self.form_provider = "llama.cpp"
         layout.addWidget(QLabel("服务商（Provider）"))
         layout.addWidget(self.provider)
         self.url, self.model = QLineEdit(), QLineEdit()
@@ -414,6 +417,23 @@ class SettingsPage(QWidget):
         for label, control in (("Base URL", self.url), ("Model", self.model), ("每条消息模型请求上限", self.limit), ("API Key", self.key)):
             layout.addWidget(QLabel(label))
             layout.addWidget(control)
+        self.deepseek_options = QWidget()
+        options = QVBoxLayout(self.deepseek_options)
+        options.setContentsMargins(0, 0, 0, 0)
+        self.thinking = QCheckBox("开启思考模式")
+        self.thinking.setChecked(True)
+        self.effort = QComboBox()
+        for effort in ("low", "high", "max"):
+            self.effort.addItem(effort, effort)
+        self.effort.setCurrentIndex(1)
+        options.addWidget(self.thinking)
+        options.addWidget(QLabel("思考强度"))
+        options.addWidget(self.effort)
+        layout.addWidget(self.deepseek_options)
+        self.thinking.toggled.connect(self.effort.setEnabled)
+        self.thinking.toggled.connect(self.invalidate)
+        self.effort.currentIndexChanged.connect(self.invalidate)
+        self.deepseek_options.hide()
         self.output_limit = QComboBox()
         self.output_limit.addItem("使用服务端默认值", "server_default")
         layout.addWidget(QLabel("单次输出上限"))
@@ -438,7 +458,7 @@ class SettingsPage(QWidget):
         layout.addStretch()
         for control in (self.url, self.model, self.key):
             control.textChanged.connect(self.invalidate)
-        self.provider.currentIndexChanged.connect(self.invalidate)
+        self.provider.currentIndexChanged.connect(self.switch_provider)
         self.limit.valueChanged.connect(self.invalidate)
         self.window._interact(self.reload)
 
@@ -447,14 +467,35 @@ class SettingsPage(QWidget):
         self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
 
     def values(self):
-        return {"provider": self.provider.currentData(), "base_url": self.url.text().strip(),
-                "model": self.model.text().strip() or None, "max_requests": self.limit.value(),
-                "output_limit": self.output_limit.currentData()}
+        value = {"provider": self.provider.currentData(), "base_url": self.url.text().strip(),
+                 "model": self.model.text().strip() or None, "max_requests": self.limit.value(),
+                 "output_limit": self.output_limit.currentData()}
+        if value["provider"] == "deepseek":
+            value.update(thinking=self.thinking.isChecked(), reasoning_effort=self.effort.currentData())
+        return value
+
+    def switch_provider(self):
+        """保留各平台本次表单草稿；切换时清晰隔离未保存密钥。"""
+        self.provider_drafts[self.form_provider] = {
+            "base_url": self.url.text(), "model": self.model.text(), "key": self.key.text(),
+            "thinking": self.thinking.isChecked(), "reasoning_effort": self.effort.currentData()}
+        self.form_provider = self.provider.currentData()
+        value = self.provider_drafts.get(self.form_provider, provider_defaults(self.form_provider))
+        self.url.setText(value["base_url"])
+        self.model.setText(value["model"] or "")
+        self.key.setText(value.get("key", ""))
+        self.thinking.setChecked(value["thinking"])
+        self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
+        self.deepseek_options.setVisible(self.form_provider == "deepseek")
+        self.model.setReadOnly(self.form_provider == "deepseek")
+        self.model_button.setText("检查模型可用性" if self.form_provider == "deepseek" else "检查模型加载状态")
+        self.show_secret(load_settings(self.host.service.data_root, {"provider": self.form_provider}))
+        self.invalidate()
 
     def check(self, model):
         """测试当前表单快照；编辑期间完成的旧检查不得冒充当前配置结果。"""
         values, revision = self.values(), self.revision
-        key = self.key.text() or self.host.secret
+        key = self.key.text() or self.host.secrets.get(values["provider"])
         self.check_status.setText("正在检查模型状态…" if model else "正在测试连接…")
         def operation():
             with self.host.service.activity("Agent Settings 检查"):
@@ -473,14 +514,22 @@ class SettingsPage(QWidget):
 
     def reload(self):
         value = load_settings(self.host.service.data_root)
+        self.provider.blockSignals(True)
         self.provider.setCurrentIndex(self.provider.findData(value["provider"]))
+        self.provider.blockSignals(False)
+        self.form_provider = value["provider"]
+        self.deepseek_options.setVisible(value["provider"] == "deepseek")
+        self.model.setReadOnly(value["provider"] == "deepseek")
+        self.model_button.setText("检查模型可用性" if value["provider"] == "deepseek" else "检查模型加载状态")
+        self.thinking.setChecked(value["thinking"])
+        self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
         self.url.setText(value["base_url"])
         self.model.setText(value["model"] or "")
         self.limit.setValue(value["max_requests"])
         self.show_secret(value)
 
     def show_secret(self, value):
-        configured = bool(self.host.secret) or bool(value["secret_name"])
+        configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
         self.secret_state.setText("API Key：已设置" if configured else "API Key：未设置")
 
     def save(self, *, clear=False):
@@ -490,13 +539,15 @@ class SettingsPage(QWidget):
             with self.host.service.activity("Agent Settings"):
                 saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear)
                 if clear:
-                    self.host.secret = None
+                    self.host.secrets.pop(value["provider"], None)
                 elif secret and sys.platform != "win32":
-                    self.host.secret = secret
+                    self.host.secrets[value["provider"]] = secret
                 return saved
         def done(saved):
             self.invalidate()
             self.key.clear()
+            if saved["provider"] in self.provider_drafts:
+                self.provider_drafts[saved["provider"]]["key"] = ""
             self.show_secret(saved)
         self.window.launch(operation, done)
 

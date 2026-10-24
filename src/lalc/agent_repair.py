@@ -28,7 +28,7 @@ game_screenshot 现场截图；crop_asset 每次从新截图裁剪新增素材�
 截图会恢复并置前唯一游戏窗口。不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
 不运行命令、候选 Workflow、点击或按键，不 Publish、不设置 Default。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
 Validator 会导入 Python，不是安全沙箱，校验通过也不证明真实游戏行为修复。
-遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；Python 模块和关键函数用简洁中文 docstring。
+遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；ctx.log(message, screenshot=False) 可记录语义日志并可选附上已有截图，不重新截图。Python 模块和关键函数用简洁中文 docstring。
 最终回答必须只输出一个合法 JSON 对象，格式为 {"revise_success": false, "message": "分析、修改结果或缺少的信息"}。
 revise_success 必须是 JSON 布尔值 true 或 false，message 必须是非空字符串；不要输出 Markdown 代码块、前后说明或 JSON 之外的文字。
 所有给用户的说明均放入 message 字段，包括纯分析和信息不足的情况。

@@ -283,7 +283,8 @@ class MainWindow(QMainWindow):
             from .agent_diagnostics import error_details, details_text
             from .agent_repair import RepairLog
             settings_page = getattr(self, "settings_page", None)
-            keys = {self.host.secret, settings_page.key.text() if settings_page else None} - {None, ""}
+            keys = {*self.host.secrets.values(), settings_page.key.text() if settings_page else None,
+                    *((draft.get("key") for draft in settings_page.provider_drafts.values()) if settings_page else ())} - {None, ""}
             conversation = self.host.conversation
             if conversation:
                 keys.update(conversation.log.keys)

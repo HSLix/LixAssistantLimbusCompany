@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any, Callable, overload
 
 
 @dataclass(frozen=True)
@@ -25,7 +25,7 @@ def capture_screen(ctx, *, save: bool = False) -> dict[str, int | str]:
 
 def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
                 threshold: float = 0.9, nms: bool = True,
-                nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | dict[str, float]]]:
+                nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]]:
     """使用当前有效截图识别模板，返回全部符合条件的目标。"""
     return ctx.match_asset(asset, priority_tags=priority_tags, region=region, threshold=threshold, nms=nms,
                            nms_iou_threshold=nms_iou_threshold)
@@ -36,8 +36,22 @@ def crop_asset(ctx, *, asset: str, region: dict[str, int], tags: list[str] | Non
     return ctx.crop_asset(asset, region=region, tags=tags)
 
 
-def click(ctx, *, x: int, y: int) -> None:
-    """在客户区坐标点击，输入接管时中断并释放。"""
+@overload
+def click(ctx, *, x: int, y: int) -> None: ...
+
+
+@overload
+def click(ctx, *, centerxy: tuple[int, int]) -> None: ...
+
+
+def click(ctx, *, x: int | None = None, y: int | None = None, centerxy: tuple[int, int] | None = None) -> None:
+    """使用完整 x/y 或二元整数 centerxy 点击客户区，两种形式不可混用。"""
+    if centerxy is not None:
+        if x is not None or y is not None:
+            raise ValueError("click requires either centerxy or x/y, not both")
+        x, y = centerxy
+    elif x is None or y is None:
+        raise ValueError("click requires centerxy or both x and y")
     ctx.control_input("click", x=x, y=y)
 
 
