@@ -476,3 +476,32 @@ def test_cancel_waits_for_new_source_rollback_before_final_snapshot(conversation
     assert candidate_files(chat.host.candidate) == before
     assert not (chat.host.candidate / "new").exists()
     assert not (chat.log.path / "round-1/final/new/cancel.py").exists()
+
+
+def test_host_and_pi_events_share_call_ids_without_removing_raw_logs(conversation):
+    chat, options, state = conversation
+    calls = []
+    for name, arguments, identity in [
+        ("action_contracts", {}, "contract-first"),
+        ("action_contracts", {}, "contract-second"),
+        ("read", {"path": "steps.total.py"}, "read-source"),
+        ("edit", {"path": "steps.total.py", "oldText": "if value > 0", "newText": "if value >= 0"}, "edit-source"),
+        ("validate", {}, "validate-draft"),
+    ]:
+        response = tool(name, arguments)
+        response[0]["tool_calls"][0]["id"] = identity
+        calls.append(response)
+    script(state, [*calls, answer()])
+    result = asyncio.run(chat.run("inspect contracts twice, read, edit and validate", options))
+    assert result["status"] == "completed", result
+    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    hosted = [event for event in events if event["type"] == "repair_tool"]
+    assert len(hosted) == 2
+    assert len({event["toolCallId"] for event in hosted}) == 2
+    completed = {event["toolCallId"]: event for event in events if event["type"] == "tool_execution_end"}
+    for event in hosted:
+        assert completed[event["toolCallId"]]["toolName"] == "action_contracts"
+        assert completed[event["toolCallId"]]["result"] == event["result"]
+    validation = next(event for event in events if event["type"] == "validation")
+    assert completed[validation["toolCallId"]]["toolName"] == "validate"
+    assert {"read", "edit"} <= {event["toolName"] for event in completed.values()}

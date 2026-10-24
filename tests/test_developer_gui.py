@@ -102,8 +102,8 @@ def test_four_pages_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
     assert [window.tabs.tabText(i) for i in range(4)] == ["Capture", "Runner", "Agent Settings", "Agent Repair"]
-    from PySide6.QtWidgets import QAbstractItemView
-    assert window.repair_page.files.selectionMode() == QAbstractItemView.SelectionMode.NoSelection
+    assert not hasattr(window.repair_page, "files")
+    assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
     view.resize(400, 200)
     view.set_image(bytes(200 * 100 * 4), (200, 100))
@@ -130,7 +130,7 @@ def test_async_operation_and_host_busy_state(gui):
     assert entered.wait(1)
     assert not window.start_button.isEnabled()
     assert not window.capture_page.capture_button.isEnabled()
-    assert not window.repair_page.files.isEnabled()
+    assert not window.repair_page.baseline.isEnabled()
     release.set()
     wait_jobs(app, window)
     assert results == ["done"]
@@ -387,11 +387,11 @@ def test_repair_error_is_not_agent_reply_and_normal_answer_stays_reply(gui, monk
     monkeypatch.setattr(page, "show_diff", lambda: None)
     page.answered({"reason": "error", "requests": 0, "error": "failed",
                    "diagnostics": {"stage": "service_check", "message": "failed", "traceback": "cause"}})
-    assert "Agent：" not in page.chat.toPlainText() and "错误：failed" in page.status.text()
+    assert "Agent" not in page.chat.toPlainText() and "错误：failed" in page.status.text()
     page.diagnostics.copy_error()
     assert "cause" in app.clipboard().text()
     page.answered({"reason": "answered", "requests": 2, "answer": {"message": "信息不足"}})
-    assert "Agent：信息不足" in page.chat.toPlainText()
+    assert "Agent" in page.chat.toPlainText() and "信息不足" in page.chat.toPlainText()
 
 
 def test_interaction_error_uses_redacted_details_and_keeps_log_entry(gui, caplog):
@@ -426,9 +426,10 @@ def test_manual_validate_displays_once_and_persists_context(gui, monkeypatch, ph
     monkeypatch.setattr(page.diagnostics, "show_error", lambda: opened.append(True))
     page.validate()
     wait_jobs(app, window)
-    lines = page.chat.toPlainText().splitlines()
-    assert len(lines) == 1 and lines[0].startswith("Validator：")
-    result = json.loads(lines[0].removeprefix("Validator："))
+    entries = page.chat.entries
+    assert len(entries) == 1 and entries[0]["name"] == "validate"
+    result = entries[0]["events"]["validation"]
+    assert len(page.chat.tools) == 1
     assert result["ok"] is valid
     assert page.diagnostics.errors.count() == (0 if valid else 1)
     assert len(opened) == (0 if valid else 1)
@@ -444,7 +445,8 @@ def test_manual_validate_without_conversation_does_not_create_one(gui):
     window.repair_page.validate()
     wait_jobs(app, window)
     assert window.host.conversation is None
-    assert window.repair_page.chat.toPlainText().count("Validator：") == 1
+    assert len(window.repair_page.chat.entries) == 1
+    assert window.repair_page.chat.entries[0]["name"] == "validate"
 
 
 def test_request_progress_keeps_round_and_limit_through_tool_events_and_resets(gui):

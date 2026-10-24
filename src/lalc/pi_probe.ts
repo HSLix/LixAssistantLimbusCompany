@@ -143,7 +143,7 @@ export default async function (pi) {
       parameters: Type.Object({}),
       async execute(_id, _params, _signal, _update, ctx) {
         // 复用 RPC 已有请求/响应通道，由 Python 宿主校验；不会向用户交互提问。
-        const value = await ctx.ui.input("lalc.validate");
+        const value = await ctx.ui.input("lalc.validate:" + _id);
         if (value === undefined) throw new Error("Validation cancelled");
         return { content: [{ type: "text", text: value }], details: JSON.parse(value) };
       },
@@ -173,7 +173,7 @@ export default async function (pi) {
       pi.registerTool({ ...tool, label: tool.name,
         async execute(_id, params, _signal, _update, ctx) {
           // 图片走独立返回文件，避免大载荷与 RPC 事件竞争 stdout/stdin。
-          const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name: tool.name, arguments: params }));
+          const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name: tool.name, arguments: params, tool_call_id: _id }));
           if (path === undefined) throw new Error("Repair tool cancelled");
           const result = JSON.parse(await readFile(path, "utf8"));
           if (!result.isError && (tool.name === "add_component" || tool.name === "add_recovery_rule")) {

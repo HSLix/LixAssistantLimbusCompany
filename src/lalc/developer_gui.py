@@ -9,13 +9,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer
-from PySide6.QtGui import QImage, QPainter, QPixmap, QPen
+from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QPlainTextEdit,
-    QSpinBox, QListWidget, QListWidgetItem, QAbstractItemView, QComboBox, QFileDialog,
+    QSpinBox, QComboBox, QFileDialog,
     QMessageBox, QDialog, QDialogButtonBox,
 )
 
+from .repair_chat import RepairChat
 from .agent_settings import load_settings, save_settings
 from .agent_diagnostics import check_settings, details_text
 
@@ -507,12 +508,13 @@ class SettingsPage(QWidget):
 
 
 class RepairPage(QWidget):
-    """显式文件选择与连续对话；Diff、校验、Publish 和 Default 分开操作。"""
+    """分轮连续对话与工作区入口；Diff、校验、Publish 和 Default 分开操作。"""
 
     def __init__(self, window):
         super().__init__()
         self.window, self.host = window, window.host
         self.images = []
+        self.tool_errors = {}
         self.controls = []
         layout = QVBoxLayout(self)
         row = QHBoxLayout()
@@ -522,19 +524,14 @@ class RepairPage(QWidget):
         self.controls.append(button("初始化／重建 Candidate", self.initialize, row))
         layout.addLayout(row)
         row = QHBoxLayout()
-        for text, callback in (("New Conversation", self.new), ("刷新文件", self.refresh_files)):
-            self.controls.append(button(text, callback, row))
+        self.controls.append(button("New Conversation", self.new, row))
+        self.workspace_button = button("打开 Agent 工作区", self.open_workspace, row)
         layout.addLayout(row)
-        self.files = QListWidget()
-        self.files.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
-        self.files.setMaximumHeight(110)
-        layout.addWidget(self.files)
         self.identity = QLabel("尚未开始对话")
         layout.addWidget(self.identity)
         self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-interactions")
         layout.addWidget(self.diagnostics)
-        self.chat = QPlainTextEdit()
-        self.chat.setReadOnly(True)
+        self.chat = RepairChat()
         layout.addWidget(self.chat, 1)
         self.message = QPlainTextEdit()
         self.message.setPlaceholderText("输入问题、异常或下一步要求；可纯文字发送")
@@ -553,16 +550,11 @@ class RepairPage(QWidget):
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
-        self.diff = QPlainTextEdit()
-        self.diff.setReadOnly(True)
-        self.diff.setPlaceholderText("相对 Candidate 固定基线的累计 Diff")
-        layout.addWidget(self.diff, 1)
         row = QHBoxLayout()
         for text, callback in (("查看累计 Diff", self.show_diff), ("Validate", self.validate),
                                ("Publish", self.publish), ("设置 Default", self.set_default)):
             self.controls.append(button(text, callback, row))
         layout.addLayout(row)
-        self.refresh_files()
 
     def refresh_manifests(self):
         self.window.launch(self.host.manager.list_manifests, self.set_manifests)
@@ -576,18 +568,15 @@ class RepairPage(QWidget):
         if index >= 0:
             self.baseline.setCurrentIndex(index)
 
-    def refresh_files(self):
-        from .developer import candidate_files
-        self.files.clear()
-        if not self.host.candidate.exists():
-            return
-        try:
-            for name in candidate_files(self.host.candidate):
-                if "plan.json" not in Path(name).parts:
-                    item = QListWidgetItem(name)
-                    self.files.addItem(item)
-        except Exception as error:
-            self.status.setText(str(error))
+    def open_workspace(self):
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        def operation():
+            if not self.host.candidate.is_dir():
+                raise ValueError("请先明确初始化 Candidate，再打开 Agent 工作区。")
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.host.candidate))):
+                raise ValueError(f"无法打开 Agent 工作区：{self.host.candidate}")
+        self.window._interact(operation)
 
     def initialize(self):
         identity = self.baseline.currentData()
@@ -601,11 +590,10 @@ class RepairPage(QWidget):
                 return
         def done(_):
             self.chat.clear()
+            self.tool_errors.clear()
             self.request_progress.setText("对话轮次：尚未开始；本轮模型请求：0")
             self.diagnostics.errors.clear()
             self.diagnostics.set_path(self.host.conversation.log.path)
-            self.diff.clear()
-            self.refresh_files()
             self.identity.setText(f"对话：{self.host.conversation.log.path.name}\nCandidate 已重建；日志：{self.host.conversation.log.path}")
         self.window.launch(lambda: self.host.initialize(identity, replace=exists), done)
 
@@ -613,6 +601,7 @@ class RepairPage(QWidget):
         def action():
             conversation = self.host.new_conversation()
             self.chat.clear()
+            self.tool_errors.clear()
             self.request_progress.setText("对话轮次：尚未开始；本轮模型请求：0")
             self.diagnostics.errors.clear()
             self.diagnostics.set_path(conversation.log.path)
@@ -646,7 +635,7 @@ class RepairPage(QWidget):
             args = SimpleNamespace(pi="pi", ask_api_key=False)
             limit = load_settings(self.host.service.data_root)["max_requests"]
             self.request_progress.setText(f"对话轮次：{conversation.log.group + 1}；本轮模型请求：0/{limit}")
-            self.chat.appendPlainText("你：" + message)
+            self.chat.add_message("你", message, conversation.log.group + 1)
             self.identity.setText(f"对话：{conversation.log.path.name}\n日志：{conversation.log.path}")
             self.message.clear()
             self.clear_image()
@@ -666,73 +655,83 @@ class RepairPage(QWidget):
                                         "round": result.get("round"), "log_path": result.get("log_path")})
             self.diagnostics.show_error()
         elif result["reason"] == "answered":
-            self.chat.appendPlainText("Agent：" + str(answer.get("message", "")))
+            self.chat.add_message("Agent", str(answer.get("message", "")),
+                                  result.get("round", self.host.conversation.log.group if self.host.conversation else 0))
         summary = "错误：" + result["error"] if result.get("error") else "本轮结束：" + result["reason"]
         self.status.setText(f"{summary}；实际请求 {result['requests']} 次")
-        self.refresh_files()
-        self.show_diff()
 
     def show_event(self, event):
         value = event["event"]
-        kind = value.get("type")
+        kind, number = value.get("type"), event.get("round", 0)
         if kind == "lalc_request":
-            self.request_progress.setText(f"对话轮次：{event.get('round', '—')}；本轮模型请求："
+            self.request_progress.setText(f"对话轮次：{number}；本轮模型请求："
                                           f"{value['requests']}/{value.get('request_limit', '—')}")
-        # 手动校验由完成回调显示，日志事件可能在首次发送后也经信号送达。
-        if kind == "validation" and value.get("source") == "manual":
-            return
-        if kind == "final_answer_retry":
+            self.status.setText(f"已发出模型请求：{value['requests']}")
+        elif kind == "final_answer_retry":
             self.diagnostics.add_error(value["diagnostics"])
             self.status.setText(f"最终回复格式错误，正在要求重新生成；剩余请求 {value['requests_remaining']} 次。")
-        if kind == "validation" and not value.get("ok"):
-            self.diagnostics.add_error({"message": "候选校验失败，请查看错误详情。", "stage": "validation",
-                                        "errors": value.get("errors", []), "round": event.get("round"),
-                                        "log_path": str(self.host.conversation.log.path) if self.host.conversation else None})
-            self.status.setText("错误：候选校验失败；Candidate 和对话已保留。")
-        if kind == "tool_execution_end" and value.get("isError"):
-            self.diagnostics.add_error({"message": "工具执行失败：" + value.get("toolName", "unknown"),
-                                        "stage": "tool:" + value.get("toolName", "unknown"), "event": value,
-                                        "round": event.get("round"),
-                                        "log_path": str(self.host.conversation.log.path) if self.host.conversation else None})
-            self.status.setText("错误：工具执行失败，可查看详情；本轮继续处理。")
-        if kind == "repair_tool" and value.get("result", {}).get("isError"):
-            details = value["result"].get("details", {})
-            self.diagnostics.add_error({**details, "message": details.get("message") or details.get("error") or "工具执行失败",
-                                        "stage": "tool:" + value["name"], "round": event.get("round"),
-                                        "log_path": str(self.host.conversation.log.path) if self.host.conversation else None})
-        if kind == "pi_version_warning":
-            self.chat.appendPlainText("WARNING: " + value["message"])
-        if kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation", "lalc_request", "round_finished"}:
+        elif kind == "pi_version_warning":
+            self.chat.add_message("系统", "WARNING: " + value["message"], number)
+        elif kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation"}:
+            if kind == "validation" and value.get("source") == "manual":
+                return
+            identity = value.get("toolCallId", f"event-{len(self.chat.entries)}")
+            name = value.get("toolName") or value.get("name") or "validate"
+            entry = self.chat.upsert_tool(number, identity, name, kind, value)
             if kind == "tool_execution_start":
-                self.status.setText("正在调用工具：" + value.get("toolName", ""))
-            elif kind == "lalc_request":
-                self.status.setText(f"已发出模型请求：{value['requests']}")
-            elif kind != "round_finished":
-                if kind == "repair_tool":
-                    shown = {"tool": value["name"], "arguments": value["arguments"],
-                             "result": value["result"].get("details"), "isError": value["result"].get("isError", False)}
-                elif kind == "tool_execution_end":
-                    shown = {"tool": value.get("toolName"), "isError": value.get("isError"),
-                             "text": [part.get("text") for part in value.get("result", {}).get("content", []) if part.get("type") == "text"]}
+                self.status.setText("正在调用工具：" + name)
+            if entry["failed"]:
+                host = entry["events"].get("repair_tool", {}).get("result", {}).get("details", {})
+                validation = entry["events"].get("validation", {})
+                details = {**host, "message": host.get("message") or host.get("error") or
+                           ("候选校验失败，请查看错误详情。" if name == "validate" else "工具执行失败：" + name),
+                           "stage": "validation" if name == "validate" else "tool:" + name,
+                           "round": number, "toolCallId": identity, "events": dict(entry["events"]),
+                           "log_path": str(self.host.conversation.log.path) if self.host.conversation else None}
+                if validation:
+                    details["errors"] = validation.get("errors", [])
+                key = (number, identity)
+                if key not in self.tool_errors:
+                    self.tool_errors[key] = self.diagnostics.errors.count()
+                    self.diagnostics.add_error(details)
                 else:
-                    shown = value
-                if kind == "validation":
-                    shown = {"ok": value["ok"], "errors": value.get("errors", [])}
-                self.chat.appendPlainText(("Validator：" if kind == "validation" else "")
-                                          + json.dumps(shown, ensure_ascii=False))
+                    self.diagnostics.errors.setItemData(self.tool_errors[key], details)
+                    self.diagnostics.select_error()
+                self.status.setText("错误：" + details["message"] + "；可查看详情，本轮继续处理。")
 
     def show_diff(self):
-        self.window.launch(self.host.diff, self.diff.setPlainText)
+        self.window.launch(self.host.diff, self.open_diff)
+
+    def open_diff(self, value):
+        """只在主动审阅时打开固定基线 Diff，不阻塞对话页面。"""
+        dialog = QDialog(self)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.setWindowTitle("累计 Diff（Candidate 固定基线）")
+        dialog.resize(900, 650)
+        dialog.setSizeGripEnabled(True)
+        layout = QVBoxLayout(dialog)
+        text = QPlainTextEdit()
+        text.setReadOnly(True)
+        text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        text.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
+        text.setPlainText(value or "暂无修改")
+        layout.addWidget(text)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.close)
+        layout.addWidget(buttons)
+        self.diff_dialog = dialog
+        dialog.show()
 
     def validate(self):
         def done(value):
-            self.show_event({"event": {"type": "validation", **value}})
+            self.show_event({"round": self.host.conversation.log.group if self.host.conversation else 0,
+                             "event": {"type": "validation", **value, "toolCallId": f"manual-{len(self.chat.entries)}"}})
             if not value.get("ok"):
                 self.diagnostics.show_error()
         self.window.launch(self.host.validate, done)
 
     def publish(self):
-        self.window.launch(self.host.publish, lambda identity: self.chat.appendPlainText("已发布新 Manifest：" + identity + "；Default 未改变。"))
+        self.window.launch(self.host.publish, lambda identity: self.chat.add_message("系统", "已发布新 Manifest：" + identity + "；Default 未改变。"))
 
     def set_default(self):
         identity = self.baseline.currentData()
@@ -749,6 +748,5 @@ class RepairPage(QWidget):
         for control in self.controls:
             control.setEnabled(not busy)
             control.setToolTip("当前活动尚未结束" if busy else "")
-        self.files.setEnabled(not busy)
         self.baseline.setEnabled(not busy)
         self.cancel_button.setEnabled(self.window.service.state.get("activity") == "Agent")
