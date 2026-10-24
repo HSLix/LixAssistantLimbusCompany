@@ -60,3 +60,7 @@ uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags zh event
 crop-asset CLI 可现场裁剪并配置 tags；observe.crop_asset 也能传 tags。每次匹配重新读取目录及标签，同一个 Run 内新增图片或改标签从下一次匹配生效，Manifest 切换不切换素材。
 
 完整示例回归使用生产动作注册和平台替身，覆盖三层调用、全部动作、裁剪→加标签→直接匹配及 Trace/Ledger；不代表 Windows 游戏或包内业务验收。
+
+## Trusted Action 类型补全
+
+样例使用 `from lalc import RunContext` 和 `ctx: RunContext` 注解，在项目 Python 环境中提供 Action 名称、参数和返回类型补全。应用注册、Action 签名或 Context 公开接口变化后，在源码根目录运行 `uv run lalc generate-stubs` 并提交更新后的声明；详见[开发教程](../../docs/developer-workflow-tutorial.md#trusted-action-类型补全)。

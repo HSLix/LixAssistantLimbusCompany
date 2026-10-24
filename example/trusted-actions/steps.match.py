@@ -1,9 +1,9 @@
 """显式截图后匹配当前逻辑名目录，无需登记白名单或发布素材。"""
-from lalc import step
+from lalc import RunContext, step
 
 
 @step
-def execute(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
+def execute(ctx: RunContext, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
             threshold: float = 0.9, nms: bool = True,
             nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | dict[str, float]]]:
     """返回完整客户区坐标，空匹配不等于业务完成。"""

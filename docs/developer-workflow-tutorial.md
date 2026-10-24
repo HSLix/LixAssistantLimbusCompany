@@ -20,6 +20,30 @@ Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另�
 
 源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
+## Trusted Action 类型补全
+
+开发者从根包导入 `RunContext`，给 execute、condition 或 detect/recover 的 ctx 参数添加注解。IDE 使用项目的 Python 环境，即可补全 Action 名称、对应关键字参数和返回类型；其他 Context 成员（例如 `ctx.call()` 和 `ctx.game_language`）也保留类型信息。
+
+```python
+from lalc import RunContext, step
+
+
+@step
+def execute(ctx: RunContext, *, x: int, y: int) -> None:
+    ctx.action("observe.capture_screen")
+    ctx.action("control.click", x=x, y=y)
+```
+
+新增或修改应用 Trusted Action 的注册、函数签名，或修改 RunContext 公开接口后，在源码 checkout 中运行：
+
+```bash
+uv run lalc generate-stubs
+```
+
+命令直接从 `application_actions()` 和真实函数签名生成完整的 `src/lalc/run_context.pyi`，保留默认值并移除执行器注入的 Context 参数；装饰器需通过 `functools.wraps` 或准确的 `__signature__` 保留签名。注解须能解析，Action 参数和返回值采用运行时支持的 JSON 类型；无法表达的签名、缺失注解或写入失败会报错并返回非零。生成成功后把声明与源码一起提交，不手工编辑声明。命令无需 Candidate、Manifest、游戏窗口或模型服务。
+
+`tests/test_stubgen.py` 比较声明与当前注册、Context 接口是否一致，并使用 Pyright 验证典型合法与非法调用。静态声明对应应用正式注册，不随测试替身表或 Manifest 切换；角色/阶段权限仍由现有 Validator 和执行器检查，`ctx.call()` 仍保持现有动态参数与返回类型。
+
 ## 独立素材与标签
 
 完整逻辑名对应完整目录，例如 `ui/claim` 对应数据目录的 `assets/ui/claim/`。每张图为 `<完整SHA256>.png`，目录下 `asset-tag.json` 保存 `哈希 → tag列表`。语言只是普通可选 tag，无特殊筛选规则。所有有效图片都参与候选；缺 tag 文件或缺哈希条目时按 `[]` 处理，不需要登记白名单。

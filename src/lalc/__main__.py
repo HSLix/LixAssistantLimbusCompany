@@ -72,6 +72,7 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument("asset")
     tag.add_argument("--tags", nargs="*", default=None, help="Complete replacement list; omit to clear")
     tag.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
+    commands.add_parser("generate-stubs", help="Generate RunContext types from registered Trusted Actions")
     commands.add_parser("data-dir")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
@@ -207,6 +208,15 @@ def _dispatch(args: argparse.Namespace) -> int:
         from .pi_probe import run_probe
 
         return run_probe(args)
+    if args.command == "generate-stubs":
+        from .stubgen import generate_stubs
+
+        try:
+            print(generate_stubs())
+        except (OSError, ValueError, TypeError, NameError) as error:
+            _print_exception(error)
+            return 1
+        return 0
     data_root = default_data_root()
     if args.command == "data-dir":
         print(data_root)
@@ -308,7 +318,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return run_application()
     try:
-        if args[0] not in {"data-dir", "pi-probe"}:
+        if args[0] not in {"data-dir", "pi-probe", "generate-stubs"}:
             configure_logging(default_data_root())
         return _dispatch(_parser().parse_args(args))
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:
