@@ -28,7 +28,7 @@ uv run --frozen lalc pi-probe \
 
 - 单次输出采用服务端默认值，不发送 `max_tokens`、`max_completion_tokens` 或 `max_output_tokens`；流式输出及独立的请求次数限制继续保留。
 
-- 临时空目录承载 pi 工作目录与配置；关闭个人扩展、技能、提示模板及 AGENTS/CLAUDE 上下文发现，只加载 LALC 指定扩展，只启用受限 `read`。终端、PowerShell、edit、write 均不开放。
+- 临时空目录承载 pi 工作目录与配置；模型 system prompt 不包含该真实工作目录，文件路径相对于宿主指定的只读源码根目录，工具内部仍解析真实路径并检查边界。关闭个人扩展、技能、提示模板及 AGENTS/CLAUDE 上下文发现，只加载 LALC 指定扩展，只启用受限 `read`。终端、PowerShell、edit、write 均不开放。
 - 关闭会话重试、自动压缩、缓存预热及启动联网；现成 pi 模型客户端设置 `maxRetries: 0`，避免内部 HTTP 重试绕过计数。
 - `--max-requests` 默认 20，在发送前计数并拒绝超限请求。到达上限后若模型已正常回答仍可完成；需要下一次请求时结束为未完成。
 - 终端展示实际模型请求（省略图片编码）、工具参数和结果、响应与最终状态。以 `agent_settled` 判断停止，不把 `agent_end` 当作最终结束。

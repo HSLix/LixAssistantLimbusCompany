@@ -338,6 +338,8 @@ class RepairConversation:
                             self.log.record(item)
                             if kind == "lalc_request":
                                 self.log.requests = item["requests"]
+                                if item.get("budget_message"):
+                                    self.history.append(self.log.clean(item["budget_message"]))
                             elif kind == "message_end":
                                 received = item.get("message", {})
                                 if received.get("role") != "user":

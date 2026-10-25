@@ -126,7 +126,15 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），`plan.json` 始终只读；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
 
 
-## 2026-10-24 Agent Repair 命名与请求额度
+## 2026-10-25 固定上下文前缀与相对路径
+
+本节替代下文历史记录中的“额度注入 system、计数不加入长期历史”。请求按固定规则、按时间追加的历史消息/工具调用及结果、本次额度提醒组织。system 不包含动态额度或 pi 自动添加的真实工作目录；文件路径相对于 Candidate 根目录，已有文件列表继续随用户消息提供。实际工作目录、路径解析及访问边界仍由宿主管理，不扩展为所有工具反馈的路径脱敏。
+
+额度提醒作为宿主状态消息进入实际请求和对话历史，旧提醒原位保留，最新提醒有效；不触发新轮、不替换旧消息、不拆开一组工具调用与结果。每条用户消息重新计数，预检和格式纠正继续计入；预检消息不混入修复历史，格式纠正继续禁用工具，发送前的硬性上限保持有效。GUI/CLI 共用此行为，不新增设置。连接预检及 pi-probe 同样移除 system 中的工作目录，但保留各自原有的文件访问与计数规则。
+
+实施验证：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **43 passed, 4 skipped**。真实 pi 1.4.0 与本机 HTTP 替身验证固定 system 不含工作目录、末尾额度、预检隔离、同轮及跨轮消息前缀一致、DeepSeek reasoning/连续工具、原图、格式纠正与硬性上限。首次检查因沙箱禁止本机监听而未能建立替身服务，授权监听后重新运行得到上述结果。相关普通检查 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_agent_repair.py tests/test_agent_settings.py tests/test_developer_gui.py` 为 **86 passed, 1 skipped**。未调用真实模型、测量 DeepSeek 实际缓存收益或执行 Windows 实机验收，跳过项不计通过。
+
+## 历史：2026-10-24 Agent Repair 命名与请求额度
 
 共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，在模型 system prompt 中注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。该动态提示进入实际请求日志，不把过时计数追加进长期对话历史。
 

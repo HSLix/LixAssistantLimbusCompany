@@ -82,7 +82,9 @@ def probe(tmp_path):
                 if state["status"] != 200:
                     self.wfile.write(json.dumps({"error": {"message": state.get("error_message", "test provider unavailable")}}).encode())
                     return
-                content = body["messages"][-1].get("content", "")
+                message = next(message for message in reversed(body["messages"])
+                               if "LALC_REQUEST_BUDGET\\n" not in json.dumps(message, ensure_ascii=False))
+                content = message.get("content", "")
                 text = content if isinstance(content, str) else "".join(p.get("text", "") for p in content)
                 if (state.get("repair_check") and not body.get("tools")
                         and text.startswith(("连接检查：", "简短描述随附图片"))):
@@ -148,6 +150,11 @@ def test_image_and_restricted_read_with_real_pi(probe, full_screenshot):
     assert all(not ({"max_tokens", "max_completion_tokens", "max_output_tokens"} & body.keys())
                for body in state["calls"])
     first, second = state["calls"]
+    for payload in (first, second):
+        system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
+        assert "<cwd>" not in system and "lalc-pi-" not in system
+        assert "文件路径相对于宿主指定的源码根目录" in system
+    assert first["messages"][0] == second["messages"][0]
     assert [tool["function"]["name"] for tool in first["tools"]] == ["read"]
     assert any(part["type"] == "image_url" for message in first["messages"]
                if isinstance(message.get("content"), list) for part in message["content"])

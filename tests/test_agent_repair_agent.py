@@ -369,7 +369,8 @@ def test_invalid_final_gets_error_feedback_then_strict_json_without_tools(conver
     assert len(state["calls"]) == result["requests"] == 3
     for index, payload in enumerate(state["calls"], 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
-        assert f"本轮模型请求第 {index}/20 次" in system
+        assert "本轮模型请求第" not in system and "<cwd>" not in system
+        assert f"本轮模型请求第 {index}/20 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
     assert all(not ({"max_tokens", "max_completion_tokens", "max_output_tokens"} & body.keys())
                for body in state["calls"])
     assert any(part.get("text") == invalid for message in chat.history for part in message.get("content", []))
@@ -467,10 +468,15 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
     first_calls = list(state["calls"])
     for index, payload in enumerate(first_calls, 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
-        assert f"当前对话第 1 轮；本轮模型请求第 {index}/3 次" in system
-        assert f"还可请求 {3 - index} 次" in system
-        assert system.count("当前对话第") == 1
+        latest = json.dumps(payload["messages"][-1], ensure_ascii=False)
+        assert payload["messages"][-1]["role"] == "user"
+        assert f"当前对话第 1 轮；本轮模型请求第 {index}/3 次" in latest
+        assert f"还可请求 {3 - index} 次" in latest
+        assert "当前对话第" not in system
+        assert "<cwd>" not in system and "lalc-pi-" not in system
         assert "达到上限后必须停止" in system
+    assert first_calls[2]["messages"][:len(first_calls[1]["messages"])] == first_calls[1]["messages"]
+    assert first_calls[1]["messages"][0] == first_calls[2]["messages"][0]
     requests = [event["event"] for event in events if event["event"]["type"] == "lalc_request"]
     assert [(value["requests"], value["request_limit"]) for value in requests] == [(1, 3), (2, 3), (3, 3)]
     options.max_requests = 2
@@ -479,9 +485,12 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
     assert result["status"] == "completed" and result["requests"] == 2
     for index, payload in enumerate(state["calls"][3:], 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
-        assert f"当前对话第 2 轮；本轮模型请求第 {index}/2 次" in system
-        assert "当前对话第 1 轮" not in system
-    assert "当前对话第" not in json.dumps(chat.history, ensure_ascii=False)
+        assert f"当前对话第 2 轮；本轮模型请求第 {index}/2 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
+        assert "当前对话第" not in system
+    assert state["calls"][-1]["messages"][:len(first_calls[-1]["messages"])] == first_calls[-1]["messages"]
+    budgets = [message for message in chat.history if "LALC_REQUEST_BUDGET" in json.dumps(message)]
+    assert len(budgets) == 3  # 两轮预检的通知不进入修复历史。
+    assert json.loads((chat.log.path / "context.json").read_text()) == chat.history
 
 
 def test_add_both_source_kinds_then_edit_new_files_in_same_round(conversation):
@@ -650,6 +659,10 @@ def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, th
     assistant = [m for m in payload['messages'] if m['role'] == 'assistant']
     assert [m['reasoning_content'] for m in assistant] == [
         'Inspect source before answering.', 'Check available actions too.', 'Source inspection completed.']
+    # 连续工具调用及新一轮均完整保留先前实际请求的消息前缀。
+    for previous, current in ((1, 2), (2, 3), (3, 5)):
+        before = state['calls'][previous]['messages']
+        assert state['calls'][current]['messages'][:len(before)] == before
     for payload in state['calls']:
         assert payload['model'] == 'deepseek-flash'
         assert payload['thinking'] == {'type': 'enabled' if thinking else 'disabled'}

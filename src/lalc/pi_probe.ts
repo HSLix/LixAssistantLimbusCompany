@@ -59,6 +59,9 @@ export default async function (pi) {
   const history = process.env.LALC_PI_HISTORY ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")) : [];
   const inputImages = process.env.LALC_PI_INPUT_IMAGES
     ? JSON.parse(await readFile(process.env.LALC_PI_INPUT_IMAGES, "utf8")) : [];
+  const budgetHistory = [];
+  let pendingBudget;
+  let budgetPosition = 0;
   pi.on("context", async event => {
     const messages = [...history, ...event.messages];
     if (inputImages.length) {
@@ -69,6 +72,17 @@ export default async function (pi) {
       messages[index] = { ...messages[index], content: [
         { type: "text", text: process.env.LALC_PI_INPUT_MESSAGE }, ...inputImages] };
     }
+    // 按原始消息位置重放通知，不改写已经发送的前缀。
+    for (const { position, message } of [...budgetHistory].reverse()) {
+      messages.splice(history.length + position, 0, message);
+    }
+    pendingBudget = undefined;
+    if (conversationRound) {
+      budgetPosition = event.messages.length;
+      pendingBudget = { role: "user", timestamp: Date.now(), content: [{ type: "text", text:
+        `LALC_REQUEST_BUDGET\n当前对话第 ${conversationRound} 轮；本轮模型请求第 ${requests + 1}/${roundLimit} 次（包含本次，还可请求 ${Math.max(0, roundLimit - requests - 1)} 次）。` }] };
+      messages.push(pendingBudget);
+    }
     return { messages };
   });
   pi.on("before_agent_start", async event => {
@@ -76,6 +90,10 @@ export default async function (pi) {
     if (repairMode && event.messageType === "user" && event.prompt.startsWith("LALC_FINAL_FORMAT_CORRECTION\n")) {
       pi.setActiveTools([]);
     }
+    // 使用宿主原始提示词覆盖 pi 的自动工作目录段，工具声明仍由 pi 管理。
+    return { systemPrompt: event.systemPromptOptions.customPrompt
+      + "\n" + (repairMode ? "文件路径相对于 Candidate 根目录；已有文件列表由宿主提供。" : "文件路径相对于宿主指定的源码根目录。")
+      + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；历史通知原位保留，以最后一条为准。每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。" };
   });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
@@ -126,13 +144,8 @@ export default async function (pi) {
           // 扩展事件中的异常会被 pi 捕获；上限必须在客户端回调里拒绝发送。
           if (requests >= limit) throw new Error("LALC request limit reached");
           requests++;
-          if (conversationRound) {
-            // 在最终载荷注入当前额度，避免 SDK 丢弃上下文字段；不改长期历史。
-            const budget = `当前对话第 ${conversationRound} 轮；本轮模型请求第 ${requests}/${roundLimit} 次（包含本次，还可请求 ${Math.max(0, roundLimit - requests)} 次）。`
-              + "每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。";
-            const system = payload.messages.find(message => message.role === "system" || message.role === "developer");
-            if (system) system.content += "\n\n" + budget;
-            else payload.messages.unshift({ role: "system", content: budget });
+          if (pendingBudget) {
+            budgetHistory.push({ position: budgetPosition, message: pendingBudget });
           }
           const shown = JSON.parse(JSON.stringify(payload, (_key, value) =>
             typeof value === "string" && value.startsWith("data:image/")
@@ -143,9 +156,9 @@ export default async function (pi) {
             const key = process.env.LALC_PI_API_KEY!;
             await writeFile(payloadPath, JSON.stringify(payload, (_name, value) =>
               typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
-            emit("lalc_request", { requests, request_limit: roundLimit, payload_path: payloadPath });
+            emit("lalc_request", { requests, request_limit: roundLimit, payload_path: payloadPath, budget_message: pendingBudget });
           } else {
-            emit("lalc_request", { requests, request_limit: roundLimit, payload: shown });
+            emit("lalc_request", { requests, request_limit: roundLimit, payload: shown, budget_message: pendingBudget });
           }
           return payload;
         },
