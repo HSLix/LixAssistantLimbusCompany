@@ -68,6 +68,8 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 
 ## 连接错误诊断
 
+LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检、正式请求及 pi-probe 共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
+
 pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。预检与正式请求均覆盖；原有预检日志仍在 round-N/events.jsonl，正式交互日志位于对话根 events.jsonl。
 
 旧记录中的 `Connection error.` 本身不能证明代理、TLS、服务端或工具定义是根因。更新后需在实际出错的 Windows 环境复现，根据新增错误码确定修复；本机 HTTP 替身检查只验证诊断链路。

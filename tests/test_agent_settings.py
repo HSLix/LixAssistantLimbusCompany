@@ -96,6 +96,28 @@ def test_full_api_path_and_explicit_loaded_model(monkeypatch, tmp_path):
             pytest.fail("implicit model accepted")
 
 
+@pytest.mark.parametrize("explicit", [None, "0", "1"])
+def test_pi_defaults_to_system_ca_without_changing_parent_environment(tmp_path, monkeypatch, explicit):
+    """仅配置子进程的 CA 来源，不启动真实 pi 或改变父进程设置。"""
+    import os
+    import lalc.pi_probe as probe
+    if explicit is None:
+        monkeypatch.delenv("NODE_USE_SYSTEM_CA", raising=False)
+    else:
+        monkeypatch.setenv("NODE_USE_SYSTEM_CA", explicit)
+    monkeypatch.setattr(probe.shutil, "which", lambda _: "/pi")
+    monkeypatch.setattr(probe, "_models", lambda *args: [{"id": "test"}])
+    expected = "1" if explicit is None else explicit
+    def version(*args, **kwargs):
+        assert kwargs["env"]["NODE_USE_SYSTEM_CA"] == expected
+        return argparse.Namespace(stdout=probe.PI_VERSION)
+    monkeypatch.setattr(probe.subprocess, "run", version)
+    args = arguments(base_url="https://example.test", model="test", max_requests=2, pi="pi")
+    with configured_pi(args, tmp_path, "lalc-no-key", "prompt", require_image=False) as (_, env, *_):
+        assert env["NODE_USE_SYSTEM_CA"] == expected
+    assert os.environ.get("NODE_USE_SYSTEM_CA") == explicit
+
+
 def test_secret_separation_and_temporary_override(tmp_path, monkeypatch):
     # 替身仅证明存储分离及选择规则；原生加密另由 Windows 测试验证。
     monkeypatch.setattr(settings, "dpapi", lambda value, **kw: value[7:] if kw.get("decrypt") else b"opaque:" + value)
