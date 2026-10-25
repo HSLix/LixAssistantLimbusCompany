@@ -21,6 +21,13 @@ def invoke(tools, name, **arguments):
     return json.loads(Path(tools.call(name, arguments)).read_text())
 
 
+def crop(tools, **arguments):
+    preview = invoke(tools, "preview_crop", **arguments)
+    if preview.get("isError"):
+        return preview
+    return invoke(tools, "crop_asset", preview_id=preview["details"]["preview_id"])
+
+
 def snapshot(root):
     return {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()}
 
@@ -101,9 +108,9 @@ def test_every_capture_refocuses_and_crop_preserves_old_tags_and_source(tools):
         return bytes([10, 20, 30, 255]) * 4
     tools.platform.capture = fixed_capture
     args = {"logical_name": "ui/new", "region": {"x": 0, "y": 0, "width": 1, "height": 1}}
-    added = invoke(tools, "crop_asset", **args, tags=["keep", "keep"])["details"]
+    added = crop(tools, **args, tags=["keep", "keep"])["details"]
     before = snapshot(tools.library.root)
-    reused = invoke(tools, "crop_asset", **args, tags=["replace"])["details"]
+    reused = crop(tools, **args, tags=["replace"])["details"]
     assert not added["existed"] and reused["existed"]
     assert reused["tags"] == ["keep", "keep"] and reused["sha256"] == added["sha256"]
     assert snapshot(tools.library.root) == before
@@ -111,28 +118,28 @@ def test_every_capture_refocuses_and_crop_preserves_old_tags_and_source(tools):
     source = json.loads((tools.library.data_root / "asset-provenance" / f"{reused['provenance_id']}.json").read_text())
     assert Path(source["source_screenshot"]).is_file()
     assert source["interaction_id"] == tools.log.path.name
-    other = invoke(tools, "crop_asset", logical_name="ui/new", region={"x": 0, "y": 0, "width": 2, "height": 1})["details"]
+    other = crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 2, "height": 1})["details"]
     tags = json.loads(tools.library.path("ui/new/asset-tag.json").read_text())
     assert tags == {added["sha256"]: ["keep", "keep"], other["sha256"]: []}
     assert invoke(tools, "asset_images", images=[{"logical_name": "ui/new", "sha256": other["sha256"]}])["details"]["images"]
 
 
 def test_reusing_image_without_tag_file_does_not_create_metadata(tools):
-    invoke(tools, "crop_asset", logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1})
+    crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1})
     tags = tools.library.path("ui/new/asset-tag.json")
     tags.unlink()
     tools.platform.captures = 0
-    result = invoke(tools, "crop_asset", logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1}, tags=["ignored"])
+    result = crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1}, tags=["ignored"])
     assert result["details"]["existed"] and result["details"]["tags"] == []
     assert not tags.exists()
 
 
 def test_crop_preserves_tag_entry_even_if_its_image_is_missing(tools):
     args = {"logical_name": "ui/new", "region": {"x": 0, "y": 0, "width": 1, "height": 1}}
-    first = invoke(tools, "crop_asset", **args, tags=["keep"])["details"]
+    first = crop(tools, **args, tags=["keep"])["details"]
     Path(first["image_path"]).unlink()
     tools.platform.captures = 0
-    second = invoke(tools, "crop_asset", **args, tags=["replace"])["details"]
+    second = crop(tools, **args, tags=["replace"])["details"]
     assert not second["existed"] and second["tags"] == ["keep"]
 
 
@@ -154,9 +161,9 @@ def test_live_tools_reject_nonunique_window_without_capturing(tools, windows):
 
 
 def test_crop_rejects_invalid_region_and_cancel_retains_new_asset(tools):
-    bad = invoke(tools, "crop_asset", logical_name="ui/new", region={"x": 0, "y": 0, "width": 3, "height": 1})
+    bad = crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 3, "height": 1})
     assert bad["isError"] and not tools.library.root.exists()
-    invoke(tools, "crop_asset", logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1})
+    crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 1, "height": 1})
     before = snapshot(tools.library.root)
     tools.cancelled.set()
     with pytest.raises(RuntimeError, match="cancelled"):

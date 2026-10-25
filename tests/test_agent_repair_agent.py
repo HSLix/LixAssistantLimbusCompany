@@ -102,6 +102,49 @@ def test_text_only_and_context_retained(conversation):
     assert (chat.log.path / "round-2" / "result.json").exists()
 
 
+@pytest.mark.parametrize("fault,phase", [("disconnect_at", "connect"), ("broken_body_at", "response_body")])
+@pytest.mark.parametrize("request_number", [1, 2])
+def test_transport_error_preserves_cause_and_request_without_retry(conversation, fault, phase, request_number):
+    chat, options, state = conversation
+    state[fault] = request_number
+    result = asyncio.run(chat.run("只分析连接", options, key="test-private-key"))
+    assert result["status"] == "incomplete", result
+    assert result["requests"] == len(state["calls"]) == request_number
+    transport = result["diagnostics"]["transport"]
+    assert transport["phase"] == phase and transport["requests"] == request_number
+    assert transport["url"].endswith("/v1/chat/completions")
+    assert transport["error"]["name"] and transport["error"]["cause"]["code"]
+    assert "底层连接信息" in result["error"]
+    assert "test-private-key" not in json.dumps(result)
+
+
+def test_agent_previews_saves_and_archives_asset(conversation):
+    from test_focused_observation import FakeWindowPlatform
+    chat, options, state = conversation
+    platform = FakeWindowPlatform()
+    capture = platform.capture
+    def fixed_capture(*args):
+        capture(*args)
+        return bytes([10, 20, 30, 255]) * 4
+    platform.capture = fixed_capture
+    chat.tools.platform = platform
+    def save(_body):
+        return tool("crop_asset", {"preview_id": next(reversed(chat.tools.previews))})
+    def remove(_body):
+        path = next(chat.tools.library.root.glob("ui/test/*.png"))
+        return tool("remove_asset", {"logical_name": "ui/test", "sha": path.stem, "reason": "开发者要求测试归档"})
+    steps = iter([lambda body: tool("preview_crop", {"logical_name": "ui/test", "region": {"x": 0, "y": 0, "width": 1, "height": 1}}),
+                  save, remove, lambda body: answer()])
+    state["respond"] = lambda body: next(steps)(body)
+    result = asyncio.run(chat.run("预览、保存后归档素材", options))
+    assert result["status"] == "completed", result
+    assert platform.captures == 2
+    assert not list(chat.tools.library.root.glob("ui/test/*.png"))
+    assert chat.tools.library._tag_mapping("ui/test") == {}
+    assert len(list((chat.host.service.data_root / "agent_removed_asset").glob("*/record.json"))) == 1
+    assert "archive_id" in json.dumps(state["calls"][-1])
+
+
 def test_developer_publish_trial_and_logs_continue_same_round(conversation, monkeypatch):
     chat, options, state = conversation
     monkeypatch.setattr(chat.host.service, "_start_session", lambda: None)
@@ -284,8 +327,8 @@ def test_windows_real_model_captures_and_reuses_crop(tmp_path):
     # 绕过测试套件的公共平台替身，验收必须使用真实 Win32 服务。
     from lalc.focused import WindowsWindowPlatform
     chat.tools.platform = WindowsWindowPlatform(checkpoint=chat.tools.checkpoint)
-    message = ("不改候选。调用 game_screenshot，然后连续调用两次 crop_asset，logical_name=acceptance/live，region="
-               + region + "。第一次 tags=[\"keep\"]，第二次 tags=[\"replace\"]，报告工具结果后结束本轮。")
+    message = ("不改候选。调用 game_screenshot，然后分别 preview_crop 并用返回的 preview_id 调用 crop_asset 保存两次，logical_name=acceptance/live，region="
+               + region + "。第一次预览 tags=[\"keep\"]，第二次预览 tags=[\"replace\"]，报告工具结果后结束本轮。")
     result = asyncio.run(chat.run(message, options))
     print(f"Windows live screenshot/crop evidence: {chat.log.path}")
     assert result["status"] == "completed", result
@@ -397,11 +440,15 @@ def test_live_asset_tool_images_retained_across_rounds_without_overwrite(convers
     chat.tools.platform = platform
     region = {"x": 0, "y": 0, "width": 1, "height": 1}
     crop = {"logical_name": "ui/new", "region": region, "tags": ["keep"]}
-    script(state, [tool("game_screenshot", {}), tool("crop_asset", crop), answer()])
+    def save_preview(_body):
+        return tool("crop_asset", {"preview_id": next(reversed(chat.tools.previews))})
+    steps = iter([lambda body: tool("game_screenshot", {}), lambda body: tool("preview_crop", crop), save_preview, lambda body: answer()])
+    state["respond"] = lambda body: next(steps)(body)
     first = asyncio.run(chat.run("inspect and crop", options))
     assert first["status"] == "completed", first
     retained = {p: p.read_bytes() for p in chat.log.path.glob("tool-*") if p.is_file()}
-    script(state, [tool("crop_asset", {**crop, "tags": ["replace"]}), answer()])
+    steps = iter([lambda body: tool("preview_crop", {**crop, "tags": ["replace"]}), save_preview, lambda body: answer()])
+    state["respond"] = lambda body: next(steps)(body)
     second = asyncio.run(chat.run("reuse the same crop", options))
     assert second["status"] == "completed", second
     assert all(p.read_bytes() == value for p, value in retained.items())

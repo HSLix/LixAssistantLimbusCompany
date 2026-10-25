@@ -8,7 +8,7 @@
 
 安装已有 `gui`、`automation` extras 后运行 `uv run --frozen lalc`。普通执行不启动 pi；Agent 当前接入回归基线为 pi 1.4.0；其他版本也允许启动，版本不匹配会写 WARNING 日志，在 CLI 终端及 GUI 对话提示，兼容性须另行验证。
 
-- **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 的 `crop_asset` 仍每次新截图。
+- **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
 - **Runner**：刷新 Manifest 与入口，选择 Task Workflow、Subworkflow、Step 或 Automation Plan。前三种输入 JSON 对象，空白按 `{}`；Plan 选择已有配置文件。可暂停、恢复、取消，查看真实 Base ID、结果、Trace 和 Ledger。Runner 选择持久保存，只作用于后续执行，不改变 Default 或 Candidate；重启恢复后先刷新核验，不可加载时禁止启动，须重新选择或清除。
 - **Agent Settings**：保存完整 Base URL、Model 和每轮请求上限，默认 20、最小 2。API Key 普通空输入保留原值；新输入覆盖，明确清除解除凭据。界面仅显示是否设置，不回读旧明文。Windows 使用当前用户 DPAPI；其他平台仅在本次 GUI 内存中保留输入的临时密钥。不会读写其他 pi 实例的个人配置。
 - **Agent Repair**：从已有 Manifest 明确初始化或重建 Candidate；非空替换须确认，成功后开启新对话，失败保留原草稿及原对话。通过“打开 Agent 工作区”在系统文件管理器查看 Candidate，无需选择编辑目标；Agent 可修改多个已有文件，`plan.json` 始终只读。支持纯文字及任意数量的可选图片，每条消息启动一轮，最终回答后等待主动发送下一条。New Conversation 保留 Candidate 和固定 Diff 基线，旧日志保留。提问和最终回答按轮分块，工具默认显示可展开摘要；“查看累计 Diff”主动打开可伸缩滚动窗口，无常驻预览框。
@@ -51,11 +51,28 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 ## 权限、上下文和日志
 
-按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建、删除和 `plan.json` 编辑；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
+按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建、删除和 `plan.json` 编辑；Asset 仅允许下述专用移除归档例外；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
 
 pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查询和 Validator RPC；Developer Policy 增加下述发布、试运行和日志工具，不提供终端、通用写入、删除或设置 Default 工具。Candidate Python 校验会导入模块，Validator 不是操作系统沙箱；生成代码的副作用约束不能被描述为进程隔离保证。
 
-## Developer Policy 开发调试循环
+## Agent 素材预览与归档
+
+[ADR 0031](adr/0031-preview-agent-crops-and-archive-removed-assets.md) 取代旧的 Agent 裁剪直接保存与禁止移除规则。Workflow 的 `observe.crop_asset` 不变。
+
+- `game_screenshot()` 返回原始截图和独立的 40px 横纵坐标网格图，均在交互日志留存。
+- `preview_crop(logical_name, region, threshold=0.9, tags=...)` 从当前游戏新截图，返回区域标线全图、干净裁剪图、同图匹配结果及 `preview_id`。结果含命中数、坐标、分数和中心点；不自动判断模板合格，不加入活跃库。
+- `crop_asset(preview_id)` 保存本对话预览的相同原始像素、名称、区域和标签，不重新截图。预览可跨同一对话的轮次复用；New Conversation/重建 Candidate 后须重新预览。既有同名同哈希图片及标签仍保留。
+- `remove_asset(logical_name, sha, reason)` 先验完整哈希及路径、新截当前原始画面，归档完成准备后移除活跃图片及同逻辑名的 SHA→Tags 关系；其他逻辑名不变。不需要 Publish，但会影响所有后续使用该 Asset 的匹配。
+
+归档位于数据目录 `agent_removed_asset/<UTC时间-UUID>/`，包含原图、移除时的原始截图及 `record.json`（原名、SHA、Tags 快照、理由、时间、原路径和状态），结果返回记录 ID 与归档位置。截图/准备失败不移除；修改活跃数据中途发生普通失败或取消会回退。中断可能留下 `prepared` 记录及完整恢复数据，不提供自动恢复工具、GUI 或永久删除。网格/标线不会进入模板、模拟匹配或原始截图证据。
+
+## 连接错误诊断
+
+pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。预检与正式请求均覆盖；原有预检日志仍在 round-N/events.jsonl，正式交互日志位于对话根 events.jsonl。
+
+旧记录中的 `Connection error.` 本身不能证明代理、TLS、服务端或工具定义是根因。更新后需在实际出错的 Windows 环境复现，根据新增错误码确定修复；本机 HTTP 替身检查只验证诊断链路。
+
+## Developer Policy 开发调试循环（工具）
 
 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 允许 Agent 在一次开发者消息中自主重复修改、校验、发布、试运行和读日志。此规则优先于旧有“Agent 不自动 Publish/运行”的说明，与 Stage 3.5 Runtime Policy 分开。
 

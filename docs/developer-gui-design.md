@@ -216,6 +216,21 @@ llama.cpp 原表单保持不变；DeepSeek 下显示思考开关和 low/high/max
 各平台仅在本次 GUI 内存中保留，不新增系统钥匙串或持久密钥。旧 secret_name 归到原平台。
 DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/architecture 字段。
 
+## 2026-10-25 Agent 截图、裁剪预览与移除归档（已确认并实现）
+
+本节经 grill、design-impact-review 及开发者整体确认，由 ADR 0031 接受并实现，优先于本文旧有 Agent 新截图直接保存及禁止移除素材的规则。输入为交互记录 3f218ab9-6cdc-4e14-9092-2eabfa66520c；其中第 1 轮正式请求、第 3/4 轮无工具预检均出现 Connection error，第 2/5 轮可以交互，不能据此把新增工具认定为连接失败根因。连接诊断需保留底层错误原因后再定位。
+
+- 已确认：Agent 裁剪采用关联预览与正式保存。预览工具命名为 preview_crop，正式 crop_asset 引用对应预览，保存预览时确认的同一份裁剪像素，不重新截图。此决定替换 ADR 0028 的 Agent 每次正式裁剪均新截图规则；Workflow Trusted Action observe.crop_asset 的边界本次不随之改变。接口为 preview_crop(logical_name, region, threshold=0.9, tags=...) → preview_id，再调用 crop_asset(preview_id)；ID 可跨同一对话轮次复用，不跨 New Conversation。
+- 已确认：preview_crop 接收裁剪区域及模拟匹配 threshold，返回带区域标线的原图、裁剪图和使用裁剪图在同一原图上匹配的结果；预览不加入活跃 Asset Library，但可在 Agent Interaction Log 留证。game_screenshot 返回原截图及每隔 40px 的横纵标尺/网格辅助图。辅助覆盖层不进入裁剪模板、匹配输入或归档要求的原始游戏截图。同图匹配仅提供位置、分数及重复情况，不能证明跨状态可靠性，也不因单次命中自动批准素材。
+- 已确认：仅使用 remove_asset(logical_name, sha, reason)，不提供 discard_asset；从活跃目录移除指定图片并保存在 agent_removed_asset 下独立且不冲突的时间/唯一 ID 归档记录中，保留原图、哈希、原逻辑名、Tags 快照、移除时间、理由及无覆盖层的原始游戏截图。校验实际哈希与路径边界，归档失败不得丢失原素材，返回归档 ID 和位置，并保留未来恢复需要的元数据。本次不要求恢复 GUI/自动恢复，不新增 Candidate Asset Store、Discard Index、独立 Asset Library 或 Manifest Asset 映射。
+- 已确认：remove_asset 可归档任意既有 Asset，包括人工或其他对话创建的图片，不限本轮新增。移除活跃图片时必须同步移除该 Logical Name 的 asset-tag.json 中对应 SHA→Tags 关系；归档保留移除前的 Tags 快照。同一 SHA 在其他 Logical Name 下的活跃图片及标签关系不变，不引入全局标签表。Asset 独立于 Manifest，移除会影响所有使用该 Logical Name 的后续匹配。
+- 已确认：remove_asset 每次重新截取当前游戏画面，归档无标尺、网格或其他覆盖层的原始截图；截图失败则不移除。可保留原裁剪来源记录的引用，但旧截图不能代替移除时的当前截图。
+- 结构核对：当前 Tags 按 Logical Name 分别存于 asset-tag.json，不存在全局 SHA→Tags 表；按上述已确认决定适配移除要求，保留现有架构。三个 grill 边界与影响审查已完成并获整体实施确认。
+
+实现与影响审查：共享 RepairTools、AssetLibrary 和 pi 工具定义/提示词同步升级；旧 Agent crop_asset(logical_name, region, tags) 改为 crop_asset(preview_id)，未知或跨对话 ID 拒绝，不保留跳过预览的兼容路径。复用 crop_content、detect_template、路径/哈希检查和交互日志；Workflow Trusted Action 与人工裁剪行为不变。归档文件及 prepared 记录先完整写入，才更新活跃图片/标签，普通失败回退；进程中断保留恢复证据而不声称跨文件原子提交。旧契约的窄例外见 [ADR 0031](adr/0031-preview-agent-crops-and-archive-removed-assets.md)。连接诊断在 pi 支持的 fetch 接口捕获请求和响应流错误，并将脱敏 cause/错误码关联到预检或正式请求的失败详情；不新增重试或更换模型接入。
+
+2026-10-25 验证：普通回归 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q` 为 **404 passed, 48 skipped**；相关显式 Agent 回归 `--run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **43 passed, 4 skipped**。覆盖预览不入活跃库、保存不重截/像素一致、40px 网格与原图隔离、同图匹配信息、图与标签同步移除、同 SHA 其他逻辑名不变、重复归档 ID 唯一、哈希/内部符号链接拒绝、截图/归档/元数据/标签/删除失败及取消回退，以及真实 pi 的预览→保存→归档、多轮图片留存、预检和正式请求的断连/响应流异常记录与无自动重试。首次新增端到端测试的计数替身未累加 capture，修正替身后执行完整回归得到上述结果。未调用真实模型；原始 Windows 间歇连接故障仍需更新后复现获取底层码，不能把本机模拟异常测试当作根因修复。Windows 游戏窗口、网格可读性及现场归档验收未执行，4 项真实模型/Windows 条件检查保持跳过。
+
 ## 2026-10-25 Developer Policy（已确认设计与实现）
 
 以下边界已经 grill 和 design-impact-review 收敛，由 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 接受，优先于本文旧有禁止自动 Publish、执行及历史记录列举的要求。工具、共享宿主及 GUI 已实现；自动化检查与真实游戏验收分开记录。Runtime Policy 继续遵循 Stage 3.5，本次不扩展其设计。

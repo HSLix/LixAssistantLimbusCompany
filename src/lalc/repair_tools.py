@@ -6,6 +6,7 @@ import base64
 import inspect
 import json
 import threading
+import uuid
 
 from .actions import application_actions
 from .assets import AssetLibrary, asset_name
@@ -15,7 +16,7 @@ from .agent_diagnostics import error_details
 
 REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
                 "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-                "publish", "trial_run", "list_runs", "read_run_log"]
+                "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset"]
 
 
 class RepairTools:
@@ -29,6 +30,7 @@ class RepairTools:
         self.platform = platform
         self.cancelled = threading.Event()
         self.sequence = 0
+        self.previews = {}
 
     def checkpoint(self):
         if self.cancelled.is_set():
@@ -44,7 +46,8 @@ class RepairTools:
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
                        "publish": self.publish, "trial_run": self.trial_run,
-                       "list_runs": self.list_runs, "read_run_log": self.read_run_log}
+                       "list_runs": self.list_runs, "read_run_log": self.read_run_log,
+                       "preview_crop": self.preview_crop, "remove_asset": self.remove_asset}
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -251,19 +254,82 @@ class RepairTools:
         return session, metadata, path
 
     def game_screenshot(self):
-        _, metadata, path = self.capture()
-        return self.image(path.read_bytes(), metadata)
+        session, metadata, path = self.capture()
+        result = self.image(path.read_bytes(), {**metadata, "view": "original"})
+        overlay = self.image(self.marked_image(session, grid=True), {"view": "grid", "spacing": 40}, 2)
+        result["content"].extend(overlay["content"])
+        result["details"]["grid"] = overlay["details"]
+        return result
 
-    def crop_asset(self, logical_name, region, tags=None):
+    @staticmethod
+    def marked_image(session, *, grid=False, region=None):
+        """只在复制的像素上画辅助线，不污染原始截图和模板。"""
+        import cv2
+        from .recognition import client_image
+        image = client_image(session.image, session.size)
+        width, height = session.size
+        if grid:
+            for x in range(0, width, 40):
+                cv2.line(image, (x, 0), (x, height - 1), (0, 255, 255), 1)
+                cv2.putText(image, str(x), (x + 2, 12), cv2.FONT_HERSHEY_SIMPLEX, .3, (0, 255, 255), 1)
+            for y in range(0, height, 40):
+                cv2.line(image, (0, y), (width - 1, y), (0, 255, 255), 1)
+                cv2.putText(image, str(y), (2, max(12, y - 2)), cv2.FONT_HERSHEY_SIMPLEX, .3, (0, 255, 255), 1)
+        if region is not None:
+            x, y, w, h = (region[key] for key in ("x", "y", "width", "height"))
+            for column in (x, min(width - 1, x + w)):
+                cv2.line(image, (column, 0), (column, height - 1), (0, 0, 255), 1)
+            for row in (y, min(height - 1, y + h)):
+                cv2.line(image, (0, row), (width - 1, row), (0, 0, 255), 1)
+        ok, encoded = cv2.imencode(".png", image)
+        if not ok:
+            raise ValueError("辅助图 PNG 编码失败。")
+        return encoded.tobytes()
+
+    def preview_crop(self, logical_name, region, threshold=.9, tags=None):
+        """从新截图预览裁剪及同图匹配；仅留交互证据，不加入活跃素材库。"""
+        from .recognition import client_image, decode_image, detect_template
         asset_name(logical_name)
-        self.library.tags(tags)
+        tags = self.library.tags(tags)
         session, metadata, _ = self.capture()
+        content, area = self.library.crop_content(session.image, session.size, region)
+        matches = detect_template(client_image(session.image, session.size), decode_image(content), threshold=threshold)
+        for match in matches:
+            match["centerxy"] = (match["x"] + match["width"] // 2, match["y"] + match["height"] // 2)
+        identity = uuid.uuid4().hex
+        details = {"preview_id": identity, "logical_name": logical_name, "region": area, "tags": tags,
+                   "threshold": threshold, "matches": matches, "match_count": len(matches),
+                   "source_screenshot": metadata["path"], "interaction_id": self.log.path.name}
+        result = self.image(self.marked_image(session, region=area), {**details, "view": "crop_region"})
+        crop = self.image(content, {"view": "crop"}, 2)
+        result["content"].extend(crop["content"])
+        result["details"]["crop"] = crop["details"]
         self.checkpoint()
-        result = self.library.save_crop(logical_name, session.image, session.size, region, run_id=None,
-                                        observation=session.observation, tags=tags, preserve_existing_tags=True)
+        self.previews[identity] = {"pixels": session.image, "size": session.size,
+                                   "observation": session.observation, **details}
+        return result
+
+    def crop_asset(self, preview_id):
+        """只保存本对话已预览的原始像素，不重新截图或接受外部路径。"""
+        if not isinstance(preview_id, str) or preview_id not in self.previews:
+            raise ValueError("未知 preview_id；请先调用 preview_crop，不能引用其他对话的预览。")
+        preview = self.previews[preview_id]
+        self.checkpoint()
+        result = self.library.save_crop(preview["logical_name"], preview["pixels"], preview["size"],
+                                        preview["region"], run_id=None, observation=preview["observation"],
+                                        tags=preview["tags"], preserve_existing_tags=True)
         # 来源同时指向独立留存的完整截图，不能依赖下次会被替换的 Candidate。
-        result["source_screenshot"] = metadata["path"]
+        result["source_screenshot"] = preview["source_screenshot"]
+        result["preview_id"] = preview_id
         result["interaction_id"] = self.log.path.name
         from .runtime import atomic_write_json
         atomic_write_json(self.library.data_root / "asset-provenance" / f"{result['provenance_id']}.json", result)
         return self.image(self.library.read({"path": result["path"], "sha256": result["sha256"]}), result)
+
+    def remove_asset(self, logical_name, sha, reason):
+        """移除前重新截图；归档保留原始画面，并同步移除活跃图片及标签关系。"""
+        asset_name(logical_name)
+        self.library.read({"path": f"{logical_name}/{sha}.png", "sha256": sha})
+        _, _, path = self.capture()
+        result = self.library.remove(logical_name, sha, reason, path.read_bytes(), checkpoint=self.checkpoint)
+        return self.text(result)

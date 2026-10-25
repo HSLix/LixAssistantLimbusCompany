@@ -24,8 +24,11 @@ plan.json 始终只读。不通用新建、删除或重命名文件，不访问�
 新增成功后同轮可 read/edit/validate；不自动登记已有未引用文件，不把工具成功当作完整校验通过。
 校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
 asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
-game_screenshot 现场截图；crop_asset 每次从新截图裁剪新增素材，同名同哈希保留原图和原标签。非 Windows 现场工具不可用。
-截图会恢复并置前唯一游戏窗口。不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
+game_screenshot 返回现场原图和每隔40px的网格辅助图；辅助覆盖层不能进入模板或原始截图证据。
+先 preview_crop(logical_name, region, threshold, tags) 取得区域标线图、干净裁剪图及同图匹配结果，再 crop_asset(preview_id) 保存完全相同的像素和参数，不重新截图。
+预览不进入活跃素材库；同图匹配不证明跨状态可靠性，也不自动决定是否保存。同名同哈希保留原图和原标签。
+remove_asset(logical_name, sha, reason) 可归档任意既有图片及原Tags、理由和移除时新截的原始游戏画面，再同步移除活跃图片及该逻辑名的标签关系；截图失败不移除。移除影响所有后续使用该素材的匹配。
+非 Windows 现场工具不可用。截图会恢复并置前唯一游戏窗口。除专用移除归档外，不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
 可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
 试运行支持 Candidate 内已有 JSON Plan 或 Task Workflow/Subworkflow/Step。运行期间等待工具结果，不并行修改或操作游戏。
 启动拒绝无 Run ID，修正原因后可再次调用；已启动的结果带 Run ID，使用 list_runs 查看可用 ID、read_run_log 分段查看日志及引用截图。
@@ -53,6 +56,7 @@ class RepairLog:
         self.key = key
         self.group = 0
         self.requests = 0
+        self.transport_error = None
         self.on_event = on_event
 
     @property
@@ -71,6 +75,10 @@ class RepairLog:
     def record(self, value):
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
+        if value.get("type") == "lalc_request":
+            self.transport_error = None
+        elif value.get("type") == "lalc_transport_error":
+            self.transport_error = self.clean(value)
         event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "round": self.group, "event": value})
         with (self.path / "events.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event, ensure_ascii=False) + "\n")
@@ -113,7 +121,7 @@ def final_answer(message):
     return value
 
 
-def model_error(message, stage, requests, request_limit):
+def model_error(message, stage, requests, request_limit, transport=None):
     """区分请求额度、单次输出截断与服务错误，保留实际用量及结束原因。"""
     stop = message.get("stopReason")
     original = message.get("errorMessage") or ""
@@ -126,7 +134,10 @@ def model_error(message, stage, requests, request_limit):
     else:
         code, summary = "provider_error", original or f"模型请求未正常结束（stopReason={stop or '未提供'}），服务未返回具体错误说明。"
     parts = message.get("content", [])
+    if transport:
+        summary += " 底层连接信息：" + json.dumps(transport.get("error", {}), ensure_ascii=False)
     return AgentDiagnosticError(summary, stage, failure_code=code, stop_reason=stop,
+                                transport=transport,
                                 provider_error=original or None, usage=usage,
                                 requests_used=requests, request_limit=request_limit,
                                 content_types=[part.get("type") for part in parts],
@@ -208,7 +219,7 @@ async def check_model_image(command, env, temporary, images, log):
                 raise RuntimeError("Model image check failed: " + str(item))
             elif kind == "agent_settled":
                 if last.get("stopReason") != "stop":
-                    raise model_error(last, "model_preflight", log.requests, 1)
+                    raise model_error(last, "model_preflight", log.requests, 1, log.transport_error)
                 if (log.requests != 1 or not any(part.get("type") == "text" and part.get("text", "").strip()
                                    for part in last.get("content", []))):
                     raise RuntimeError("Model image check failed: " + str(last.get("errorMessage") or last))
@@ -363,7 +374,7 @@ class RepairConversation:
                                 stage = "agent"
                             elif kind == "agent_settled":
                                 if last.get("stopReason") != "stop":
-                                    error = model_error(last, "provider_request", self.log.requests, settings["max_requests"])
+                                    error = model_error(last, "provider_request", self.log.requests, settings["max_requests"], self.log.transport_error)
                                     reason = error.evidence["failure_code"]
                                     result = {"status": "incomplete", "reason": reason, "answer": last}
                                     result["error"] = str(error)

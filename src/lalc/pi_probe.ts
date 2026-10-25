@@ -14,6 +14,44 @@ export async function checkedPath(root: string, path: string) {
   return target;
 }
 
+// 只提取诊断字段，不序列化请求头、请求体或完整 SDK 错误对象。
+export function transportCause(error, depth = 0) {
+  if (depth > 5) return { message: "cause chain truncated" };
+  if (!error || typeof error !== "object") return { message: String(error) };
+  const result: Record<string, unknown> = {};
+  for (const key of ["name", "message", "code", "errno", "syscall", "hostname", "address", "port"]) {
+    if (["string", "number"].includes(typeof error[key])) result[key] = error[key];
+  }
+  if (error.cause) result.cause = transportCause(error.cause, depth + 1);
+  if (Array.isArray(error.errors)) result.errors = error.errors.map(item => transportCause(item, depth + 1));
+  return result;
+}
+
+export function diagnosticFetch(fetcher, report, requestNumber) {
+  return async (input, init) => {
+    const started = Date.now();
+    const parsed = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+    const url = parsed.origin + parsed.pathname;
+    const failed = (phase, error) => report({ requests: requestNumber(), url, phase,
+      elapsed_ms: Date.now() - started, error: transportCause(error) });
+    let response;
+    try { response = await fetcher(input, init); }
+    catch (error) { failed("connect", error); throw error; }
+    if (!response.body) return response;
+    const reader = response.body.getReader();
+    const body = new ReadableStream({
+      async pull(controller) {
+        try {
+          const { done, value } = await reader.read();
+          if (done) controller.close(); else controller.enqueue(value);
+        } catch (error) { failed("response_body", error); controller.error(error); }
+      },
+      cancel(reason) { return reader.cancel(reason); },
+    });
+    return new Response(body, { status: response.status, statusText: response.statusText, headers: response.headers });
+  };
+}
+
 export default async function (pi) {
   const root = await realpath(process.env.LALC_PI_SOURCE_ROOT!);
   const repairMode = process.env.LALC_PI_REPAIR_FILES !== undefined;
@@ -42,7 +80,7 @@ export default async function (pi) {
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
                        "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-                       "publish", "trial_run", "list_runs", "read_run_log"];
+                       "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset"];
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
   const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
@@ -73,6 +111,12 @@ export default async function (pi) {
       return api.streamSimple(model, context, {
         ...options,
         maxRetries: 0,
+        fetch: diagnosticFetch(options?.fetch ?? globalThis.fetch, details => {
+          const key = process.env.LALC_PI_API_KEY!;
+          const clean = JSON.parse(JSON.stringify(details, (_name, value) =>
+            typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
+          emit("lalc_transport_error", clean);
+        }, () => requests),
         async onPayload(payload, model) {
           payload = options?.onPayload ? (await options.onPayload(payload, model)) ?? payload : payload;
           // pi 会按模型元数据补预算；最终发送前移除，明确使用服务端默认值。
@@ -177,12 +221,17 @@ export default async function (pi) {
           sha256: Type.String({ pattern: "^[0-9a-f]{64}$" }) }), { minItems: 1 }) }) },
       { name: "action_contracts", description: "Read all registered Trusted Action classifications, signatures, return types and docstrings. Does not execute actions or expose implementation source.",
         parameters: Type.Object({}) },
-      { name: "game_screenshot", description: "Restore and focus the unique game window, then return a fresh client-area image and dimensions. Unavailable on unsupported platforms; errors may be retried explicitly.",
+      { name: "game_screenshot", description: "Return a fresh original game screenshot and a separate 40px coordinate grid image. Overlays are viewing aids only, never template or evidence pixels. Restores and focuses the unique game window.",
         parameters: Type.Object({}) },
-      { name: "crop_asset", description: "Restore and focus the unique game window and crop a NEW screenshot at client pixel coordinates. Add a new Asset or reuse an existing image and its original tags. No file import or game control.",
+      { name: "preview_crop", description: "Capture the game anew; preview a crop without adding an active Asset. Return full image with crop boundary lines, the clean crop, and same-image template matching at threshold. A match is diagnostic, not proof of cross-state reliability. Returns preview_id for crop_asset to save the identical pixels and parameters.",
         parameters: Type.Object({ logical_name: logicalName,
           region: Type.Object({ x: Type.Integer(), y: Type.Integer(), width: Type.Integer(), height: Type.Integer() }),
+          threshold: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
           tags: Type.Optional(Type.Array(Type.String())) }) },
+      { name: "crop_asset", description: "Save an existing preview from this conversation using preview_id. Does not recapture. Reuses existing logical-name/hash images and original tags. Preview first with preview_crop.",
+        parameters: Type.Object({ preview_id: Type.String() }) },
+      { name: "remove_asset", description: "Archive the exact active logical-name/SHA Asset, original tags, reason, and a NEW clean game screenshot. Remove its active image and local tag mapping only after archival preparation. Other logical names are unchanged. No permanent deletion or arbitrary paths. Screenshot failure prevents removal.",
+        parameters: Type.Object({ logical_name: logicalName, sha: Type.String({ pattern: "^[0-9a-f]{64}$" }), reason: Type.String({ minLength: 1 }) }) },
     ];
     for (const tool of tools) {
       pi.registerTool({ ...tool, label: tool.name,

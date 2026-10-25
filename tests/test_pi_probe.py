@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -62,8 +63,20 @@ def probe(tmp_path):
             state["started"].set()
             if state.get("block"):
                 state["release"].wait(15)
+            if state.get("disconnect_at") == len(state["calls"]):
+                self.connection.shutdown(socket.SHUT_RDWR)
+                self.close_connection = True
+                return
             self.send_response(state["status"])
             self.send_header("Content-Type", "text/event-stream" if state["status"] == 200 else "application/json")
+            if state.get("broken_body_at") == len(state["calls"]):
+                self.send_header("Content-Length", "10000")
+                self.end_headers()
+                self.wfile.write(b"data: ")
+                self.wfile.flush()
+                self.connection.shutdown(socket.SHUT_RDWR)
+                self.close_connection = True
+                return
             self.end_headers()
             try:
                 if state["status"] != 200:
