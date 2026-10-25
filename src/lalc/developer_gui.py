@@ -58,6 +58,42 @@ class Operation(QThread):
             self.task = None
 
 
+class TrialDialog(QDialog):
+    """试运行的模态日志窗口；阻止主界面操作，显示时不抢游戏焦点。"""
+
+    def __init__(self, service, parent):
+        super().__init__(parent)
+        self.service = service
+        self.setWindowTitle("Agent 试运行")
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+        self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
+        self.resize(760, 480)
+        layout = QVBoxLayout(self)
+        self.logs = QPlainTextEdit()
+        self.logs.setReadOnly(True)
+        layout.addWidget(self.logs)
+        controls = QHBoxLayout()
+        self.pause = button("暂停", lambda: service.resume() if service.state["paused"] else service.pause(), controls)
+        self.stop = button("停止", service.stop, controls)
+        layout.addLayout(controls)
+        self.sequence = 0
+
+    def render(self, state):
+        for record in state["trace"]:
+            if record["sequence"] > self.sequence:
+                self.logs.appendPlainText(json.dumps(record, ensure_ascii=False))
+                self.sequence = record["sequence"]
+        self.pause.setText("恢复" if state["paused"] else "暂停")
+        self.pause.setEnabled(not state.get("resume_pending", False))
+
+    def reject(self):
+        """Escape 不关闭运行窗口；停止通过执行器完成。"""
+
+    def closeEvent(self, event):
+        event.ignore()
+
+
 class CropView(QWidget):
     """缩放只影响展示；拖动端点映射回原始像素并夹紧到客户区。"""
 

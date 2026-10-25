@@ -72,3 +72,72 @@ Retain ordinary Python Workflows and their call stacks; do not introduce externa
 3. **Agent-assisted Recovery:** if deterministic recovery fails or the Task does not allow restart, let the Agent analyze the game state, execution Trace, and related Components. Controlled modifications produce a candidate Manifest; after user approval, select Step Retry or Task Restart, respecting the Task's restart permission. The discussion must specify when Step Retry remains available after stack unwinding without reconstructing a discarded frame.
 
 The executor manages the entire recovery process and records it in Trace. Safely terminate when recovery ultimately fails. All recovery attempts share the unified recovery budget; do not introduce a separate `max_restarts`. Within an Automation Plan, recover only the current Task and never restart the entire Plan. Budget accounting and the transition from the current Step-only Agent boundary remain architecture discussion work.
+
+## 2026-10-25 待讨论：保留调用栈的恢复、终结式试运行与历史检索
+
+以下是设计评估后的讨论输入，不是已接受决定，不修改上面的 Confirmed scope，也不表示运行时 Agent 已实现。与前一节 Task Restart 提案并列讨论：一旦退出原调用栈，不能再使用这里的直接返回机制。
+
+### 1. 当前 Step 的恢复调用作为本次 ctx.call 的完成
+
+- 合理的核心：在当前 Step wrapper 内捕获可恢复的执行失败，保留外层 Task/Subworkflow 的 Python 帧、局部变量、原输入和调用位置。Recovery Rule 修复环境后重新调用当前 Step；Agent 提案经完整校验、兼容检查和人工运行许可后，由执行器调用替换版本。试运行正常返回且满足原返回契约时，将实际返回值交回原 ctx.call，不再重复执行一次。失败 Step 自身的帧已经退出，不能从其内部某行恢复。这是进程内的恢复边界，不是可在进程终止后重建的持久化 checkpoint。
+- 边界修正：并非任意 ctx.call 报错都能成为新恢复点；当前基线只允许 Step 边界。Workflow 自身异常、Recovery Rule 失败、取消和输入释放失败不能笼统当成可重试的 Step 异常。用户暂停/接管沿原有手动恢复路径处理。
+- Working Manifest 应在合法试运行前整体保存并选择，成功兼容返回后确认这次选择；失败保留已选版本和尝试证据，不把游戏状态视为自动回滚。中间 Manifest 按 ID 留档并可显式再选，已有基线已支持这一点；留档不等于永久审批，不应为留档自动授予 Publish/永久批准或修改 Default。
+- 当前 Task/Subworkflow 帧继续执行其原版本。后续 ctx.call 通过最新 Working Manifest 查找被调用的 Step/Subworkflow，不会把正在执行的 Task 换成新代码；Task 不能通过 ctx.call 调用另一个 Task。后续独立 Task 调用使用其执行上下文当时选择的 Manifest；新 Top-level Execution 仍按显式选择或 Default 确定 Base，不继承上次 Run 的 Working Manifest。
+- “任选历史 Manifest 的任意点执行，再接回当前 Step”需要单列为扩展提案，不能由保留栈自然推出。任意源码行没有独立调用/返回契约；即使是合法 Component 入口，其成功也不保证完成原 Step 的责任。若允许辅助 Workflow/Task，需要定义输入、调用角色、结果与原 Step 的映射、对外层局部值/游戏状态的影响和恢复嵌套归属；当前 Step 不允许调用 Component，Task 嵌套也不合法。优先讨论复用受限的当前 Step Recheck，扩展不能默认绕过这些约束。
+
+### 2. 试运行作为结束本轮 Agent 的控制权交接
+
+- 可以把提交 Recheck 作为本轮终结动作：Agent 交回控制权，执行器先完成必要的校验、兼容检查和变更审批，再执行当前 Step。这里结束的是本轮交互，不是终止父 Run 或整个 Runtime Agent Session；Agent 正常结束、revise_success 或自然语言成功声明都不能替代执行证据。
+- 试运行成功直接向暂停调用者返回实际结果；失败将新的异常、截图和 Trace 关联交给后续恢复决策。试运行成功后不再等待 Agent 继续修改或操作游戏，否则原成功结果是否仍适用需要重新判断。
+- 在 Agent Interaction Log 与 Execution Trace 中建立双向关联：父 run_id、暂停 Step 的 call_id、Agent Session/轮次、Manifest ID，以及具体试运行的 attempt/call 标识。仅 run_id 不能区分同一 Run 中多次试运行。优先把 Recheck 记为父 Run 内的一次调用尝试；若另设子 Run，必须定义父子关联、执行上下文与返回交接，不能启动一个无关 Run 后假定可续栈。字段名、分配时机、拒绝/取消时无实际执行的记录方式待定。
+- 需要重新讨论旧基线“每次模型请求消耗一个 Agent Turn”与当前 Stage 3 多工具交互/对话轮次的对应关系，不能把结束一轮、结束 Session 和执行器完成一次 Step 混为一谈。
+
+### 3. 恢复循环草案与退出条件
+
+用户提出的 Rule → 当前 Step 重试 → Agent → Recheck → Rule 循环合理作为候选流程，但不能无界重复。待明确重复命中同一 Rule 且无进展时的升级规则、规则检测/执行错误及多规则同时命中的处理、每次尝试的归属和统一预算计数。已有 max_turns 仅计模型请求，无法单独约束不调用模型的 Rule 循环；沿前节讨论统一恢复预算，不直接增加一套独立重试配置。
+
+```mermaid
+flowchart TD
+    A["当前 Step 调用；外层 Workflow 帧保留"] --> B{"正常返回且契约兼容？"}
+    B -->|是| C["把实际返回值交回原 ctx.call；继续外层 Workflow"]
+    B -->|可恢复执行失败| D{"仍有恢复预算且允许继续？"}
+    D -->|否| X["安全终止当前任务并报告"]
+    D -->|是| R["检测 Recovery Rules"]
+    R --> E{"唯一匹配且恢复正常完成？"}
+    E -->|是| F["重新调用当前 Step"]
+    F --> B
+    E -->|无匹配、歧义或规则失败：升级策略待定| H{"Agent 已启用且有剩余额度？"}
+    H -->|否| X
+    H -->|是| I["Agent 检索历史、分析并提出修改或 Recheck"]
+    I --> J{"仍能继续修复？"}
+    J -->|否| X
+    J -->|是| K["提交请求并结束本轮 Agent；执行器校验与兼容检查"]
+    K --> P{"新代码获人工运行许可或无需新代码审批？"}
+    P -->|拒绝或检查失败：反馈下一轮，计入预算| D
+    P -->|是| L["保存并选择完整 Manifest；正式 Recheck 当前 Step"]
+    L --> B
+```
+
+图中取消从任何等待/执行位置进入现有 Cancellation 路径，不进入恢复循环；用户暂停/接管及输入释放失败也不走图中普通失败边。Recheck 请求若没有修改则使用当前 Manifest。成功后的后续 ctx.call 使用更新映射，已进入的帧保持原代码。图中的升级与重复策略仍是待讨论项，不能据此宣称现有实现已有此循环。
+
+### 4. 从原始交互历史开始的无 embedding 检索基线
+
+- 建议先实验只读 grep/rg 检索已脱敏的 Agent Interaction Log，按 Component 逻辑名、异常文本、Asset 名及 Manifest ID 查找，返回命中位置、相邻上下文和原记录引用；按需查看关联 Trace/截图。复用原始留存，不先建立另一份摘要记忆或向量数据库，检索结果仍只是诊断证据。
+- 参考 [Is Complex Agentic Memory Always Needed? Naive RAG Is Stronger Than We Thought](https://arxiv.org/abs/2610.30755)（[方法全文](https://arxiv.org/html/2610.30755v1)）。其 Raw-RAG 使用原始历史上的 dense retrieval 与 reranking；它支持保留原始证据、先设简单检索基线的动机，不能作为“不做 embedding 的 grep 已被证明同样有效”的理论结论。这里的无 embedding 方案是本项目待验证的工程简化。
+- 讨论返回条数/文本预算、上下文扩展、历史先后与版本差异、日志清理后引用失效，以及同义表达/纯图像信息无法被关键词命中的限制。用少量真实修复历史检查相关证据召回、误命中、检索耗时与实际修复帮助，再决定是否需要语义检索；不把未检索到当作从未发生。
+
+### 5. Plan 改为 Python、参数化循环与 Plan 层恢复
+
+2026-10-25 开发者提出以下后续讨论事项，尚未接受为执行契约，不纳入当前 Developer Policy 实现；当前 plan.json 仍只读，现有 Automation Plan 语义继续有效。
+
+- 提案：以 plan.py 取代 plan.json，将任务循环编写在 Plan 的 Python 代码内，循环次数作为调用参数传给 Plan；外部调用 Plan 也统一使用 ctx.call。
+- 目标：Plan 层自身出错并触发 Agent 介入后，允许执行器接续修复后的新 Plan，而不把恢复能力限制在其内部 Step。
+- 待明确：Python Plan 的身份、不可变源码与 Manifest 归属、入口/输入/返回契约、允许的调用关系，以及 ctx.call 的外部调用者。当前 Plan 不是 Component、没有执行栈，Task 也不能调用 Task；此提案改变这些边界，不能直接套用现有 ctx.call 即视为成立。
+- 待明确：“接回新 Plan”指重试完整 Plan 入口，还是从保留调用者处接收替换调用的返回值；失败 Plan 自身已退出的帧不能原地替换。需要定义已完成任务与循环进度、局部值和结果如何处理，避免重放已产生的游戏副作用；不能默认恢复到任意源码行。
+- 后续统一评估 Plan 层 Agent 触发、Working Manifest 选择、监督审批、取消、恢复预算及 Trace 归属，与本节保留栈恢复和 Task Restart 提案的关系。本次仅记录议题，不新增 Runtime Policy 实现。
+
+### 影响与后续验证
+
+- 已检查的实现：runtime.py 的 _invoke_step 保留外层调用链，_try_manifest_choices 在原链内调用替换 Step 并校验结果，_replacement_problem 限制续接契约；_recover_step 当前最多重试一次，即使无规则匹配也会重试，并未实现本节的重复 Rule/Agent 循环。tests/test_recovery.py 已有保留调用者、后续调用使用新映射和失败版本留档的测试源码，本次未执行。
+- 若采纳，需协调 CONTEXT.md、Stage 2 执行契约、Stage 3.5 Confirmed scope、ADR 0015 的审批边界和既有恢复阶梯讨论，随后修改 runtime/application 的恢复调度、Agent 协议/日志和监督 GUI。任意 Component 辅助执行涉及额外角色权限与返回协议，不能作为普通 Recheck 的小改动处理。
+- 最小验收证据应覆盖：原调用者只进入一次且局部值保留；成功试跑结果只交付一次；已进入帧不替换而后续调用采用新映射；失败试跑保留 Manifest/游戏副作用事实；重复规则能退出/升级；审批拒绝、取消和预算耗尽；同一 Run 多次尝试可从交互日志准确追溯。真实模型与真实游戏状态衔接另行验收，静态校验或假环境测试不能代替。

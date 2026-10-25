@@ -1,5 +1,7 @@
 # Stage 3 — Agent-assisted Component Repair
 
+2026-10-25 更新：[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 接受 Developer Policy 的自主 Publish、已保存 Manifest 试运行及 Run ID/日志工具，GUI 使用不抢游戏焦点的模态日志子窗口。本页旧有“Agent 不自动发布/执行”、纯人工发起实机试运行及禁止历史列举的条款由该决定替代；Runtime Policy、Working Manifest 续接及监督审批仍属 Stage 3.5。当前接口见 [修复指南](agent-repair.md)，验收边界见 [GUI 设计](developer-gui-design.md)。
+
 Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) and [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) (shared GUI/CLI implementation and automated checks complete; Windows/game acceptance pending); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage have automated evidence plus a developer-reported Windows native DPAPI pass. The developer approved closing #327 and deferred its new real-model startup and Windows authentication checks until the developer GUI is complete; those checks remain unverified. Windows screenshot/crop and game acceptance also remain pending.
 
 Tracking: [GitHub Issue #312](https://github.com/HSLix/LixAssistantLimbusCompany/issues/312). Confirmed implementation spec: [GitHub Issue #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323).

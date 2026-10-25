@@ -119,15 +119,19 @@ class ApplicationService:
             return deepcopy(self._state)
 
     def start(
-        self, logical_name: str, inputs: dict[str, Any], *, manifest_id: str | None = None
+        self, logical_name: str, inputs: dict[str, Any], *, manifest_id: str | None = None,
+        _developer_trial: bool = False,
     ) -> int:
         """同步校验启动请求，再在单一后台线程执行已捕获的 Manifest。"""
 
         with self._condition:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
-            if self._state["phase"] == "running" or self._activity:
+            if self._state["phase"] == "running" or (self._activity and not (
+                    _developer_trial and self._activity == "Agent")):
                 raise StartError("run_already_active", "Another Run is already active.")
+            if _developer_trial and (self._activity != "Agent" or manifest_id is None):
+                raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
             manifest = self._loaded_manifest(manifest_id)
             component = manifest.components.get(logical_name)
             if component is None:
@@ -138,6 +142,8 @@ class ApplicationService:
                 raise StartError("inputs_invalid", str(error)) from error
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
+            if _developer_trial:
+                entry["developer_trial"] = True
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs)
 
             self._thread = threading.Thread(
@@ -150,20 +156,25 @@ class ApplicationService:
             self._changed_locked()
             return run_id
 
-    def start_plan(self, path: Path, *, manifest_id: str | None = None) -> int:
+    def start_plan(self, path: Path, *, manifest_id: str | None = None, _developer_trial: bool = False) -> int:
         """启动用户保存的 JSON Plan；结构问题作为本次 Run 的 invalid_plan 结果。"""
 
         with self._condition:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
-            if self._state["phase"] == "running" or self._activity:
+            if self._state["phase"] == "running" or (self._activity and not (
+                    _developer_trial and self._activity == "Agent")):
                 raise StartError("run_already_active", "Another Run is already active.")
+            if _developer_trial and (self._activity != "Agent" or manifest_id is None):
+                raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
             manifest = self._loaded_manifest(manifest_id)
             try:
                 source: str | Exception = Path(path).read_text(encoding="utf-8")
             except (OSError, UnicodeError) as error:
                 source = error
             entry = {"role": "automation_plan", "path": str(path)}
+            if _developer_trial:
+                entry["developer_trial"] = True
             run_id, snapshot, gate = self._begin_run(manifest, entry, {})
             self._thread = threading.Thread(
                 target=self._worker, args=(self._run_plan, snapshot, source, gate),

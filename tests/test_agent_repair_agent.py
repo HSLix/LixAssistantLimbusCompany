@@ -102,6 +102,78 @@ def test_text_only_and_context_retained(conversation):
     assert (chat.log.path / "round-2" / "result.json").exists()
 
 
+def test_developer_publish_trial_and_logs_continue_same_round(conversation, monkeypatch):
+    chat, options, state = conversation
+    monkeypatch.setattr(chat.host.service, "_start_session", lambda: None)
+    original_default = chat.host.manager.default_manifest_id()
+    count = 0
+    def respond(body):
+        nonlocal count
+        count += 1
+        if count == 1:
+            return tool("edit", {"path": "steps.total.py", "oldText": " if value > 0", "newText": ""})
+        if count == 2:
+            return tool("publish", {})
+        if count == 3:
+            saved = chat.host.manager.list_manifests()
+            identity = next(item["manifest_id"] for item in saved if item["manifest_id"] != original_default)
+            return tool("trial_run", {"manifest_id": identity, "logical_name": "steps.total", "inputs": {"values": [1, -2]}})
+        if count == 4:
+            assert chat.host.service.state["result"]["output"] == -1
+            return tool("list_runs", {})
+        if count == 5:
+            return tool("read_run_log", {"run_id": chat.host.service.state["run_id"], "limit": 2})
+        assert "run_started" in json.dumps(body)
+        assert "run_id" in json.dumps(body)
+        return answer("developed and tested")
+    state["respond"] = respond
+    result = asyncio.run(chat.run("develop and trial", options))
+    assert result["status"] == "completed", result
+    assert result["round"] == 1 and result["requests"] == 7
+    assert chat.host.manager.default_manifest_id() == original_default
+    assert {"publish", "trial_run", "list_runs", "read_run_log"} <= {
+        item["function"]["name"] for item in state["calls"][-1]["tools"]}
+
+
+@pytest.mark.parametrize("cancel_round", [False, True])
+def test_trial_stop_or_round_cancel_waits_for_cleanup(conversation, monkeypatch, cancel_round):
+    import threading
+    from lalc.runtime import UserInterruption
+    chat, options, state = conversation
+    entered, cleaned = threading.Event(), threading.Event()
+    identity = chat.host.manager.default_manifest_id()
+    def run(_manifest, _name, _component, _inputs, gate):
+        gate.pause()
+        entered.set()
+        try:
+            gate.checkpoint()
+        except UserInterruption:
+            return {"status": "failure", "failure_code": "user_cancelled"}
+        finally:
+            cleaned.set()
+    monkeypatch.setattr(chat.host.service, "_run", run)
+    script(state, [tool("trial_run", {"manifest_id": identity, "logical_name": "steps.total", "inputs": {"values": []}}), answer("stopped")])
+    async def interact():
+        task = asyncio.create_task(chat.run("trial", options))
+        try:
+            assert await asyncio.to_thread(entered.wait, 15)
+            if cancel_round:
+                task.cancel()
+            else:
+                chat.host.service.stop()
+            return await asyncio.wait_for(task, 10)
+        finally:
+            chat.host.service.stop()
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+    result = asyncio.run(interact())
+    assert result["status"] == ("cancelled" if cancel_round else "completed"), result
+    assert cleaned.is_set() and chat.host.service.state["phase"] == "finished"
+    assert chat.host.service.state["activity"] is None
+    if not cancel_round:
+        assert "用户主动停止" in json.dumps(state["calls"][-1], ensure_ascii=False)
+
+
 def test_request_limit_ends_round_and_next_round_resets(conversation):
     chat, options, state = conversation
     options.max_requests = 2

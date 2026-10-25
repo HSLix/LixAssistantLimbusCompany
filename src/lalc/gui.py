@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
         self._pause_notice_shown = False
         self._reported_run = None
         self._fatal_reported = False
+        self.trial_dialog = None
         from .developer import DeveloperHost
         from .developer_gui import CapturePage, SettingsPage, RepairPage
         self.host = DeveloperHost(service, Path.cwd() / "candidate")
@@ -351,6 +352,17 @@ class MainWindow(QMainWindow):
 
     @Slot(dict)
     def render_state(self, state: dict) -> None:
+        trial = bool((state.get("entry") or {}).get("developer_trial"))
+        if trial and state["phase"] == "running":
+            if self.trial_dialog is None:
+                from .developer_gui import TrialDialog
+                self.trial_dialog = TrialDialog(self.service, self)
+                self.trial_dialog.show()
+            self.trial_dialog.render(state)
+        elif self.trial_dialog is not None:
+            self.trial_dialog.done(QDialog.DialogCode.Accepted)
+            self.trial_dialog.deleteLater()
+            self.trial_dialog = None
         info = state.get("pause_info")
         if info:
             instruction = "恢复时将检查当前 Step 的 condition。" if info["has_condition"] else \
@@ -358,7 +370,7 @@ class MainWindow(QMainWindow):
             if not info.get("restart_step", True):
                 instruction = "恢复后继续 Workflow 的观察与调度。"
             self.pause_notice.setText(f"自动化已暂停：{info['reason']}\n{info['description']}\n{instruction}")
-            if not self._pause_notice_shown:
+            if not self._pause_notice_shown and not trial:
                 self._pause_notice_shown = True
                 self.showNormal()
                 self.raise_()
@@ -384,10 +396,10 @@ class MainWindow(QMainWindow):
             self._reported_run = state["run_id"]
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
-            elif (result.get("status") in {"failure", "interrupted"}
+            elif not trial and ((result.get("status") in {"failure", "interrupted"}
                   and result.get("failure_code", result.get("reason")) != "user_cancelled") or any(
                       item.get("result") == "failure" and item.get("failure_code") != "user_cancelled"
-                      for item in result.get("items", [])):
+                      for item in result.get("items", []))):
                 details = result_diagnostics(result)
                 self.service.logger.error("Execution failed: %s", details)
                 ErrorDialog("执行失败，原始错误信息如下。", details, parent=self).open()

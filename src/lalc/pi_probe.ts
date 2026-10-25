@@ -41,7 +41,8 @@ export default async function (pi) {
   });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                       "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule"];
+                       "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
+                       "publish", "trial_run", "list_runs", "read_run_log"];
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
   const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
@@ -156,6 +157,15 @@ export default async function (pi) {
     const logicalName = Type.String({ description: "Complete Asset logical name, e.g. ui/claim" });
     const sourceParameters = Type.Object({ filename: Type.String(), logical_name: Type.String(), source: Type.String() });
     const tools = [
+      { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default or grant runtime permanent approval. Publish after edits before trial_run.", parameters: Type.Object({}) },
+      { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Specify exactly one of logical_name or a Candidate-relative JSON plan_path. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
+        parameters: Type.Object({ manifest_id: Type.String(), logical_name: Type.Optional(Type.String()),
+          inputs: Type.Optional(Type.Record(Type.String(), Type.Any())), plan_path: Type.Optional(Type.String()) }) },
+      { name: "list_runs", description: "List retained Run IDs, newest first. No log content search.",
+        parameters: Type.Object({ offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) }) },
+      { name: "read_run_log", description: "Read retained Trace events for an explicit Run ID, paged by event sequence. Optionally view an evidence_id screenshot referenced by this Run's log. Missing or cleaned records are unavailable.",
+        parameters: Type.Object({ run_id: Type.Integer({ minimum: 1 }), start_sequence: Type.Optional(Type.Integer({ minimum: 1 })),
+          limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })), evidence_id: Type.Optional(Type.String()) }) },
       { name: "add_component", description: "Create a new Candidate Python Component from complete source and register its logical name in components. No overwrite. The created file may be edited in this round.", parameters: sourceParameters },
       { name: "add_recovery_rule", description: "Create a new Candidate Recovery Rule from complete detect/recover source and register in recovery_rules. No overwrite. The created file may be edited in this round.", parameters: sourceParameters },
       { name: "asset_tree", description: "Read the global Asset logical-name text tree without loading images.",
