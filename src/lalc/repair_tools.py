@@ -1,4 +1,4 @@
-"""独立修复的素材、动作契约和现场观察工具；不执行候选或游戏控制。"""
+"""Developer Policy 工具：候选开发、不可变版本试运行及运行证据读取。"""
 
 from __future__ import annotations
 
@@ -14,7 +14,8 @@ from .agent_diagnostics import error_details
 
 
 REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule"]
+                "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
+                "publish", "trial_run", "list_runs", "read_run_log"]
 
 
 class RepairTools:
@@ -41,7 +42,9 @@ class RepairTools:
             methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
-                       "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule}
+                       "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
+                       "publish": self.publish, "trial_run": self.trial_run,
+                       "list_runs": self.list_runs, "read_run_log": self.read_run_log}
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -59,6 +62,105 @@ class RepairTools:
     def add_component(self, filename, logical_name, source):
         """创建普通 Component 并登记；角色由实际源码决定。"""
         return self.add_source("components", filename, logical_name, source)
+
+    def publish(self):
+        """在当前 Agent 活动中完整校验并保存不可变版本，不改变 Default。"""
+        result = self.host.manager.publish(self.host.candidate / "manifest.json")
+        if not result.ok:
+            return {**self.text({"ok": False, "errors": [error.as_dict() for error in result.errors]}),
+                    "isError": True}
+        return self.text({"ok": True, "manifest_id": result.loaded.manifest_id,
+                          "message": "已保存不可变版本，可用此 Manifest ID 试运行；Default 未改变。"})
+
+    def trial_run(self, manifest_id, *, logical_name=None, inputs=None, plan_path=None):
+        """串行执行已保存版本；取消整轮时先停止运行并等输入释放，再返回宿主。"""
+        from .application import StartError
+        if not isinstance(manifest_id, str) or not manifest_id:
+            raise ValueError("必须指定已 Publish 的 Manifest ID；修改 Candidate 后须先 Publish。")
+        if (logical_name is None) == (plan_path is None):
+            raise ValueError("必须且只能指定 logical_name 或 Candidate 内的 plan_path。")
+        service = self.host.service
+        request = {"manifest_id": manifest_id, "logical_name": logical_name,
+                   "inputs": inputs if inputs is not None else {}, "plan_path": plan_path}
+        try:
+            if plan_path is not None:
+                if inputs:
+                    raise ValueError("JSON Plan 的输入由 Plan 文件提供。")
+                path = (self.host.candidate / plan_path).resolve()
+                if not path.is_relative_to(self.host.candidate.resolve()) or path.suffix != ".json":
+                    raise ValueError("plan_path 必须是 Candidate 内的已有 JSON Plan。")
+                run_id = service.start_plan(path, manifest_id=manifest_id, _developer_trial=True)
+            else:
+                run_id = service.start(logical_name, request["inputs"], manifest_id=manifest_id,
+                                       _developer_trial=True)
+        except StartError as error:
+            return self.text({**request, "status": "rejected", "run_id": None,
+                              "code": error.code, "message": str(error), "errors": error.errors,
+                              "feedback": "试运行启动失败，未创建 Run。请修正原因后再次调用 trial_run；Candidate 修改后须先 Publish。"})
+        try:
+            self.log.record({"type": "trial_started", "run_id": run_id, **request})
+            while True:
+                state = service.state
+                if state["run_id"] != run_id:
+                    raise RuntimeError("试运行的 Run ID 意外改变。")
+                if state["phase"] == "finished":
+                    break
+                if self.cancelled.wait(.05):
+                    service.stop()
+                    service.wait_for(lambda current: current["phase"] == "finished")
+        finally:
+            # 工具日志写入失败也不能把正在操作游戏的运行遗留到 Agent 轮次之外。
+            if service.state["run_id"] == run_id and service.state["phase"] == "running":
+                service.stop()
+                service.wait_for(lambda current: current["phase"] == "finished")
+        self.checkpoint()
+        result = state["result"]
+        stopped = result.get("failure_code", result.get("reason")) == "user_cancelled"
+        outcome = ("试运行执行成功。" if result.get("status") == "success" else
+                   "试运行执行失败。" if result.get("status") == "failure" else
+                   "Plan 结果已返回；遍历完成不代表每个任务成功，请检查各项结果。")
+        return self.text({**request, "run_id": run_id, "result": result,
+                          "log": {"run_id": run_id, "first_sequence": 1,
+                                  "last_sequence": len(state["trace"])},
+                          "feedback": "用户主动停止了本次运行，建议总结并等待用户的下个指示。" if stopped else
+                          outcome + "按 Run ID 查看日志；需要再试时调用 trial_run，修改 Candidate 后须先 Publish。"})
+
+    def list_runs(self, offset=0, limit=100):
+        """列出仍有 Trace 的 Run ID，不把已清理记录当作空日志。"""
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 200:
+            raise ValueError("offset 必须非负，limit 必须为 1–200 的整数。")
+        directory = self.library.data_root / "traces"
+        ids = sorted((int(path.stem) for path in directory.glob("*.jsonl")
+                      if path.stem.isdecimal() and not path.is_symlink()), reverse=True)
+        return self.text({"run_ids": ids[offset:offset + limit],
+                          "next_offset": offset + limit if offset + limit < len(ids) else None})
+
+    def read_run_log(self, run_id, start_sequence=1, limit=100, evidence_id=None):
+        """按事件序号读取 Trace；仅允许查看该 Trace 实际引用的截图。"""
+        if (type(run_id) is not int or run_id < 1 or type(start_sequence) is not int or start_sequence < 1
+                or type(limit) is not int or not 1 <= limit <= 200):
+            raise ValueError("run_id/start_sequence 必须为正整数，limit 必须为 1–200 的整数。")
+        root = self.library.data_root
+        path = root / "traces" / f"{run_id}.jsonl"
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("Run 日志不可用：记录不存在或已清理。")
+        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        selected = [record for record in records if record["sequence"] >= start_sequence]
+        details = {"run_id": run_id, "events": selected[:limit],
+                   "next_sequence": selected[limit]["sequence"] if len(selected) > limit else None}
+        if evidence_id is None:
+            return self.text(details)
+        def referenced(value):
+            if isinstance(value, dict):
+                return value.get("evidence_id") == evidence_id or any(referenced(item) for item in value.values())
+            return isinstance(value, list) and any(referenced(item) for item in value)
+        prefix, separator, observation = str(evidence_id).partition("/")
+        if prefix != str(run_id) or not separator or not observation.isdecimal() or not referenced(records):
+            raise ValueError("截图必须是该 Run 日志引用的 evidence_id。")
+        image_path = root / "evidence" / str(run_id) / f"{observation}.png"
+        if image_path.is_symlink() or not image_path.resolve().is_relative_to((root / "evidence").resolve()):
+            raise ValueError("截图路径越界。")
+        return self.image(image_path.read_bytes(), {**details, "evidence_id": evidence_id})
 
     def add_recovery_rule(self, filename, logical_name, source):
         """创建 Recovery Rule 并登记，不赋予通用写入权限。"""

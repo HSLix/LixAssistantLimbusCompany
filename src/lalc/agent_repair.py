@@ -17,7 +17,7 @@ from .developer import candidate_files, editable_files, file_diff
 from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 
 
-SYSTEM_PROMPT = """你是 LALC Developer Candidate 修复助手。根据用户问题分析，需要修改时实际 read、edit，并 validate 完整候选。
+SYSTEM_PROMPT = """你是 LALC Developer Policy 开发助手。根据开发者 prompt 和当前游戏状态持续开发、调试工作流，需要修改时实际 read、edit，并 validate 完整候选。
 只能读取 Candidate 内已有文件；可按需修改多个已有文件，包括 manifest.json、Recovery Rule 和未被 Manifest 引用的文件。
 plan.json 始终只读。不通用新建、删除或重命名文件，不访问目录外文件。
 新增源码仅用 add_component / add_recovery_rule，提供 filename、logical_name、source 完整源码，工具同时创建并登记 Manifest。
@@ -26,7 +26,11 @@ plan.json 始终只读。不通用新建、删除或重命名文件，不访问�
 asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
 game_screenshot 现场截图；crop_asset 每次从新截图裁剪新增素材，同名同哈希保留原图和原标签。非 Windows 现场工具不可用。
 截图会恢复并置前唯一游戏窗口。不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
-不运行命令、候选 Workflow、点击或按键，不 Publish、不设置 Default。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
+可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
+试运行支持 Candidate 内已有 JSON Plan 或 Task Workflow/Subworkflow/Step。运行期间等待工具结果，不并行修改或操作游戏。
+启动拒绝无 Run ID，修正原因后可再次调用；已启动的结果带 Run ID，使用 list_runs 查看可用 ID、read_run_log 分段查看日志及引用截图。
+试运行结果返回后可继续修改、发布、试运行直到完成开发要求；用户停止本次运行后建议总结并等待下个指示。
+不运行命令、不直接点击或按键、不执行可变 Candidate、不设置 Default。Publish 不表示运行时永久批准。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
 Validator 会导入 Python，不是安全沙箱，校验通过也不证明真实游戏行为修复。
 遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；ctx.log(message, screenshot=False) 可记录语义日志并可选附上已有截图，不重新截图。Python 模块和关键函数用简洁中文 docstring。
 最终回答必须只输出一个合法 JSON 对象，格式为 {"revise_success": false, "message": "分析、修改结果或缺少的信息"}。
@@ -275,7 +279,7 @@ class RepairConversation:
                     prompt["images"] = attachments
                 self.history.append(self.log.clean({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                     "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]}))
-                input_record = {"prompt": prompt, "settings": settings,
+                input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
                                     "attachments": attachment_records, "editable_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": SYSTEM_PROMPT}
                 self.log.save_json(f"{prefix}/input.json", input_record)

@@ -215,3 +215,19 @@ llama.cpp 原表单保持不变；DeepSeek 下显示思考开关和 low/high/max
 消息发送及清除按平台隔离，不按模型保存密钥。Windows 各平台使用独立 DPAPI 引用；macOS
 各平台仅在本次 GUI 内存中保留，不新增系统钥匙串或持久密钥。旧 secret_name 归到原平台。
 DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/architecture 字段。
+
+## 2026-10-25 Developer Policy（已确认设计与实现）
+
+以下边界已经 grill 和 design-impact-review 收敛，由 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 接受，优先于本文旧有禁止自动 Publish、执行及历史记录列举的要求。工具、共享宿主及 GUI 已实现；自动化检查与真实游戏验收分开记录。Runtime Policy 继续遵循 Stage 3.5，本次不扩展其设计。
+
+- 已确认：一次开发者消息授权本轮 Developer Agent 自主重复修改、完整校验、Publish、试运行与日志检查，无需逐次人工确认。试运行是返回结果后允许继续开发的工具调用，不是终结本轮的控制权交接。
+- 已确认：此处 Publish 指保存完整不可变 Manifest 及按内容哈希保存的 Component 源码，返回 Manifest ID；不自动授予 Stage 3.5 的永久批准，不改变 Default。每次试运行必须显式指定已保存的 Manifest ID、入口及输入；不能直接执行可变 Candidate。
+- 四个 grill 议题及整体设计已确认，影响审查已完成。ADR 0030 替代 ADR 0029 禁止 Developer Agent 自动执行/发布的边界。
+- 已确认：Developer Agent 发起试运行时打开模态子窗口，仅显示运行日志和暂停/恢复、停止控件；暂停与恢复共用一个按钮。“置顶”的最终含义是阻止操作 Developer GUI，不是系统级置顶或抢走游戏焦点。人工暂停或接管后只能由人工恢复，等待期间 Agent 不修改 Candidate、不并行操作游戏。沿用现有执行预算与本轮模型请求额度，暂不增加独立试运行次数上限。
+- 已确认：试运行错误、正常结束或人工停止后，自动关闭试运行子窗口，把真实结果作为后续消息送给 Agent。具体消息封装仍待实现审查，不据此认定必须新增一次用户对话轮次。人工停止只终止本次试运行，回传类似“用户主动停止了本次运行，建议总结并等待用户的下个指示”的提示，不增加停止后的工具禁用或强制结束机制；此决定替代此前“停止结束本轮”的规则。“取消本轮”仍结束整轮 Agent。正常结束、报错和停止后的反馈沿用本轮模型请求额度，不重置额度。
+- 已确认：每次实际试运行反馈包含 Run ID、Manifest ID、入口、输入、结果或异常及日志索引；启动前被拒绝则无 Run ID，返回拒绝原因并提示修正后重新调用。通过 list_runs 列出可用 Run ID，read_run_log 按指定 ID 分段读取事件并可查看引用截图，不限当前开发对话；不实现内容搜索。复用现有 Trace 和截图存储，记录已清理或证据不可用时明确返回不可用。
+- 已确认：本次 plan.json 继续只读。Agent 继续通过现有专用工具开发 Component 和 Recovery Rule；支持按指定 Manifest 试运行 Plan、Task Workflow、Subworkflow 或 Step，不扩大 Plan 编辑权限。plan.py 参数化循环与恢复接续另列 Stage 3.5 待讨论事项。
+
+实现：publish、trial_run、list_runs、read_run_log 由共享 Python 宿主和 pi 工具注册共同提供。trial_run 的说明提醒修改 Candidate 后先 Publish，参数必须显式指定 Manifest ID，入口是 logical_name + inputs 或 Candidate 内的 plan_path。Agent 活动始终保留排他权，仅允许宿主所属试运行进入普通执行器，其他 Runner/Capture/候选操作仍被阻止。运行结果作为工具返回值触发同轮后续模型请求，不另起用户消息轮次、不重置额度；取消本轮时先停试运行并等清理完成。模态窗口不接受 Escape/关闭按钮绕过运行，结束后自动关闭；普通试运行失败交给 Agent 而不重复弹主窗口错误框，应用致命错误仍沿用原有处理。
+
+2026-10-25 检查：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q` 为 **392 passed, 43 skipped**；显式 `--run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **38 passed, 4 skipped**。覆盖四类入口、已保存版本与未发布修改分离、启动拒绝无 Run ID、运行失败/停止反馈、取消等待收尾、交互日志失败时停止运行、日志分页与截图引用、模态窗口属性/控件/自动关闭，以及真实 pi + 本机 HTTP 替身的同轮编辑→发布→试运行→日志调用和额度连续性。Agent 测试首次因沙箱禁止本机监听而无法建立替身服务，授权本机监听后重新执行并得到上述结果；不把首次环境错误计为通过。4 项跳过的真实模型/Windows 检查未执行，真实 Windows 游戏焦点、接管、模态交互及真实模型开发循环仍待实机验收；offscreen/HTTP 替身不替代这些证据。

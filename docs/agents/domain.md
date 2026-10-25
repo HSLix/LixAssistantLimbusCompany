@@ -39,6 +39,8 @@ If proposed work contradicts an existing ADR, surface the conflict explicitly in
 
 ## Agent changes to Manifests and Assets
 
+ADR 0030 supersedes the Developer Agent automatic Publish/execution prohibition below: Developer Policy may publish complete immutable versions and trial explicitly selected saved Manifest IDs through the existing executor, then inspect Run logs. Trial results return to the same round; they do not grant runtime permanent approval or change Default. GUI trials use a modal log window without requesting game focus. Runtime Policy remains Stage 3.5. Candidate file and Asset protection below still applies.
+
 Stage 3 originally implemented independent single-Component repair. ADR 0029 now accepts Developer GUI and shared multi-file repair: explicit Candidate initialization, all existing Candidate files (including candidate manifest.json and Recovery Rules), plan.json read-only, dedicated Candidate creation tools, no generic creation/deletion, continuous conversations and manual review/Publish. The shared host and four GUI pages implement these changes; see the Developer GUI design for automated versus pending real-model/Windows acceptance. ADR 0028's live screenshot and bounded Asset additions remain. Runtime Agent Sessions, Working Manifest integration and supervised runtime trials remain Stage 3.5.
 
 - Existing published Manifests, formal source, images and old hash-to-tag entries remain read-only to the Agent, including through generated code or executor requests. Never overwrite, rename, or delete them as part of a repair. The editable Candidate manifest is distinct from a published Manifest. The dedicated crop tool may add a new image and its tag entry under ADR 0028.

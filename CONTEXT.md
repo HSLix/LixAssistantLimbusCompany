@@ -69,8 +69,20 @@ The one editable complete Manifest draft in a project checkout, explicitly initi
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A manually initiated repair of a Developer Candidate using screenshots, exception information and context, with bounded tools for live game observation and fresh-crop Asset additions. The Agent reads and edits Candidate files, adds explicitly registered Component and Recovery Rule source, and checks the complete draft with the existing Validator, retaining the interaction and reviewable outputs without taking over a running Workflow, executing the candidate, or changing formal source, existing images/tags or the Default Manifest.
+A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer's objective, game observations and retained execution evidence. It preserves existing immutable source, images/tags and the Default Manifest and does not take over a paused runtime Workflow.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
+
+**Developer Policy**:
+The Agent's authority to iteratively develop a Developer Candidate, validate and publish immutable versions, run explicitly selected saved versions, and inspect their actual results within one developer-authorized conversation round. Publication is separate from runtime permanent approval and Default selection.
+_Avoid_: Runtime Policy, runtime recovery
+
+**Developer Trial**:
+An independent Top-level Execution of an explicitly selected saved Manifest and entry, undertaken to test a developer change and return actual evidence to the developing Agent. It does not resume a paused runtime caller or prove the developer's full objective has been completed.
+_Avoid_: Runtime Step Recheck, Candidate execution
+
+**Runtime Policy**:
+The Agent's runtime maintenance responsibility governed by Stage 3.5, distinct from developer-directed iterative development. Its paused-caller recovery and supervision contracts do not follow from Developer Trial permission.
+_Avoid_: Developer Policy
 
 **Capability Bundle**:
 The transport-neutral software-release data package containing one complete retained Component Manifest, immutable Component source and the Asset metadata and images needed by the distributed capabilities. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.

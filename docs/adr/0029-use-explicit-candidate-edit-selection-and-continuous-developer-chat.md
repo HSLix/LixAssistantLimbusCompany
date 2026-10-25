@@ -5,6 +5,8 @@ supersedes: 0025 and 0028 (independent repair lifecycle and edit scope only)
 
 # Use existing Candidate files and continuous developer chat
 
+2026-10-25：下文禁止 Developer Agent 自动 Publish/试运行的部分由 [ADR 0030](0030-developer-policy-publish-and-trial-tools.md) 替代，其余候选、编辑、素材及对话边界继续有效。
+
 2026-10-23 确认：Developer GUI 四页纳入 Stage 3，须在 2026-10-29 前完成，作为 #329 的前置。为允许多轮开发而不丢失草稿，Candidate 改为由开发者从已有 Manifest 明确初始化/重建，非空时确认替换；修复和 New Conversation 不清空 Candidate。重建成功开启新对话，取消或失败保留原草稿和上下文。Runner 选择只决定后续执行的 Base Manifest，与 Candidate 基线和 Default 独立。
 
 2026-10-23 的显式文件选择授权由以下 2026-10-24 决定替代。

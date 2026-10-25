@@ -28,6 +28,40 @@ def test_activity_blocks_runner_capture_rebuild_publish_and_clears_on_failure(tm
     assert host.service.state["activity"] is None
 
 
+def test_trial_modal_blocks_main_window_without_topmost_and_closes_on_result(gui, monkeypatch):
+    from PySide6.QtCore import Qt
+    from lalc.gui import ErrorDialog
+    app, window = gui
+    calls = []
+    for name in ("pause", "resume", "stop"):
+        monkeypatch.setattr(window.service, name, lambda *_, name=name: calls.append(name))
+    monkeypatch.setattr(ErrorDialog, "open", lambda self: pytest.fail("Trial must return errors to Agent"))
+    window.show()
+    state = {**window.service.state, "phase": "running", "run_id": 1, "activity": "Agent",
+             "entry": {"developer_trial": True}, "trace": [{"sequence": 1, "event": "run_started"}]}
+    window.render_state(state)
+    app.processEvents()
+    dialog = window.trial_dialog
+    assert dialog.windowModality() == Qt.WindowModality.WindowModal
+    assert dialog.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
+    assert not dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
+    assert app.activeModalWidget() is dialog
+    assert "run_started" in dialog.logs.toPlainText()
+    dialog.pause.click()
+    state["paused"] = True
+    window.render_state(state)
+    # 按钮读取真实服务状态，而不是界面文字。
+    monkeypatch.setattr(window.service, "_state", {**window.service._state, "paused": True})
+    dialog.pause.click()
+    dialog.stop.click()
+    assert calls == ["pause", "resume", "stop"]
+    dialog.reject()
+    assert not dialog.close() and dialog.isVisible()
+    window.render_state({**state, "phase": "finished", "paused": False,
+                         "result": {"status": "failure", "failure_code": "execution_failed"}})
+    assert window.trial_dialog is None and not dialog.isVisible()
+
+
 def test_capture_preview_saves_exact_original_without_recapture(tmp_path):
     from lalc.assets import AssetLibrary
     host, _ = host_for(tmp_path)

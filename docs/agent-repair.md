@@ -1,6 +1,6 @@
 # Agent Repair — Developer Candidate 开发与修复
 
-#330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主。使用当前 Candidate，可编辑全部已有文件（`plan.json` 只读），按每条用户消息处理一轮并保留上下文；不会自动重建草稿、执行候选、Publish 或设置 Default。
+#330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主，[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 增加 Developer Policy 的自主发布和试运行。使用当前 Candidate，可编辑全部已有文件（`plan.json` 只读），按每条用户消息处理一轮并保留上下文；不自动重建草稿、不执行可变 Candidate、不设置 Default。Agent 可 Publish 后显式选择保存的 Manifest 进行试运行。
 
 > Capture 窗口宽高与放大预览、专用源码新增工具、多图片附件及 Recovery Rule 示例已实现；Windows/真实游戏验收仍单列。完整边界见 [GUI 增量要求](developer-gui-design.md)。
 
@@ -15,7 +15,7 @@
 
 实际 Diff 与 Validator 结果供人工审阅。Publish 重新校验并生成新的不可变 Manifest，不运行它，也不设置 Default；设置 Default 是另一个明确操作。GUI 不增加运行时审批流程。
 
-Runner（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥。被动坐标和已有图片框选/预览可以继续。候选初始化、校验、发布也通过共享宿主活动检查。关闭时可返回继续，或取消并等待输入释放、日志保存和 pi 回收；切换页面不取消任务。
+Runner（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥；Agent 所属的串行试运行是内部执行入口，仍阻止外部 Runner/Capture。被动坐标和已有图片框选/预览可以继续。候选初始化、手动校验、发布也通过共享宿主活动检查。关闭时可返回继续，或取消并等待输入释放、日志保存和 pi 回收；切换页面不取消任务。
 
 ## CLI
 
@@ -53,7 +53,19 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建、删除和 `plan.json` 编辑；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
 
-pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查询和 Validator RPC；不提供终端、通用写入、删除、发布或设置 Default 工具。Candidate Python 校验会导入模块，Validator 不是操作系统沙箱；生成代码的副作用约束不能被描述为进程隔离保证。
+pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查询和 Validator RPC；Developer Policy 增加下述发布、试运行和日志工具，不提供终端、通用写入、删除或设置 Default 工具。Candidate Python 校验会导入模块，Validator 不是操作系统沙箱；生成代码的副作用约束不能被描述为进程隔离保证。
+
+## Developer Policy 开发调试循环
+
+[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 允许 Agent 在一次开发者消息中自主重复修改、校验、发布、试运行和读日志。此规则优先于旧有“Agent 不自动 Publish/运行”的说明，与 Stage 3.5 Runtime Policy 分开。
+
+- `publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`，不改变 Default，不授予运行时永久批准。
+- `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 使用 `trial_run(manifest_id, plan_path="plan.json")`，文件必须在 Candidate 内，仍只读。修改 Candidate 后先重新 Publish 才能运行新代码。
+- 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
+- `list_runs(offset=0, limit=100)`：列出仍有 Trace 的 Run ID，按新到旧分页。
+- `read_run_log(run_id, start_sequence=1, limit=100, evidence_id=...)`：分段读取日志，可选查看该日志引用的截图；记录已清理时明确报不可用。两个日志工具均只读，不做内容搜索。
+
+GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停止；阻止操作主界面，显示时不主动抢游戏焦点。暂停/接管仅人工恢复。结束、报错或停止后窗口自动关闭，结果作为工具响应交给同轮 Agent，后续请求继续计入原额度；不会自动创建新一轮。停止只结束当前运行并建议总结等待，不禁用后续工具。取消本轮则停止试运行、等待输入释放及收尾，再结束 Agent。CLI 复用相同工具与结果，模态窗口仅用于 GUI。
 
 每个对话在数据目录 `agent-interactions/<UTC日期>/<UUID4>/` 下独立留存：
 
