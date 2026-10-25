@@ -180,6 +180,65 @@ class AssetLibrary:
         atomic_write_json(self.data_root / "asset-provenance" / f"{provenance_id}.json", result)
         return result
 
+    def remove(self, name: str, digest: str, reason: str, screenshot: bytes, *, checkpoint: Callable[[], None]) -> dict:
+        """先完整归档，再移除活跃图片和标签；中途失败回退，归档始终保留恢复数据。"""
+        from .recognition import decode_image
+        asset_name(name)
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("移除 Asset 必须提供非空理由。")
+        relative = f"{name}/{digest}.png"
+        content = self.read({"path": relative, "sha256": digest})
+        if (self.path(relative) != self.root.resolve() / relative
+                or self.path(f"{name}/asset-tag.json") != self.root.resolve() / name / "asset-tag.json"):
+            raise ValueError("移除不接受指向其他目录或标签文件的符号链接。")
+        decode_image(content)
+        decode_image(screenshot)
+        if not screenshot.startswith(b"\x89PNG\r\n\x1a\n"):
+            raise ValueError("归档截图必须是原始 PNG。")
+        mapping = self._tag_mapping(name)
+        updated = dict(mapping)
+        updated.pop(digest, None)
+        now = datetime.now(UTC)
+        identity = now.strftime("%Y%m%dT%H%M%S%fZ-") + uuid.uuid4().hex
+        directory = self.data_root / "agent_removed_asset" / identity
+        if not directory.resolve().is_relative_to(self.data_root.resolve()):
+            raise ValueError("Asset 归档目录越界。")
+        directory.mkdir(parents=True, exist_ok=False)
+        record = {"archive_id": identity, "logical_name": name, "sha256": digest,
+                  "tags": list(mapping.get(digest, [])), "removed_at": now.isoformat(), "reason": reason,
+                  "source_path": relative, "image": "asset.png", "screenshot": "screenshot.png",
+                  "archive_path": str(directory), "state": "prepared"}
+        # 多文件不能一次原子提交；先保留完整副本与准备记录，进程中断后仍可从此恢复。
+        for filename, data in (("asset.png", content), ("screenshot.png", screenshot)):
+            with (directory / filename).open("xb") as stream:
+                stream.write(data)
+                stream.flush()
+                os.fsync(stream.fileno())
+        atomic_write_json(directory / "record.json", record)
+        with (directory / "record.json").open("rb") as stream:
+            os.fsync(stream.fileno())
+        path = self.path(relative)
+        tags_changed = removed = False
+        try:
+            checkpoint()
+            if updated != mapping:
+                atomic_write_json(self.path(f"{name}/asset-tag.json"), updated)
+                tags_changed = True
+            path.unlink()
+            removed = True
+            record["state"] = "completed"
+            atomic_write_json(directory / "record.json", record)
+        except BaseException:
+            try:
+                if removed:
+                    with path.open("xb") as stream:
+                        stream.write(content)
+            finally:
+                if tags_changed:
+                    atomic_write_json(self.path(f"{name}/asset-tag.json"), mapping)
+            raise
+        return record
+
     def match(
         self, name: str, pixels: bytes, size: tuple[int, int], *, run_id: int,
         observation: int, emit: Callable[[str, dict[str, Any]], None],

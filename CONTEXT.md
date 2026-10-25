@@ -69,12 +69,20 @@ The one editable complete Manifest draft in a project checkout, explicitly initi
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer's objective, game observations and retained execution evidence. It preserves existing immutable source, images/tags and the Default Manifest and does not take over a paused runtime Workflow.
+A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer's objective, game observations and retained execution evidence. It preserves immutable source and the Default Manifest, permits explicit evidence-preserving Asset archive removal, and does not take over a paused runtime Workflow.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Developer Policy**:
 The Agent's authority to iteratively develop a Developer Candidate, validate and publish immutable versions, run explicitly selected saved versions, and inspect their actual results within one developer-authorized conversation round. Publication is separate from runtime permanent approval and Default selection.
 _Avoid_: Runtime Policy, runtime recovery
+
+**Asset Crop Preview**:
+A retained observation tying a proposed Asset name, tags and crop region to exact original game pixels, with visual aids and same-image matching evidence. Saving that preview creates or reuses the corresponding Asset without observing the game again; a preview alone is not an active Asset.
+_Avoid_: Candidate Asset Store, confirmed game-state detector
+
+**Removed Asset Archive**:
+A retained record of an explicitly removed Asset image, its original logical name, hash and tags, the reason and time, and the original game screenshot observed at removal. It preserves recovery evidence while the removed image and its tag relation no longer participate in the active Asset Library.
+_Avoid_: Permanent deletion, Discard Index, separate Asset Library
 
 **Developer Trial**:
 An independent Top-level Execution of an explicitly selected saved Manifest and entry, undertaken to test a developer change and return actual evidence to the developing Agent. It does not resume a paused runtime caller or prove the developer's full objective has been completed.

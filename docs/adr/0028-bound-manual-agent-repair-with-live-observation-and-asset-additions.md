@@ -5,6 +5,8 @@ supersedes: 0025 (Stage 3 workspace and Agent Asset creation limits only)
 
 # Bound manual Agent repair with live observation and Asset additions
 
+2026-10-25：[ADR 0031](0031-preview-agent-crops-and-archive-removed-assets.md) 替代本页 Agent 正式裁剪每次新截图的规则，改为关联预览保存同一像素；另接受专用 remove_asset 归档并移除活跃图片与标签关系。其余禁止通用图片修改、同名同哈希保留原图/原标签规则继续有效。
+
 2026-10-23 后续修订：[ADR 0029](0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 取代本决定中每次从 Default 重建 Candidate、单目标编辑、候选 Manifest/Recovery Rule 不可编辑的范围。它允许人工明确初始化、多文件授权与连续对话；下文现场截图、Agent 素材新增及旧标签保护规则继续有效。旧范围的既有 CLI 实现不表示新 GUI 契约已经实现。
 
 2026-10-23 确认：Stage 3 继续只做人工启动的单 Component 修复，但允许两个专用工具取得当前游戏截图、从新截图裁剪新增 Asset，避免 Agent 只能依赖启动时的一张截图。裁剪每次重新截图，返回实际裁剪图片、完整哈希及标签；同逻辑名同哈希已存在时复用图片和原标签，明确报告已存在，不通过裁剪修改旧标签。新增哈希可写入现有逻辑名的标签映射，但不得改动旧哈希的标签。人类开发工具按 ADR 0027 仍可整体替换标签，本决定只收窄 Agent 的写入权限。新增 Asset 立即进入共享库，不要求 Publish；修复失败、取消或拒绝均保留产物，不清理。
