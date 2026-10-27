@@ -5,6 +5,8 @@ supersedes: 0029 (Developer Agent automatic Publish and execution prohibition on
 
 # Developer Policy uses Publish and trial tools
 
+2026-10-27：后续 [ADR 0032](0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受每 Manifest 唯一 Python Plan、同进程双 GUI 和 Candidate Plan 编辑/已发布试运行，按其列明范围替代本文的旧 Plan/GUI 边界；本文其余决定及历史实施证据保留，Stage 4 尚未实现。
+
 2026-10-25：Developer Agent 负责按开发者 prompt 和游戏状态持续开发，与 Stage 3.5 的运行中维护分开。一次用户消息授权本轮自主修改、完整校验、Publish、试运行和查日志；试运行返回实际结果后可继续开发，不是 Runtime Policy 的终结式控制权交接。复用现有发布、执行和 Trace，无需新增并行执行器或运行时 Policy 实现。
 
 Publish 保存完整不可变 Manifest 及内容哈希源码，不授予运行时永久批准、不改变 Default；试运行必须显式指定已保存的 Manifest ID，修改 Candidate 后须重新 Publish。支持 Candidate 内只读 JSON Plan 或 Task Workflow、Subworkflow、Step 入口及输入。启动拒绝不创建 Run ID；实际运行的结果必带 Run ID。两个只读工具分别列出可用 Run ID、按指定 ID 分段查看 Trace 和引用截图，不增加内容搜索。

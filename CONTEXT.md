@@ -65,11 +65,11 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer from a saved Manifest for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its files and register new Component or Recovery Rule source through dedicated additions, with plan.json read-only, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing Python Automation Plan and other authorized files and register new Component or Recovery Rule source through dedicated additions, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
-A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer's objective, game observations and retained execution evidence. It preserves immutable source and the Default Manifest, permits explicit evidence-preserving Asset archive removal, and does not take over a paused runtime Workflow.
+A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer’s objective, game observations and retained execution evidence. It may edit the Candidate Automation Plan, but does not take over a paused runtime caller or edit shared GUI settings pages.
 _Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
 
 **Developer Policy**:
@@ -89,7 +89,7 @@ An independent Top-level Execution of an explicitly selected saved Manifest and 
 _Avoid_: Runtime Step Recheck, Candidate execution
 
 **Runtime Policy**:
-The Agent's runtime maintenance responsibility governed by Stage 3.5, distinct from developer-directed iterative development. Its paused-caller recovery and supervision contracts do not follow from Developer Trial permission.
+The Agent's runtime maintenance responsibility governed by Stage 6 (formerly Stage 3.5), distinct from developer-directed iterative development. Its paused-caller recovery and supervision contracts do not follow from Developer Trial permission.
 _Avoid_: Developer Policy
 
 **Capability Bundle**:
@@ -141,11 +141,11 @@ A user-originated request to pause, take over, or cancel automation. Pause and t
 _Avoid_: Execution Failure, automatic recovery
 
 **Automation Plan**:
-User-saved configuration executed from a frozen ordered list of Task Workflow stable logical names and normalized inputs plus a current item index. It is not a Component or Manifest entry and has no execution stack. Before any task starts, the complete configuration must parse, every name must resolve through the initial Working Manifest to a Task Workflow, and every input must bind and normalize successfully. Each list position then becomes one independent best-effort call, including repeated occurrences of the same task; the latest Working Manifest is checked again before that call. The Plan records an ordered per-item result and proceeds without item identities, dependencies, conditions, retries, result mappings, state inheritance, or failure policies. Completing traversal is distinct from every task succeeding; invalid configuration, cancellation, a process failure, or an inability to continue scheduling interrupts the Plan.
-_Avoid_: Workflow, Task Workflow
+The unique immutable Python orchestration Component owned by a Component Manifest, distinct from a Task Workflow. It calls Task Workflows using configured repetition counts and settings; ordinary Task failures are recorded and may be followed by further calls, while cancellation, an unrecoverable environment failure or a Plan error ends the execution.
+_Avoid_: JSON task list, arbitrary script path, Task Workflow
 
 **Top-level Execution**:
-One application-service-started execution boundary: a formal Task Workflow, Subworkflow, or Step selected by stable logical name, or one Automation Plan and all of its sequential Task Workflows. Direct Subworkflow and Step entry supports development without creating another run kind; the selected Component keeps its normal role and return contract. The boundary owns exactly one Working Manifest and retains its complete attempted Manifests through post-execution review.
+One application-service-started execution of a Manifest’s unique Automation Plan or a directly selected Task Workflow, Subworkflow, or Step. It owns one Working Manifest and retains actual calls, results and attempted versions; a Plan’s traversal completion is distinct from every Task succeeding.
 _Avoid_: Nested Component call, debug-only executor
 
 **Runtime Exception Handling**:
@@ -185,7 +185,7 @@ The structured synchronous exception raised when an application-service start re
 _Avoid_: Failed Run Result, execution exception, condition failure
 
 **Task Workflow Result**:
-The final business result of one considered Task Workflow call after Automation Plan preflight or direct launch: `success` or `failure`. Every considered task that does not complete successfully is `failure`, including one whose `execute()` is not entered because its condition fails or its current Working Manifest binding is incompatible. A stable machine-readable `failure_code` propagated from its source, a user-facing `failure_message`, Agent involvement, recovery facts, and whether Safe Task Termination occurred explain how it failed. Errors pass upward without intermediate layers changing their meaning; diagnostics retain the original cause and traceback. Failure location and process remain in Execution Trace rather than a duplicated `failure_stage`. `incomplete` may exist only while the invocation is still open and is not a final result. Initial Automation Plan preflight failure creates no Task Workflow result.
+The final business result of one considered Task Workflow call within an Automation Plan or direct launch: `success` or `failure`. Every considered task that does not complete successfully is `failure`, including one whose `execute()` is not entered because its condition fails or its current Working Manifest binding is incompatible. A stable machine-readable `failure_code` propagated from its source, a user-facing `failure_message`, Agent involvement, recovery facts, and whether Safe Task Termination occurred explain how it failed. Errors pass upward without intermediate layers changing their meaning; diagnostics retain the original cause and traceback. Failure location and process remain in Execution Trace rather than a duplicated `failure_stage`. `incomplete` may exist only while the invocation is still open and is not a final result. A rejected Plan start or a Plan failure before any Task is considered creates no Task Workflow result.
 _Avoid_: Automation Plan status, Safe Task Termination, not executed
 
 **Subworkflow Result**:
@@ -220,7 +220,7 @@ The topmost modal post-execution decision boundary for one complete Capability P
 _Avoid_: Supervised Review Dialog, partial approval, runtime confirmation
 
 **Component**:
-An immutable Python Task Workflow, Subworkflow, Step, or Recovery Rule that a Component Manifest may reference; application-registered Trusted Actions are not Manifest source Components. Its Component ID is `sha256:` followed by the SHA-256 of its exact source bytes, with no separate source-hash field. Formal Task Workflow, Subworkflow, Step, Step condition, Recovery Rule, and their private source functions contain no `except`; they may use `try/finally` for cleanup, but a `finally` suite contains no `return`, `break`, `continue`, or `raise` that could suppress or replace the active exception. The Trusted Action boundary alone may normalize caught low-level exceptions. Editing changes the Component ID rather than changing existing content.
+An immutable Python Automation Plan, Task Workflow, Subworkflow, Step, or Recovery Rule referenced by a Component Manifest. Its identity is the hash of its exact source; application-registered Trusted Actions and shared GUI settings pages are not Manifest source Components.
 _Avoid_: Component Revision, mutable component
 
 **Component Logical Name**:
@@ -258,3 +258,16 @@ _Avoid_: Agent memory, capability library
 **Expert Guidance**:
 User-authored, immediately available knowledge that combines annotated visual evidence, handling instructions, and applicability information. It can guide diagnosis but cannot execute actions or bypass approval boundaries.
 _Avoid_: Workflow, executable memory
+
+
+**User GUI**:
+The user-facing application interface for configuring and running the Default Manifest’s unique Automation Plan, distinct from developer-directed repair and trial.
+_Avoid_: Developer Runner, independent runtime
+
+**Developer GUI**:
+The developer-facing interface for observation, Agent settings and Candidate repair/trial, sharing execution ownership with the User GUI while retaining its own selected Manifest.
+_Avoid_: User GUI, concurrent executor
+
+**Workflow Settings Page**:
+A shared business-settings page independent of a Manifest that may contribute repetition tasks identified by stable task IDs. The selected Plan explicitly declares supported task IDs; page identity and task identity are distinct from Component logical names.
+_Avoid_: Manifest Component, automatic form schema

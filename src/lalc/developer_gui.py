@@ -78,12 +78,31 @@ class TrialDialog(QDialog):
         self.stop = button("停止", service.stop, controls)
         layout.addLayout(controls)
         self.sequence = 0
+        self.pause_notice = QLabel()
+        self.pause_notice.setWordWrap(True)
+        layout.addWidget(self.pause_notice)
+        self._pause_notice_shown = False
 
     def render(self, state):
         for record in state["trace"]:
             if record["sequence"] > self.sequence:
                 self.logs.appendPlainText(json.dumps(record, ensure_ascii=False))
                 self.sequence = record["sequence"]
+        info = state.get("pause_info")
+        if info:
+            instruction = "恢复后将检查当前 Step 的 condition。" if info["has_condition"] else "恢复后将从头执行当前 Step。"
+            if not info.get("restart_step", True):
+                instruction = "恢复后继续 Workflow 的观察与调度。"
+            self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
+            if not self._pause_notice_shown:
+                self._pause_notice_shown = True
+                self.logs.appendPlainText(info.get("traceback", ""))
+                self.parentWidget().showNormal()
+                self.parentWidget().raise_()
+                self.parentWidget().activateWindow()
+        else:
+            self._pause_notice_shown = False
+            self.pause_notice.clear()
         self.pause.setText("恢复" if state["paused"] else "暂停")
         self.pause.setEnabled(not state.get("resume_pending", False))
 
@@ -363,7 +382,7 @@ class CapturePage(QWidget):
     def render(self, busy):
         for control in (self.capture_button, self.save_button, self.resize_button, self.window_width, self.window_height):
             control.setEnabled(not busy)
-            control.setToolTip("Runner、Agent 或其他操作尚未结束" if busy else "")
+            control.setToolTip("运行、Agent 或其他操作尚未结束" if busy else "")
 
 
 class DiagnosticPanel(QWidget):
@@ -572,13 +591,12 @@ class SettingsPage(QWidget):
         value = self.values()
         secret = self.key.text()
         def operation():
-            with self.host.service.activity("Agent Settings"):
-                saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear)
-                if clear:
-                    self.host.secrets.pop(value["provider"], None)
-                elif secret and sys.platform != "win32":
-                    self.host.secrets[value["provider"]] = secret
-                return saved
+            saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear)
+            if clear:
+                self.host.secrets.pop(value["provider"], None)
+            elif secret and sys.platform != "win32":
+                self.host.secrets[value["provider"]] = secret
+            return saved
         def done(saved):
             self.invalidate()
             self.key.clear()
@@ -588,8 +606,8 @@ class SettingsPage(QWidget):
         self.window.launch(operation, done)
 
     def render(self, busy):
-        self.save_button.setEnabled(not busy)
-        self.clear_button.setEnabled(not busy)
+        self.save_button.setEnabled(not self.window.jobs and not self.window.closing)
+        self.clear_button.setEnabled(not self.window.jobs and not self.window.closing)
         self.connection_button.setEnabled(not busy)
         self.model_button.setEnabled(not busy)
 

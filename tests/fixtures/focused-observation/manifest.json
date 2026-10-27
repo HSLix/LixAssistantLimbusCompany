@@ -3,6 +3,9 @@
   "components": {
     "steps.capture_screen": {
       "source_path": "steps.capture_screen.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
     }
   },
   "recovery_rules": {}

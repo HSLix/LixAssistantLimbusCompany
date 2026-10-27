@@ -47,7 +47,6 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
     chat, options, state = conversation
     candidate = chat.host.candidate
     manifest = (candidate / "manifest.json").read_text()
-    (candidate / "plan.json").write_text("{}")
     (candidate / "temporary.py").write_text("# before")
     (candidate / "outside-link.py").symlink_to(candidate.parent / "outside.py")
     # 候选符号链接在进入模型前拒绝，不依赖文件选择。
@@ -57,7 +56,7 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
     script(state, [
         tool("edit", {"path": "steps.total.py", "oldText": "if value > 0", "newText": "if value >= 0"}),
         tool("edit", {"path": "manifest.json", "oldText": manifest, "newText": "{invalid json"}),
-        tool("edit", {"path": "plan.json", "oldText": "{}", "newText": "hacked"}),
+        tool("edit", {"path": "plans.default.py", "oldText": "return None", "newText": 'ctx.log("plan edited")\n    return None'}),
         tool("edit", {"path": "steps.unchanged.py", "oldText": 'return "unchanged"', "newText": 'return "changed"'}),
         tool("edit", {"path": "temporary.py", "oldText": "# before", "newText": "# after"}),
         tool("edit", {"path": "new.py", "oldText": "", "newText": "created"}),
@@ -66,7 +65,7 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
     assert result["status"] == "completed", result
     assert "if value >= 0" in (candidate / "steps.total.py").read_text()
     assert (candidate / "manifest.json").read_text() == "{invalid json"
-    assert (candidate / "plan.json").read_text() == "{}"
+    assert 'ctx.log("plan edited")' in (candidate / "plans.default.py").read_text()
     assert not (candidate / "new.py").exists()
     assert 'return "changed"' in (candidate / "steps.unchanged.py").read_text()
     assert (candidate / "temporary.py").read_text() == "# after"
@@ -674,3 +673,35 @@ def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, th
     assert state['authorization'] == 'Bearer deepseek-test-key'
     assert all(b'deepseek-test-key' not in path.read_bytes()
                for path in chat.log.path.rglob('*') if path.is_file())
+
+
+def test_python_plan_edit_publish_and_saved_trial_ignore_unpublished_changes(conversation, monkeypatch):
+    """真实 pi 工具协议编辑 Plan；未发布后续修改不能进入试运行。"""
+    chat, options, state = conversation
+    monkeypatch.setattr(chat.host.service, "_start_session", lambda: None)
+    original = chat.host.manager.default_manifest_id()
+    step = 0
+    def respond(body):
+        nonlocal step
+        step += 1
+        if step == 1:
+            return tool("edit", {"path": "plans.default.py", "oldText": "-> None:\n    return None",
+                                 "newText": '-> Any:\n    return {"value": 7}'})
+        if step == 2:
+            return tool("publish", {})
+        if step == 3:
+            return tool("edit", {"path": "plans.default.py", "oldText": '{"value": 7}',
+                                 "newText": '{"value": 9}'})
+        if step == 4:
+            saved = next(m["manifest_id"] for m in chat.host.manager.list_manifests() if m["manifest_id"] != original)
+            return tool("trial_run", {"manifest_id": saved})
+        if step == 5:
+            result = chat.host.service.state["result"]
+            assert result["status"] == "completed" and result["output"] == {"value": 7}
+            return tool("read_run_log", {"run_id": chat.host.service.state["run_id"], "limit": 2})
+        return answer("Plan published and tested")
+    state["respond"] = respond
+    result = asyncio.run(chat.run("edit, publish and trial Python Plan", options))
+    assert result["status"] == "completed", result
+    assert chat.host.manager.default_manifest_id() == original
+    assert '{"value": 9}' in (chat.host.candidate / "plans.default.py").read_text()

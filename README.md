@@ -9,8 +9,9 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 1 product and Agent boundaries: accepted.
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
 - Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
-- Stage 3 Agent-assisted Component Repair: scope accepted; independent CLI repair implementation and reproducible acceptance pending.
-- Stage 3.5 Agent Runtime Step Recovery and Maintenance: prior runtime architecture retained; implementation deferred.
+- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; final Windows/model/game acceptance remains tracked in #329.
+- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan and coexisting windows implemented locally; #332–#334 remain pending. See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
+- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: deferral confirmed on 2026-10-26; prior runtime architecture retained. Other Stage 5–6 proposals remain [pending discussion](docs/reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案).
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
 - Agent-assisted Workflow Drafting and autonomous Capability Expansion: explicitly deferred.
 
@@ -22,10 +23,12 @@ Start with:
 - [Developer Workflow tutorial](docs/developer-workflow-tutorial.md)
 - [Three-level Workflow and all Trusted Actions sample](example/trusted-actions/README.md)
 - [Stage 3 Agent-assisted Component Repair](docs/stage-3-agent-assisted-component-repair.md)
-- [Stage 3.5 Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
+- [Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
 - [Architecture decisions](docs/adr/)
 
 ## Development
+
+The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages, shared Agent profiles, bilingual information panels and final Windows packaged acceptance belong to later slices.
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
@@ -42,7 +45,7 @@ UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv r
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run --all-extras pytest
 ```
 
-Running `lalc` without arguments opens the GUI. The developer workflow uses a
+Running `lalc` without arguments opens User Dashboard; `lalc --developer` opens Developer GUI. Both windows share one application service. Repeated GUI launches activate the existing application, and game activities also exclude independent CLI runs. The developer workflow uses a
 single Git-ignored `candidate/` directory in the current project:
 
 ```bash
@@ -52,7 +55,8 @@ uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>
 uv run lalc run <logical-name> --inputs '{}'
-uv run lalc run-plan <plan.json>
+uv run lalc run-plan
+uv run lalc --developer
 uv run lalc list-manifests
 uv run lalc clear
 uv run lalc data-dir
@@ -80,8 +84,7 @@ Use `publish` → `set-default` → `run` / `run-plan` for normal development. A
 
 `publish` keeps the editable candidate and does not change the Default
 Manifest. `clear` is the only command that removes it and asks for confirmation.
-`run-plan` reads an existing JSON file; edit and save that file with any text
-editor. Each Plan uses one Run ID, and its Task/Subworkflow records are saved
+`init` creates and registers an empty `plan.py`. Edit it in the Candidate, then validate and publish. Each runnable Manifest requires exactly one `@automation_plan`; `run-plan` executes its saved immutable source, with optional `--inputs` / `--inputs-file` containing `task_repetitions` and `settings`. JSON Plan paths are no longer executable; old data is preserved and requires explicit republication. CLI returns 1 for completed Plans containing failed tasks. Each Plan uses one Run ID, and its Task/Subworkflow records are saved
 under the local data directory's `ledger/` folder.
 
 Release-like dependency installation and the internal `onedir` spike use a

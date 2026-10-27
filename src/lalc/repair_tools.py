@@ -75,24 +75,17 @@ class RepairTools:
         return self.text({"ok": True, "manifest_id": result.loaded.manifest_id,
                           "message": "已保存不可变版本，可用此 Manifest ID 试运行；Default 未改变。"})
 
-    def trial_run(self, manifest_id, *, logical_name=None, inputs=None, plan_path=None):
+    def trial_run(self, manifest_id, *, logical_name=None, inputs=None):
         """串行执行已保存版本；取消整轮时先停止运行并等输入释放，再返回宿主。"""
         from .application import StartError
         if not isinstance(manifest_id, str) or not manifest_id:
             raise ValueError("必须指定已 Publish 的 Manifest ID；修改 Candidate 后须先 Publish。")
-        if (logical_name is None) == (plan_path is None):
-            raise ValueError("必须且只能指定 logical_name 或 Candidate 内的 plan_path。")
         service = self.host.service
         request = {"manifest_id": manifest_id, "logical_name": logical_name,
-                   "inputs": inputs if inputs is not None else {}, "plan_path": plan_path}
+                   "inputs": inputs if inputs is not None else {}}
         try:
-            if plan_path is not None:
-                if inputs:
-                    raise ValueError("JSON Plan 的输入由 Plan 文件提供。")
-                path = (self.host.candidate / plan_path).resolve()
-                if not path.is_relative_to(self.host.candidate.resolve()) or path.suffix != ".json":
-                    raise ValueError("plan_path 必须是 Candidate 内的已有 JSON Plan。")
-                run_id = service.start_plan(path, manifest_id=manifest_id, _developer_trial=True)
+            if logical_name is None:
+                run_id = service.start_plan(**request["inputs"], manifest_id=manifest_id, _developer_trial=True)
             else:
                 run_id = service.start(logical_name, request["inputs"], manifest_id=manifest_id,
                                        _developer_trial=True)

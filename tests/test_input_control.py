@@ -113,7 +113,7 @@ def fast_quiet(monkeypatch):
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0.001)
 
 
-def service_for(tmp_path: Path, *, condition: str = ""):
+def service_for(tmp_path: Path, *, condition: str = "", repetitions: int = 1):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     for path in FIXTURE.glob("*.py"):
@@ -134,6 +134,8 @@ def execute(ctx, *, operation: str = "drag") -> str:
     manifest = json.loads((FIXTURE / "manifest.json").read_text(encoding="utf-8"))
     manifest["components"]["tasks.control"] = {"source_path": "task.py"}
     (candidate / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json", '    ctx.call("tasks.control")\n' * repetitions)
     manager = ManifestManager(tmp_path)
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
@@ -238,12 +240,10 @@ def condition(ctx, *, operation: str = "key_press", key: str = "esc", x: int = 1
 
 
 def test_release_failure_ends_plan_without_resume_or_later_task(tmp_path):
-    service, window = service_for(tmp_path)
+    service, window = service_for(tmp_path, repetitions=2)
     window.backend.takeovers = 1
     window.backend.fail_release = True
-    plan = tmp_path / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}] * 2}), encoding="utf-8")
-    service.start_plan(plan)
+    service.start_plan()
     state = finished(service)
     assert state["result"]["reason"] == "input_release_failed"
     assert len(state["result"]["items"]) == 1
@@ -404,15 +404,17 @@ def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path,
         "reason": "检测到用户接管", "description": "请回到邮箱页面", "has_condition": False,
         "traceback": "Traceback (most recent call last):\n  original_function\nOSError: denied\n",
     })
+    window.owns_run = True
     window.render_state(state)
     window.render_state(state)
     state["resume_pending"] = True
     window.render_state(state)
     assert calls == ["raise", "activate"]
-    assert "请回到邮箱页面" in window.pause_notice.text()
-    assert "从头执行" in window.pause_notice.text()
-    assert "\n  original_function\n" in window.trace.toPlainText()
-    assert not window.pause_button.isEnabled()
+    assert "请回到邮箱页面" in window.trial_dialog.pause_notice.text()
+    assert "从头执行" in window.trial_dialog.pause_notice.text()
+    assert "\n  original_function\n" in window.trial_dialog.logs.toPlainText()
+    assert not window.trial_dialog.pause.isEnabled()
+    window.render_state({**state, "phase": "finished", "pause_info": None})
     window.close()
 
 
@@ -545,9 +547,7 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         return capture(hwnd, width, height)
     monkeypatch.setattr(window, "capture", observe)
     if plan:
-        path = tmp_path / "plan.json"
-        path.write_text(json.dumps({"items": [{"task": "tasks.control", "inputs": {}}]}), encoding="utf-8")
-        service.start_plan(path)
+        service.start_plan()
     else:
         service.start("tasks.control", {})
     state = paused(service)

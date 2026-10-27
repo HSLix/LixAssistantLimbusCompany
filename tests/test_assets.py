@@ -243,6 +243,8 @@ def execute(ctx) -> str:
 ''', encoding="utf-8")
     (candidate / "manifest.json").write_text(json.dumps({"schema_version":2,"components":{"steps.find":{"source_path":"step.py"}},"recovery_rules":{}}), encoding="utf-8")
     manager = ManifestManager(tmp_path)
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json")
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
     manifest = published.loaded.manifest_id
@@ -298,6 +300,8 @@ def test_usage_index_survives_later_step_failure(tmp_path):
     path = candidate / "steps.detect.py"
     path.write_text(path.read_text(encoding="utf-8").replace('return ctx.action("observe.match_asset"', 'result = ctx.action("observe.match_asset"') + '\n    raise ValueError("business check failed")\n', encoding="utf-8")
     manager = ManifestManager(tmp_path)
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json")
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
     entry(tmp_path, "ui/claim")
@@ -316,6 +320,8 @@ def test_components_cannot_bypass_asset_trusted_action_gate(tmp_path, operation)
     (candidate / "step.py").write_text('"""验证素材调用权限。"""\nfrom lalc import step\n@step\ndef execute(ctx) -> str:\n    return '+call+'\n', encoding="utf-8")
     (candidate / "manifest.json").write_text(json.dumps({"schema_version":2,"components":{"steps.find":{"source_path":"step.py"}},"recovery_rules":{}}), encoding="utf-8")
     manager = ManifestManager(tmp_path)
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json")
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=Window())

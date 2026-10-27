@@ -40,10 +40,12 @@ class OutputValidationError(ValueError):
 
 class TraceWriteError(RuntimeError):
     """Trace 持久化失败；继续执行会丢失必要证据。"""
+    code = "trace_write_failed"
 
 
 class WorkingManifestWriteError(TraceWriteError):
     """Working Manifest 持久化失败；禁止继续执行新 Component。"""
+    code = "working_manifest_write_failed"
 
 
 class ExecutionFailure(RuntimeError):
@@ -58,7 +60,11 @@ class ExecutionFailure(RuntimeError):
             self.__cause__ = cause
 
 
-class InputReleaseFailure(ExecutionFailure):
+class EnvironmentFailure(ExecutionFailure):
+    """游戏环境无法继续；不得降为可继续的 Task 失败。"""
+
+
+class InputReleaseFailure(EnvironmentFailure):
     """无法确认输入释放，必须终止整个 Run，不能再恢复控制。"""
 
     def __init__(self, message: str) -> None:
@@ -68,6 +74,11 @@ class InputReleaseFailure(ExecutionFailure):
 def _mark_role(function: Callable[..., Any], role: str) -> Callable[..., Any]:
     function.__lalc_role__ = role
     return function
+
+
+def automation_plan(function: Callable[..., Any]) -> Callable[..., Any]:
+    """标记 Manifest 唯一的正式 Python 调度入口。"""
+    return _mark_role(function, "automation_plan")
 
 
 def task_workflow(function: Callable[..., Any]) -> Callable[..., Any]:
@@ -169,7 +180,10 @@ class WorkflowExecutor:
         match_asset: Callable[..., list[dict[str, Any]]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
+        task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
     ) -> None:
+        self.task_results: list[dict[str, Any]] = []
+        self.task_finished = task_finished
         self.manifest = manifest
         self.gate = gate
         self.emit = emit
@@ -195,6 +209,20 @@ class WorkflowExecutor:
     def prepare_inputs(component: LoadedComponent, arguments: dict[str, Any]) -> dict[str, Any]:
         """绑定默认值并按 execute 注解生成独立的 JSON 输入副本。"""
 
+        if component.role == "automation_plan":
+            if type(arguments) is not dict or set(arguments) != {"task_repetitions", "settings"}:
+                raise InputValidationError("Plan requires task_repetitions and settings")
+            repetitions, settings = arguments["task_repetitions"], arguments["settings"]
+            if type(repetitions) is not dict or any(type(k) is not str or type(v) is not int or v < 0
+                                                   for k, v in repetitions.items()):
+                raise InputValidationError("task_repetitions must map task IDs to non-negative integers")
+            if type(settings) is not dict or any(type(k) is not str or type(v) is not dict
+                                               for k, v in settings.items()):
+                raise InputValidationError("settings must map page IDs to JSON objects")
+            try:
+                return {"task_repetitions": deepcopy(repetitions), "settings": _strict_json(settings)}
+            except (ValueError, TypeError) as error:
+                raise InputValidationError(str(error)) from error
         return _bind_and_normalize(component.module.execute, arguments)
 
     def run(
@@ -231,15 +259,15 @@ class WorkflowExecutor:
     @staticmethod
     def _failure(
         logical_name: str,
-        component: LoadedComponent,
+        component: LoadedComponent | None,
         code: str,
         message: str,
     ) -> dict[str, Any]:
         return {
             "status": "failure",
             "logical_name": logical_name,
-            "component_id": component.component_id,
-            "role": component.role,
+            "component_id": component.component_id if component else None,
+            "role": component.role if component else "task_workflow",
             "failure_code": code,
             "failure_message": message,
         }
@@ -250,6 +278,8 @@ class WorkflowExecutor:
         if not self._frames or self._frames[-1].phase != "execute":
             raise ExecutionFailure("execution_failed", "ctx.call is unavailable outside execute().")
         caller = self._frames[-1]
+        if caller.role == "automation_plan":
+            return self._call_task(logical_name, arguments, caller.call_id)
         if caller.role not in {"task_workflow", "sub_workflow"}:
             raise ExecutionFailure("execution_failed", f"{caller.role} cannot call a Component.")
         component = self.manifest.components.get(logical_name)
@@ -263,6 +293,49 @@ class WorkflowExecutor:
             return self._invoke_step(logical_name, component, arguments, caller.call_id)
         return self._invoke_component(logical_name, component, arguments, parent_call_id=caller.call_id)
 
+    def _call_task(self, name: str, arguments: dict[str, Any], parent_call_id: int) -> dict[str, Any]:
+        """Plan 的 Task 结果边界；环境故障和用户控制信号始终向外传播。"""
+        from datetime import UTC, datetime
+        self.gate.checkpoint()
+        component = self.manifest.components.get(name)
+        if component is not None and component.role != "task_workflow":
+            component = None
+        started = time.monotonic()
+        event = {"logical_name": name, "component_id": component.component_id if component else None,
+                 "manifest_id": self.manifest.manifest_id, "inputs": _json_copy(arguments),
+                 "recorded_at": datetime.now(UTC).isoformat()}
+        terminal = None
+        next_call_id = self._next_call_id
+        try:
+            if component is None:
+                raise ExecutionFailure("working_manifest_incompatible", f"Task unavailable: {name}")
+            output = self._invoke_component(name, component, arguments, parent_call_id=parent_call_id)
+            self.gate.checkpoint()
+            result = {"status": "success", "output": _json_copy(output)}
+        except (UserInterruption, TraceWriteError, EnvironmentFailure) as error:
+            if isinstance(error, UserInterruption) and self._next_call_id == next_call_id:
+                raise
+            terminal = error
+            code = "user_cancelled" if isinstance(error, UserInterruption) else error.code
+            result = {**self._failure(name, component, code, str(error)), **_exception_fields(error)}
+        except Exception as error:
+            code = error.code if isinstance(error, ExecutionFailure) else (
+                "working_manifest_incompatible" if isinstance(error, InputValidationError) else "execution_failed")
+            result = {**self._failure(name, component, code, str(error)), **_exception_fields(error)}
+        duration = _duration_ms(started)
+        item = {"index": len(self.task_results), "task": name, "inputs": event["inputs"],
+                "result": result["status"], "duration_ms": duration, **result}
+        # items 的 status 属于 Task；Plan 的遍历状态在应用服务单独汇总。
+        self.task_results.append(_json_copy(item))
+        event["ended_at"] = datetime.now(UTC).isoformat()
+        if self.task_finished is not None:
+            self.task_finished(event, result, duration)
+        if not isinstance(terminal, TraceWriteError):
+            self.emit("plan_item_finished", {"index": item["index"], "task": name, "result": result})
+        if terminal is not None:
+            raise terminal
+        return _json_copy(result)
+
     def _invoke_step(
         self, logical_name: str, component: LoadedComponent, arguments: dict[str, Any],
         parent_call_id: int | None,
@@ -275,7 +348,7 @@ class WorkflowExecutor:
                 return self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
             except UserInterruption:
                 raise
-            except InputReleaseFailure:
+            except EnvironmentFailure:
                 raise
             except ExecutionFailure as error:
                 self.emit("step_interrupted", {"logical_name": logical_name,
@@ -317,7 +390,7 @@ class WorkflowExecutor:
                         "role": "step", "call_id": self._allocate_call_id(),
                         "parent_call_id": parent_call_id, "inputs": _json_copy(inputs),
                     }, inputs)
-            except (UserInterruption, TraceWriteError, InputReleaseFailure):
+            except (UserInterruption, TraceWriteError, EnvironmentFailure):
                 raise
             except Exception as check_error:
                 reason = str(check_error)
@@ -345,7 +418,7 @@ class WorkflowExecutor:
                                                     parent_call_id=parent_call_id, skip_condition=True)
                 except UserInterruption:
                     raise
-                except InputReleaseFailure:
+                except EnvironmentFailure:
                     raise
                 except ExecutionFailure as interrupted:
                     self.emit("step_interrupted", {"logical_name": logical_name,
@@ -387,7 +460,7 @@ class WorkflowExecutor:
             self.gate.checkpoint()
             try:
                 manifest_id = self.choose_manifest(str(reason), logical_name, tuple(self.attempted_manifest_ids))
-            except (UserInterruption, TraceWriteError, InputReleaseFailure):
+            except (UserInterruption, TraceWriteError, EnvironmentFailure):
                 raise
             except Exception as error:
                 self.emit("recovery_choice_failed", {"logical_name": logical_name, **_exception_fields(error)})
@@ -428,7 +501,7 @@ class WorkflowExecutor:
                     finally:
                         self.manifest = previous
                 except Exception as error:
-                    if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
+                    if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
                         raise
                     reason = error
                     self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(reason), **_exception_fields(error)})
@@ -447,7 +520,7 @@ class WorkflowExecutor:
                 self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": replacement.component_id})
                 return True, result
             except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
                     raise
                 reason = error
                 self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": replacement.component_id, **_exception_fields(error)})
@@ -489,7 +562,7 @@ class WorkflowExecutor:
             try:
                 matched = self._invoke_recovery_rule(name, rule, "detect")
             except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
                     raise
                 return False, error
             if type(matched) is not bool:
@@ -503,7 +576,7 @@ class WorkflowExecutor:
             try:
                 recovered = self._invoke_recovery_rule(name, rule, "recover")
             except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
+                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
                     raise
                 return False, error
             if recovered is not None:
@@ -517,7 +590,7 @@ class WorkflowExecutor:
             self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": current.component_id})
             return True, result
         except Exception as error:
-            if isinstance(error, (UserInterruption, TraceWriteError, InputReleaseFailure)):
+            if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
                 raise
             self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": current.component_id, **_exception_fields(error)})
             return False, error
@@ -653,7 +726,7 @@ class WorkflowExecutor:
         skip_condition: bool = False,
     ) -> Any:
         self.gate.checkpoint()
-        inputs = _bind_and_normalize(component.module.execute, arguments)
+        inputs = self.prepare_inputs(component, arguments)
         call_id = self._allocate_call_id()
         if self._root_call_id is None:
             self._root_call_id = call_id
@@ -674,6 +747,13 @@ class WorkflowExecutor:
             result = component.module.execute(self.context, **_json_copy(inputs))
             if component.role == "step" and self._check_input is not None:
                 self._check_input()
+            if component.role == "automation_plan":
+                self.gate.checkpoint()
+                if get_type_hints(component.module.execute)["return"] is Any:
+                    try:
+                        return _strict_json(result)
+                    except (TypeError, ValueError) as error:
+                        raise OutputValidationError(str(error)) from error
             return _normalize_output(result, get_type_hints(
                 component.module.execute, globalns=component.module.execute.__globals__
             )["return"])
@@ -720,11 +800,14 @@ class WorkflowExecutor:
         except TraceWriteError:
             raise
         except Exception as error:
+            from .focused import WindowError
+            if isinstance(error, WindowError):
+                error = EnvironmentFailure("environment_unavailable", str(error), cause=error)
             self.emit(f"{event}_failed", {
                 **fields, **_exception_fields(error), "duration_ms": _duration_ms(started),
             })
             if isinstance(error, ExecutionFailure):
-                raise
+                raise error
             code = "invalid_output" if isinstance(error, OutputValidationError) else "execution_failed"
             raise ExecutionFailure(code, str(error), cause=error) from error
         finally:
@@ -797,6 +880,22 @@ def _normalize_output(value: Any, annotation: Any) -> Any:
         return _normalize_value(value, annotation, "return")
     except InputValidationError as error:
         raise OutputValidationError(str(error)) from error
+
+
+def _strict_json(value: Any) -> Any:
+    """复制 Plan 混合配置，拒绝非 JSON 类型、循环引用及非有限数值。"""
+    json.dumps(value, allow_nan=False)
+    def copy(item):
+        if item is None or type(item) in {str, bool, int}:
+            return item
+        if type(item) is float and math.isfinite(item):
+            return item
+        if type(item) is list:
+            return [copy(v) for v in item]
+        if type(item) is dict and all(type(k) is str for k in item):
+            return {k: copy(v) for k, v in item.items()}
+        raise ValueError("settings must contain only JSON values and string object keys")
+    return copy(value)
 
 
 def _json_copy(value: Any) -> Any:

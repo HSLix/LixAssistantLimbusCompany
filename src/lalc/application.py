@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
 
+from .process_lock import ProcessLock
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
 from .control import InputSession
@@ -69,6 +70,8 @@ class ApplicationService:
         self._condition = threading.Condition()
         self._thread: threading.Thread | None = None
         self._activity: str | None = None
+        self._activity_lock: ProcessLock | None = None
+        self._run_lock: ProcessLock | None = None
         self._gate: RunGate | None = None
         self._trace_path: Path | None = None
         self._ledger: WorkflowRunLedger | None = None
@@ -101,13 +104,23 @@ class ApplicationService:
         """共享宿主排他操作；暂停中的 Run 仍占用执行环境。"""
         with self._condition:
             if self._activity or self._state["phase"] == "running":
-                raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or 'Runner'}")
+                raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or '运行'}")
+            if name == "Agent" or name.startswith("Capture"):
+                lock = ProcessLock("game")
+                try:
+                    lock.acquire()
+                except OSError as error:
+                    raise StartError("activity_busy", "另一进程正在使用游戏环境。") from error
+                self._activity_lock = lock
             self._activity = name
             self._changed_locked()
         try:
             yield
         finally:
             with self._condition:
+                if self._activity_lock is not None:
+                    self._activity_lock.release()
+                    self._activity_lock = None
                 self._activity = None
                 self._changed_locked()
 
@@ -119,7 +132,7 @@ class ApplicationService:
             return deepcopy(self._state)
 
     def start(
-        self, logical_name: str, inputs: dict[str, Any], *, manifest_id: str | None = None,
+        self, logical_name: str | None, inputs: dict[str, Any], *, manifest_id: str | None = None,
         _developer_trial: bool = False,
     ) -> int:
         """同步校验启动请求，再在单一后台线程执行已捕获的 Manifest。"""
@@ -133,6 +146,11 @@ class ApplicationService:
             if _developer_trial and (self._activity != "Agent" or manifest_id is None):
                 raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
             manifest = self._loaded_manifest(manifest_id)
+            if logical_name is None:
+                plans = [name for name, item in manifest.components.items() if item.role == "automation_plan"]
+                if len(plans) != 1:
+                    raise StartError("unique_plan_required", "Manifest requires exactly one Python Plan.")
+                logical_name = plans[0]
             component = manifest.components.get(logical_name)
             if component is None:
                 raise StartError("entry_not_found", f"Unknown runnable Component: {logical_name}")
@@ -156,40 +174,20 @@ class ApplicationService:
             self._changed_locked()
             return run_id
 
-    def start_plan(self, path: Path, *, manifest_id: str | None = None, _developer_trial: bool = False) -> int:
-        """启动用户保存的 JSON Plan；结构问题作为本次 Run 的 invalid_plan 结果。"""
-
-        with self._condition:
-            if self._fatal:
-                raise StartError("application_failed", "Application cannot continue after a fatal error.")
-            if self._state["phase"] == "running" or (self._activity and not (
-                    _developer_trial and self._activity == "Agent")):
-                raise StartError("run_already_active", "Another Run is already active.")
-            if _developer_trial and (self._activity != "Agent" or manifest_id is None):
-                raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
-            manifest = self._loaded_manifest(manifest_id)
-            try:
-                source: str | Exception = Path(path).read_text(encoding="utf-8")
-            except (OSError, UnicodeError) as error:
-                source = error
-            entry = {"role": "automation_plan", "path": str(path)}
-            if _developer_trial:
-                entry["developer_trial"] = True
-            run_id, snapshot, gate = self._begin_run(manifest, entry, {})
-            self._thread = threading.Thread(
-                target=self._worker, args=(self._run_plan, snapshot, source, gate),
-                name=f"lalc-run-{run_id}", daemon=True,
-            )
-            self._thread.start()
-            self._changed_locked()
-            return run_id
+    def start_plan(
+        self, *, manifest_id: str | None = None,
+        task_repetitions: dict[str, int] | None = None,
+        settings: dict[str, Any] | None = None, _developer_trial: bool = False,
+    ) -> int:
+        """只启动已发布 Manifest 的唯一 Python Plan，冻结两份输入快照。"""
+        return self.start(None, {"task_repetitions": task_repetitions if task_repetitions is not None else {},
+                                 "settings": settings if settings is not None else {}},
+                          manifest_id=manifest_id, _developer_trial=_developer_trial)
 
     def connect(self) -> dict[str, Any]:
         """检查唯一游戏窗口并留下截图与文字连接日志，不创建 Run。"""
 
-        with self._condition:
-            if self._state["phase"] == "running" or self._activity:
-                raise WindowError("Cannot connect while a Run is active.")
+        with self.activity("Capture 连接"):
             session = FocusedAutomationSession(self._window_platform(), lambda _event, _fields: None)
             window = session.connect()
             image = session.capture()
@@ -360,6 +358,26 @@ class ApplicationService:
     ) -> tuple[int, LoadedManifest, RunGate]:
         """为直接运行与 Plan 建立同一个持久 Run 边界。"""
 
+        if self._activity_lock is None:
+            lock = ProcessLock("game")
+            try:
+                lock.acquire()
+            except OSError as error:
+                raise StartError("activity_busy", "另一进程正在使用游戏环境。") from error
+            self._run_lock = lock
+        try:
+            return self._establish_run(manifest, entry, inputs)
+        except BaseException:
+            self._release_run_lock()
+            raise
+
+    def _release_run_lock(self) -> None:
+        if self._run_lock is not None:
+            self._run_lock.release()
+            self._run_lock = None
+
+    def _establish_run(self, manifest, entry, inputs):
+        """已获得游戏排他后建立 Run；失败由调用方释放锁。"""
         run_id = self._allocate_run_id()
         snapshot = _manifest_snapshot(manifest)
         gate = RunGate()
@@ -454,6 +472,7 @@ class ApplicationService:
                 errors.append(_exception_fields(error))
                 result = self._fatal_result(result, errors)
                 with self._condition:
+                    self._release_run_lock()
                     self._state.update(phase="finished", paused=False, pause_info=None,
                                        resume_pending=False, result=result)
                     self._focused_session = None
@@ -476,7 +495,8 @@ class ApplicationService:
                   "fatal_errors": list(errors), "previous_result": previous}
         if entry.get("role") == "automation_plan":
             result.update(status="interrupted", reason="fatal_error",
-                          items=deepcopy(previous.get("items", [])))
+                          items=deepcopy(previous.get("items", [])),
+                          all_tasks_succeeded=previous.get("all_tasks_succeeded", False))
         else:
             result.update(status="failure", failure_code="fatal_error")
         return result
@@ -500,6 +520,7 @@ class ApplicationService:
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
             game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
+            task_finished=self._finish_plan_task,
         )
         started = time.monotonic()
         started_at = datetime.now(UTC).isoformat()
@@ -551,99 +572,21 @@ class ApplicationService:
                 **_exception_fields(error),
             }
 
+        if component.role == "automation_plan":
+            success = result["status"] == "success"
+            result = {**result, "status": "completed" if success else "interrupted",
+                      "items": [{**item, "run_id": self._state["run_id"]} for item in executor.task_results],
+                      "all_tasks_succeeded": all(item["result"] == "success" for item in executor.task_results)}
+            if not success:
+                result["reason"] = result["failure_code"]
         return result
 
-    def _run_plan(self, manifest: LoadedManifest, source: str | Exception, gate: RunGate) -> dict[str, Any]:
-        """一次预检后按冻结顺序逐项执行，并复用同一个 Working Manifest。"""
-
-        executor = WorkflowExecutor(
-            manifest, gate, self._emit,
-            capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
-            control_input=self._control_input, check_input=self._check_input,
-            prepare_resume=self._prepare_input_resume,
-            manifest_manager=self.manifest_manager,
-            choose_manifest=self.recovery_choice,
-            select_manifest=self._select_working_manifest,
-            game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
-        )
-        items, errors = _prepare_plan(source, manifest)
-        if errors:
-            return {"status": "interrupted", "reason": "invalid_plan", "errors": errors, "items": []}
-        completed: list[dict[str, Any]] = []
-        reason: str | None = None
-        diagnostic: dict[str, Any] = {}
-        try:
-            self._start_session()
-            for index, item in enumerate(items):
-                gate.checkpoint()
-                assert self._ledger is not None
-                self._ledger.item_index = index
-                prior_records = len(self._ledger.records)
-                name, frozen_inputs = item["task"], item["inputs"]
-                component = executor.manifest.components.get(name)
-                started = time.monotonic()
-                started_at = datetime.now(UTC).isoformat()
-                if component is None or component.role != "task_workflow":
-                    task_result = {
-                        "status": "failure", "failure_code": "working_manifest_incompatible",
-                        "failure_message": f"Task Workflow is unavailable: {name}",
-                    }
-                else:
-                    try:
-                        current_inputs = WorkflowExecutor.prepare_inputs(component, frozen_inputs)
-                    except (InputValidationError, TypeError, ValueError) as error:
-                        task_result = {
-                            "status": "failure", "failure_code": "working_manifest_incompatible",
-                            "failure_message": str(error),
-                        }
-                    else:
-                        task_result = executor.run(name, component, current_inputs)
-                duration = round((time.monotonic() - started) * 1000, 3)
-                if component is not None and component.role == "task_workflow":
-                    self._ledger.finish_task(
-                        {"logical_name": name, "component_id": component.component_id,
-                         "manifest_id": executor.manifest.manifest_id, "inputs": frozen_inputs,
-                         "recorded_at": started_at, "ended_at": datetime.now(UTC).isoformat()},
-                        task_result, duration,
-                    )
-                if task_result.get("failure_code") == "user_cancelled" and len(self._ledger.records) == prior_records:
-                    reason = "user_cancelled"
-                    break
-                completed.append({"index": index, "task": name, "inputs": frozen_inputs,
-                                  "result": task_result["status"], "run_id": self._state["run_id"],
-                                  "duration_ms": duration,
-                                  **({"failure_code": task_result["failure_code"],
-                                      "failure_message": task_result["failure_message"]}
-                                     if task_result["status"] == "failure" else {})})
-                for field in ("traceback",):
-                    if field in task_result:
-                        completed[-1][field] = task_result[field]
-                self._emit("plan_item_finished", {"index": index, "task": name, "result": task_result})
-                if task_result.get("failure_code") == "input_release_failed":
-                    reason = "input_release_failed"
-                    break
-                if gate.stopped:
-                    reason = "user_cancelled"
-                    break
-        except UserInterruption as error:
-            if error.reason != "cancel":
-                raise
-            reason = "user_cancelled"
-        except LedgerWriteError as error:
-            reason = "ledger_write_failed"
-            diagnostic = _exception_fields(error)
-        except WorkingManifestWriteError as error:
-            reason = "working_manifest_write_failed"
-            diagnostic = _exception_fields(error)
-        except TraceWriteError as error:
-            reason = "trace_write_failed"
-            diagnostic = _exception_fields(error)
-        except Exception as error:
-            reason = "plan_execution_failed"
-            diagnostic = _exception_fields(error)
-            self.logger.exception("Automation Plan scheduling failed: %s", error)
-        return {"status": "interrupted" if reason else "completed",
-                **({"reason": reason} if reason else {}), "items": completed, **diagnostic}
+    def _finish_plan_task(self, event, result, duration):
+        """按实际动态 Task 调用收尾 Ledger；故障必须中断 Plan。"""
+        assert self._ledger is not None
+        if not any(r["workflow_kind"] == "task" for r in self._ledger.active):
+            self._ledger.item_index = sum(r["workflow_kind"] == "task" for r in self._ledger.records)
+        self._ledger.finish_task(event, result, duration)
 
     def _complete(self, result: dict[str, Any]) -> None:
         """写入最终事实并发布一次 Run 的结果。"""
@@ -657,11 +600,13 @@ class ApplicationService:
                 if self._state["entry"]["role"] == "automation_plan":
                     result = {**result, "status": "interrupted", "reason": "trace_write_failed",
                               "items": result.get("items", []), **_exception_fields(error)}
+                    result.pop("output", None)
                 else:
                     result = {**result,
                               "status": "failure", "failure_code": "trace_write_failed",
                               "failure_message": str(error), **_exception_fields(error)}
                 result["previous_result"] = previous
+            self._release_run_lock()
             self._state.update(phase="finished", paused=False, pause_info=None, resume_pending=False,
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
             self._focused_session = None
@@ -729,6 +674,8 @@ class ApplicationService:
             raise TraceWriteError(str(error)) from error
         self._state["trace"].append(record)
         if self._ledger is not None:
+            if event == "component_started" and fields.get("role") == "task_workflow":
+                self._ledger.item_index = sum(r["workflow_kind"] == "task" for r in self._ledger.records)
             self._ledger.observe(record)
         self._changed_locked()
 
@@ -784,57 +731,6 @@ def _manifest_snapshot(manifest: LoadedManifest) -> LoadedManifest:
         dict(manifest.components),
         dict(manifest.recovery_rules),
     )
-
-
-def _prepare_plan(
-    source: str | Exception, manifest: LoadedManifest,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """一次收集 Plan 结构、Task 角色及输入错误，成功时冻结规范化输入。"""
-
-    if isinstance(source, Exception):
-        return [], [{"code": "plan_unreadable", "message": str(source)}]
-
-    def unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
-        value = {}
-        for key, item in pairs:
-            if key in value:
-                raise ValueError(f"Duplicate JSON key: {key}")
-            value[key] = item
-        return value
-
-    try:
-        parsed = json.loads(source, object_pairs_hook=unique_keys)
-    except (json.JSONDecodeError, ValueError) as error:
-        return [], [{"code": "plan_invalid_json", "message": str(error)}]
-    if type(parsed) is not dict or set(parsed) != {"items"} or type(parsed["items"]) is not list:
-        return [], [{"code": "plan_invalid_structure", "message": "Plan must contain only an items list."}]
-    errors: list[dict[str, Any]] = []
-    items: list[dict[str, Any]] = []
-    for index, item in enumerate(parsed["items"]):
-        if type(item) is not dict:
-            errors.append({"index": index, "code": "plan_item_invalid",
-                           "message": "Each item must be a JSON object."})
-            continue
-        if set(item) - {"task", "inputs"}:
-            errors.append({"index": index, "code": "plan_item_invalid",
-                           "message": "Items may contain only task and inputs."})
-        name, inputs = item.get("task"), item.get("inputs")
-        component = manifest.components.get(name) if type(name) is str else None
-        if type(name) is not str or not name:
-            errors.append({"index": index, "code": "plan_task_invalid", "message": "task must be a nonempty logical name."})
-        elif component is None:
-            errors.append({"index": index, "code": "plan_task_missing", "message": f"Unknown Task Workflow: {name}"})
-        elif component.role != "task_workflow":
-            errors.append({"index": index, "code": "plan_task_role_invalid", "message": f"{name} is not a Task Workflow."})
-        if "inputs" not in item or type(inputs) is not dict:
-            errors.append({"index": index, "code": "plan_inputs_invalid", "message": "inputs must be a JSON object."})
-        elif component is not None and component.role == "task_workflow":
-            try:
-                inputs = WorkflowExecutor.prepare_inputs(component, inputs)
-            except (InputValidationError, TypeError, ValueError) as error:
-                errors.append({"index": index, "code": "plan_inputs_invalid", "message": str(error)})
-        items.append({"task": name, "inputs": inputs})
-    return ([], errors) if errors else (items, [])
 
 
 def default_data_root() -> Path:

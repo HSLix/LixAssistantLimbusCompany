@@ -22,8 +22,10 @@ uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>
 uv run lalc run tasks.example
-uv run lalc run-plan example/trusted-actions/plan.json
+uv run lalc run-plan
 ```
+
+`plan.py` 是正式源码，随本样例 Manifest 一起校验和发布；不能直接执行源码文件路径。它调用两次 tasks.example，保留每次结果。普通任务失败后可继续，CLI 对含失败的已完成 Plan 返回 1。
 
 后续命令使用 Default Manifest，省略 `--manifest`。每次重新发布并希望使用新版本时，再执行一次 `set-default`；临时运行其他保留版本时才用 `--manifest <UUID>`。
 

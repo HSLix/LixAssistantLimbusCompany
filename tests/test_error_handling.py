@@ -191,6 +191,8 @@ def test_fatal_report_always_exits_gui_event_loop(monkeypatch, capsys, dialog_fa
 
 
 def test_gui_outer_hooks_forward_main_and_thread_errors_then_restore(tmp_path: Path, monkeypatch) -> None:
+    # 本测试只验证生命周期错误出口；真实跨进程通道由 test_user_gui 覆盖。
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
     from PySide6.QtWidgets import QApplication
     import lalc.gui as gui
     app = QApplication.instance() or QApplication([])
@@ -277,23 +279,23 @@ def test_unhandled_completion_error_still_publishes_terminal_fatal_result(tmp_pa
     assert "OSError: completion failed" in result_diagnostics(state["result"])
 
 
-def test_gui_completed_task_failure_is_reported_once(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_gui_completed_task_failure_is_reported_once(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QApplication
-    from lalc.gui import MainWindow, ErrorDialog
+    from lalc.gui import GuiCoordinator
+    from lalc.lifecycle import ApplicationLifecycle
     app = QApplication.instance() or QApplication([])
-    window = MainWindow(ApplicationService(tmp_path))
-    dialogs = []
-    monkeypatch.setattr(ErrorDialog, "open", lambda dialog: dialogs.append(dialog.details.toPlainText()))
-    state = window.service.state
-    state.update(phase="finished", run_id=1, result={
-        "status": "failure", "failure_code": "execution_failed",
-        "traceback": "OSError: original execution error",
-    })
-    with caplog.at_level(logging.ERROR):
-        window.render_state(state)
-        window.render_state(state)
-    assert dialogs == ["OSError: original execution error"]
-    assert "OSError: original execution error" in caplog.text
+    service = ApplicationService(tmp_path)
+    owner = GuiCoordinator(service, ApplicationLifecycle())
+    window = owner.open_window()
+    notices = []
+    monkeypatch.setattr(window.notifications, "notify", lambda *args: notices.append(args))
+    window.owns_run = True
+    state = {**service.state, "phase": "finished", "run_id": 1, "result": {
+        "status": "interrupted", "reason": "execution_failed",
+        "traceback": "OSError: original execution error"}}
+    window.render_state(state)
+    window.render_state(state)
+    assert len(notices) == 1 and "OSError: original execution error" in notices[0][1]
     window.close()
     app.processEvents()
 
@@ -323,7 +325,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
     if failure_at == "worker":
         def fail(*args):
             raise RuntimeError("plan worker failed")
-        monkeypatch.setattr(service, "_run_plan", fail)
+        monkeypatch.setattr(service, "_run", fail)
     elif failure_at == "completion":
         def fail(result):
             raise RuntimeError("plan completion failed")
@@ -336,9 +338,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
             return teams
         execute.__lalc_role__ = "task_workflow"
         manager.default.components["tasks.rotate_teams"].module.execute = execute
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [{"task": "tasks.rotate_teams", "inputs": {"teams": ["alpha"]}}]}), encoding="utf-8")
-    state = _finished(service, service.start_plan(path))
+    state = _finished(service, service.start_plan())
     result = state["result"]
     assert result["fatal"] and result["status"] == "interrupted"
     assert result["reason"] == "fatal_error" and "failure_code" not in result
@@ -386,6 +386,8 @@ def test_lifecycle_normal_gui_exit_restores_hooks(tmp_path: Path) -> None:
 
 
 def test_unhandled_background_thread_reports_fatal_on_gui_thread(tmp_path: Path, monkeypatch) -> None:
+    # 本测试只验证生命周期错误出口；真实跨进程通道由 test_user_gui 覆盖。
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
     from PySide6.QtWidgets import QApplication
     import lalc.gui as gui
     app = QApplication.instance() or QApplication([])

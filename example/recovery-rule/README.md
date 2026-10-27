@@ -22,6 +22,6 @@ uv run --frozen lalc run steps.check_popup --manifest <实际UUID>
 
 没有弹窗时 Step 直接完成，不执行规则。多个不同规则同时匹配时报错，不按优先级猜测；不要把同一弹窗重复登记为多个规则。detect/recover 均不调用其他正式 Component，recover 可以使用应用已注册的 observe/control 动作。该示例不新增业务专属 Trusted Action，也不会恢复整个 Task/Subworkflow。
 
-Runner 的 Trace 中可检查 `component_failed`、`recovery_rule_started/returned` 的 detect/recover 阶段、`step_reinvocation_started/returned/failed` 和实际动作调用。每次截图均可保存证据。查看对应 Run 的结果与 Trace，不能仅凭规则返回 None 判定游戏恢复成功。
+对应 Run 的 Trace 中可检查 `component_failed`、`recovery_rule_started/returned` 的 detect/recover 阶段、`step_reinvocation_started/returned/failed` 和实际动作调用。每次截图均可保存证据。查看对应 Run 的结果与 Trace，不能仅凭规则返回 None 判定游戏恢复成功。
 
 自动化回归使用生产动作和测试自有平台图像验证“匹配 → 点击 → 图像变化 → 重试”，另覆盖未生效、目标不唯一及规则多匹配；这些不是 Windows/真实游戏验收。真实按钮的模板、点击效果及跨 DPI 定位需在 Windows 上人工核对。

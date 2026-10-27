@@ -1,4 +1,4 @@
-"""覆盖四页 GUI、共享活动互斥、截图原图保存、Runner 持久选择和凭据边界。
+"""覆盖三页 Developer GUI、共享活动互斥、截图原图保存、Runner 持久选择和凭据边界。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_developer_gui.py
@@ -132,10 +132,10 @@ def wait_jobs(app, window):
     app.processEvents()
 
 
-def test_four_pages_scaled_crop_and_no_implicit_selection(gui):
+def test_three_pages_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
-    assert [window.tabs.tabText(i) for i in range(4)] == ["Capture", "Runner", "Agent Settings", "Agent Repair"]
+    assert [window.tabs.tabText(i) for i in range(3)] == ["Capture", "Agent Settings", "Agent Repair"]
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
@@ -162,13 +162,13 @@ def test_async_operation_and_host_busy_state(gui):
     results = []
     window.launch(operation, results.append)
     assert entered.wait(1)
-    assert not window.start_button.isEnabled()
+    assert not window.trial_button.isEnabled()
     assert not window.capture_page.capture_button.isEnabled()
     assert not window.repair_page.baseline.isEnabled()
     release.set()
     wait_jobs(app, window)
     assert results == ["done"]
-    assert window.start_button.isEnabled()
+    assert window.trial_button.isEnabled()
 
 
 def test_coordinate_monitor_does_not_focus_and_stops_until_refresh(tmp_path):
@@ -197,26 +197,16 @@ def test_coordinate_monitor_does_not_focus_and_stops_until_refresh(tmp_path):
     assert host.refresh_coordinates()["x"] == -1
 
 
-def test_runner_four_entry_modes_use_shared_service_and_freeze_inputs(gui, monkeypatch):
+def test_selected_plan_trial_uses_shared_service_without_changing_default(gui, monkeypatch):
     app, window = gui
+    identity = window.host.manager.default_manifest_id()
+    window.host.select_runner(identity)
     calls = []
-    monkeypatch.setattr(window.service, "start", lambda name, inputs, **kwargs: calls.append((name, inputs, kwargs)))
-    monkeypatch.setattr(window.service, "start_plan", lambda path, **kwargs: calls.append((path, kwargs)))
-    for role in ("task_workflow", "subworkflow", "step"):
-        window.runner_role.setCurrentIndex(window.runner_role.findData(role))
-        window.entry.setText("example." + role)
-        window.inputs.setPlainText("")
-        operation = window._start_request()
-        window.entry.setText("changed after request")
-        operation()
-        assert calls[-1] == ("example." + role, {}, {"manifest_id": None})
-    window.inputs.setPlainText("[]")
-    with pytest.raises(ValueError):
-        window._start_request()
-    window.runner_role.setCurrentIndex(window.runner_role.findData("automation_plan"))
-    window.plan_path.setText("existing-plan.json")
-    window._start_request()()
-    assert calls[-1] == (Path("existing-plan.json"), {"manifest_id": None})
+    monkeypatch.setattr(window.service, "start_plan", lambda **kwargs: calls.append(kwargs))
+    window.start_selected_plan()
+    assert calls == [{"manifest_id": identity}]
+    assert window.host.manager.default_manifest_id() == identity
+    assert not hasattr(window, "plan_path")
 
 
 def test_closing_cancels_then_waits_for_actual_cleanup(gui, monkeypatch):

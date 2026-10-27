@@ -1,4 +1,4 @@
-"""覆盖 Automation Plan 预检、顺序执行、取消及 Workflow Run Ledger。
+"""覆盖 Automation Plan 预检、Python 调度、顺序执行、取消及 Workflow Run Ledger。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_plan.py
@@ -49,6 +49,7 @@ def execute(ctx, *, value: int) -> int:
 def _publish(
     root: Path, manager: ManifestManager | None = None,
     *, task_source: str = TASK, step_source: str = STEP,
+    plan_body: str = '    ctx.call("tasks.double", value=1)\n    ctx.call("tasks.double", value=2)\n',
 ) -> ManifestManager:
     candidate = root / f"candidate-{len(list(root.glob('candidate-*')))}"
     candidate.mkdir(parents=True)
@@ -63,6 +64,8 @@ def _publish(
         },
         "recovery_rules": {},
     }), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json", plan_body)
     manager = manager or ManifestManager(root)
     published = manager.publish(candidate / "manifest.json")
     assert published.ok, published.errors
@@ -75,16 +78,10 @@ def _finished(service: ApplicationService, run_id: int) -> dict:
 
 
 def test_plan_continues_after_item_failure_and_ledger_counts_unique_events(tmp_path: Path, monkeypatch, capsys) -> None:
-    manager = _publish(tmp_path)
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": -1}},
-        {"task": "tasks.double", "inputs": {"value": 2}},
-    ]}), encoding="utf-8")
+    manager = _publish(tmp_path, plan_body='    for value in [1, -1, 2]:\n        ctx.call("tasks.double", value=value)\n')
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
 
-    assert cli.main(["run-plan", str(path)]) == 0
+    assert cli.main(["run-plan"]) == 1
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "completed"
     assert [item["result"] for item in result["items"]] == ["success", "failure", "success"]
@@ -108,23 +105,14 @@ def test_plan_continues_after_item_failure_and_ledger_counts_unique_events(tmp_p
     assert not any(event["event"].startswith("verification_") for event in trace)
 
 
-def test_invalid_plan_reports_all_errors_before_any_task(tmp_path: Path) -> None:
+def test_static_plan_targets_are_checked_before_publish(tmp_path):
+    from runtime_support import add_plan
     manager = _publish(tmp_path)
-    path = tmp_path / "invalid.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.missing", "inputs": {}},
-        {"task": "steps.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": True}},
-    ]}), encoding="utf-8")
-    service = ApplicationService(tmp_path, manifest_manager=manager)
-
-    state = _finished(service, service.start_plan(path))
-
-    assert state["result"]["status"] == "interrupted"
-    assert state["result"]["reason"] == "invalid_plan"
-    assert {error["index"] for error in state["result"]["errors"]} == {0, 1, 2}
-    assert not any(event["event"] == "component_started" for event in state["trace"])
-    assert not (tmp_path / "ledger" / "1.json").exists()
+    candidate = tmp_path / "candidate-0" / "manifest.json"
+    add_plan(candidate, '    ctx.call("missing")\n    ctx.call("steps.double", value=1)\n')
+    result = manager.publish(candidate)
+    assert not result.ok
+    assert {e.code for e in result.errors} >= {"component_call_unresolved", "component_call_role_invalid"}
 
 
 def test_cancellation_stops_plan_and_skips_later_item(tmp_path: Path, monkeypatch) -> None:
@@ -139,14 +127,9 @@ def test_cancellation_stops_plan_and_skips_later_item(tmp_path: Path, monkeypatc
 
     blocking.__lalc_role__ = "step"
     monkeypatch.setattr(manager.default.components["steps.double"].module, "execute", blocking)
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": 2}},
-    ]}), encoding="utf-8")
     service = ApplicationService(tmp_path, manifest_manager=manager)
 
-    run_id = service.start_plan(path)
+    run_id = service.start_plan()
     assert entered.wait(2)
     service.stop()
     release.set()
@@ -187,13 +170,8 @@ def execute(ctx, *, value: int) -> int:
         tmp_path, manifest_manager=manager,
         recovery_choice=lambda *_: next(choices, None),
     )
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": 2}},
-    ]}), encoding="utf-8")
 
-    state = _finished(service, service.start_plan(path, manifest_id=first_id))
+    state = _finished(service, service.start_plan(manifest_id=first_id))
 
     assert state["result"]["status"] == "completed"
     assert [item["result"] for item in state["result"]["items"]] == ["success", "failure"]
@@ -207,23 +185,18 @@ def test_ledger_write_failure_interrupts_plan(tmp_path: Path, monkeypatch) -> No
     from lalc.ledger import LedgerWriteError, WorkflowRunLedger
 
     manager = _publish(tmp_path)
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": 2}},
-    ]}), encoding="utf-8")
     def fail_save(self) -> None:
         raise LedgerWriteError("disk full")
 
     monkeypatch.setattr(WorkflowRunLedger, "_save", fail_save)
     service = ApplicationService(tmp_path, manifest_manager=manager)
 
-    state = _finished(service, service.start_plan(path))
+    state = _finished(service, service.start_plan())
 
     assert state["result"]["status"] == "interrupted"
     assert state["result"]["reason"] == "ledger_write_failed"
-    assert state["result"]["items"] == []
-    assert [event["event"] for event in state["trace"]].count("component_started") == 1
+    assert len(state["result"]["items"]) == 1
+    assert [event["event"] for event in state["trace"]].count("component_started") == 2
     assert not any(event["event"] == "component_started" and event["role"] == "step"
                    for event in state["trace"])
     assert manager.default.components["steps.double"].module.calls == 0
@@ -231,11 +204,6 @@ def test_ledger_write_failure_interrupts_plan(tmp_path: Path, monkeypatch) -> No
 
 def test_cancellation_between_items_creates_no_next_task_record(tmp_path: Path) -> None:
     manager = _publish(tmp_path)
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [
-        {"task": "tasks.double", "inputs": {"value": 1}},
-        {"task": "tasks.double", "inputs": {"value": 2}},
-    ]}), encoding="utf-8")
     service = ApplicationService(tmp_path, manifest_manager=manager)
     emit = service._emit
 
@@ -245,7 +213,7 @@ def test_cancellation_between_items_creates_no_next_task_record(tmp_path: Path) 
             service.stop()
 
     service._emit = stop_after_first
-    state = _finished(service, service.start_plan(path))
+    state = _finished(service, service.start_plan())
 
     assert state["result"]["reason"] == "user_cancelled"
     assert len(state["result"]["items"]) == 1

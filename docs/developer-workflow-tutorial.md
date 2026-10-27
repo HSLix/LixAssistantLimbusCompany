@@ -1,5 +1,7 @@
 # Developer Workflow
 
+2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。[Stage 4 规格](stage-4-extensible-user-gui.md)中的外置页面、共享 Agent 配置、双语信息面板及 Windows 打包验收仍由后续票完成。
+
 正式 Run 要求唯一可用的 Windows 游戏窗口。运行开始时连接、聚焦并启动物理输入监听，结束时清理；自动化测试提供平台替身。
 
 ## Component 工作台与发布
@@ -11,14 +13,15 @@ uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>
 uv run lalc run <logical-name> --inputs '{}'
-uv run lalc run-plan <plan.json>
+uv run lalc run-plan
+uv run lalc --developer
 ```
 
 常规使用按 publish → set-default → run / run-plan 进行，后续省略 `--manifest`。每次发布并希望使用新代码版本时，再设置 Default；临时运行其他版本才用 `--manifest <id>`。
 
-Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 仅在明确使用 `init --replace` 或 GUI 确认后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。GUI 四页和多文件连续修复见 [修复指南](agent-repair.md)。
+Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 仅在明确使用 `init --replace` 或 GUI 确认后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。User Dashboard 与三页 Developer GUI、多文件连续修复见 [修复指南](agent-repair.md)。
 
-源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
+初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其固定输入为 `task_repetitions: dict[str, int]` 与 `settings: dict[str, Any]`，由宿主规范化并复制；完整示例见[实施记录](stage-4-331-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
 ## Trusted Action 类型补全
 
@@ -75,7 +78,7 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 
 `lalc data-dir` 查看数据根。图片在 assets/，裁剪来源在 asset-provenance/。Trace 的 asset_matched 记录优先条件、实际尝试模板、所选批次和最终检测结果；asset-usage.json 按逻辑名保存最近一次非空返回及来源，空结果不更新，不等待 Step 成功，也不影响搜索区域。普通截图不落盘，显式 `save=True` 才保存证据。
 
-[三层教学样例](../example/trusted-actions/README.md) 不附图片或素材映射文件，默认只截图和等待。Plan 从外部 JSON 读取有序 Task，共用 Run、会话和 Working Manifest；物理接管需明确 Resume，Stop 后释放持有输入并收尾。
+[三层教学样例](../example/trusted-actions/README.md) 不附图片或素材映射文件，默认只截图和等待。Plan 从已发布 Manifest 加载不可变 Python 源码，按普通 Python 控制流调用 Task，共用 Run、会话和 Working Manifest；物理接管需明确 Resume，Stop 后释放持有输入并收尾。
 
 [ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 取代旧专属库。旧 Asset 布局、Candidate 素材库及已发布专属库废弃，清理后重新准备，不做迁移或兼容；Component、Manifest、Default 和运行历史保留。相同 Manifest 的素材结果可随文件更新而变化。
 

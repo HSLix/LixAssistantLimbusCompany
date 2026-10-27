@@ -72,6 +72,8 @@ def _write_candidate(directory: Path, *, sources: dict[str, str] | None = None) 
     }
     path = directory / "candidate.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(path)
     return path
 
 

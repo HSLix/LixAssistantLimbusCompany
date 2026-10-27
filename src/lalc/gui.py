@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QVBoxLayout,
     QWidget,
-    QTabWidget, QComboBox, QFileDialog, QMessageBox,
+    QTabWidget, QComboBox, QMessageBox, QListWidget, QStackedWidget,
 )
 
 from .application import ApplicationService, StartError, default_data_root
@@ -64,24 +64,27 @@ class MainWindow(QMainWindow):
 
     operation_event = Signal(dict)
 
-    def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None) -> None:
+    def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None,
+                 *, host=None, coordinator=None) -> None:
         super().__init__()
         self.service = service
         self.lifecycle = lifecycle or ApplicationLifecycle()
+        self.coordinator = coordinator
         self._pause_notice_shown = False
         self._reported_run = None
         self._fatal_reported = False
         self.trial_dialog = None
         from .developer import DeveloperHost
         from .developer_gui import CapturePage, SettingsPage, RepairPage
-        self.host = DeveloperHost(service, Path.cwd() / "candidate")
+        self.host = host or DeveloperHost(service, Path.cwd() / "candidate")
         self.jobs = []
+        self.owns_run = False
         self.closing = False
         self.close_timer = QTimer(self)
         self.close_timer.setInterval(100)
         self.close_timer.timeout.connect(self._finish_close)
-        self.setWindowTitle("LALC")
-        self.resize(820, 620)
+        self.setWindowTitle("LALC — Developer")
+        self.resize(1050, 900)
         root = QWidget()
         layout = QVBoxLayout(root)
         self.runner_manifest = QComboBox()
@@ -92,74 +95,39 @@ class MainWindow(QMainWindow):
             if selected is not None:
                 self.runner_manifest.addItem(selected, selected)
                 self.runner_manifest.setCurrentIndex(1)
-                self.runner_selection_error = "已恢复 Runner 选择，请刷新 Manifest 与入口以核验可用性。"
         except Exception as error:
             self.runner_selection_error = str(error)
         for item in self.host.manager.list_manifests():
             if self.runner_manifest.findData(item["manifest_id"]) < 0:
                 self.runner_manifest.addItem(item["manifest_id"], item["manifest_id"])
         self.runner_manifest.currentIndexChanged.connect(self._runner_selected)
+        layout.addWidget(QLabel("Developer Selected Manifest（不修改 Default 或 Candidate 来源）"))
         layout.addWidget(self.runner_manifest)
-        self.runner_notice = QLabel()
+        self.runner_notice = QLabel(self.runner_selection_error or "所选版本用于后续开发试运行。")
         self.runner_notice.setWordWrap(True)
         layout.addWidget(self.runner_notice)
-        self.refresh_manifest_button = QPushButton("刷新 Manifest 与入口")
+        self.refresh_manifest_button = QPushButton("刷新 Manifest")
         self.refresh_manifest_button.clicked.connect(self._refresh_runner)
         layout.addWidget(self.refresh_manifest_button)
-        self.runner_role = QComboBox()
-        for label, role in (("Task Workflow", "task_workflow"), ("Subworkflow", "subworkflow"), ("Step", "step"), ("Automation Plan", "automation_plan")):
-            self.runner_role.addItem(label, role)
-        self.runner_role.currentIndexChanged.connect(self._filter_entries)
-        layout.addWidget(self.runner_role)
-        self.runner_entries = QComboBox()
-        self.runner_entries.currentTextChanged.connect(lambda text: self.entry.setText(text) if hasattr(self, "entry") else None)
-        layout.addWidget(self.runner_entries)
-        self._entries = []
-        self.entry = QLineEdit()
-        self.entry.setPlaceholderText("逻辑名，例如 tasks.claim_mail")
-        layout.addWidget(self.entry)
-        self.inputs = QPlainTextEdit("{}")
-        self.inputs.setPlaceholderText("JSON 输入")
-        layout.addWidget(self.inputs)
-        controls = QHBoxLayout()
-        self.start_button = QPushButton("开始")
-        self.pause_button = QPushButton("暂停")
-        self.stop_button = QPushButton("停止")
-        self.start_button.clicked.connect(self._start_background)
-        self.pause_button.clicked.connect(self._toggle_pause)
-        self.stop_button.clicked.connect(lambda: self._interact(self.service.stop))
-        for button in (self.start_button, self.pause_button, self.stop_button):
-            controls.addWidget(button)
-        layout.addLayout(controls)
-        self.plan_path = QLineEdit()
-        self.plan_path.setPlaceholderText("Automation Plan 配置文件路径")
-        layout.addWidget(self.plan_path)
-        choose_plan = QPushButton("选择现有 Plan 文件")
-        choose_plan.clicked.connect(self._choose_plan)
-        layout.addWidget(choose_plan)
-        self.ledger_button = QPushButton("查看 Ledger")
-        self.ledger_button.clicked.connect(lambda: self.launch(self.service.ledger_records, lambda value: self.trace.setPlainText(json.dumps(value, ensure_ascii=False, indent=2))))
-        layout.addWidget(self.ledger_button)
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
-        self.pause_notice = QLabel()
-        self.pause_notice.setWordWrap(True)
-        layout.addWidget(self.pause_notice)
-        self.trace = QPlainTextEdit()
-        self.trace.setReadOnly(True)
-        layout.addWidget(self.trace)
+        self.trial_button = QPushButton("试运行所选 Plan")
+        self.trial_button.clicked.connect(lambda: self._interact(self.start_selected_plan))
+        layout.addWidget(self.trial_button)
         self.tabs = QTabWidget()
         self.capture_page = CapturePage(self)
         self.settings_page = SettingsPage(self)
         self.repair_page = RepairPage(self)
         self.operation_event.connect(self.repair_page.show_event)
-        for page, name in ((self.capture_page, "Capture"), (root, "Runner"), (self.settings_page, "Agent Settings"), (self.repair_page, "Agent Repair")):
+        for page, name in ((self.capture_page, "Capture"), (self.settings_page, "Agent Settings"),
+                           (self.repair_page, "Agent Repair")):
             self.tabs.addTab(page, name)
         self.repair_page.set_manifests(self.host.manager.list_manifests())
-        self.runner_notice.setText(self.runner_selection_error or "刷新 Manifest 与入口后可按角色选择；也可直接填写逻辑名。")
-        self.setCentralWidget(self.tabs)
-        self.resize(1050, 900)
+        layout.addWidget(self.tabs)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        layout.addWidget(self.status)
+        self.notifications = NotificationList()
+        layout.addWidget(self.notifications)
+        self.setCentralWidget(root)
         self.render_state(service.state)
 
     def launch(self, operation, done=None):
@@ -190,11 +158,6 @@ class MainWindow(QMainWindow):
         for job in self.jobs:
             job.cancel()
 
-    def _choose_plan(self):
-        path, _ = QFileDialog.getOpenFileName(self, "选择 Plan", "", "JSON (*.json)")
-        if path:
-            self.plan_path.setText(path)
-
     def _runner_selected(self):
         self.runner_selection_error = None
         identity = self.runner_manifest.currentData()
@@ -208,17 +171,28 @@ class MainWindow(QMainWindow):
                 raise
         self.launch(operation, saved)
 
+    def start_selected_plan(self):
+        """显式运行 Developer 所选已发布版本；不改变 Default。"""
+        if self.runner_selection_error:
+            raise ValueError(self.runner_selection_error)
+        identity = self.host.runner_selection() or self.host.manager.default_manifest_id()
+        if identity is None:
+            raise ValueError("请先选择已发布 Manifest。")
+        self.service.start_plan(manifest_id=identity)
+        self.owns_run = True
+        self.render_state(self.service.state)
+
     def _refresh_runner(self):
         identity = self.runner_manifest.currentData()
         def operation():
             manifests = self.host.manager.list_manifests()
             try:
-                loaded = self.service._loaded_manifest(identity)
-                return manifests, [(name, component.role) for name, component in loaded.components.items()], None
+                self.service._loaded_manifest(identity)
+                return manifests, None
             except Exception as error:
-                return manifests, [], str(error)
+                return manifests, str(error)
         def done(values):
-            manifests, self._entries, error = values
+            manifests, error = values
             self.runner_manifest.blockSignals(True)
             self.runner_manifest.clear()
             self.runner_manifest.addItem("使用 Default", None)
@@ -231,22 +205,14 @@ class MainWindow(QMainWindow):
             self.runner_manifest.setCurrentIndex(max(0, index))
             self.runner_manifest.blockSignals(False)
             self.runner_selection_error = error
-            self.runner_notice.setText(error or "所选 Manifest 仅用于后续执行；不改变 Default 或 Candidate。")
+            self.runner_notice.setText(error or "Selected 仅用于后续试运行；不改变 Default 或 Candidate。")
             self.repair_page.set_manifests(manifests)
-            self._filter_entries()
             self.render_state(self.service.state)
         self.launch(operation, done)
 
-    def _filter_entries(self):
-        role = self.runner_role.currentData()
-        self.runner_entries.clear()
-        self.runner_entries.addItems([name for name, item_role in self._entries if item_role == role])
-        self.inputs.setEnabled(role != "automation_plan")
-        self.entry.setEnabled(role != "automation_plan")
-
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
-        active = bool(self.jobs) or self.service.state["phase"] == "running"
+        active = bool(self.jobs) or (self.owns_run and self.service.state["phase"] == "running")
         if active:
             event.ignore()
             if not self.closing:
@@ -262,9 +228,11 @@ class MainWindow(QMainWindow):
             return
         self.close_timer.stop()
         event.accept()
+        if self.coordinator is not None:
+            self.coordinator.closed(self)
 
     def _finish_close(self):
-        if not self.jobs and (self.service._thread is None or not self.service._thread.is_alive()):
+        if not self.jobs and (not self.owns_run or self.service._thread is None or not self.service._thread.is_alive()):
             self.close()
 
     def shutdown(self):
@@ -289,9 +257,9 @@ class MainWindow(QMainWindow):
             conversation = self.host.conversation
             if conversation:
                 keys.update(conversation.log.keys)
-            page = self.tabs.currentWidget()
+            page = self.tabs.currentWidget() if hasattr(self, "tabs") else None
             panel = getattr(page, "diagnostics", None)
-            log = conversation.log if page is getattr(self, "repair_page", None) and conversation else None
+            log = conversation.log if page is not None and page is getattr(self, "repair_page", None) and conversation else None
             if panel and log is None:
                 log = RepairLog(self.service.data_root, category="agent-diagnostics")
                 log.keys.update(keys)
@@ -306,37 +274,6 @@ class MainWindow(QMainWindow):
             if panel:
                 panel.add_error(value)
             ErrorDialog(value["message"], details_text(value), parent=self).open()
-
-    def _start(self) -> None:
-        self._interact(self._start_run)
-
-    def _start_run(self) -> None:
-        return self._start_request()()
-
-    def _start_background(self):
-        self._interact(lambda: self.launch(self._start_request()))
-
-    def _start_request(self):
-        """主线程读取控件；后台操作只携带冻结参数，不访问 Qt 控件。"""
-        if self.runner_selection_error:
-            raise ValueError(self.runner_selection_error + "；请重新选择或清除 Runner Manifest。")
-        identity = self.runner_manifest.currentData()
-        if self.runner_role.currentData() == "automation_plan":
-            path = Path(self.plan_path.text())
-            return lambda: self.service.start_plan(path, manifest_id=identity)
-        inputs = json.loads(self.inputs.toPlainText().strip() or "{}")
-        if type(inputs) is not dict:
-            raise ValueError("输入必须是 JSON 对象。")
-        name = self.entry.text().strip()
-        return lambda: self.service.start(name, inputs, manifest_id=identity)
-
-    def _toggle_pause(self) -> None:
-        def toggle() -> None:
-            if self.service.state["paused"]:
-                self.service.resume()
-            else:
-                self.service.pause()
-        self._interact(toggle)
 
     @Slot(str)
     def fatal_error(self, details: str) -> None:
@@ -353,7 +290,8 @@ class MainWindow(QMainWindow):
     @Slot(dict)
     def render_state(self, state: dict) -> None:
         trial = bool((state.get("entry") or {}).get("developer_trial"))
-        if trial and state["phase"] == "running":
+        if (trial or self.owns_run) and state["phase"] == "running":
+            self.owns_run = True
             if self.trial_dialog is None:
                 from .developer_gui import TrialDialog
                 self.trial_dialog = TrialDialog(self.service, self)
@@ -363,79 +301,245 @@ class MainWindow(QMainWindow):
             self.trial_dialog.done(QDialog.DialogCode.Accepted)
             self.trial_dialog.deleteLater()
             self.trial_dialog = None
-        info = state.get("pause_info")
-        if info:
-            instruction = "恢复时将检查当前 Step 的 condition。" if info["has_condition"] else \
-                "没有 condition，恢复后将从头执行当前 Step。"
-            if not info.get("restart_step", True):
-                instruction = "恢复后继续 Workflow 的观察与调度。"
-            self.pause_notice.setText(f"自动化已暂停：{info['reason']}\n{info['description']}\n{instruction}")
-            if not self._pause_notice_shown and not trial:
-                self._pause_notice_shown = True
-                self.showNormal()
-                self.raise_()
-                self.activateWindow()
-        else:
-            self._pause_notice_shown = False
-            self.pause_notice.clear()
-        self.status.setText(
-            f"状态：{state['phase']}  |  暂停：{state['paused']}  |  "
-            f"Default Manifest：{state['default_manifest_id']}  |  "
-            f"Base Manifest：{state['base_manifest_id']}  |  "
-            f"Working Manifest：{state['working_manifest_id']}  |  Run ID：{state['run_id']}"
-        )
-        result = state.get("result") or {}
-        diagnostic = (info or {}).get("traceback", "") or result.get("traceback", "")
-        if not diagnostic and result.get("reason") == "input_release_failed":
-            diagnostic = next((item.get("traceback", "") for item in result.get("items", [])
-                               if item.get("failure_code") == "input_release_failed"), "")
-        self.trace.setPlainText(diagnostic + "\n" + "\n".join(
-            json.dumps(item, ensure_ascii=False) for item in state["trace"]
-        ))
-        if state["phase"] == "finished" and self._reported_run != state["run_id"]:
-            self._reported_run = state["run_id"]
+        if state["phase"] == "finished":
+            if self.owns_run and not trial:
+                result = state.get("result") or {}
+                self.notifications.notify("执行完成" if result.get("status") == "completed" and result.get("all_tasks_succeeded") else "执行完成，含失败任务" if result.get("status") == "completed" else "执行中断", result_diagnostics(result))
+            self.owns_run = False
+            result = state.get("result") or {}
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
-            elif not trial and ((result.get("status") in {"failure", "interrupted"}
-                  and result.get("failure_code", result.get("reason")) != "user_cancelled") or any(
-                      item.get("result") == "failure" and item.get("failure_code") != "user_cancelled"
-                      for item in result.get("items", []))):
-                details = result_diagnostics(result)
-                self.service.logger.error("Execution failed: %s", details)
-                ErrorDialog("执行失败，原始错误信息如下。", details, parent=self).open()
-        self.pause_button.setText("继续" if state["paused"] else "暂停")
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
-        self.start_button.setEnabled(not busy and not self.runner_selection_error)
-        self.start_button.setToolTip("当前活动尚未结束" if busy else self.runner_selection_error or "")
+        self.status.setText("当前活动：" + (state.get("activity") or ("运行中" if state["phase"] == "running" else "空闲")))
+        self.trial_button.setEnabled(not busy and not self.runner_selection_error)
         self.runner_manifest.setEnabled(not busy)
         self.refresh_manifest_button.setEnabled(not busy)
         for page in (self.capture_page, self.settings_page, self.repair_page):
             page.render(busy)
-        self.pause_button.setEnabled(state["phase"] == "running" and not state.get("resume_pending", False))
-        self.stop_button.setEnabled(state["phase"] == "running")
 
 
-def run_gui(lifecycle: ApplicationLifecycle | None = None) -> int:
-    """建立 GUI；进程启动与最终报告由同一生命周期入口负责。"""
+class NotificationList(QWidget):
+    """统一应用内持久通知；多条共存，仅由用户关闭，不跨进程保留。"""
 
+    def __init__(self):
+        super().__init__()
+        self.messages = QVBoxLayout(self)
+        self.messages.setContentsMargins(0, 0, 0, 0)
+
+    def notify(self, message: str, details: str = "") -> None:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        label = QLabel(message)
+        label.setWordWrap(True)
+        label.setTextFormat(Qt.TextFormat.PlainText)
+        layout.addWidget(label, 1)
+        if details:
+            button = QPushButton("详情")
+            button.clicked.connect(lambda: ErrorDialog(message, details, parent=self).open())
+            layout.addWidget(button)
+        close = QPushButton("关闭")
+        close.clicked.connect(row.deleteLater)
+        layout.addWidget(close)
+        self.messages.addWidget(row)
+
+
+class UserWindow(MainWindow):
+    """用户只选择 Default 并运行其唯一 Plan；普通配置不占用游戏。"""
+
+    def __init__(self, service, lifecycle=None, *, host, coordinator):
+        # 共用窗口清理/后台操作和脱敏错误处理，用户页面独立构建。
+        QMainWindow.__init__(self)
+        self.service, self.host, self.coordinator = service, host, coordinator
+        self.lifecycle = lifecycle or ApplicationLifecycle()
+        self.jobs = []
+        self.owns_run = False
+        self.closing = False
+        self._reported_run = None
+        self._fatal_reported = False
+        self.trial_dialog = None
+        self.close_timer = QTimer(self)
+        self.close_timer.setInterval(100)
+        self.close_timer.timeout.connect(self._finish_close)
+        self.setWindowTitle("LALC")
+        self.resize(950, 680)
+        root = QWidget()
+        layout = QHBoxLayout(root)
+        self.navigation = QListWidget()
+        self.navigation.addItems(["Dashboard", "General Settings"])
+        self.navigation.setMaximumWidth(190)
+        layout.addWidget(self.navigation)
+        self.pages = QStackedWidget()
+        layout.addWidget(self.pages, 1)
+        dashboard = QWidget()
+        dash = QHBoxLayout(dashboard)
+        left = QVBoxLayout()
+        dash.addLayout(left, 1)
+        self.manifest_label = QLabel()
+        self.manifest_label.setWordWrap(True)
+        left.addWidget(self.manifest_label)
+        self.manifest_button = QPushButton("选择 Default Manifest")
+        self.manifest_button.clicked.connect(self.choose_manifest)
+        left.addWidget(self.manifest_button)
+        self.start_button = QPushButton("开始运行")
+        self.start_button.clicked.connect(lambda: self._interact(self.start_plan))
+        left.addWidget(self.start_button)
+        self.status = QLabel()
+        self.status.setWordWrap(True)
+        left.addWidget(self.status)
+        self.notifications = NotificationList()
+        left.addWidget(self.notifications)
+        left.addStretch()
+        information = QLabel("")
+        information.setWordWrap(True)
+        information.setAlignment(Qt.AlignmentFlag.AlignTop)
+        dash.addWidget(information, 1)
+        self.pages.addWidget(dashboard)
+        settings = QWidget()
+        options = QVBoxLayout(settings)
+        developer = QPushButton("打开 Developer GUI")
+        developer.clicked.connect(self.open_developer)
+        options.addWidget(developer)
+        options.addWidget(QLabel("Developer 用于观察、Candidate 开发与发布后试运行。"))
+        options.addWidget(QLabel("运行时自动修复当前不可用。"))
+        options.addStretch()
+        self.pages.addWidget(settings)
+        self.navigation.currentRowChanged.connect(self.pages.setCurrentIndex)
+        self.navigation.setCurrentRow(0)
+        self.setCentralWidget(root)
+        self.render_state(service.state)
+
+    def open_developer(self):
+        QMessageBox.information(self, "Developer GUI", "此界面供开发者观察、编辑 Candidate 和试运行。")
+        self.coordinator.open_window(True)
+
+    def choose_manifest(self):
+        """每次打开重新枚举；选择只改变后续 Run 的 Default。"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("选择 Default Manifest")
+        layout = QVBoxLayout(dialog)
+        choices = QComboBox()
+        for item in self.host.manager.list_manifests():
+            choices.addItem(item["manifest_id"], item["manifest_id"])
+        choices.setCurrentIndex(max(0, choices.findData(self.host.manager.default_manifest_id())))
+        layout.addWidget(choices)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        layout.addWidget(buttons)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        if dialog.exec() == QDialog.DialogCode.Accepted and choices.currentData():
+            def select():
+                result = self.host.manager.set_default(choices.currentData())
+                if not result.ok:
+                    raise ValueError("; ".join(error.message for error in result.errors))
+                self.render_state(self.service.state)
+            self._interact(select)
+
+    def start_plan(self):
+        """固定 Default 的本次运行，并将清理职责归属当前窗口。"""
+        self.service.start_plan()
+        self.owns_run = True
+        self.render_state(self.service.state)
+
+    @Slot(dict)
+    def render_state(self, state):
+        if not hasattr(self, "start_button"):
+            return
+        busy = state["phase"] == "running" or bool(state.get("activity")) or self.closing
+        self.manifest_label.setText("Default Manifest：" + (state["default_manifest_id"] or "未选择"))
+        self.start_button.setEnabled(not busy)
+        self.start_button.setToolTip("当前活动尚未结束" if busy else "执行 Default 的唯一 Python Plan")
+        self.status.setText("运行已暂停" if state["paused"] else "运行中" if state["phase"] == "running" else "空闲")
+        if self.owns_run and state["phase"] == "running":
+            if self.trial_dialog is None:
+                from .developer_gui import TrialDialog
+                self.trial_dialog = TrialDialog(self.service, self)
+                self.trial_dialog.setWindowTitle("运行")
+                self.trial_dialog.show()
+            self.trial_dialog.render(state)
+        elif self.owns_run and state["phase"] == "finished":
+            if self.trial_dialog is not None:
+                self.trial_dialog.done(QDialog.DialogCode.Accepted)
+                self.trial_dialog.deleteLater()
+                self.trial_dialog = None
+            self.owns_run = False
+            result = state.get("result") or {}
+            if result.get("fatal"):
+                self.fatal_error(result_diagnostics(result))
+            else:
+                message = ("执行完成" if result.get("all_tasks_succeeded") else "执行完成，含失败任务") if result.get("status") == "completed" else "执行中断"
+                self.notifications.notify(message, result_diagnostics(result))
+
+
+class GuiCoordinator:
+    """应用持有唯一服务和宿主；窗口可独立关闭或重新打开。"""
+
+    def __init__(self, service, lifecycle):
+        from .developer import DeveloperHost
+        self.service, self.lifecycle = service, lifecycle
+        self.host = DeveloperHost(service, Path.cwd() / "candidate")
+        self.user = None
+        self.developer = None
+
+    def open_window(self, developer=False):
+        """复用已有窗口；已关闭的窗口可在同一服务上重新创建。"""
+        name = "developer" if developer else "user"
+        window = getattr(self, name)
+        if window is None:
+            window = MainWindow(self.service, self.lifecycle, host=self.host, coordinator=self) if developer else UserWindow(
+                self.service, self.lifecycle, host=self.host, coordinator=self)
+            setattr(self, name, window)
+        window.showNormal()
+        window.raise_()
+        window.activateWindow()
+        return window
+
+    def render_state(self, state):
+        for window in (self.user, self.developer):
+            if window is not None:
+                window.render_state(state)
+
+    def closed(self, window):
+        if window is self.user:
+            self.user = None
+        elif window is self.developer:
+            self.developer = None
+        window.deleteLater()
+        if self.user is None and self.developer is None:
+            QApplication.instance().quit()
+
+    def shutdown(self):
+        for window in (self.user, self.developer):
+            if window is not None:
+                window.shutdown()
+        self.service.shutdown()
+
+
+def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False) -> int:
+    """归并重复 GUI 入口，在唯一事件循环内持有双窗口。"""
     if lifecycle is None:
-        return run_application(lambda owner: run_gui(owner))
+        return run_application(lambda owner: run_gui(owner, developer=developer))
+    from .gui_instance import GuiInstance
     app = QApplication.instance() or QApplication(sys.argv)
+    instance = GuiInstance()
+    if instance.forward(developer):
+        return 0
     bridge = StateBridge()
     service = ApplicationService(default_data_root(), on_change=bridge.changed.emit)
-    window = None
-    def shutdown() -> None:
-        if window is None:
-            service.shutdown()
-        else:
-            window.shutdown()
-        result = service.state.get("result") or {}
-        if result.get("fatal"):
-            lifecycle.present_fatal(result_diagnostics(result))
-    lifecycle.shutdown = shutdown
-    window = MainWindow(service, lifecycle)
-    bridge.changed.connect(window.render_state)
-    bridge.fatal.connect(window.fatal_error)
+    coordinator = GuiCoordinator(service, lifecycle)
+    instance.listen(coordinator.open_window)
+    app.setQuitOnLastWindowClosed(False)
+    bridge.changed.connect(coordinator.render_state)
+    bridge.fatal.connect(lambda details: (coordinator.user or coordinator.developer).fatal_error(details)
+                         if coordinator.user or coordinator.developer else lifecycle.present_fatal(details))
     lifecycle.dispatch_fatal = bridge.fatal.emit
-    window.show()
+    def shutdown():
+        try:
+            coordinator.shutdown()
+            result = service.state.get("result") or {}
+            if result.get("fatal"):
+                lifecycle.present_fatal(result_diagnostics(result))
+        finally:
+            instance.close()
+    lifecycle.shutdown = shutdown
+    coordinator.open_window(developer)
     return app.exec()

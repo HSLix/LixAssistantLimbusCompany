@@ -182,8 +182,8 @@ export default async function (pi) {
   if (repairMode) {
     const checkedEdit = async (path: string) => {
       const target = await checkedPath(root, path);
-      if (relative(root, target).split(/[\\/]/).includes("plan.json") || !repairTargets.includes(target))
-        throw new Error("Only existing Candidate files may be edited; plan.json is read-only");
+      if (!repairTargets.includes(target))
+        throw new Error("Only existing Candidate files may be edited");
       return target;
     };
     const edit = createEditTool(root, {
@@ -215,9 +215,9 @@ export default async function (pi) {
     const sourceParameters = Type.Object({ filename: Type.String(), logical_name: Type.String(), source: Type.String() });
     const tools = [
       { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default or grant runtime permanent approval. Publish after edits before trial_run.", parameters: Type.Object({}) },
-      { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Specify exactly one of logical_name or a Candidate-relative JSON plan_path. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
+      { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Omit logical_name to run the saved Manifest unique Python Plan; inputs then contains task_repetitions and settings. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
         parameters: Type.Object({ manifest_id: Type.String(), logical_name: Type.Optional(Type.String()),
-          inputs: Type.Optional(Type.Record(Type.String(), Type.Any())), plan_path: Type.Optional(Type.String()) }) },
+          inputs: Type.Optional(Type.Record(Type.String(), Type.Any())) }) },
       { name: "list_runs", description: "List retained Run IDs, newest first. No log content search.",
         parameters: Type.Object({ offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) }) },
       { name: "read_run_log", description: "Read retained Trace events for an explicit Run ID, paged by event sequence. Optionally view an evidence_id screenshot referenced by this Run's log. Missing or cleaned records are unavailable.",

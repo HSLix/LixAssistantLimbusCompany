@@ -41,7 +41,7 @@ def test_existing_files_editable_despite_validation_failure_and_missing_referenc
     (host.candidate / "manifest.json").write_text("broken json")
     (host.candidate / "plan.json").write_text("{}")
     (host.candidate / "temporary.py").write_text("# 临时测试文件")
-    expected = tuple(name for name in candidate_files(host.candidate) if name != "plan.json")
+    expected = tuple(candidate_files(host.candidate))
     assert editable_files(host.candidate) == expected
     assert not host.validate()["ok"]
     assert editable_files(host.candidate) == expected

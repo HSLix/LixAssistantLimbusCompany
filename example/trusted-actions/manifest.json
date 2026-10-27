@@ -27,6 +27,9 @@
     },
     "steps.match": {
       "source_path": "steps.match.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
     }
   },
   "recovery_rules": {}

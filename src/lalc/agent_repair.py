@@ -19,7 +19,7 @@ from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 
 SYSTEM_PROMPT = """你是 LALC Developer Policy 开发助手。根据开发者 prompt 和当前游戏状态持续开发、调试工作流，需要修改时实际 read、edit，并 validate 完整候选。
 只能读取 Candidate 内已有文件；可按需修改多个已有文件，包括 manifest.json、Recovery Rule 和未被 Manifest 引用的文件。
-plan.json 始终只读。不通用新建、删除或重命名文件，不访问目录外文件。
+可编辑已有 Candidate Python Plan；不得执行可变 Candidate 路径，Plan 必须先 Publish。不通用新建、删除或重命名文件，不访问目录外文件。
 新增源码仅用 add_component / add_recovery_rule，提供 filename、logical_name、source 完整源码，工具同时创建并登记 Manifest。
 新增成功后同轮可 read/edit/validate；不自动登记已有未引用文件，不把工具成功当作完整校验通过。
 校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
@@ -29,7 +29,7 @@ game_screenshot 返回现场原图和每隔40px的网格辅助图；辅助覆盖
 预览不进入活跃素材库；同图匹配不证明跨状态可靠性，也不自动决定是否保存。同名同哈希保留原图和原标签。
 remove_asset(logical_name, sha, reason) 可归档任意既有图片及原Tags、理由和移除时新截的原始游戏画面，再同步移除活跃图片及该逻辑名的标签关系；截图失败不移除。移除影响所有后续使用该素材的匹配。
 非 Windows 现场工具不可用。截图会恢复并置前唯一游戏窗口。除专用移除归档外，不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
-可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
+trial_run 不提供 logical_name 时运行已保存 Manifest 的唯一 Python Plan，inputs 为 task_repetitions/settings；可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
 试运行支持 Candidate 内已有 JSON Plan 或 Task Workflow/Subworkflow/Step。运行期间等待工具结果，不并行修改或操作游戏。
 启动拒绝无 Run ID，修正原因后可再次调用；已启动的结果带 Run ID，使用 list_runs 查看可用 ID、read_run_log 分段查看日志及引用截图。
 试运行结果返回后可继续修改、发布、试运行直到完成开发要求；用户停止本次运行后建议总结并等待下个指示。
@@ -245,7 +245,7 @@ class RepairConversation:
 
     async def run(self, message, args, *, images=(), key=None, on_event=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
-        with self.host.service.activity("Agent"):
+        with self.host.service.activity("Agent"), self.host.candidate_lock():
             names = editable_files(self.host.candidate)
             if not message.strip():
                 raise ValueError("消息不能为空。")

@@ -26,7 +26,7 @@ def test_manifest_lifecycle_is_independent_of_assets(tmp_path):
     manager = ManifestManager(tmp_path / "data")
     candidate = tmp_path / "candidate"
     assert not manager.initialize_candidate(candidate)
-    assert {p.name for p in candidate.iterdir()} == {"manifest.json"}
+    assert {p.name for p in candidate.iterdir()} == {"manifest.json", "plan.py"}
     # 素材损坏不再阻止 Component 发布；使用时才报告其原始错误。
     (manager.data_root / "assets").mkdir(parents=True)
     (manager.data_root / "assets" / "broken.png").write_bytes(b"broken")
@@ -38,7 +38,7 @@ def test_manifest_lifecycle_is_independent_of_assets(tmp_path):
     assert not (manager.data_root / "asset-libraries").exists()
     other = tmp_path / "other"
     assert not manager.initialize_candidate(other)
-    assert {p.name for p in other.iterdir()} == {"manifest.json"}
+    assert {p.name for p in other.iterdir()} == {"manifest.json", "plans.default.py"}
 
 
 @pytest.mark.parametrize("version,extra", [(1, {}), (2, {"assets": {}}), (2, {"trusted_actions": {}})])
@@ -78,6 +78,8 @@ def execute(ctx) -> int:
 ''', encoding="utf-8")
     (candidate / "manifest.json").write_text(json.dumps({"schema_version": 2,
         "components": {"tasks.compute": {"source_path": "task.py"}}, "recovery_rules": {}}), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(candidate / "manifest.json", '    for _ in range(2):\n        ctx.call("tasks.compute")\n')
     saved = manager.publish(candidate / "manifest.json").loaded
     window = FakeWindow()
     startups = []
@@ -95,11 +97,9 @@ def execute(ctx) -> int:
     events = [e["event"] for e in done["trace"]]
     assert events.index("target_window_connected") < events.index("component_started")
     assert window.captures == 0  # 启动会话不代替 Component 决定何时截图。
-    plan = tmp_path / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.compute", "inputs": {}}] * 2}), encoding="utf-8")
     plan_window = FakeWindow()
     plan_service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=plan_window)
-    plan_run = plan_service.start_plan(plan, manifest_id=saved.manifest_id)
+    plan_run = plan_service.start_plan( manifest_id=saved.manifest_id)
     done = plan_service.wait_for(lambda s: s["run_id"] == plan_run and s["phase"] == "finished")
     assert done["result"]["status"] == "completed"
     assert plan_window.focus_calls == 1 and plan_window.backend.closed

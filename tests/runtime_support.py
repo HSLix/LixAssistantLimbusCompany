@@ -35,3 +35,15 @@ def register_sources(manager, sources):
         exec(compile(source, namespace["__file__"], "exec"), namespace)
         actions[name] = TrustedAction(namespace["execute"], classification)
     manager.actions = MappingProxyType(actions)
+
+
+def add_plan(path, body="    return None\n"):
+    """为测试草稿显式登记 Plan；不用于产品迁移或缺失 Plan 的拒绝测试。"""
+    import json
+    from pathlib import Path
+    path = Path(path)
+    source = '"""测试正式 Python Plan。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:\n' + body
+    (path.parent / "plan.py").write_text(source)
+    data = json.loads(path.read_text())
+    data["components"]["plans.default"] = {"source_path": "plan.py"}
+    path.write_text(json.dumps(data))

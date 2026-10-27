@@ -87,7 +87,9 @@ def _parser() -> argparse.ArgumentParser:
     inputs.add_argument("--inputs")
     inputs.add_argument("--inputs-file", type=Path)
     plan = commands.add_parser("run-plan")
-    plan.add_argument("path", type=Path)
+    plan_inputs = plan.add_mutually_exclusive_group()
+    plan_inputs.add_argument("--inputs")
+    plan_inputs.add_argument("--inputs-file", type=Path)
     plan.add_argument("--manifest")
     plan.add_argument("--language", default="en", help="Running game language (default: en)")
     listing = commands.add_parser("list-manifests")
@@ -159,7 +161,10 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
     try:
         service = ApplicationService(data_root, manifest_manager=manager, game_language=args.language)
         if args.command == "run-plan":
-            run_id = service.start_plan(args.path, manifest_id=args.manifest)
+            inputs = _read_inputs(args)
+            if set(inputs) - {"task_repetitions", "settings"}:
+                raise ValueError("Plan inputs may contain only task_repetitions and settings.")
+            run_id = service.start_plan(**inputs, manifest_id=args.manifest)
         else:
             inputs = _read_inputs(args)
             run_id = service.start(args.logical_name, inputs, manifest_id=args.manifest)
@@ -205,7 +210,7 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
         if result.get("failure_code", result.get("reason")) != "user_cancelled":
             logging.getLogger(__name__).error("Execution result: %s", details)
         print(details, file=sys.stderr)
-    return 0 if state["result"]["status"] in {"success", "completed"} else 1
+    return 0 if result["status"] == "success" or (result["status"] == "completed" and result["all_tasks_succeeded"]) else 1
 
 
 def _dispatch(args: argparse.Namespace) -> int:
@@ -318,14 +323,22 @@ def main(argv: list[str] | None = None) -> int:
         from .packaging_probe import run_probe
 
         return run_probe(args[1], args[2])
-    if not args:
+    if not args or args == ["--developer"]:
         from .lifecycle import run_application
 
+        if args:
+            from .gui import run_gui
+            return run_application(lambda owner: run_gui(owner, developer=True))
         return run_application()
     try:
         if args[0] not in {"data-dir", "pi-probe", "generate-stubs"}:
             configure_logging(default_data_root())
-        return _dispatch(_parser().parse_args(args))
+        parsed = _parser().parse_args(args)
+        if parsed.command in {"validate", "publish", "clear"}:
+            from .process_lock import ProcessLock
+            with ProcessLock("candidate:" + str((Path.cwd() / "candidate").resolve())):
+                return _dispatch(parsed)
+        return _dispatch(parsed)
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:
         _print_exception(error)
         return 1

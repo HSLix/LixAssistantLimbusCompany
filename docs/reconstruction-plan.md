@@ -2,6 +2,17 @@
 
 This plan keeps the reconstruction dependency-ordered. Accepted boundaries may change only through an explicit reopening such as the Python-first decision below.
 
+## 2026-10-26 规划记录：已确认排期与待讨论草案
+
+2026-10-26 首次按 grill-with-docs 仅记录；2026-10-27 已完成 Stage 4 grill 与影响审查并接受设计，随后经 #331 补充 grill 和影响审查确认，已在本地实现其 Python Plan 与双窗口闭环；后续票及 Windows 打包验收仍未完成，见[实施记录](stage-4-331-implementation.md)。首次输入为开发者提供的 AI 整理稿，可能含推演或扩写；其内容不因粘贴自动接受。Stage 4 已经后续逐项 grill 并确认，Stage 5/6 未确认内容继续作为讨论材料。
+
+- **已确认：原 Stage 3.5 的完整 Runtime Agent Maintenance 延后至 Stage 6。** 原设计和讨论记录保留，不因改期自动修改执行契约，也不表示已经实现。
+- **路线主线：** Stage 4 — Extensible GUI → Stage 5 — Workflow Construction & External Knowledge Transfer → Stage 6 — Runtime Maintenance & Continual Learning。Stage 4 已接受，Stage 5/6 的具体目标、交付和依赖仍待确认；Stage 6 承接原 Stage 3.5 的排期已确定。
+- Stage 3 已有 Agent Repair、Developer Candidate、Validate、Developer Policy Publish/独立试运行/Run 日志等能力保留，权限以 ADR 0029–0031 为准。延期不取消这些能力，也不把独立试运行等同于恢复运行中的调用者。实施及验收见 [Stage 3 实施记录](stage-3-implementation-slices.md) 和 [Developer GUI](developer-gui-design.md)。
+- Stage 4 重要设计和实现边界已完成 grill，正式接受范围见下文；Stage 5/6 除已确认改期及 Plan Agent 评估方向外仍为后续议题，不顺带定案。
+
+下文 Stage 1–3 保留既有基线；其中 Stage 3.5 均指原阶段名，现排至 Stage 6。旧 Stage 4 范围不直接成为新提案的交付承诺。
+
 ## Stage 1: Product and Agent boundaries
 
 Status: accepted and explicitly revised for runtime Agent maintenance and formal trials of unapproved candidate Python.
@@ -112,6 +123,8 @@ The accepted implementation baseline is maintained in [Stage 2 Minimum Implement
 
 ## Stage 3 — Agent-assisted Component Repair
 
+以下保留 Stage 3 早期范围基线；当前实现/权限以 ADR 0029–0031 和实施记录为准，Stage 4 的替代范围以 ADR 0032 为准。旧条款不重新施加自动 Publish/试运行禁令，也不表示后续已实现的 GUI 增量仍未开发。
+
 Status: ADR 0025 and ADR 0028 establish the implemented CLI baseline. [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) adds the accepted Developer GUI revision; implementation and final Windows/game acceptance remain pending.
 
 - Deliver Capture, Runner, Agent Settings and Agent Repair before 2026-10-29 using existing PySide6, shared application services and fixed pi integration, without CLI subprocess wrappers or a second Agent loop.
@@ -126,25 +139,70 @@ Status: ADR 0025 and ADR 0028 establish the implemented CLI baseline. [ADR 0029]
 
 See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](developer-gui-design.md) and [implementation slices](stage-3-implementation-slices.md). GUI issue #330 is a prerequisite of the #329 TA demo, not implementation evidence.
 
-## Stage 3.5 — Agent Runtime Step Recovery and Maintenance
+## Stage 4 — Extensible User GUI and Python Plan
 
-Status: deferred. ADR 0025 transfers the prior Stage 3 runtime architecture here without requiring it for the Stage 3 experiment.
+状态（2026-10-27）：grill 及 design-impact-review 已完成并经开发者确认，设计接受；#331 已在本地实现，#332–#334 待实施，验证与限制见[实施记录](stage-4-331-implementation.md)。正式规格集中在 [Stage 4](stage-4-extensible-user-gui.md)，取代此前逐轮草案；架构边界见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)。
 
-Runtime Agent Recovery, Runtime Agent Sessions, automatic anomaly takeover, supervised execution and approval, complete Working Manifest trials, paused-Step reconnection, Working Manifest integration and runtime multi-Component evolution belong here; existing Candidate multi-file repair belongs to Stage 3 under ADR 0029. This stage reuses the independent screenshot, bounded Asset addition and interaction-log capabilities of Stage 3 (ADR 0028). The prior accepted runtime boundaries, including #310/#311, are retained in [Stage 3.5](stage-3.5-agent-runtime-step-recovery-and-maintenance.md). The Recovery Ladder revision remains a discussion TODO rather than an accepted implementation change.
+- 每 Manifest 唯一 Python Plan，直接替换 JSON Plan；由 Plan 调用 Task，普通任务失败可继续，取消/环境不可继续/Plan 自身错误结束。Developer Agent 可编辑 Candidate Plan并发布后试运行。
+- User Dashboard/General Settings 加外置 Python 页面；任务 ID 对接显式 Plan 支持声明，配置跨 Manifest 共用，重启应用完成重载与语言生效。应用内结果/加载错误通知保留至人工关闭。
+- User/Developer 同进程双窗口共享活动互斥和生命周期；User 改 Default，Developer 使用 Selected；删除 Developer Runner 页，保留修复试运行。Agent 配置共享内容、独立选用，仅 User 有启用开关。
+- 目标是框架及示例可用，必须通过 Windows 打包版页面逻辑验证。完整业务/内置 Agent 页面构建在 Stage 5，完整 Runtime Maintenance 在 Stage 6。
 
-## Stage 4: Application structure, UI, and packaging
+[影响审查与验证证据](stage-4-design-impact-review.md)；[可独立验证的垂直实施阶段](stage-4-implementation-slices.md)。四个阶段已发布为 [#331](https://github.com/HSLix/LixAssistantLimbusCompany/issues/331) → [#332](https://github.com/HSLix/LixAssistantLimbusCompany/issues/332) → [#333](https://github.com/HSLix/LixAssistantLimbusCompany/issues/333) → [#334](https://github.com/HSLix/LixAssistantLimbusCompany/issues/334)，使用原生阻塞关系。不得把设计接受视为已完成实现。
 
-Status: planned.
+## Stage 5 提案：Workflow Construction & External Knowledge Transfer
 
-- CLI and desktop UI call the same application and execution services;
-- Developer coordinates, crop preview and the four-page workbench move to Stage 3 under ADR 0029; Stage 4 builds on those shared services.
-- the UI exposes task execution, Agent configuration, supervised Step and Workflow source review, proposal review, and Manifest recovery;
-- TODO for future discussion: resource deletion, reference scanning, Component Usage Index, and cleanup UI; no maintenance policy or UI is committed for this version.
-- the UI exposes per-Workflow strict success rate, Agent-assisted completion, recovery breakdown, and average duration from the local Workflow Run Ledger;
-- distribution and package variants are deferred until after Stage 4 by ADR 0029; after the first release, evaluate executor subprocess isolation with Context transport, cancellation and original-error propagation;
-- packaged formal automation must remain usable without a model.
+**状态：Planning / Pending Discussion。**
 
-## TODO after Stage 4
+### 候选目标、交付与边界
+
+- 开发者给出业务目标，Agent 参考外部成熟项目和 LALC 实现，协助构建完整 Python Workflow；不要求开放世界自主探索或从零学习全部游戏机制。
+- 候选验收目标：一版覆盖旧版本主要业务功能的 Workflow，层级和 ctx.call 边界合理，Asset/业务参数完整，可经 User GUI 配置启动，核心流程实际运行，保留来源、迁移及验证记录，减少手工业务代码编写。覆盖清单与验收标准尚未确定。
+- AALC（AhabAssistantLimbusCompany）、Charge-Grinder 等仅为候选只读知识来源；参考业务流程、状态判断、识别、策略和异常处理，迁移后遵守 LALC Component、Trusted Action、Manifest、Asset 和验证规范。许可证及复用限制待核实，不直接执行外部源码。
+- 将 Agent Repair 扩成 Workbench 的 Construction Mode 是提案：共享 Candidate、文档/源码检索、Asset、Validate、试跑、日志和发布工具；Repair 聚焦失败和兼容性，Construction 聚焦业务目标，各自 Prompt/Policy 待定。允许创建 Plan/Task/Subworkflow/Step/GUI Page 是权限议题，不能覆盖当前 plan.json 只读及专用新增工具边界。Explore Mode 未定。
+- 检索候选：本地只读源码、rg/路径/符号搜索、Git Diff/Commit、图片定位与检查、简短 Pi Skill、可搜索迁移历史。按任务读取最小范围、复用经验、更新时优先看差异，每次扩大范围有信息需求，有充分依据后进入修改和验证。
+- 先不引入传统 Embedding RAG/向量数据库也是待讨论倾向；实际定位成本高时再评估 Repo Map、轻量索引、BM25 或 Embedding，均未选型。
+
+### Open Questions
+
+- 外部仓库获取、固定版本/更新、许可证；外部逻辑与 LALC 的对应关系如何低成本保存。
+- Pi Skill 触发、Repo Map 价值、成熟 Coding Agent 的按需上下文策略；源码阅读、工具调用和探索范围的成本控制。
+- Construction Prompt、工具权限、任务拆分；如何保持 ctx.call 层级及恢复语义。
+- 旧功能覆盖清单、游戏状态/策略/后置条件验收；如何衡量外部知识减少开发成本。
+
+## Stage 6（原 Stage 3.5）：Runtime Agent Maintenance
+
+**状态：延期至 Stage 6 已确认；新增设计、名称与验收目标待讨论。**
+
+原 Runtime Agent Session、自动异常接管、监督运行/审批、Working Manifest 试跑、暂停 Step 续接等设计，保留在[原运行时设计文档](stage-3.5-agent-runtime-step-recovery-and-maintenance.md)。ADR 0025 的排期由本次确认更新，既有契约不被 AI 草案覆盖。
+
+草案动机：先积累完整、可长期运行的真实业务 Workflow，再有效验证复杂恢复、嵌套恢复和经验复用。此处记录讨论动机，不宣称已核验业务现状或效果。
+
+### 候选目标、交付与边界
+
+- 在真实业务 Workflow 上验证确定性 Recovery Rule 优先、必要时 Agent Repair、受控 Recheck、恢复原 Workflow 及历史经验复用；预算耗尽或无法安全继续时进入统一失败出口。
+- 草案循环：规则恢复后重试，耗尽确定性预算后按启用状态升级 Agent；Agent 分析、修改、Validate、提交 Recheck 后结束本轮，由 Runtime 试跑并保存日志/截图/结果，再决定续接、继续修复或失败。嵌套故障及多轮循环的具体语义尚未接受。
+- 候选生命周期为短 Agent Turn + Runtime 持续管理 Repair Process，保留挂起状态和父子恢复关系，避免同步等待嵌套 Recheck 导致死锁。
+- 经验检索候选为 Raw Agent Interaction History + grep：保留交互/工具、Candidate Revision、Trace/错误、Recheck/截图引用及最终结果；新轮次获得当前故障及上次必要反馈，按需检索更早历史。暂不承诺复杂摘要、知识图谱或 Embedding。
+- 严格区分 Runtime Execution State 与 Agent Experience History；经验检索不能代替保证正确性的确定性执行状态，也没有 grep 效果已被证明的结论。
+
+### Open Questions 与既有契约差异
+
+- 嵌套 ctx.call/父子 Recheck 调度、原 Python 调用栈续接、游戏副作用及安全重试、业务后置条件。
+- Candidate Revision、Working Manifest 和运行中代码的绑定/切换；Agent Publish 与正式批准边界。
+- 人工接管、暂停/继续、Stop 和自动恢复交互；重试、时间、Token、环境操作预算。
+- 历史检索成本和上下文大小、有/无历史效果比较；策略层修复是否及何时纳入。
+- 当前只有 Step 是恢复边界，Step/Recovery Rule 不能调用正式 Component；“Component 失败后恢复”“嵌套恢复”不能直接解释成任意层恢复。已进入帧保留原代码/局部值，Recheck 的兼容返回值交回原调用者，不自动证明整个 Workflow 成功。
+
+原文档已有 Recovery Ladder、保留栈恢复、历史检索及 Python Plan 讨论，继续在那里细化，不另建重复的运行时规范。
+
+## 待讨论的阶段依赖与旧范围去向
+
+草案建议 Stage 4 提供页面/设置基础，Stage 5 构建真实业务 Workflow，Stage 6 以其验证运行时维护及经验复用。Stage 4 的实际完成门槛以已接受规格为准；Stage 5/6 的具体业务与恢复细节仍待后续讨论，不扩大 Stage 4 范围。
+
+旧 Stage 4 曾列出的监督源码/提案审批及 Manifest 恢复界面，其运行时部分随原 Stage 3.5 延后至 Stage 6；具体 GUI 交付仍待讨论。原统计界面（成功率、Agent 完成率、恢复分布和耗时）、资源清理/引用扫描/Component Usage Index、分发渠道及首版后的执行器子进程评估仍为待讨论事项；Windows 打包版页面逻辑已明确是 Stage 4 门槛。模型可选、确定性流程不依赖模型的现有产品边界保持。
+
+## 既有 Stage 4 之后的讨论备忘（归属待重审）
 
 - Explore learning and memory of game states, using [Agent S](https://github.com/simular-ai/Agent-S) as a reference. Investigate how experience from observations and execution can be retained and retrieved to help recognize game states and handle similar situations. This is future research after Stage 4, not a prerequisite for Stages 3 or 4 or a commitment to adopt the framework.
 
@@ -158,7 +216,7 @@ Discuss distributing the existing **Capability Bundle** (called Workflow Bundle 
 
 All three channels distribute the same Bundle. The client uses one version, full-hash, and signature verification/import path for immutable Components and resources. Retain historical versions and user-local Manifests, without overwriting existing versions; updates affect only subsequent executions. The suggested implementation order is Bundle export/import first, GitHub automated publishing second, then Mirror 酱 and Quark Drive as needed.
 
-## Explicitly deferred
+## 既有暂缓项（不自动成为新 Stage 4–6 承诺）
 
 - operating-system sandboxing or stronger dynamic-code inspection;
 - complex AST import or API allowlists;

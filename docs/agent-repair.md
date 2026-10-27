@@ -1,21 +1,23 @@
 # Agent Repair — Developer Candidate 开发与修复
 
-#330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主，[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 增加 Developer Policy 的自主发布和试运行。使用当前 Candidate，可编辑全部已有文件（`plan.json` 只读），按每条用户消息处理一轮并保留上下文；不自动重建草稿、不执行可变 Candidate、不设置 Default。Agent 可 Publish 后显式选择保存的 Manifest 进行试运行。
+2026-10-27：#331 已替换 JSON Plan 与独立 Runner，使用并存 User/Developer 窗口及唯一 Python Plan；见[实施记录](stage-4-331-implementation.md)。本文保留的 Stage 3 历史验收只代表对应版本。
+
+#330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主，[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 增加 Developer Policy 的自主发布和试运行。使用当前 Candidate，可编辑全部已有文件（含已有 Python Plan），按每条用户消息处理一轮并保留上下文；不自动重建草稿、不执行可变 Candidate、不设置 Default。Agent 可 Publish 后显式选择保存的 Manifest 进行试运行。
 
 > Capture 窗口宽高与放大预览、专用源码新增工具、多图片附件及 Recovery Rule 示例已实现；Windows/真实游戏验收仍单列。完整边界见 [GUI 增量要求](developer-gui-design.md)。
 
 ## Developer GUI
 
-安装已有 `gui`、`automation` extras 后运行 `uv run --frozen lalc`。普通执行不启动 pi；Agent 当前接入回归基线为 pi 1.4.0；其他版本也允许启动，版本不匹配会写 WARNING 日志，在 CLI 终端及 GUI 对话提示，兼容性须另行验证。
+安装已有 `gui`、`automation` extras 后运行 `uv run --frozen lalc --developer`；无参数启动 User Dashboard，可在 General Settings 打开 Developer。普通执行不启动 pi；Agent 当前接入回归基线为 pi 1.4.0；其他版本也允许启动，版本不匹配会写 WARNING 日志，在 CLI 终端及 GUI 对话提示，兼容性须另行验证。
 
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
-- **Runner**：刷新 Manifest 与入口，选择 Task Workflow、Subworkflow、Step 或 Automation Plan。前三种输入 JSON 对象，空白按 `{}`；Plan 选择已有配置文件。可暂停、恢复、取消，查看真实 Base ID、结果、Trace 和 Ledger。Runner 选择持久保存，只作用于后续执行，不改变 Default 或 Candidate；重启恢复后先刷新核验，不可加载时禁止启动，须重新选择或清除。
+- **Developer Selected Manifest**：窗口上方独立选择已保存版本，点击“试运行所选 Plan”运行其唯一不可变 Python Plan。不修改 Default 或 Candidate 来源；没有独立 Runner 页。Task/Subworkflow/Step 的直接启动仍可用 CLI 或 Agent trial_run。
 - **Agent Settings**：保存完整 Base URL、Model 和每轮请求上限，默认 20、最小 2。API Key 普通空输入保留原值；新输入覆盖，明确清除解除凭据。界面仅显示是否设置，不回读旧明文。Windows 使用当前用户 DPAPI；其他平台仅在本次 GUI 内存中保留输入的临时密钥。不会读写其他 pi 实例的个人配置。
-- **Agent Repair**：从已有 Manifest 明确初始化或重建 Candidate；非空替换须确认，成功后开启新对话，失败保留原草稿及原对话。通过“打开 Agent 工作区”在系统文件管理器查看 Candidate，无需选择编辑目标；Agent 可修改多个已有文件，`plan.json` 始终只读。支持纯文字及任意数量的可选图片，每条消息启动一轮，最终回答后等待主动发送下一条。New Conversation 保留 Candidate 和固定 Diff 基线，旧日志保留。提问和最终回答按轮分块，工具默认显示可展开摘要；“查看累计 Diff”主动打开可伸缩滚动窗口，无常驻预览框。
+- **Agent Repair**：从已有 Manifest 明确初始化或重建 Candidate；非空替换须确认，成功后开启新对话，失败保留原草稿及原对话。通过“打开 Agent 工作区”在系统文件管理器查看 Candidate，无需选择编辑目标；Agent 可修改多个已有文件，已有 Python Plan 可编辑，不开放任意文件创建。支持纯文字及任意数量的可选图片，每条消息启动一轮，最终回答后等待主动发送下一条。New Conversation 保留 Candidate 和固定 Diff 基线，旧日志保留。提问和最终回答按轮分块，工具默认显示可展开摘要；“查看累计 Diff”主动打开可伸缩滚动窗口，无常驻预览框。
 
 实际 Diff 与 Validator 结果供人工审阅。Publish 重新校验并生成新的不可变 Manifest，不运行它，也不设置 Default；设置 Default 是另一个明确操作。GUI 不增加运行时审批流程。
 
-Runner（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥；Agent 所属的串行试运行是内部执行入口，仍阻止外部 Runner/Capture。被动坐标和已有图片框选/预览可以继续。候选初始化、手动校验、发布也通过共享宿主活动检查。关闭时可返回继续，或取消并等待输入释放、日志保存和 pi 回收；切换页面不取消任务。
+User Run/Developer Trial（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥；Agent 所属的串行试运行是内部执行入口，仍阻止外部 Run/Capture。被动坐标和已有图片框选/预览可以继续。候选初始化、手动校验、发布也通过共享宿主活动检查。关闭时可返回继续，或取消并等待输入释放、日志保存和 pi 回收；切换页面不取消任务。
 
 ## CLI
 
@@ -24,7 +26,7 @@ uv run --frozen lalc init --from <saved-manifest-uuid>
 # 明确确认替换现有草稿时才使用：
 uv run --frozen lalc init --from <saved-manifest-uuid> --replace
 
-# Agent 自行读取和修改所需已有文件，plan.json 只读
+# Agent 自行读取和修改所需已有文件，包括现有 Python Plan
 uv run --frozen lalc repair \
   --problem '问题、复现步骤和预期行为' \
   --image /absolute/path/to/optional.png --image /absolute/path/to/another.jpg
@@ -51,7 +53,7 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 ## 权限、上下文和日志
 
-按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建、删除和 `plan.json` 编辑；Asset 仅允许下述专用移除归档例外；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
+按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建及删除文件；Asset 仅允许下述专用移除归档例外；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
 
 pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查询和 Validator RPC；Developer Policy 增加下述发布、试运行和日志工具，不提供终端、通用写入、删除或设置 Default 工具。Candidate Python 校验会导入模块，Validator 不是操作系统沙箱；生成代码的副作用约束不能被描述为进程隔离保证。
 
@@ -79,7 +81,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 允许 Agent 在一次开发者消息中自主重复修改、校验、发布、试运行和读日志。此规则优先于旧有“Agent 不自动 Publish/运行”的说明，与 Stage 3.5 Runtime Policy 分开。
 
 - `publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`，不改变 Default，不授予运行时永久批准。
-- `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 使用 `trial_run(manifest_id, plan_path="plan.json")`，文件必须在 Candidate 内，仍只读。修改 Candidate 后先重新 Publish 才能运行新代码。
+- `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 使用 `trial_run(manifest_id, inputs={"task_repetitions": {}, "settings": {}})`，省略 logical_name，只加载该已发布 Manifest 的唯一 Python Plan；不接受文件路径。修改 Candidate 后先重新 Publish 才能运行新代码。
 - 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
 - `list_runs(offset=0, limit=100)`：列出仍有 Trace 的 Run ID，按新到旧分页。
 - `read_run_log(run_id, start_sequence=1, limit=100, evidence_id=...)`：分段读取日志，可选查看该日志引用的截图；记录已清理时明确报不可用。两个日志工具均只读，不做内容搜索。
@@ -125,7 +127,7 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 ## 历史：2026-10-24 文件选择修订
 
-2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），`plan.json` 始终只读；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
+2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），已有 Python Plan 可编辑，不开放任意文件创建；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
 
 
 ## 2026-10-25 固定上下文前缀与相对路径
