@@ -137,7 +137,7 @@ def test_error_details_expand_and_copy_full_text(app):
     dialog.details_button.click()
     assert not dialog.details.isHidden()
     from qfluentwidgets import PushButton
-    next(button for button in dialog.findChildren(PushButton) if "Copy error" in button.text()).click()
+    next(button for button in dialog.findChildren(PushButton) if "复制错误信息" in button.text()).click()
     assert app.clipboard().text() == "操作失败\n\nTraceback\nfull details"
     dialog.details_button.click()
     assert dialog.details.isHidden()

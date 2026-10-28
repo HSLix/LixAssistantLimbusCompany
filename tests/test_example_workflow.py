@@ -64,19 +64,22 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     from lalc.user_pages import UserSettings, discover_pages, task_inputs
     app = QApplication.instance() or QApplication([])
     example = Path(__file__).resolve().parents[1] / "example"
-    assert {path.name for path in example.iterdir()} == {"pages", "workflow"}
+    assert {path.name for path in example.iterdir() if not path.name.startswith(".")} == {"pages", "workflow"}
     manager = ManifestManager(tmp_path / "data", actions=application_actions())
     saved = manager.publish(example / "workflow/manifest.json")
     assert saved.ok, saved.errors
     store = UserSettings(manager.data_root)
     pages, errors = discover_pages(example / "pages", store)
     assert not errors
-    assert {page.page_id for page in pages} == {"exp", "mirror"}
-    assert {page.page_id: page.icon for page in pages} == {"exp": FluentIcon.EDUCATION, "mirror": FluentIcon.GAME}
+    assert {page.page_id for page in pages} == {"exp", "mirror", "legacy-language-example"}
+    assert {page.page_id: page.icon for page in pages} == {
+        "exp": FluentIcon.EDUCATION, "mirror": FluentIcon.GAME, "legacy-language-example": FluentIcon.APPLICATION}
     for page in pages:
-        page.widget.message.setText(page.page_id + " message")
+        if page.task_id:
+            page.widget.message.setText(page.page_id + " message")
         page.context.save(page.widget.submit())
-        store.save_task(page.task_id, True, 2 if page.task_id == "exp" else 1)
+        if page.task_id:
+            store.save_task(page.task_id, True, 2 if page.task_id == "exp" else 1)
     repetitions, settings, warnings = task_inputs(pages, ("exp", "mirror"), store)
     assert not warnings
     service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=Window())

@@ -79,8 +79,8 @@ def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows)
     widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
     assert len(widgets) == 5
     general, dashboard, settings, separator, workflow = widgets
-    assert isinstance(general, NavigationItemHeader) and general.text() == "GENERAL"
-    assert isinstance(workflow, NavigationItemHeader) and workflow.text() == "WORKFLOW SETTINGS"
+    assert isinstance(general, NavigationItemHeader) and general.text() == "通用"
+    assert isinstance(workflow, NavigationItemHeader) and workflow.text() == "业务设置"
     assert isinstance(separator, NavigationSeparator)
     assert dashboard._icon == FluentIcon.HOME and settings._icon == FluentIcon.SETTING
     assert user.pages.count() == 2 and not user.business_pages

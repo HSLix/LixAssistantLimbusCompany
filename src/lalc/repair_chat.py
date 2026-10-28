@@ -6,6 +6,8 @@ import json
 from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import QTextBrowser
 
+from .i18n import tr
+
 
 class RepairChat(QTextBrowser):
     """用原生富文本区呈现角色与 Markdown，按调用 ID 合并可展开工具记录。"""
@@ -65,12 +67,14 @@ class RepairChat(QTextBrowser):
         for index, entry in enumerate(self.entries):
             number, role = entry["round"], entry["role"]
             if number and number != previous_round:
-                parts.append(f"<hr><p><b>第 {number} 轮</b></p>")
+                parts.append(tr('<hr><p><b>Round {0}</b></p>').format(number))
                 previous_round = number
             if role == "工具":
                 color = "#9e1c1c" if entry["failed"] else "#333333"
-                title = f"工具：{escape(entry['name'])} · {entry['status']}"
-                toggle = "收起详情" if entry["expanded"] else "展开详情"
+                status = {"失败": tr("Failed"), "成功": tr("Succeeded"),
+                          "等待完成确认": tr("Awaiting completion"), "执行中": tr("In progress")}[entry["status"]]
+                title = tr('Tool: {0} · {1}').format(escape(entry['name']), status)
+                toggle = tr('Hide details') if entry["expanded"] else tr('Show details')
                 body = f'<p style="color:{color}">{title}　<a href="tool:{index}">{toggle}</a></p>'
                 if entry["expanded"]:
                     events = entry["events"]
@@ -88,7 +92,8 @@ class RepairChat(QTextBrowser):
                     body += "<pre>" + escape(json.dumps(shown, ensure_ascii=False, indent=2)) + "</pre>"
                 parts.append(body)
                 continue
-            heading = escape(role) + (f" · 第 {number} 轮" if number else "")
+            shown_role = {"你": tr("You"), "系统": tr("System")}.get(role, role)
+            heading = escape(shown_role) + (tr(' · Round {0}').format(number) if number else "")
             background = {"你": "#e8f2ff", "Agent": "#f2f4f6"}.get(role, "#fff6dd")
             if role == "Agent":
                 document = QTextDocument()

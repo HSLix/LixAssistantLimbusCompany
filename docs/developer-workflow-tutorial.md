@@ -1,6 +1,6 @@
 # Developer Workflow
 
-2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。[Stage 4 规格](stage-4-extensible-user-gui.md)中的外置页面、共享 Agent 配置、双语信息面板及 Windows 打包验收仍由后续票完成。
+2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。外置页面及共享 Agent 配置已在 #332 本地实现，#333 双语与语言重载也已完成本地实现、待开发者验收确认（[使用与证据](stage-4-333-implementation.md)）；#334 Windows 打包验收仍待完成。
 
 正式 Run 要求唯一可用的 Windows 游戏窗口。运行开始时连接、聚焦并启动物理输入监听，结束时清理；自动化测试提供平台替身。
 

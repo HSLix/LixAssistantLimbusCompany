@@ -1,11 +1,11 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
-2026-10-28：[User GUI P0](user-gui-p0-layout.md) 已获确认并完成本地实现，配置文本保存/使用校验及错误详情折叠按该记录更新；#333 双语/语言重载和 #334 Windows 成品验收仍未完成。
+2026-10-28：[User GUI P0](user-gui-p0-layout.md) 已获确认并完成本地实现，配置文本保存/使用校验及错误详情折叠按该记录更新；#333 双语/语言重载已完成本地实现，待开发者验收确认；#334 Windows 成品验收仍未完成，见[#333 记录](stage-4-333-implementation.md)。
 
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
 
 
-状态（2026-10-27）：grill 已结束，设计及影响审查结论已获开发者确认；#331、#332 已在本地实现（[#332 实施证据](stage-4-332-implementation.md)），后续 #333–#334 尚未实现，当前用法及验证边界见[实施记录](stage-4-331-implementation.md)。本文是 Stage 4 接受规格，阶段排期见[路线图](reconstruction-plan.md)，架构替代范围见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)，影响证据见[影响审查](stage-4-design-impact-review.md)，实施拆分见[垂直阶段](stage-4-implementation-slices.md)。文档完成不等于源码或 Windows 打包版验收完成。
+状态（2026-10-27）：grill 已结束，设计及影响审查结论已获开发者确认；#331、#332 已在本地实现（[#332 实施证据](stage-4-332-implementation.md)），后续状态见[#333 实施记录](stage-4-333-implementation.md)，#334 尚未完成，当前用法及验证边界见[实施记录](stage-4-331-implementation.md)。本文是 Stage 4 接受规格，阶段排期见[路线图](reconstruction-plan.md)，架构替代范围见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)，影响证据见[影响审查](stage-4-design-impact-review.md)，实施拆分见[垂直阶段](stage-4-implementation-slices.md)。文档完成不等于源码或 Windows 打包版验收完成。
 
 ## 目标与非目标
 
@@ -52,6 +52,14 @@
 2026-10-27，#332 追加确认：重新加载覆盖整个应用，User/Developer 两窗口一起重载，完成后恢复原先打开的窗口。任一侧存在活动或未结束的后台操作时禁止重载。顺序固定为提交并保存配置 → 清理双窗口、线程与服务 → 关闭单实例通道并释放启动锁 → 启动新实例、重新扫描页面和读取配置。清理失败则明确报错，不启动新实例；新实例启动失败明确报错，由用户手动重新启动，不建设提前启动新进程等待旧实例的交接机制。macOS 进程内临时密钥在真正重启后丢失，重载前提示。
 
 2026-10-28：清理完成后使用程序入口替换实现重载，macOS/POSIX 保留原终端启动链，避免旧启动命令提前结束而新实例继续输出。真实进程与双窗口关闭的检查见[实施记录](fluent-gui-migration.md#重载与终端启动链)；该调整不改变保存、活动互斥、锁释放或重新扫描的顺序。
+
+### #333 双语与重载补充确认
+
+2026-10-28：开发者确认[关键决策](stage-4-333-decisions.md)及[影响审查](stage-4-333-design-impact-review.md)并授权实施。User/Developer 自有 GUI 组件（导航、标签、按钮、提示、运行控制、通知与弹窗）统一随本次启动语言显示，中文模式以中文为主，英文模式自有组件全部英文。原始异常与错误详情无需中英分开，Trace、模型回答、用户内容不翻译。
+
+仅 User General Settings 提供共享语言选择和既有重载入口，Developer 单独启动也沿用共享语言，不新增设置入口。选择立即保存，当前进程含新弹窗、重开窗口和外置页都维持启动语言；下次整应用重启后统一切换。活动期间允许保存语言选择，禁止重载；语言控件不属于 Agent 配置编辑权范围。设置失败不得假报成功。具体保存、资源与验证见[#333 实施记录](stage-4-333-implementation.md)。
+
+外置页增加 `context.language`、`context.translate(中文, English)` 和可选 `PAGE_NAMES` 两语显示名，稳定 PAGE_NAME 回退、页面/任务 ID、配置和 submit 契约保持。现有 example/pages 的 exp/mirror 完整双语，另有不支持切换的 legacy 纯设置示例，用来证明旧接口兼容；该页和第三方未翻译页面是英文模式全英文要求的明确例外。用法见[示例说明](../example/pages/README.md)。
 
 ## 外置页面、任务注册与配置
 

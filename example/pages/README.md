@@ -13,3 +13,12 @@
 导航展开时，Dashboard 与 General Settings 位于 `GENERAL`，其下以原生分隔线和 `WORKFLOW SETTINGS` 标题列出全部已加载业务页，包括纯设置页和当前 Plan 不支持的页。收起为图标栏后隐藏标题、保留分隔线；没有业务页时也保留该分组。General Settings 继续使用齿轮，页面顺序和配置保存规则不变。
 
 页面 ID、任务 ID 各自唯一；冲突注册全部排除，普通导入或创建失败只跳过本页。配置保存在数据目录 `user-settings.json`，切换 Manifest 不删除配置。页面改动需整应用重载。Plan 的 `SUPPORTED_TASK_IDS` 必须是模块级字面量字符串列表；Dashboard 只提供页面与 Plan 的任务 ID 交集，缺项会提示。纯设置页可省略 `TASK_ID`，其配置仍传入 Plan。
+
+
+## GUI 语言与旧页面兼容
+
+User GUI → General Settings → 应用 → 界面语言可选“跟随系统 / 简体中文 / English”；选择立即保存，通过“保存并重新加载整个应用”生效。中文系统（含繁体地区）跟随到简体中文，其余用英文。两窗口共享语言，Developer 不提供独立入口；活动期间可保存语言选择，但不能重载。GUI 语言不影响游戏识别语言。
+
+`context.language` 是本次已生效的 `zh_CN` 或 `en_US`；`context.translate(中文文案, English_text)` 按该语言选择页面自带文案，无需编译翻译资源。导航名可选声明 `PAGE_NAMES = {"zh_CN": "中文名称", "en_US": "English name"}`，键只允许这两个语言，值须为非空字符串；未提供当前语言时回退原有 `PAGE_NAME`。`PAGE_NAME` 仍必需，原有 create_page、submit、配置保存契约不变。
+
+`exp.py` 和 `mirror.py` 同时翻译导航、页面标签及输入校验提示，保持现有页面/任务 ID 和 message 配置键。新增 `legacy.py` 是不使用语言接口的纯设置页：导航和标签固定中文，不注册循环任务，切换英文仍保留原文，用于验证旧页面兼容；其 note 配置仍正常保存。页面作者负责自己的翻译，宿主不调用模型翻译页面，也不翻译用户填写的内容。旧页面无需迁移，修改已安装页面后仍需整应用重载。

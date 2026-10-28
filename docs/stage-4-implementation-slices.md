@@ -1,6 +1,6 @@
 # Stage 4 — Vertical Implementation Slices
 
-状态（2026-10-27）：设计与以下四阶段拆分已由开发者确认（原 1/2 合并、原 3/4 合并）；四票已发布 GitHub；#331 已在本地实现并经开发者确认关闭，真实使用测试留待后续，验证和未验收边界见[实施记录](stage-4-331-implementation.md)；#332 已完成本地实现及定向验证，见[实施证据](stage-4-332-implementation.md)；#333–#334 尚未实现。每阶段独立可演示、验证，不按 schema/API/UI/测试横向拆分。依据 [Stage 4 规格](stage-4-extensible-user-gui.md)、[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 及[影响审查](stage-4-design-impact-review.md)。
+状态（2026-10-27）：设计与以下四阶段拆分已由开发者确认（原 1/2 合并、原 3/4 合并）；四票已发布 GitHub；#331 已在本地实现并经开发者确认关闭，真实使用测试留待后续，验证和未验收边界见[实施记录](stage-4-331-implementation.md)；#332 已完成本地实现及定向验证，见[实施证据](stage-4-332-implementation.md)；#333 已完成本地双语及语言重载实现，待开发者验收确认（[证据](stage-4-333-implementation.md)）；#334 尚未完成。每阶段独立可演示、验证，不按 schema/API/UI/测试横向拆分。依据 [Stage 4 规格](stage-4-extensible-user-gui.md)、[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 及[影响审查](stage-4-design-impact-review.md)。
 
 直接依赖：1 → 2 → 3 → 4。已使用 ready-for-agent 和 GitHub 原生 blocked-by；不修改或关闭既有父议题。
 
@@ -57,10 +57,12 @@
 **交付行为：** 交付 User GUI P0 布局、信息占位卡与 General Settings，保留双语及语言重启生效要求。真实信息内容移至 Stage 6 之后，不整体后移本票。
 
 - [x] 按[User GUI P0 设计](user-gui-p0-layout.md)完成左右布局、占位卡、Agent 配置状态与启动门槛、密钥输入弹窗和统一折叠错误详情；不联网，Update 禁用。
-- [ ] General Settings 使用纵向选项布局，包含共享 Agent 配置/User 选择与开关、开发者入口及用途提示、页面重载和语言，不扩充无关设置。
-- [ ] 提供跟随系统/简体中文/English，默认跟随系统：系统中文用简体中文，其他用英文。保存语言后通过同一重启重载流程生效；翻译覆盖固定页面、通知和运行控制，并给外置页可复用的最小语言接口。
-- [ ] GUI 语言不改变游戏识别语言；语言/设置重启后保留，活动期间不允许重载。
-- [ ] 验证占位卡不联网、Update 禁用、P0 设置及启动规则、中文/英文/跟随系统、重启生效及游戏识别语言隔离。
+- [x] General Settings 使用纵向选项布局，包含共享 Agent 配置/User 选择与开关、开发者入口及用途提示、页面重载和语言，不扩充无关设置。
+- [x] 提供跟随系统/简体中文/English，默认跟随系统：系统中文用简体中文，其他用英文。保存语言后通过同一重启重载流程生效；翻译覆盖固定页面、通知和运行控制，并给外置页可复用的最小语言接口。
+- [x] GUI 语言不改变游戏识别语言；语言/设置重启后保留，活动期间不允许重载。
+- [x] 验证占位卡不联网、Update 禁用、P0 设置及启动规则、中文/英文/跟随系统、重启生效及游戏识别语言隔离。
+
+#333 本地验证与尚未验收边界见[实施记录](stage-4-333-implementation.md)；未关闭 issue，不代表 #334 Windows 成品通过。
 
 ## 4 — Windows 打包成品与框架验收
 
