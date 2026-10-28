@@ -1,10 +1,11 @@
 """经验本教学页：配置消息，次数由 Dashboard 管理。"""
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout
-from qfluentwidgets import BodyLabel as QLabel, LineEdit
+from qfluentwidgets import BodyLabel as QLabel, FluentIcon, LineEdit
 
 PAGE_ID = "exp"
 PAGE_NAME = "经验本教学示例"
+PAGE_ICON = FluentIcon.EDUCATION
 TASK_ID = "exp"
 
 

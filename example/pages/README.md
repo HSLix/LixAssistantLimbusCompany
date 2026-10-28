@@ -8,4 +8,8 @@
 
 外置页是可信、同进程的 Python 模块，提供 `PAGE_ID`、`PAGE_NAME`、可选 `TASK_ID` 和 `create_page(context)`。返回的 QWidget 提供 `submit() -> dict`，输入非法时抛出明确错误。`context.load(defaults)` 读取配置副本，`context.save(config)` 保存 JSON 配置；宿主开始运行和整应用重载前提交所有页面，包括未启用的任务与纯设置页。页面不随 Manifest 发布，内置 Agent 无权编辑。
 
+可与 `PAGE_ID` 并列声明可选导航图标，例如 `from qfluentwidgets import FluentIcon` 后设置 `PAGE_ICON = FluentIcon.EDUCATION`。exp 使用 EDUCATION，mirror 使用 GAME；未声明或设为 `None` 时统一使用 APPLICATION。图标值必须是 `FluentIcon` 成员；无效值会记录带页面身份的警告并回退默认图标，页面仍可用。若声明引用不存在的枚举成员，导致模块本身导入/求值失败，仍按原有加载失败规则处理。图标属于展示元数据，不保存到 `user-settings.json`，修改后需整应用重载。
+
+导航展开时，Dashboard 与 General Settings 位于 `GENERAL`，其下以原生分隔线和 `WORKFLOW SETTINGS` 标题列出全部已加载业务页，包括纯设置页和当前 Plan 不支持的页。收起为图标栏后隐藏标题、保留分隔线；没有业务页时也保留该分组。General Settings 继续使用齿轮，页面顺序和配置保存规则不变。
+
 页面 ID、任务 ID 各自唯一；冲突注册全部排除，普通导入或创建失败只跳过本页。配置保存在数据目录 `user-settings.json`，切换 Manifest 不删除配置。页面改动需整应用重载。Plan 的 `SUPPORTED_TASK_IDS` 必须是模块级字面量字符串列表；Dashboard 只提供页面与 Plan 的任务 ID 交集，缺项会提示。纯设置页可省略 `TASK_ID`，其配置仍传入 Plan。

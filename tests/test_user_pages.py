@@ -101,6 +101,55 @@ def test_discovery_isolates_import_create_and_all_conflicting_registrations(tmp_
     assert sum("冲突" in error for error in errors) == 2
 
 
+@pytest.mark.parametrize("declaration, expected, warning", [
+    ("", "APPLICATION", False),
+    ("PAGE_ICON = None", "APPLICATION", False),
+    ("from qfluentwidgets import FluentIcon\nPAGE_ICON = FluentIcon.EDUCATION", "EDUCATION", False),
+    ('PAGE_ICON = "invalid"', "APPLICATION", True),
+])
+def test_page_icon_metadata_defaults_and_invalid_values_keep_page_usable(tmp_path, app, caplog, declaration, expected, warning):
+    """导航图标可选，错误值只记警告，不改变页面加载与配置提交。"""
+    from qfluentwidgets import FluentIcon
+    directory = tmp_path / "pages"
+    directory.mkdir()
+    (directory / "loop.py").write_text((PAGES / "loop.py").read_text() + "\n" + declaration + "\n")
+    store = UserSettings(tmp_path)
+    pages, errors = discover_pages(directory, store)
+    assert not errors and len(pages) == 1
+    page = pages[0]
+    assert page.icon == getattr(FluentIcon, expected)
+    assert ("PAGE_ICON 无效" in caplog.text) == warning
+    if warning:
+        assert "loop.py" in caplog.text and page.page_id in caplog.text
+    page.context.save(page.widget.submit())
+    assert store.value["pages"][page.page_id] == {"message": "Hello"}
+    page.widget.close()
+
+
+def test_business_navigation_keeps_all_pages_and_uses_registered_icon(owner, app):
+    """纯设置页也归入业务分组，页面图标不改变路由、页面数和任务注册。"""
+    from qfluentwidgets import FluentIcon, NavigationItemHeader, NavigationSeparator
+    from PySide6.QtTest import QTest
+    owner.user.business_pages[0].icon = FluentIcon.EDUCATION
+    assert owner.user.close()
+    user = owner.open_window()
+    panel = user.navigationInterface.panel
+    widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
+    assert isinstance(widgets[0], NavigationItemHeader) and widgets[0].text() == "GENERAL"
+    assert [widget.property("routeKey") for widget in widgets[1:3]] == ["dashboard", "general-settings"]
+    assert isinstance(widgets[3], NavigationSeparator)
+    assert isinstance(widgets[4], NavigationItemHeader) and widgets[4].text() == "WORKFLOW SETTINGS"
+    assert [widget.property("routeKey") for widget in widgets[5:]] == [page.page_id for page in user.business_pages]
+    assert panel.widget(user.business_pages[0].page_id)._icon == FluentIcon.EDUCATION
+    assert panel.widget(user.business_pages[1].page_id)._icon == FluentIcon.APPLICATION
+    assert user.pages.count() == 4 and list(user.task_rows) == ["sample.loop"]
+    for page in user.business_pages:
+        user.switchTo(page.widget)
+        QTest.qWait(700)
+        assert user.pages.currentWidget() is page.widget
+        assert panel.widget(page.page_id).itemWidget.isSelected
+
+
 def test_support_is_bidirectional_and_empty_list_warns_without_deleting_values(tmp_path, app):
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(PAGES, store)
@@ -294,6 +343,18 @@ def test_restart_spawn_failure_reports_error(tmp_path, monkeypatch):
     assert "could not start" in errors[0]
 
 
+@pytest.mark.parametrize("frozen", [False, True])
+def test_gui_reload_replaces_launcher_instead_of_leaving_detached_child(monkeypatch, frozen):
+    """源码与打包入口均替换当前程序，终端不会提前结束其启动命令。"""
+    import sys
+    calls = []
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    monkeypatch.setattr("lalc.gui.os.execv", lambda executable, arguments: calls.append((executable, arguments)))
+    GuiCoordinator.restart_process(("user", "developer"))
+    command = [sys.executable] + ([] if frozen else ["-m", "lalc"]) + ["--restore-gui=user,developer"]
+    assert calls == [(sys.executable, command)]
+
+
 def test_reload_through_real_process_restores_both_windows_and_rescans(tmp_path):
     import os
     import socket
@@ -339,7 +400,14 @@ def create_page(context):
             assert not owner.user.agent_controls.isEnabled()
             atexit.register(lambda: (root / "clean-exit").write_text("normal"))
             (root / "ready").write_text("restored-and-rescanned")
-            QTimer.singleShot(20, QApplication.instance().quit)
+            def close_when_requested():
+                if not (root / "close-now").exists():
+                    return QTimer.singleShot(20, close_when_requested)
+                assert owner.user.close()
+                assert owner.user is None and owner.developer is not None
+                assert owner.developer.close()
+                assert owner.developer is None
+            QTimer.singleShot(20, close_when_requested)
         else:
             (root / "pages/new.py").write_text('from PySide6.QtWidgets import QWidget\\nPAGE_ID="new"\\nPAGE_NAME="new"\\nclass P(QWidget):\\n    def submit(self): return {}\\ndef create_page(ctx): return P()\\n')
             owner.request_reload()
@@ -357,11 +425,13 @@ def create_page(context):
         'raise SystemExit(run_application(lambda owner: run_gui(owner, restore=("user","developer"))))'],
         env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
+        until = time.monotonic() + 10
+        while not (root / "ready").exists() and process.poll() is None and time.monotonic() < until:
+            time.sleep(.03)
+        assert (root / "ready").exists() and process.poll() is None
+        (root / "close-now").touch()
         output, error = process.communicate(timeout=10)
         assert process.returncode == 0, error.decode()
-        until = time.monotonic() + 5
-        while not (root / "ready").exists() and time.monotonic() < until:
-            time.sleep(.03)
         assert (root / "ready").read_text() == "restored-and-rescanned", error.decode()
         assert "Fatal Python error" not in error.decode()
         assert (root / "clean-exit").exists()

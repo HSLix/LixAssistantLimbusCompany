@@ -60,6 +60,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
 def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     """两个真实页面的配置、循环次数进入已发布 Plan，并产生动作及 Task 记录。"""
     from PySide6.QtWidgets import QApplication
+    from qfluentwidgets import FluentIcon
     from lalc.user_pages import UserSettings, discover_pages, task_inputs
     app = QApplication.instance() or QApplication([])
     example = Path(__file__).resolve().parents[1] / "example"
@@ -71,6 +72,7 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     pages, errors = discover_pages(example / "pages", store)
     assert not errors
     assert {page.page_id for page in pages} == {"exp", "mirror"}
+    assert {page.page_id: page.icon for page in pages} == {"exp": FluentIcon.EDUCATION, "mirror": FluentIcon.GAME}
     for page in pages:
         page.widget.message.setText(page.page_id + " message")
         page.context.save(page.widget.submit())

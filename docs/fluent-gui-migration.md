@@ -1,5 +1,27 @@
 # 完整 FluentWindow 迁移实施记录
 
+## User 导航分组与页面图标
+
+2026-10-28：按[接受规格](stage-4-extensible-user-gui.md#导航分组与页面图标)和[实施前影响审查](user-navigation-impact-review.md)完成本地实施。
+
+- User 使用原生 `addItemHeader()` 与 `addSeparator()`：`GENERAL` 下为 Dashboard、General Settings；`WORKFLOW SETTINGS` 下为全部已加载业务页。空业务分组也保留；收起导航时原生标题高度归零，分隔线和图标分组仍可见。Developer 导航不变。
+- 页面模块可选 `PAGE_ICON = FluentIcon.…`；缺省/None 使用 APPLICATION，无效值记录带模块文件名、页面 ID 的日志警告并回退，不进入“页面加载失败”通知。模块本身导入失败仍按原规则隔离。元数据不写入配置或 Manifest，旧页面无需迁移。例子 exp 使用 EDUCATION、mirror 使用 GAME。
+- 展开宽度仍为 220，固定页面索引和业务页发现顺序保持；继续使用原生选中效果、配色和路由。页面保存、任务匹配、Plan、Runtime 及重载机制不变。
+
+验证：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_user_pages.py tests/test_user_gui.py tests/test_user_gui_p0.py tests/test_example_workflow.py`，**52 passed，3 skipped**。覆盖图标声明/默认/None/无效值、警告与配置可用性、固定/业务/纯设置页分组、空分组、展开/收起及窄窗口菜单、页面选中与 exp/mirror 的配置进入 Plan。跳过项未计为通过，未启用 Agent 测试。
+
+已生成并检查 `.generated/user-navigation/expanded.png`、`compact.png`、`empty.png`、`menu.png`。预览使用临时数据及既有 macOS 标题栏替身，不操作用户已安装页面、配置、模型或游戏。未做 Windows/macOS 原生窗口验收，offscreen 不能替代原生验收；之前记录的原生启动和个别测试组收尾问题不在本次范围内。
+
+## 重载与终端启动链
+
+2026-10-28：修正重载使用 Popen 后旧启动程序提前返回、重载实例继续向原终端输出的问题。保存、停止活动、双窗口清理及单实例锁释放的顺序保持；清理完成后改为 `os.execv` 替换当前程序入口。macOS/POSIX 下原 PID 和终端启动链保留，最后一个窗口关闭后启动命令才结束；认证仍不进入命令参数，源码与打包入口分别使用自身解释器/程序。
+
+聚焦回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_user_pages.py tests/test_error_handling.py tests/test_user_gui.py`，**68 passed，3 skipped**。新增源码/冻结入口替换参数检查，保留清理失败禁止重载及启动失败报错测试。
+
+另在允许本地 IPC 的环境单独运行 `tests/test_user_pages.py::test_reload_through_real_process_restores_both_windows_and_rescans`，**1 passed**：临时用户目录、真实 macOS Cocoa 窗口，重载后恢复双窗口并发现新增页；恢复窗口保持打开时原启动进程仍在，随后调用两个窗口各自的 close 路径，最终正常退出并写入 atexit 标记。该检查不再以直接 QApplication.quit 代替用户关窗。没有调用模型或游戏；Windows 原生打包重载及 VS Code 运行指示器自身未验收。
+
+## 初始迁移记录
+
 2026-10-27：开发者在[可行性调研](qfluentwidgets-feasibility.md)后明确授权正式迁移完整窗口层。本轮已将 User/Developer 产品窗口迁到 FluentWindow；不再通过实验中的源码副本、临时替换或适配下拉框运行。
 
 ## 当前实现

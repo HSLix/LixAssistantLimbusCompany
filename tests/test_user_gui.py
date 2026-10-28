@@ -70,6 +70,40 @@ def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(
     assert not developer.pages.isAnimationEnabled()
 
 
+def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows):
+    """空业务分组也保留；展开有标题，收起只保留原生分隔线及页面图标。"""
+    from PySide6.QtTest import QTest
+    from qfluentwidgets import FluentIcon, NavigationItemHeader, NavigationSeparator, NavigationDisplayMode
+    app, _, user, developer = windows
+    panel = user.navigationInterface.panel
+    widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
+    assert len(widgets) == 5
+    general, dashboard, settings, separator, workflow = widgets
+    assert isinstance(general, NavigationItemHeader) and general.text() == "GENERAL"
+    assert isinstance(workflow, NavigationItemHeader) and workflow.text() == "WORKFLOW SETTINGS"
+    assert isinstance(separator, NavigationSeparator)
+    assert dashboard._icon == FluentIcon.HOME and settings._icon == FluentIcon.SETTING
+    assert user.pages.count() == 2 and not user.business_pages
+    assert not developer.navigationInterface.findChildren(NavigationItemHeader)
+    assert panel.expandWidth == 220
+    user.navigationInterface.expand(useAni=False)
+    QTest.qWait(200)
+    assert all(header.height() > 0 for header in (general, workflow))
+    assert separator.isVisible()
+    panel.collapse()
+    QTest.qWait(400)
+    assert all(header.height() == 0 for header in (general, workflow))
+    assert separator.isVisible() and separator.width() == 48
+    assert dashboard.isCompacted and settings.isCompacted
+    user.resize(700, 800)
+    app.processEvents()
+    user.navigationInterface.expand(useAni=False)
+    QTest.qWait(200)
+    assert panel.displayMode == NavigationDisplayMode.MENU
+    assert all(header.height() > 0 for header in (general, workflow))
+    assert separator.isVisible() and panel.expandWidth == 220
+
+
 def test_native_owned_modal_keeps_other_fluent_window_editable(windows):
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest

@@ -7,6 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 import importlib.util
 import json
+import logging
 import sys
 from pathlib import Path
 import uuid
@@ -69,6 +70,7 @@ class BusinessPage:
     task_id: str | None
     widget: Any
     context: PageContext
+    icon: Any = None
 
 
 def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessPage], list[str]]:
@@ -102,11 +104,16 @@ def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessP
             if ids[page_id] > 1 or task_id is not None and tasks[task_id] > 1:
                 raise ValueError(f"页面或任务 ID 冲突：{page_id} / {task_id}")
             from PySide6.QtWidgets import QWidget
+            from qfluentwidgets import FluentIcon
             context = PageContext(store, page_id)
             widget = module.create_page(context)
             if not isinstance(widget, QWidget) or not callable(getattr(widget, "submit", None)):
                 raise ValueError("create_page 必须返回提供 submit() -> dict 的 QWidget。")
-            pages.append(BusinessPage(page_id, name, task_id, widget, context))
+            icon = getattr(module, "PAGE_ICON", None)
+            if icon is not None and not isinstance(icon, FluentIcon):
+                logging.getLogger(__name__).warning("%s（%s）：PAGE_ICON 无效，使用默认导航图标。", path.name, page_id)
+                icon = None
+            pages.append(BusinessPage(page_id, name, task_id, widget, context, icon or FluentIcon.APPLICATION))
         except Exception as error:
             errors.append(f"{path.name}：{type(error).__name__}: {error}")
     return pages, errors

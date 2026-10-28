@@ -553,3 +553,30 @@ def test_repair_opens_external_pages_folder_next_to_workspace(gui, monkeypatch, 
     assert directory.is_dir()
     assert opened == [str(directory.absolute())]
     assert bool(errors) != can_open
+
+
+@pytest.mark.parametrize("case", ["missing", "existing", "system_refused", "path_is_file"])
+def test_capture_creates_asset_directory_before_opening(gui, monkeypatch, case):
+    """缺失目录自动创建，已有内容保留，创建与系统打开失败仍显示错误。"""
+    from PySide6.QtGui import QDesktopServices
+    from lalc.gui import ErrorDialog
+    _, window = gui
+    directory = window.service.asset_library.root
+    assert not directory.exists()
+    if case == "existing":
+        directory.mkdir(parents=True)
+        (directory / "keep.txt").write_text("keep")
+    elif case == "path_is_file":
+        directory.parent.mkdir(parents=True, exist_ok=True)
+        directory.write_text("keep")
+    opened, errors = [], []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or case != "system_refused")
+    monkeypatch.setattr(ErrorDialog, "open", lambda dialog: errors.append(dialog.details.toPlainText()))
+    window.capture_page.open_assets()
+    assert bool(errors) == (case in {"system_refused", "path_is_file"})
+    if case == "path_is_file":
+        assert directory.read_text() == "keep" and not opened
+    else:
+        assert directory.is_dir() and opened == [str(directory.absolute())]
+        if case == "existing":
+            assert (directory / "keep.txt").read_text() == "keep"

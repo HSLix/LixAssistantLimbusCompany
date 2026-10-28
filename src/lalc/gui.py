@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import asyncio
-import subprocess
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
@@ -249,7 +249,8 @@ class MainWindow(FluentWindow):
                 self.service.stop()
                 self.cancel_operation()
                 self.render_state(self.service.state)
-                self.status.setText("正在停止，等待输入释放、日志保存和 pi 回收…")
+                if hasattr(self, "status"):
+                    self.status.setText("正在停止，等待输入释放、日志保存和 pi 回收…")
                 self.close_timer.start()
             return
         self.close_timer.stop()
@@ -459,8 +460,6 @@ class UserWindow(MainWindow):
         self.start_button = PrimaryPushButton("Start Plan")
         self.start_button.clicked.connect(lambda: self._interact(self.start_plan))
         left.addWidget(self.start_button)
-        self.status = QLabel()
-        left.addWidget(self.status)
         self.notifications = NotificationList()
         left.addWidget(self.notifications)
         information = QVBoxLayout()
@@ -481,6 +480,7 @@ class UserWindow(MainWindow):
             information.addWidget(card)
         information.addStretch()
         dash.addLayout(information, 1)
+        self.navigationInterface.addItemHeader("GENERAL")
         self.addSubInterface(dashboard, FluentIcon.HOME, "Dashboard")
         settings = QWidget()
         settings.setObjectName("general-settings-content")
@@ -538,9 +538,11 @@ class UserWindow(MainWindow):
         scroll.setObjectName("general-settings")
         self.general_settings = scroll
         self.addSubInterface(scroll, FluentIcon.SETTING, "General Settings")
+        self.navigationInterface.addSeparator()
+        self.navigationInterface.addItemHeader("WORKFLOW SETTINGS")
         for page in self.business_pages:
             page.widget.setObjectName(page.page_id)
-            self.addSubInterface(page.widget, FluentIcon.SETTING, page.name)
+            self.addSubInterface(page.widget, page.icon or FluentIcon.APPLICATION, page.name)
         for error in self.page_errors:
             self.add_warning(error)
             self.notifications.notify("外置页面加载失败", self.clean_details(error))
@@ -738,7 +740,6 @@ class UserWindow(MainWindow):
         self.start_button.setEnabled(not busy and ready)
         self.start_button.setToolTip("当前活动尚未结束" if busy else
                                     "执行 Default 的唯一 Python Plan" if ready else self.start_hint.text())
-        self.status.setText("运行已暂停" if state["paused"] else "运行中" if state["phase"] == "running" else "空闲")
         if self.owns_run and state["phase"] == "running":
             if self.trial_dialog is None:
                 from .developer_gui import TrialDialog
@@ -843,12 +844,12 @@ class GuiCoordinator:
 
     @staticmethod
     def restart_process(windows):
-        """认证不进入启动参数；源码和冻结入口分别沿用自身解释器/程序。"""
+        """清理完成后替换当前程序，保留终端启动链；认证不进入启动参数。"""
         command = [sys.executable]
         if not getattr(sys, "frozen", False):
             command += ["-m", "lalc"]
         command.append("--restore-gui=" + ",".join(windows))
-        subprocess.Popen(command, close_fds=True)
+        os.execv(command[0], command)
 
     def render_state(self, state):
         for window in (self.user, self.developer):
