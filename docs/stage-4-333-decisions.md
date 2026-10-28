@@ -19,3 +19,7 @@
 - #333 正文由 [2026-10-28 范围修订评论](https://github.com/HSLix/LixAssistantLimbusCompany/issues/333#issuecomment-6460102840) 修正：信息卡保持占位、不联网、Update 禁用；真实公告、旧版声明及版本联网功能移至 Stage 6 之后。
 - 双语、语言保存与整应用重载、外置页最小语言接口仍属于 #333；P0 实施不代表本票完成。Windows 打包现场验收属于 #334。
 - 关键决策确认后进行 design-impact-review；评审获确认后进入实现，开发者确认后才关闭 issue。
+
+## 人工验收与关闭
+
+2026-10-28：开发者反馈“已人工验收，没看出明显问题”，明确要求关闭 #333。GitHub 已关闭为 completed；Windows 成品及其他未验收边界继续按[实施记录](stage-4-333-implementation.md)归 #334 等后续范围。

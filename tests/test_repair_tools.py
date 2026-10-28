@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from lalc.agent_log import read_json
 from lalc.actions import application_actions
 from lalc.agent_repair import RepairLog
 from lalc.repair_tools import RepairTools
@@ -18,7 +19,7 @@ from test_focused_observation import FakeWindowPlatform
 
 
 def invoke(tools, name, **arguments):
-    return json.loads(Path(tools.call(name, arguments)).read_text())
+    return read_json(tools.call(name, arguments))
 
 
 def crop(tools, **arguments):

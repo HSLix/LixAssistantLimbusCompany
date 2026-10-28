@@ -117,7 +117,7 @@ The executor-owned chronological record of what one real execution attempt actua
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:
-The retained record of information supplied to an Agent, its tool operations and results, and its outputs. A continuous developer conversation groups its user messages and model/tool exchanges into one record with per-round outcomes; runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
+The complete reconstructable record of information supplied to an Agent, its tool operations and results, and its outputs. Each continuous developer conversation is an independent, self-contained retention unit with per-round outcomes; compact content references preserve the evidence rather than summarize or alter the model context, while runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
 _Avoid_: Execution Trace, Agent memory
 
 **Agent Adapter**:

@@ -5,7 +5,7 @@
 
 2026-10-27 #331 实施更新：当前使用唯一不可变 Python Plan、User/Developer 双窗口及跨进程游戏排他；已有 Candidate Plan 可编辑。现行入口和迁移步骤见[实施记录](stage-4-331-implementation.md)。下文旧 JSON Plan、Runner 页及 plan.json 只读内容保留为历史设计/验收，不能作为当前操作要求。
 
-2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，#331 已迁移，#332 已实现外置页、共享设置与即时保存（[证据](stage-4-332-implementation.md)），#333 双语与语言重载已完成本地实现，待开发者验收确认（[证据](stage-4-333-implementation.md)），#334 尚未完成，不得把这些旧操作说明当作新 Stage 4 规格。
+2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，#331 已迁移，#332 已实现外置页、共享设置与即时保存（[证据](stage-4-332-implementation.md)），#333 双语与语言重载已完成本地实现，已获开发者人工验收确认并关闭 #333（[证据](stage-4-333-implementation.md)），#334 尚未完成，不得把这些旧操作说明当作新 Stage 4 规格。
 
 状态（2026-10-26）：四页及后续增量已完成实现与回归核验，按开发者确认关闭 [#330](https://github.com/HSLix/LixAssistantLimbusCompany/issues/330)。真模型、Windows 和真实游戏验收仍分别记录，并由 #329 完成最终集成与交付；见文末关闭核验。历史记录不计为新的实机证据。
 

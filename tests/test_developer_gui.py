@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from lalc.agent_log import read_json
+
 from lalc.application import StartError
 from test_agent_repair import host_for
 
@@ -459,7 +461,7 @@ def test_manual_validate_displays_once_and_persists_context(gui, monkeypatch, ph
     assert result["ok"] is valid
     assert page.diagnostics.errors.count() == (0 if valid else 1)
     assert len(opened) == (0 if valid else 1)
-    assert json.loads((chat.log.path / "context.json").read_text()) == chat.history
+    assert read_json(chat.log.path / "context.json") == chat.history
     assert len(chat.history) == 1
     if not valid:
         assert page.diagnostics.errors.currentData()["errors"] == result["errors"]

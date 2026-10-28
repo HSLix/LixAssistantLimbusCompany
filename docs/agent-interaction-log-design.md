@@ -1,6 +1,6 @@
-# Agent Interaction Log 去重设计讨论
+# Agent Interaction Log 去重设计
 
-2026-10-28：本节记录 grill-with-docs 中逐项确认的决定，整体设计仍待收敛与 design-impact-review，尚未实现。范围是 Agent Interaction Log 的落盘与可追溯性；本次不改变实际发送给模型的历史上下文，不自动包含预检策略或试运行权限变更。
+2026-10-28：本设计经 grill-with-docs、design-impact-review 和开发者实施确认，按 [ADR 0033](adr/0033-deduplicate-agent-logs-with-conversation-local-references.md) 实现。范围是 Agent Interaction Log 的落盘与可追溯性；不改变实际发送给模型的历史上下文，不包含预检策略或试运行权限变更。
 
 ## 已确认
 
@@ -9,7 +9,31 @@
 - 每个对话目录独立且自包含，允许对话内部跨轮去重，不引用其他对话的文件。复制或压缩整个对话目录即可带走完整证据；删除一个对话不破坏其他对话日志。不同对话出现相同图片时，各自保留一份，不引入跨对话共享内容库。
 - 旧日志保持原样，不自动迁移或重写，仅新对话使用去重格式。当前没有历史日志读取/加载/展示能力，本次不新增该界面，也不预先建立通用旧格式兼容框架；新格式的按需展开用于诊断和核验完整信息可重建，不另存一套全量副本。
 
-三个 grill 边界已逐项确认；接下来进行 design-impact-review，尚未进入实现。
+## 实现与影响审查
+
+- `agent_log.LogStore` 以固定对话根目录保存格式标记和哈希内容；重复的大块文本/JSON 保存在 objects/，图片引用对话内已有原始图片，缺少原图文件时保存哈希二进制对象。现有 PNG、附件、源码快照与 Diff 的普通文件布局保留，JSON 不再反复内嵌其 Base64。引用采用相对路径、SHA-256 和类型，保留消息/事件顺序并转义与内部标记同名的用户字段。
+- `RepairLog.record/save_json` 覆盖事件、上下文、输入、回答、结果及工具持久化。内容先完成保存，再写引用，文档替换是原子的；内容保存失败不发布新引用，不自动清理未引用的内容。
+- pi 仍在 onPayload 生成完整请求，但先写本轮临时目录；Python 宿主接收 lalc_request 后保存去重快照并移除临时文件，事件中的 payload_path 指向保留的文档。预检与正式请求共用同一对话内容库，不因 log.path 暂时切换到 round-N 分裂去重范围。
+- `RepairTools` 先保留去重工具记录，再为 pi 写完整的临时传输 JSON；GUI on_event 回调继续收到完整事件。临时文件随既有 pi 轮次目录清理，不作为长期日志。没有改动模型消息、图片/顺序、请求计数、预检触发、GUI 实时展示或运行许可。
+- `read_json/read_events` 为新格式诊断与核验提供完整展开。按路径和哈希校验所有引用；缺失、损坏、越界或无效引用明确失败。没有历史查看器、通用旧格式适配、自动迁移或跨对话存储。
+
+## 按需展开
+
+在项目根目录执行，例如：
+
+```sh
+uv run python -m lalc.agent_log /absolute/conversation/round-1/request-2.json --output /absolute/expanded-request.json
+uv run python -m lalc.agent_log /absolute/conversation/events.jsonl --output /absolute/expanded-events.jsonl
+```
+
+输入必须来自带 log-format.json 的新格式对话；省略 --output 时输出到标准输出。指定的输出文件必须不存在，展开失败会删除本次未完成的输出文件，不覆盖旧文件。平时不保存展开副本，复制/压缩整个对话目录即可带走完整引用依赖。字段中原有的外部绝对路径作为历史元数据原样保留，不会被当作需要读取的内容引用；本次不会为一个 Run ID 自动复制未提供给 Agent 的全部运行证据。
+
+## 验证
+
+- 最终普通回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q`，531 passed, 53 skipped。未执行的 Agent/平台条件检查不计为通过。
+- 真实 pi + 本机 HTTP 替身相关回归：45 passed, 4 skipped；新增逐请求比对覆盖连续两轮带工具图片的实际请求，展开后的快照与 HTTP 服务收到的请求逐项一致（按相同脱敏规则比较）。真模型/Windows 条件检查保持跳过，不冒充实机通过。
+- 使用开发者提供的旧交互 478bc276-1f3d-4f74-8974-964258b61cb0 做临时副本试验，不修改原目录，不提供迁移命令：217,313,048 字节减至 9,667,948 字节，减少 95.55%。73 个 JSON 文档与 524 条事件全部展开后与原内容逐项一致。该结果仅代表这份样本，不是对任意对话的体积保证。
+- 普通检查覆盖引用展开、同一图片/文本复用、对话复制后独立读取、事件顺序/实时回调、标记冲突转义、哈希/路径/缺失引用失败、内容写入失败不替换文档、旧日志不被改写，以及诊断输出不覆盖既有文件。
 
 ## 讨论证据
 

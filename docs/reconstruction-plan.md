@@ -143,7 +143,7 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 2026-10-28 User GUI P0 讨论：开发者确认本轮仅做布局/信息层级 P0 改进；建议稿 P1 中尚未实现的信息面板等新增内容移至 Stage 6 之后 TODO，已实现的动态循环列表、Manifest 选择、持久通知及外置页导航保留，P2 忽略。详见[逐项讨论记录](user-gui-p0-layout.md)。本轮 grill 与影响审查已完成并获用户授权实施，P0 已完成本地实现及普通回归（475 passed，53 skipped）；原 #333/#334 相关范围按[审查记录](user-gui-p0-impact-review.md)同步，不将此条解释为全部后续阶段延期。
 
-2026-10-27 #332 更新：外置业务页、共享 provider 设置、即时保存与整应用重载已完成本地实现及自动化验证，见[实施记录](stage-4-332-implementation.md)。#333 双语与语言重载已完成本地实现，待开发者验收确认（[证据](stage-4-333-implementation.md)）；#334 Windows 打包现场验收仍待完成。
+2026-10-27 #332 更新：外置业务页、共享 provider 设置、即时保存与整应用重载已完成本地实现及自动化验证，见[实施记录](stage-4-332-implementation.md)。#333 双语与语言重载已完成本地实现，已获开发者人工验收确认并关闭 #333（[证据](stage-4-333-implementation.md)）；#334 Windows 打包现场验收仍待完成。
 
 状态（2026-10-27）：grill 及 design-impact-review 已完成并经开发者确认，设计接受；#331 已在本地实现，#332–#334 待实施，验证与限制见[实施记录](stage-4-331-implementation.md)。正式规格集中在 [Stage 4](stage-4-extensible-user-gui.md)，取代此前逐轮草案；架构边界见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)。
 

@@ -10,6 +10,8 @@ import shutil
 
 import pytest
 
+from lalc.agent_log import read_json, read_events
+
 from lalc.agent_repair import final_answer
 from lalc.manifest import ManifestManager
 from lalc.application import ApplicationService
@@ -59,9 +61,9 @@ def test_manual_validation_immediately_persists_in_current_conversation(tmp_path
         host.conversation = chat
         result = host.validate()
         assert result["ok"] is valid
-        assert json.loads((chat.log.path / "context.json").read_text()) == chat.history
+        assert read_json(chat.log.path / "context.json") == chat.history
         assert json.dumps(result, ensure_ascii=False) in chat.history[-1]["content"][0]["text"]
-        event = json.loads((chat.log.path / "events.jsonl").read_text().splitlines()[-1])["event"]
+        event = list(read_events(chat.log.path / "events.jsonl"))[-1]["event"]
         assert event == {"type": "validation", "source": "manual", **result}
 
 

@@ -59,8 +59,7 @@ class RepairTools:
         self.log.record({"type": "repair_tool", "toolCallId": tool_call_id or f"host-{self.sequence}",
                          "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
-        self.log.save_json(filename, result)
-        return str(self.log.path / filename)
+        return self.log.tool_result(filename, result)
 
     def add_component(self, filename, logical_name, source):
         """创建普通 Component 并登记；角色由实际源码决定。"""
@@ -180,6 +179,7 @@ class RepairTools:
             raise ValueError("Asset image must be PNG")
         filename = f"tool-{self.sequence}-image-{index}.png"
         (self.log.path / filename).write_bytes(content)
+        self.log.store.register_image(self.log.path / filename)
         result = self.text({**metadata, "width": image.shape[1], "height": image.shape[0],
                             "evidence_path": str(self.log.path / filename)})
         result["content"].append({"type": "image", "mimeType": "image/png",
@@ -244,6 +244,7 @@ class RepairTools:
         self.checkpoint()
         path = self.log.path / f"tool-{self.sequence}-screenshot.png"
         metadata = session.save(path)
+        self.log.store.register_image(path)
         return session, metadata, path
 
     def game_screenshot(self):

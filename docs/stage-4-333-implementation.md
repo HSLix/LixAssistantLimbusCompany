@@ -1,6 +1,6 @@
 # #333 双语组件与语言重载实施记录
 
-2026-10-28：开发者确认 [grill 决策](stage-4-333-decisions.md)及[影响评审](stage-4-333-design-impact-review.md)后授权实施，现已完成本地实现及下列验证。尚未提交 Git，#333 保持 OPEN，等待开发者验收确认后关闭；本记录不表示 #334 Windows 成品通过。
+2026-10-28：开发者确认 [grill 决策](stage-4-333-decisions.md)及[影响评审](stage-4-333-design-impact-review.md)后授权实施，现已完成本地实现及下列验证。尚未提交 Git，#333 已经开发者人工验收确认（“没看出明显问题”）并按明确指令关闭为 completed；本记录不表示 #334 Windows 成品通过。
 
 ## 使用与实现
 
@@ -37,4 +37,6 @@
 - 两语 Dashboard、General Settings、Developer 三页、exp/mirror/legacy 及窄设置窗口截图位于 `.generated/gui-language/`，已检查[对照图](../.generated/gui-language/overview.png)、英文 Developer 修订页和设置页。offscreen 沿用测试的 macOS 标题栏替身；英文示例名称使用简短的 EXP example / Mirror example，避免长名称挤占导航与任务行。截图不证明原生 Windows 缩放、字体或模态行为。
 - `git diff --check` 及改动 Python 文件语法检查通过。测试及预览全部使用临时配置，不修改用户已安装页面或凭据，未调用 pi、真实模型或真实游戏。
 
-剩余验收：开发者检查本地行为并确认 #333；#334 继续负责 Windows 成品、原生焦点/模态/缩放和 DPAPI 现场证据。真实公告、旧版声明核实及版本联网功能留在 Stage 6 之后。
+2026-10-28：开发者已人工验收，反馈“没看出明显问题”，明确要求关闭 #333；GitHub 已关闭为 completed，并附上实现、验证及未验收边界说明。
+
+剩余验收：#334 继续负责 Windows 成品、原生焦点/模态/缩放和 DPAPI 现场证据。真实公告、旧版声明核实及版本联网功能留在 Stage 6 之后。
