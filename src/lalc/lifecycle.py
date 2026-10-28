@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import signal
 import sys
 import threading
 from pathlib import Path
@@ -22,6 +23,19 @@ class ApplicationLifecycle:
         self.pending_details = ""
         self.shutdown: Callable[[], None] | None = None
         self.restart: Callable[[], None] | None = None
+        self._interrupt_requested = False
+
+    def request_interrupt(self, signum, frame) -> None:
+        """信号处理器只记录请求，避免打断 Qt 回调或在事件过滤器中创建弹窗。"""
+        self._interrupt_requested = True
+
+    def process_interrupt(self) -> None:
+        """由 GUI 主线程的定时回调统一报告终端中断，重复 Ctrl+C 不重入弹窗。"""
+        if self._interrupt_requested:
+            self._interrupt_requested = False
+            if not self.failed:
+                error = KeyboardInterrupt("终端 Ctrl+C 请求退出 / Interrupted by terminal Ctrl+C")
+                self.report_fatal(type(error), error, None)
 
     def report_fatal(self, error_type, error: BaseException, tb) -> None:
         """供主线程和后台线程的异常钩子共用，保留完整原始错误链。"""
@@ -68,6 +82,8 @@ def run_application(
     """在 GUI 导入前建立错误保护；GUI 结束后恢复钩子并结束同一进程。"""
 
     lifecycle = ApplicationLifecycle()
+    previous_sigint = signal.getsignal(signal.SIGINT)
+    signal.signal(signal.SIGINT, lifecycle.request_interrupt)
     previous_sys, previous_thread = sys.excepthook, threading.excepthook
     sys.excepthook = lifecycle.report_fatal
     threading.excepthook = lambda args: lifecycle.report_fatal(args.exc_type, args.exc_value, args.exc_traceback)
@@ -80,8 +96,9 @@ def run_application(
             from .gui import run_gui
             start = run_gui
         result = start(lifecycle)
+        lifecycle.process_interrupt()
 
-    except Exception as error:
+    except (Exception, KeyboardInterrupt) as error:
         lifecycle.report_fatal(type(error), error, error.__traceback__)
         result = 1
     finally:
@@ -97,6 +114,7 @@ def run_application(
                     lifecycle.present_fatal(lifecycle.pending_details)
             finally:
                 sys.excepthook, threading.excepthook = previous_sys, previous_thread
+                signal.signal(signal.SIGINT, previous_sigint)
 
     if not lifecycle.failed and lifecycle.restart is not None:
         try:

@@ -21,7 +21,7 @@ from test_input_control import FakeInput
 @pytest.mark.parametrize("case", ["recovered", "no_popup", "click_ineffective", "multiple_targets", "multiple_rules"])
 def test_recovery_example_uses_existing_executor_and_actions(tmp_path, case):
     candidate = tmp_path / "candidate"
-    shutil.copytree(Path(__file__).resolve().parents[1] / "example/recovery-rule", candidate)
+    shutil.copytree(Path(__file__).resolve().parents[1] / "example/workflow", candidate)
     path = candidate / "manifest.json"
     if case == "multiple_rules":
         manifest = json.loads(path.read_text())

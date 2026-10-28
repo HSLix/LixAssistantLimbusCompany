@@ -78,7 +78,7 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 
 `lalc data-dir` 查看数据根。图片在 assets/，裁剪来源在 asset-provenance/。Trace 的 asset_matched 记录优先条件、实际尝试模板、所选批次和最终检测结果；asset-usage.json 按逻辑名保存最近一次非空返回及来源，空结果不更新，不等待 Step 成功，也不影响搜索区域。普通截图不落盘，显式 `save=True` 才保存证据。
 
-[三层教学样例](../example/trusted-actions/README.md) 不附图片或素材映射文件，默认只截图和等待。Plan 从已发布 Manifest 加载不可变 Python 源码，按普通 Python 控制流调用 Task，共用 Run、会话和 Working Manifest；物理接管需明确 Resume，Stop 后释放持有输入并收尾。
+[三层教学样例](../example/workflow/README.md) 不附图片或素材映射文件，默认只截图和等待。Plan 从已发布 Manifest 加载不可变 Python 源码，按普通 Python 控制流调用 Task，共用 Run、会话和 Working Manifest；物理接管需明确 Resume，Stop 后释放持有输入并收尾。
 
 [ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 取代旧专属库。旧 Asset 布局、Candidate 素材库及已发布专属库废弃，清理后重新准备，不做迁移或兼容；Component、Manifest、Default 和运行历史保留。相同 Manifest 的素材结果可随文件更新而变化。
 
@@ -86,4 +86,6 @@ Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md
 
 ## 外置业务页面与共享 Agent 设置
 
-#332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/extensible-pages/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。
+Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打开扩展配置页面文件夹”会打开数据目录下的 `pages/`，目录不存在时先创建。添加、编辑或删除页面文件后，通过 General Settings 的整应用重载使其生效；此入口不授予内置 Agent 读取或编辑页面的权限。
+
+#332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/workflow/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。

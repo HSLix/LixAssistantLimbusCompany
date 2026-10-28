@@ -442,3 +442,68 @@ def test_shutdown_error_changes_normal_exit_to_fatal(tmp_path: Path, monkeypatch
         return 0
     assert run_application(start, data_root=tmp_path) == 1
     assert "OSError: application shutdown failed" in reports[0]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="真实 POSIX SIGINT；Windows 终端需手工验收")
+def test_ctrl_c_in_qt_event_filter_shows_one_dialog_and_exits(tmp_path, monkeypatch):
+    """真实 SIGINT 不打断事件过滤器；重复中断不重入，确认弹窗后失败退出。"""
+    import os
+    import signal
+    from PySide6.QtCore import QObject, QEvent, QTimer
+    from PySide6.QtWidgets import QApplication
+    import lalc.gui as gui
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(gui, "default_data_root", lambda: tmp_path)
+    monkeypatch.setattr("lalc.application.default_data_root", lambda: tmp_path)
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.forward", lambda *_: False)
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
+    previous = signal.getsignal(signal.SIGINT)
+    filtered, reports, windows, filters = [], [], [], []
+
+    class InterruptFilter(QObject):
+        def eventFilter(self, watched, event):
+            if event.type() == QEvent.Type.User:
+                os.kill(os.getpid(), signal.SIGINT)
+                filtered.append("returned normally")
+            return False
+
+    open_window = gui.GuiCoordinator.open_window
+    def open_and_interrupt(owner, developer=False):
+        window = open_window(owner, developer)
+        windows.append(window)
+        event_filter = InterruptFilter(window)
+        filters.append(event_filter)
+        window.installEventFilter(event_filter)
+        QTimer.singleShot(0, lambda: app.sendEvent(window, QEvent(QEvent.Type.User)))
+        return window
+    monkeypatch.setattr(gui.GuiCoordinator, "open_window", open_and_interrupt)
+    original_exec = gui.ErrorDialog.exec
+    def confirm(dialog):
+        reports.append(dialog.details.toPlainText())
+        QTimer.singleShot(0, lambda: os.kill(os.getpid(), signal.SIGINT))
+        QTimer.singleShot(150, dialog.accept)
+        return original_exec(dialog)
+    monkeypatch.setattr(gui.ErrorDialog, "exec", confirm)
+    timed_out = []
+    watchdog = QTimer()
+    watchdog.setSingleShot(True)
+    def timeout():
+        timed_out.append(True)
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, gui.ErrorDialog):
+                widget.reject()
+        app.exit(9)
+    watchdog.timeout.connect(timeout)
+    watchdog.start(3000)
+    try:
+        assert gui.run_gui() == 1
+    finally:
+        watchdog.stop()
+        for window in windows:
+            window.close()
+    assert not timed_out
+    assert filtered == ["returned normally"]
+    assert len(reports) == 1 and "KeyboardInterrupt" in reports[0]
+    assert signal.getsignal(signal.SIGINT) == previous
+    assert "KeyboardInterrupt" in (tmp_path / "logs/lalc.log").read_text()

@@ -24,7 +24,7 @@ Start with:
 - [Reconstruction plan](docs/reconstruction-plan.md)
 - [Stage 2 implementation slices](docs/stage-2-implementation-slices.md)
 - [Developer Workflow tutorial](docs/developer-workflow-tutorial.md)
-- [Three-level Workflow and all Trusted Actions sample](example/trusted-actions/README.md)
+- [Three-level Workflow and all Trusted Actions sample](example/workflow/README.md)
 - [Stage 3 Agent-assisted Component Repair](docs/stage-3-agent-assisted-component-repair.md)
 - [Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
 - [Architecture decisions](docs/adr/)

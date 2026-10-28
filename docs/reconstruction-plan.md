@@ -141,6 +141,8 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 ## Stage 4 — Extensible User GUI and Python Plan
 
+2026-10-28 User GUI P0 讨论：开发者确认本轮仅做布局/信息层级 P0 改进；建议稿 P1 中尚未实现的信息面板等新增内容移至 Stage 6 之后 TODO，已实现的动态循环列表、Manifest 选择、持久通知及外置页导航保留，P2 忽略。详见[逐项讨论记录](user-gui-p0-layout.md)。本轮 grill 与影响审查已完成并获用户授权实施，P0 已完成本地实现及普通回归（475 passed，53 skipped）；原 #333/#334 相关范围按[审查记录](user-gui-p0-impact-review.md)同步，不将此条解释为全部后续阶段延期。
+
 2026-10-27 #332 更新：外置业务页、共享 provider 设置、即时保存与整应用重载已完成本地实现及自动化验证，见[实施记录](stage-4-332-implementation.md)。#333–#334 及 Windows 打包现场验收仍待完成。
 
 状态（2026-10-27）：grill 及 design-impact-review 已完成并经开发者确认，设计接受；#331 已在本地实现，#332–#334 待实施，验证与限制见[实施记录](stage-4-331-implementation.md)。正式规格集中在 [Stage 4](stage-4-extensible-user-gui.md)，取代此前逐轮草案；架构边界见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)。
@@ -229,3 +231,13 @@ All three channels distribute the same Bundle. The client uses one version, full
 - autonomous Capability Expansion for unsupported goals;
 - Unattended Operation for Agent-generated candidate trials;
 - skill-maturity labels and broad autonomous general-computer control.
+
+## Stage 6 之后 TODO — User GUI 后续信息功能
+
+2026-10-28 按开发者在 User GUI P0 讨论中的明确要求记录；不作为当前 Stage 4 交付内容：
+
+- 获取并显示最新 GitHub Release 公告。
+- 核实并复用旧版软件声明，不编造声明正文。
+- 本地/远端版本比较与 Update (TODO) 入口；不因此承诺实现下载、安装或自动更新器。
+
+动态任务循环列表、Manifest 选择、持久执行通知和外置页导航已实现，继续保留，不列为待重新开发事项。P2 项不加入该 TODO。原 #333 的双语等未被本轮提案覆盖的内容保持原状态，具体票据依赖在本轮影响审查中处理。

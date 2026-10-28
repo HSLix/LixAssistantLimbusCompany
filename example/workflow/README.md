@@ -1,9 +1,9 @@
-# 三层 Workflow 与全部 Trusted Actions
+# exp、mirror：页面、Plan、三层 Workflow 与 Recovery Rule
 
 本样例展示当前正式格式及调用方式，不承担真实游戏业务验收。默认入口为：
 
 ```text
-tasks.example
+tasks.exp
   → subworkflows.observe
       → steps.capture → observe.capture_screen
   → steps.wait → control.wait
@@ -21,11 +21,15 @@ tasks.example
 uv run lalc validate
 uv run lalc publish
 uv run lalc set-default <publish输出的UUID>
-uv run lalc run tasks.example
+uv run lalc run tasks.exp
 uv run lalc run-plan
 ```
 
-`plan.py` 是正式源码，随本样例 Manifest 一起校验和发布；不能直接执行源码文件路径。它调用两次 tasks.example，保留每次结果。普通任务失败后可继续，CLI 对含失败的已完成 Plan 返回 1。
+`plan.py` 是正式源码，随本样例 Manifest 一起校验和发布；不能直接执行源码文件路径。它声明 `SUPPORTED_TASK_IDS = ["exp", "mirror"]`，读取对应页面的消息和 Dashboard 重复次数，分别调用 `tasks.exp`、`tasks.mirror`。普通任务失败后可继续，CLI 对含失败的已完成 Plan 返回 1。
+
+先安装 [exp、mirror 页面](../pages/README.md)，再在 GUI 选择发布的 Default Manifest，填写教学消息、勾选任务并设置次数，开始运行。每个 Task 都通过 `subworkflows.observe` → `steps.capture` 截图，再调用 `steps.wait`，最后返回含页面消息与观察证据的结果；每次 Task 调用均保留结果。运行中修改配置只影响下次执行。
+
+CLI 无页面配置快照时，直接 `run-plan` 的重复次数默认为 0；可用 `run tasks.exp` / `run tasks.mirror` 配合 `--inputs-file` 传入 `{"message":"教学消息"}`。也可独立运行下面的 Step，学习全部应用动作。
 
 后续命令使用 Default Manifest，省略 `--manifest`。每次重新发布并希望使用新版本时，再执行一次 `set-default`；临时运行其他保留版本时才用 `--manifest <UUID>`。
 
@@ -66,3 +70,11 @@ crop-asset CLI 可现场裁剪并配置 tags；observe.crop_asset 也能传 tags
 ## Trusted Action 类型补全
 
 样例使用 `from lalc import RunContext` 和 `ctx: RunContext` 注解，在项目 Python 环境中提供 Action 名称、参数和返回类型补全。应用注册、Action 签名或 Context 公开接口变化后，在源码根目录运行 `uv run lalc generate-stubs` 并提交更新后的声明；详见[开发教程](../../docs/developer-workflow-tutorial.md#trusted-action-类型补全)。
+
+## 确定性恢复
+
+同一 Manifest 的 `steps.check_popup` 与 `recovery.close_popup` 演示外部弹窗打断 Step → 公共规则 detect → recover → 重试当前 Step。它们使用现有 `observe.capture_screen`、`observe.match_asset`、`control.click`，不注册新 Trusted Action。Trusted Actions 仍由应用统一注册，目录中的 Step 只是调用示例。
+
+先用裁剪工具为 `tutorial/recovery-popup` 保存可安全点击的关闭按钮模板，再显式运行 `lalc run steps.check_popup`。无弹窗时正常返回；匹配时 Step 失败，恢复规则重新观察，只在关闭目标唯一时点击。多目标、多条匹配规则、点击无效均停止并保留 Trace。该入口独立触发，不在 exp、mirror 默认演示中发送真实点击。
+
+这不是实际游戏业务的完成判定；默认示例不包含游戏素材，真实 Windows 游戏与打包验收需另行执行。

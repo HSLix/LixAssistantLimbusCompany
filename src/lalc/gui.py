@@ -6,7 +6,8 @@ import asyncio
 import subprocess
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer
+from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,10 +16,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox, QScrollArea,
+    QGraphicsOpacityEffect,
 )
 
 from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBar, InfoBarIcon, InfoBarPosition,
+    CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton,
+    TransparentToolButton, IconWidget, MessageBox,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox,
 )
@@ -36,13 +40,13 @@ class StateBridge(QObject):
 
 
 class ErrorDialog(QDialog):
-    """直接展示可选择、可复制的完整原始错误，不把 traceback 折叠隐藏。"""
+    """先展示错误摘要，完整脱敏详情由用户展开并可复制。"""
 
     def __init__(self, message: str, details: str, *, fatal: bool = False, parent=None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, not fatal)
         self.setWindowTitle("致命错误 / Fatal error" if fatal else "操作失败 / Operation failed")
-        self.resize(900, 600)
+        self.resize(600, 180)
         layout = QVBoxLayout(self)
         label = QLabel(message)
         label.setWordWrap(True)
@@ -52,6 +56,15 @@ class ErrorDialog(QDialog):
         self.details.setPlainText(details)
         self.details.setReadOnly(True)
         layout.addWidget(self.details)
+        self.details.hide()
+        self.details_button = QPushButton("展开错误详情")
+        self.details_button.setCheckable(True)
+        def toggle_details(expanded):
+            self.details.setVisible(expanded)
+            self.details_button.setText("收起错误详情" if expanded else "展开错误详情")
+            self.resize(760 if expanded else 600, 520 if expanded else 180)
+        self.details_button.toggled.connect(toggle_details)
+        layout.addWidget(self.details_button)
         copy = QPushButton("复制错误信息 / Copy error")
         copy.clicked.connect(lambda: QApplication.clipboard().setText(message + "\n\n" + details))
         layout.addWidget(copy)
@@ -270,16 +283,16 @@ class MainWindow(FluentWindow):
             from .agent_diagnostics import error_details, details_text
             from .agent_repair import RepairLog
             settings_page = getattr(self, "settings_page", None)
-            keys = {*self.host.secrets.values(), settings_page.key.text() if settings_page else None} - {None, ""}
+            keys = {*self.host.secrets.values(), settings_page.pending_key() if settings_page else None} - {None, ""}
             conversation = self.host.conversation
             if conversation:
                 keys.update(conversation.log.keys)
             page = self.pages.currentWidget() if hasattr(self, "pages") else None
-            if page is getattr(self, "settings_view", None):
+            if page is getattr(self, "settings_view", None) or page is getattr(self, "general_settings", None):
                 page = self.settings_page
             panel = getattr(page, "diagnostics", None)
             log = conversation.log if page is not None and page is getattr(self, "repair_page", None) and conversation else None
-            if panel and log is None:
+            if (panel or page is settings_page) and log is None:
                 log = RepairLog(self.service.data_root, category="agent-diagnostics")
                 log.keys.update(keys)
             context = {"log_path": str(log.path)} if log else {}
@@ -383,14 +396,21 @@ class UserWindow(MainWindow):
         dashboard = QWidget()
         dashboard.setObjectName("dashboard")
         dash = QHBoxLayout(dashboard)
-        left = QVBoxLayout()
-        dash.addLayout(left, 1)
+        execution = CardWidget()
+        left = QVBoxLayout(execution)
+        left.setContentsMargins(20, 20, 20, 20)
+        left.setSpacing(12)
+        dash.addWidget(execution, 1)
+        left.addWidget(TitleLabel("Execution"))
+        left.addWidget(QLabel("Manifest"))
+        manifest_row = QHBoxLayout()
         self.manifest_label = QLabel()
-        self.manifest_label.setWordWrap(True)
-        left.addWidget(self.manifest_label)
-        self.manifest_button = QPushButton("选择 Default Manifest")
+        self.manifest_label.setMinimumWidth(0)
+        manifest_row.addWidget(self.manifest_label, 1)
+        self.manifest_button = QPushButton("选择 Manifest")
         self.manifest_button.clicked.connect(self.choose_manifest)
-        left.addWidget(self.manifest_button)
+        manifest_row.addWidget(self.manifest_button)
+        left.addLayout(manifest_row)
         from .user_pages import UserSettings, discover_pages
         if coordinator.page_state is None:
             store = UserSettings(service.data_root)
@@ -401,71 +421,120 @@ class UserWindow(MainWindow):
         self.current_manifest_id = None
         self.current_supported = ()
         self.task_rows = {}
-        self.warning_button = QPushButton("ⓘ")
-        self.warning_button.setAccessibleName("任务告警")
+        self.warning_button = TransparentToolButton(FluentIcon.INFO)
+        self.warning_button.setIconSize(QSize(16, 16))
+        self.warning_button.setFixedSize(28, 28)
+        warning_opacity = QGraphicsOpacityEffect(self.warning_button)
+        warning_opacity.setOpacity(0.7)
+        self.warning_button.setGraphicsEffect(warning_opacity)
+        self.warning_button.setAccessibleName("任务与页面提示")
         self.warning_button.clicked.connect(self.show_warnings)
         self.warning_button.hide()
-        left.insertWidget(0, self.warning_button)
-        self.warning_timer = QTimer(self)
-        self.warning_timer.setInterval(550)
-        self.warning_timer.timeout.connect(self.pulse_warning)
-        self.warning_bright = False
+        task_heading = QHBoxLayout()
+        task_heading.addWidget(SubtitleLabel("Task Repetitions"), 1)
+        task_heading.addWidget(self.warning_button)
+        left.addLayout(task_heading)
+        self.task_warning = QLabel()
+        self.task_warning.setWordWrap(True)
+        self.task_warning.setTextFormat(Qt.TextFormat.PlainText)
+        self.task_warning.hide()
+        left.addWidget(self.task_warning)
         if self.warning_history:
             self.add_warning(self.warning_history[0])
         self.task_scroll = QScrollArea()
         self.task_scroll.setWidgetResizable(True)
         self.task_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
         self.task_list = QWidget()
+        self.task_list.setObjectName("task-list")
         self.task_layout = QVBoxLayout(self.task_list)
         self.task_scroll.setWidget(self.task_list)
-        left.insertWidget(1, self.task_scroll)
-        self.agent_status = QLabel()
-        self.agent_status.setWordWrap(True)
+        self.task_scroll.setStyleSheet("QScrollArea {border: none; background: transparent;} QWidget#task-list {background: transparent;}")
+        left.addWidget(self.task_scroll, 1)
+        self.agent_status = QPushButton()
+        self.agent_status.clicked.connect(self.show_agent_settings)
         left.addWidget(self.agent_status)
-        agent_settings = QPushButton("Agent 设置")
-        agent_settings.clicked.connect(lambda: self.switchTo(self.general_settings))
-        left.addWidget(agent_settings)
-        self.start_button = QPushButton("开始运行")
+        self.start_hint = QLabel()
+        self.start_hint.setWordWrap(True)
+        left.addWidget(self.start_hint)
+        self.start_button = PrimaryPushButton("Start Plan")
         self.start_button.clicked.connect(lambda: self._interact(self.start_plan))
         left.addWidget(self.start_button)
         self.status = QLabel()
-        self.status.setWordWrap(True)
         left.addWidget(self.status)
         self.notifications = NotificationList()
         left.addWidget(self.notifications)
-        left.addStretch()
-        information = QLabel("")
-        information.setWordWrap(True)
-        information.setAlignment(Qt.AlignmentFlag.AlignTop)
-        dash.addWidget(information, 1)
+        information = QVBoxLayout()
+        information.setSpacing(12)
+        for title, message in (("Announcements", "公告尚未接入"), ("Disclaimer", "软件声明尚未接入"),
+                               ("Version & Update", "版本信息与更新尚未接入")):
+            card = CardWidget()
+            content = QVBoxLayout(card)
+            content.setContentsMargins(20, 20, 20, 20)
+            content.addWidget(SubtitleLabel(title))
+            label = QLabel(message)
+            label.setWordWrap(True)
+            content.addWidget(label)
+            if title == "Version & Update":
+                self.update_button = QPushButton("Update")
+                self.update_button.setEnabled(False)
+                content.addWidget(self.update_button)
+            information.addWidget(card)
+        information.addStretch()
+        dash.addLayout(information, 1)
         self.addSubInterface(dashboard, FluentIcon.HOME, "Dashboard")
         settings = QWidget()
+        settings.setObjectName("general-settings-content")
         options = QVBoxLayout(settings)
-        developer = QPushButton("打开 Developer GUI")
-        developer.clicked.connect(lambda: self._interact(self.open_developer))
-        options.addWidget(developer)
-        options.addWidget(QLabel("Developer 用于观察、Candidate 开发与发布后试运行。"))
-        options.addWidget(QLabel("运行时自动修复当前不可用。"))
+        options.setContentsMargins(20, 20, 20, 20)
+        options.setSpacing(16)
+        options.addWidget(TitleLabel("General Settings"))
         from .developer_gui import SettingsPage
         from .agent_settings import settings_document
-        self.agent_controls = QWidget()
+        self.agent_controls = CardWidget()
         agent_layout = QVBoxLayout(self.agent_controls)
-        self.user_enabled = QCheckBox("启用 User Agent（运行时修复尚未接入）")
+        agent_layout.setContentsMargins(16, 16, 16, 16)
+        heading = QHBoxLayout()
+        heading.addWidget(SubtitleLabel("User Agent"), 1)
+        self.user_enabled = QCheckBox("启用 User Agent")
         self.user_enabled.setChecked(settings_document(service.data_root)["user_enabled"])
         self.user_enabled.toggled.connect(lambda _: self._interact(self.save_user_enabled))
-        agent_layout.addWidget(self.user_enabled)
+        heading.addWidget(self.user_enabled)
+        agent_layout.addLayout(heading)
+        self.agent_summary = QLabel()
+        agent_layout.addWidget(self.agent_summary)
+        agent_layout.addWidget(QLabel("运行时自动修复尚未实现。"))
         self.settings_page = SettingsPage(self, side="user")
         agent_layout.addWidget(self.settings_page)
         options.addWidget(self.agent_controls)
         self.edit_owner_notice = QLabel()
         options.addWidget(self.edit_owner_notice)
+        tools = CardWidget()
+        tools_layout = QVBoxLayout(tools)
+        tools_layout.setContentsMargins(16, 16, 16, 16)
+        tools_layout.addWidget(SubtitleLabel("Developer Tools"))
+        tools_layout.addWidget(QLabel("用于观察、Candidate 开发与发布后试运行。"))
+        developer = QPushButton("打开 Developer GUI")
+        developer.clicked.connect(lambda: self._interact(self.open_developer))
+        tools_layout.addWidget(developer)
+        options.addWidget(tools)
+        application = CardWidget()
+        application_layout = QVBoxLayout(application)
+        application_layout.setContentsMargins(16, 16, 16, 16)
+        application_layout.addWidget(SubtitleLabel("应用"))
         self.reload_button = QPushButton("保存并重新加载整个应用")
         self.reload_button.clicked.connect(lambda: self._interact(self.coordinator.request_reload))
-        options.addWidget(self.reload_button)
+        application_layout.addWidget(self.reload_button)
+        for title, path in (("打开应用日志目录", service.data_root / "logs"),
+                            ("打开 Agent 检查日志目录", service.data_root / "agent-diagnostics")):
+            entry = QPushButton(title)
+            entry.clicked.connect(lambda _, path=path: self.open_directory(path))
+            application_layout.addWidget(entry)
+        options.addWidget(application)
         options.addStretch()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(settings)
+        scroll.setStyleSheet("QScrollArea {border: none; background: transparent;} QWidget#general-settings-content {background: transparent;}")
         scroll.setObjectName("general-settings")
         self.general_settings = scroll
         self.addSubInterface(scroll, FluentIcon.SETTING, "General Settings")
@@ -476,6 +545,16 @@ class UserWindow(MainWindow):
             self.add_warning(error)
             self.notifications.notify("外置页面加载失败", self.clean_details(error))
         self.render_state(service.state)
+
+    def show_agent_settings(self):
+        """从首页进入设置并定位到 Agent 卡片。"""
+        self.switchTo(self.general_settings)
+        QTimer.singleShot(0, lambda: self.general_settings.ensureWidgetVisible(self.agent_controls, 0, 12))
+
+    def open_directory(self, path):
+        """日志入口沿用现有目录打开与统一错误处理。"""
+        from .developer_gui import open_directory
+        open_directory(self, path)
 
     def open_developer(self):
         QMessageBox.information(self, "Developer GUI", "此界面供开发者观察、编辑 Candidate 和试运行。")
@@ -516,32 +595,27 @@ class UserWindow(MainWindow):
         keys = set(self.host.secrets.values())
         if self.host.conversation:
             keys.update(self.host.conversation.log.keys)
-        if hasattr(self, "settings_page") and self.settings_page.key.text():
-            keys.add(self.settings_page.key.text())
+        if hasattr(self, "settings_page") and self.settings_page.pending_key():
+            keys.add(self.settings_page.pending_key())
         return redact(text, keys)
 
     def add_warning(self, message):
         message = self.clean_details(message)
         if message not in self.warning_history:
             self.warning_history.append(message)
-        self.warning_button.setText("!")
         self.warning_button.show()
-        self.warning_timer.start()
-
-    def pulse_warning(self):
-        self.warning_bright = not self.warning_bright
-        size = 32 if self.warning_bright else 28
-        self.warning_button.setFixedSize(size, size)
-        self.warning_button.setStyleSheet(
-            f"QPushButton {{border: 2px solid #bd7100; border-radius: {size // 2}px; font-weight: bold;"
-            + ("background: #ffe0a0;}" if self.warning_bright else "background: transparent;}"))
 
     def show_warnings(self):
-        QMessageBox.warning(self, "任务与页面告警", "\n\n".join(self.warning_history))
+        title = "任务与页面提示" if self.task_warning.text() else "历史提示（当前无配置异常）"
+        dialog = MessageBox(title, "\n\n".join(self.warning_history), self)
+        dialog.cancelButton.hide()
+        dialog.yesButton.setText("关闭")
+        dialog.open()
 
     def refresh_tasks(self):
-        """使用当前 Default 的已验证声明构建匹配行，历史告警仅重启清除。"""
+        """任务匹配保持原规则；空状态中性展示，实际异常与历史提示分开。"""
         from .user_pages import task_inputs
+        issues = [self.clean_details(error) for error in self.page_errors]
         self.current_manifest_id = self.host.manager.default_manifest_id()
         self.current_supported = ()
         if self.current_manifest_id:
@@ -552,9 +626,18 @@ class UserWindow(MainWindow):
             else:
                 for error in result.errors:
                     self.add_warning(error.message)
+                    issues.append(self.clean_details(error.message))
+                if getattr(self, "_failed_manifest", None) != self.current_manifest_id:
+                    self._failed_manifest = self.current_manifest_id
+                    message = "Manifest 加载失败"
+                    details = self.clean_details("\n".join(error.message for error in result.errors))
+                    ErrorDialog(message, details, parent=self).open()
+            if result.ok:
+                self._failed_manifest = None
         while self.task_layout.count():
             item = self.task_layout.takeAt(0)
             if item.widget():
+                item.widget().hide()
                 item.widget().deleteLater()
         self.task_rows = {}
         for page in self.business_pages:
@@ -576,25 +659,51 @@ class UserWindow(MainWindow):
             enabled.toggled.connect(lambda _, identity=page.task_id: self._interact(lambda: self.save_task(identity)))
             count.editingFinished.connect(lambda identity=page.task_id: self._interact(lambda: self.save_task(identity)))
             self.task_layout.addWidget(row)
+        if not self.task_rows and (not self.current_manifest_id or result.ok):
+            empty_state = QWidget()
+            empty_layout = QHBoxLayout(empty_state)
+            empty_layout.setSpacing(8)
+            icon = IconWidget(FluentIcon.INFO.icon(color=QColor("#808080")))
+            icon.setFixedSize(16, 16)
+            empty_layout.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
+            empty = QLabel("请先选择 Manifest。" if not self.current_manifest_id else
+                           "当前 Manifest 与已加载的配置页没有匹配任务。")
+            empty.setWordWrap(True)
+            empty_layout.addWidget(empty, 1)
+            self.task_layout.addWidget(empty_state)
         self.task_layout.addStretch()
         _, _, warnings = task_inputs(self.business_pages, self.current_supported, self.page_store)
-        for warning in warnings:
-            self.add_warning(warning)
+        # 未选 Manifest 或未声明循环任务是空状态，不改变底层 warning/次数契约。
+        if self.current_manifest_id and self.current_supported:
+            issues.extend(self.clean_details(warning) for warning in warnings)
+        for issue in issues:
+            self.add_warning(issue)
+        self.task_warning.setText("\n".join(dict.fromkeys(issues)))
+        self.task_warning.setVisible(bool(issues))
+        self.warning_button.setIcon(InfoBarIcon.WARNING if issues else
+                                    FluentIcon.INFO.icon(color=QColor("#808080")))
+        self.warning_button.setToolTip(self.task_warning.text() if issues else "查看历史提示（当前无配置异常）")
+        self.warning_button.setVisible(bool(issues or self.warning_history))
 
     def save_task(self, identity):
         enabled, count = self.task_rows[identity]
         self.page_store.save_task(identity, enabled.isChecked(), count.value())
 
     def save_user_enabled(self):
-        from .agent_settings import load_settings, save_selection
-        provider = load_settings(self.service.data_root, side="user")["provider"]
+        from .agent_settings import settings_document, save_selection
+        provider = settings_document(self.service.data_root)["user_provider"]
         save_selection(self.service.data_root, "user", provider, enabled=self.user_enabled.isChecked())
         self.coordinator.refresh_agent()
 
     def start_plan(self):
         """提交配置后固定 Manifest 和调度输入，不回读运行中的 GUI。"""
         from .user_pages import task_inputs
-        self.settings_page.submit()
+        from .agent_settings import settings_document, load_settings, configuration_complete
+        if settings_document(self.service.data_root)["user_enabled"]:
+            self.settings_page.submit()
+            value = load_settings(self.service.data_root, side="user", for_use=False)
+            if not configuration_complete(value, temporary_keys=self.host.secrets):
+                raise ValueError("请补全 Agent 配置或关闭 User Agent")
         for identity in self.task_rows:
             self.save_task(identity)
         self.submit_pages()
@@ -616,9 +725,19 @@ class UserWindow(MainWindow):
             self.settings_page.render(busy)
         if hasattr(self, "reload_button"):
             self.reload_button.setEnabled(not busy and not self.jobs and not self.coordinator.reloading)
-        self.manifest_label.setText("Default Manifest：" + (state["default_manifest_id"] or "未选择"))
-        self.start_button.setEnabled(not busy)
-        self.start_button.setToolTip("当前活动尚未结束" if busy else "执行 Default 的唯一 Python Plan")
+        identity = state["default_manifest_id"]
+        self.manifest_label.setText("Default · " + identity[:8] + "…" if identity else "未选择")
+        self.manifest_label.setToolTip(identity or "未选择 Manifest")
+        from .agent_settings import settings_document, load_settings, configuration_complete
+        enabled = settings_document(self.service.data_root)["user_enabled"]
+        complete = configuration_complete(load_settings(self.service.data_root, side="user", for_use=False),
+                                          temporary_keys=self.host.secrets)
+        ready = not enabled or complete
+        self.start_hint.setText("" if ready else "请补全 Agent 配置或关闭 User Agent")
+        self.start_hint.setVisible(not ready)
+        self.start_button.setEnabled(not busy and ready)
+        self.start_button.setToolTip("当前活动尚未结束" if busy else
+                                    "执行 Default 的唯一 Python Plan" if ready else self.start_hint.text())
         self.status.setText("运行已暂停" if state["paused"] else "运行中" if state["phase"] == "running" else "空闲")
         if self.owns_run and state["phase"] == "running":
             if self.trial_dialog is None:
@@ -679,13 +798,19 @@ class GuiCoordinator:
         document = settings_document(self.service.data_root)
         owned = self.developer is not None
         self.user.agent_controls.setEnabled(not owned)
-        self.user.edit_owner_notice.setText("Developer 已打开；User Agent 设置暂不可编辑。" if owned else "")
+        self.user.edit_owner_notice.setText("请在 Developer GUI 中修改" if owned else "")
+        self.user.edit_owner_notice.setVisible(owned)
         self.user.user_enabled.blockSignals(True)
         self.user.user_enabled.setChecked(document["user_enabled"])
         self.user.user_enabled.blockSignals(False)
-        self.user.agent_status.setText(
-            f"User Agent：{document['user_provider']} / " +
-            ("已启用" if document["user_enabled"] else "未启用") + "；运行时修复尚未接入。")
+        self.user.settings_page.setVisible(document["user_enabled"])
+        from .agent_settings import load_settings, configuration_complete
+        complete = configuration_complete(load_settings(self.service.data_root, side="user", for_use=False),
+                                          temporary_keys=self.host.secrets)
+        status = ("已启用" if document["user_enabled"] else "未启用") + " · " + ("已配置" if complete else "待配置")
+        self.user.agent_status.setText(f"User Agent：{document['user_provider']} · {status}")
+        self.user.agent_summary.setText(status)
+        self.user.render_state(self.service.state)
 
     def request_reload(self):
         """先保存并封闭所有入口，最终清理成功后才允许启动新进程。"""
@@ -790,6 +915,14 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
         finally:
             instance.close()
     lifecycle.shutdown = shutdown
-    for name in restore or (("developer" if developer else "user"),):
-        coordinator.open_window(name == "developer")
-    return app.exec()
+    interrupt_timer = QTimer(app)
+    interrupt_timer.setInterval(100)
+    interrupt_timer.timeout.connect(lifecycle.process_interrupt)
+    interrupt_timer.start()
+    try:
+        for name in restore or (("developer" if developer else "user"),):
+            coordinator.open_window(name == "developer")
+        return app.exec()
+    finally:
+        interrupt_timer.stop()
+        interrupt_timer.deleteLater()

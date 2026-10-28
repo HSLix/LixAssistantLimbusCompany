@@ -440,6 +440,8 @@ Otherwise unhandled errors reaching the outer application boundary are fatal. Ma
 
 The lifecycle owner covers GUI import, Qt initialization, callbacks, background-thread error reporting, and shutdown in the same process. Closing the GUI requests cooperative cancellation and waits for its worker's input release and completion. A shutdown failure still changes the application exit status to failure. If a fatal error occurs before a window exists, the owner creates the report when possible or writes the bilingual message and complete traceback to stderr.
 
+Terminal Ctrl+C is handled by the lifecycle owner: its SIGINT handler only records the request. A GUI-thread timer presents one KeyboardInterrupt report outside Qt event filters; acknowledging the dialog exits with failure and performs normal shutdown. Repeated Ctrl+C does not reenter the dialog. The previous SIGINT handler is restored on exit. POSIX regression sends a real signal from an event filter and again while the report is open; Windows console delivery remains a native acceptance check.
+
 Error payloads use failure_message and traceback, without exception_type or exception_message. The complete traceback includes original type and cause/context evidence. Manifest validation continues to use its code/message fields with optional traceback.
 
 Fatal Plan completion preserves status interrupted, reason, items, and previous_result containing the unmodified original Plan result; fatal_errors retains shutdown or other fatal diagnostics. A direct Run instead uses its ordinary failure status and failure_code. A later persistence error may add its own reason and diagnostics without discarding either the original result or task list.
@@ -456,7 +458,7 @@ Manifest loading and Working Manifest switching do not access Assets. Each match
 
 Developer crop and tag-asset replace the complete tag list for the image hash in asset-tag.json, preserving input order and duplicates; omitted or empty tags clear the old list. New hashes coexist rather than replacing a same-language slot. Tags are ordinary optional descriptions; no input prompt selects or overwrites an image. Full-hash paths never overwrite different bytes. Future Agent permission remains limited to creation, without overwrite of existing images.
 
-Every formal Run connects and focuses the Target Window and starts physical input monitoring before Component execution, including observation-only and calculation-only Runs. One Automation Plan shares a session and monitor. Cleanup stops monitoring and releases owned input. Calculation-only tests use platform doubles. Diagnostic `connect` remains separate and creates no Run. Old examples were removed; regression behavior is retained in test-owned fixtures. ADR 0026 permits the new schema-2 teaching sample under `example/trusted-actions/` and removes the real mailbox completion gate.
+Every formal Run connects and focuses the Target Window and starts physical input monitoring before Component execution, including observation-only and calculation-only Runs. One Automation Plan shares a session and monitor. Cleanup stops monitoring and releases owned input. Calculation-only tests use platform doubles. Diagnostic `connect` remains separate and creates no Run. Old examples were removed; regression behavior is retained in test-owned fixtures. ADR 0026 permits the new schema-2 teaching sample under `example/workflow/` and removes the real mailbox completion gate.
 
 
 ## Revised Stage 2 acceptance and crop/tag configuration

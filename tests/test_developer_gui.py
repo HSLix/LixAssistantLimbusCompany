@@ -532,3 +532,24 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     wait_jobs(app, window)
     page.reload()
     assert page.thinking.isChecked() and page.effort.currentData() == 'max'
+
+
+@pytest.mark.parametrize("can_open", [True, False])
+def test_repair_opens_external_pages_folder_next_to_workspace(gui, monkeypatch, can_open):
+    from PySide6.QtGui import QDesktopServices
+    from lalc.gui import ErrorDialog
+    _, window = gui
+    page = window.repair_page
+    directory = window.service.data_root / "pages"
+    assert not directory.exists()
+    row = next(page.layout().itemAt(i).layout() for i in range(page.layout().count())
+               if page.layout().itemAt(i).layout() and
+               page.layout().itemAt(i).layout().indexOf(page.workspace_button) >= 0)
+    assert row.indexOf(page.pages_button) == row.indexOf(page.workspace_button) + 1
+    opened, errors = [], []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or can_open)
+    monkeypatch.setattr(ErrorDialog, "open", lambda dialog: errors.append(dialog.details.toPlainText()))
+    page.pages_button.click()
+    assert directory.is_dir()
+    assert opened == [str(directory.absolute())]
+    assert bool(errors) != can_open

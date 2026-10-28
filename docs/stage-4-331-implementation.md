@@ -43,7 +43,7 @@ Plan→Task 返回成功 status/output 或失败 status/原始 failure_code/fail
 
 Developer Agent 可以编辑已有 Candidate Plan；初始化提供 Plan，不增加 Agent 创建 Plan 的权限。修改后须 Validate/Publish，`trial_run(manifest_id, inputs=...)` 省略 logical_name 时执行该保存版本的唯一 Plan。显式 logical_name 仍支持直接 Component 试运行；不接受 plan_path，不执行可变 Candidate 文件，也不修改 Default。宿主、pi 工具、提示词与快照共同执行边界。
 
-可运行教学样例为 `example/trusted-actions/`，按其 README 将完整样例准备为 Candidate、发布并选择 Default 后运行；默认只观察和等待，但正式执行仍要求唯一可用 Windows 游戏窗口。不能把示例成功当作真实游戏业务验收。
+可运行教学样例为 `example/workflow/`，按其 README 将完整样例准备为 Candidate、发布并选择 Default 后运行；默认只观察和等待，但正式执行仍要求唯一可用 Windows 游戏窗口。不能把示例成功当作真实游戏业务验收。
 
 ## 旧数据
 

@@ -52,7 +52,7 @@
 | Agent 闭环 | developer.py: editable_files、initialize、add_source；agent_repair.py: SYSTEM 规则及轮次快照；repair_tools.py: trial_run；pi_probe.ts: 编辑边界和 trial_run 参数 | 当前工具仍读取 Candidate 内 JSON plan_path；改为已发布 Manifest 的唯一 Python Plan，Python/TypeScript 参数、提示词、权限及日志同步迁移。保留同一 Agent 活动内 trial 例外，不引入可变 Candidate 执行或外置页面写权限。 |
 | 窗口与执行所有权 | gui.py: MainWindow.__init__、closeEvent、shutdown、render_state、run_gui；developer_gui.py: TrialDialog；application.py: activity、start、start_plan | 当前 MainWindow 自建 DeveloperHost、全局 busy 禁用页面，shutdown 停止共享服务；需单一应用持有服务/宿主，记录活动所属窗口，空闲窗口关闭不影响另一侧，最后窗口才退出。复用窗口模态试运行，分开普通配置和冲突操作。 |
 | CLI 与跨进程入口 | __main__.py: _parser、_run、main；application.py: activity；packaging_entry.py | 当前 CLI 每次创建独立服务，互斥只在服务实例内；需 GUI 唤起转交与实际游戏活动跨进程排他。移除 run-plan 任意 JSON 路径，并同步退出码及调用方。打包入口需能识别 User/Developer 请求。 |
-| 测试与样例 | tests/test_plan.py、test_cli.py、test_manifest.py、test_manifest_transition.py、test_developer_gui.py、test_agent_repair.py、test_agent_repair_agent.py；example/trusted-actions、tests/fixtures | 当前 test_plan 明确断言含失败的 completed 返回 CLI 0；test_cli 断言初始化 components 为空，GUI 断言固定四页，Agent 测试锁定 plan.json 只读。应迁移断言并保留原安全回归，不能只删除旧测试。同步所有需发布的完整 Manifest 夹具及教学样例。 |
+| 测试与样例 | tests/test_plan.py、test_cli.py、test_manifest.py、test_manifest_transition.py、test_developer_gui.py、test_agent_repair.py、test_agent_repair_agent.py；example/workflow、tests/fixtures | 当前 test_plan 明确断言含失败的 completed 返回 CLI 0；test_cli 断言初始化 components 为空，GUI 断言固定四页，Agent 测试锁定 plan.json 只读。应迁移断言并保留原安全回归，不能只删除旧测试。同步所有需发布的完整 Manifest 夹具及教学样例。 |
 
 以上为接受目标相对现实现的迁移差距，不作为已发生的回归缺陷。
 

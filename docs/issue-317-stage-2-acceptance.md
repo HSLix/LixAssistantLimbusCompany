@@ -1,6 +1,6 @@
 # Stage 2 收尾与 #317 延期说明
 
-更新：2026-10-22。本文替代原邮箱验收指导；原“邮箱通过才结束 Stage 2”的规则已由开发者明确修订，见 [ADR 0026](../docs/adr/0026-close-stage-2-without-a-real-game-workflow.md)。
+更新：2026-10-22。本文替代原邮箱验收指导；原“邮箱通过才结束 Stage 2”的规则已由开发者明确修订，见 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md)。
 
 ## 已确认的阶段边界
 
@@ -8,11 +8,11 @@ Stage 2 按确定性执行与基础交互能力完成，不再以邮箱业务端
 
 新入口：
 
-- [可运行的三层 Workflow 与全部 Trusted Actions](trusted-actions/README.md)
-- [开发者命令及 Candidate 工作台](../docs/developer-workflow-tutorial.md)
-- [Stage 2 实施切片与修订后完成规则](../docs/stage-2-implementation-slices.md)
+- [可运行的三层 Workflow 与全部 Trusted Actions](../example/workflow/README.md)
+- [开发者命令及 Candidate 工作台](developer-workflow-tutorial.md)
+- [Stage 2 实施切片与修订后完成规则](stage-2-implementation-slices.md)
 
-[ADR 0027](../docs/adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 已取代旧专属 Asset Library：Candidate 和发布物不再需要素材映射文件。完整逻辑名对应目录，图片仅以完整哈希命名，asset-tag.json 保存可选标签；缺标签的图片也参与匹配。旧素材数据废弃，清理后重新裁剪，不做迁移或兼容。
+[ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 已取代旧专属 Asset Library：Candidate 和发布物不再需要素材映射文件。完整逻辑名对应目录，图片仅以完整哈希命名，asset-tag.json 保存可选标签；缺标签的图片也参与匹配。旧素材数据废弃，清理后重新裁剪，不做迁移或兼容。
 
 crop/tag-asset 只处理共享目录内的图片、标签与来源，无需 publish 或重新 set-default。标签列表整体覆盖，省略或传空列表时写 []、清空旧标签。每次匹配按优先组→剩余组读取当前目录，素材更新在同一 Run 的下一次匹配生效。
 

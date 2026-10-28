@@ -36,7 +36,7 @@ def main():
         root = Path(directory)
         shutil.copytree(project / "example/pages", root / "pages")
         manager = ManifestManager(root)
-        saved = manager.publish(project / "example/extensible-pages/manifest.json")
+        saved = manager.publish(project / "example/workflow/manifest.json")
         assert saved.ok, saved.errors
         assert manager.set_default(saved.loaded.manifest_id).ok
         owner = GuiCoordinator(ApplicationService(root, manifest_manager=manager), ApplicationLifecycle())

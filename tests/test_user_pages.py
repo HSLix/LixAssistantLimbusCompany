@@ -17,8 +17,8 @@ from lalc.lifecycle import ApplicationLifecycle
 from lalc.manifest import ManifestManager, plan_task_ids
 from lalc.user_pages import UserSettings, discover_pages, task_inputs
 
-EXAMPLE = Path(__file__).resolve().parents[1] / "example/extensible-pages"
-PAGES = EXAMPLE.parent / "pages"
+EXAMPLE = Path(__file__).resolve().parent / "fixtures/user-pages"
+PAGES = EXAMPLE / "pages"
 
 
 @pytest.fixture
@@ -158,13 +158,17 @@ def test_single_editor_handoff_autosaves_and_restores_independent_selection(owne
     assert load_settings(owner.service.data_root, side="user")["provider"] == "deepseek"
 
 
-def test_failed_handoff_preserves_user_editor_and_does_not_open_developer(owner):
+def test_invalid_text_is_saved_and_handed_off_for_later_correction(owner):
     user = owner.user
     user.settings_page.url.setText("invalid")
+    developer = owner.open_window(True)
+    assert developer.settings_page.url.text() == "invalid"
+    assert not user.agent_controls.isEnabled()
     with pytest.raises(ValueError):
-        owner.open_window(True)
-    assert owner.developer is None and user.agent_controls.isEnabled()
-    assert user.settings_page.dirty
+        load_settings(owner.service.data_root)
+    assert developer.close()
+    assert user.agent_controls.isEnabled()
+    assert user.settings_page.url.text() == "invalid"
 
 
 def test_settings_can_save_during_agent_activity(owner):

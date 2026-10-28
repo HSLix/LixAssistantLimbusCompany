@@ -391,6 +391,16 @@ class CapturePage(QWidget):
             control.setToolTip("运行、Agent 或其他操作尚未结束" if busy else "")
 
 
+def open_directory(window, path):
+    """打开本地目录，目录缺失或系统拒绝时统一报错。"""
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+    def operation():
+        if not path.is_dir() or not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.absolute()))):
+            raise ValueError(f"目录尚不存在或无法打开：{path}")
+    window._interact(operation)
+
+
 class DiagnosticPanel(QWidget):
     """保留本页错误详情与证据位置；关闭弹窗后仍可重开、复制和打开目录。"""
 
@@ -446,12 +456,7 @@ class DiagnosticPanel(QWidget):
         self.open_directory(self.path)
 
     def open_directory(self, path):
-        from PySide6.QtCore import QUrl
-        from PySide6.QtGui import QDesktopServices
-        def operation():
-            if not path.is_dir() or not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.absolute()))):
-                raise ValueError(f"日志目录尚不存在或无法打开：{path}")
-        self.window._interact(operation)
+        open_directory(self.window, path)
 
 
 class SettingsPage(QWidget):
@@ -474,12 +479,37 @@ class SettingsPage(QWidget):
         self.url, self.model = QLineEdit(), QLineEdit()
         self.limit = QSpinBox()
         self.limit.setRange(2, 2147483647)
-        self.key = QLineEdit()
-        self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setPlaceholderText("API Key：空输入保留已有值")
-        for label, control in (("Base URL", self.url), ("Model", self.model), ("每条消息模型请求上限", self.limit), ("API Key", self.key)):
+        self.key = None
+        if side == "developer":
+            self.key = QLineEdit()
+            self.key.setEchoMode(QLineEdit.EchoMode.Password)
+            self.key.setPlaceholderText("API Key：空输入保留已有值")
+        for label, control in (("Base URL", self.url), ("Model", self.model)):
             layout.addWidget(QLabel(label))
             layout.addWidget(control)
+        self.secret_state = QLabel()
+        if self.key is not None:
+            layout.addWidget(self.secret_state)
+            layout.addWidget(QLabel("API Key"))
+            layout.addWidget(self.key)
+            key_layout = layout
+        else:
+            key_layout = QHBoxLayout()
+            key_layout.addWidget(self.secret_state, 1)
+            self.key_button = button("设置 API KEY", self.set_api_key, key_layout)
+            layout.addLayout(key_layout)
+        self.clear_button = button("清除 API Key", lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
+        self.advanced = QWidget()
+        advanced = QVBoxLayout(self.advanced)
+        advanced.setContentsMargins(0, 0, 0, 0)
+        if side == "user":
+            self.advanced_button = QPushButton("Advanced Settings")
+            self.advanced_button.setCheckable(True)
+            self.advanced_button.toggled.connect(self.advanced.setVisible)
+            layout.addWidget(self.advanced_button)
+            self.advanced.hide()
+        advanced.addWidget(QLabel("每条消息模型请求上限"))
+        advanced.addWidget(self.limit)
         self.deepseek_options = QWidget()
         options = QVBoxLayout(self.deepseek_options)
         options.setContentsMargins(0, 0, 0, 0)
@@ -492,18 +522,16 @@ class SettingsPage(QWidget):
         options.addWidget(self.thinking)
         options.addWidget(QLabel("思考强度"))
         options.addWidget(self.effort)
-        layout.addWidget(self.deepseek_options)
+        advanced.addWidget(self.deepseek_options)
         self.thinking.toggled.connect(self.effort.setEnabled)
         self.thinking.toggled.connect(self.invalidate)
         self.effort.currentIndexChanged.connect(self.invalidate)
         self.deepseek_options.hide()
         self.output_limit = QComboBox()
         self.output_limit.addItem("使用服务端默认值", userData="server_default")
-        layout.addWidget(QLabel("单次输出上限"))
-        layout.addWidget(self.output_limit)
-        self.secret_state = QLabel()
-        layout.addWidget(self.secret_state)
-        self.clear_button = button("明确清除 API Key", lambda: self.window._interact(lambda: self.save(clear=True)), layout)
+        advanced.addWidget(QLabel("单次输出上限"))
+        advanced.addWidget(self.output_limit)
+        layout.addWidget(self.advanced)
         row = QHBoxLayout()
         self.connection_button = button("测试连接", lambda: self.check(False), row)
         self.model_button = button("检查模型加载状态", lambda: self.check(True), row)
@@ -512,23 +540,58 @@ class SettingsPage(QWidget):
         self.check_status.setWordWrap(True)
         self.check_status.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.check_status)
-        self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-diagnostics")
-        layout.addWidget(self.diagnostics)
+        if side == "developer":
+            self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-diagnostics")
+            layout.addWidget(self.diagnostics)
         self.notice = QLabel("Windows：凭据使用当前用户 DPAPI。其他平台：凭据仅在本次 GUI 内存中保留。")
         self.notice.setWordWrap(True)
         layout.addWidget(self.notice)
         layout.addStretch()
         for control in (self.url, self.model, self.key):
-            control.textChanged.connect(self.invalidate)
+            if control is not None:
+                control.textChanged.connect(self.invalidate)
         self.provider.currentIndexChanged.connect(self.switch_provider)
         self.limit.valueChanged.connect(self.invalidate)
         self.window._interact(self.reload)
         for control in (self.url, self.model, self.key):
-            control.editingFinished.connect(self.auto_save)
-        self.limit.editingFinished.connect(self.auto_save)
+            if control is not None:
+                control.editingFinished.connect(self.auto_save)
+        self.limit.valueChanged.connect(self.auto_save)
         for control in (self.effort, self.output_limit):
             control.currentIndexChanged.connect(self.auto_save)
         self.thinking.toggled.connect(self.auto_save)
+
+    def pending_key(self):
+        """仅提供当前输入用于检查和脱敏，不回读已有密钥。"""
+        return self.key.text() if self.key is not None else ""
+
+    def set_api_key(self):
+        """密钥只在输入弹窗存活期间保留，成功保存后关闭。"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("设置 API KEY")
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        layout = QVBoxLayout(dialog)
+        self.key = QLineEdit()
+        self.key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.key.setPlaceholderText("输入新的 API Key")
+        layout.addWidget(self.key)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
+        self.key.textChanged.connect(lambda text: buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(bool(text.strip())))
+        layout.addWidget(buttons)
+        def confirm():
+            def operation():
+                self.save(secret=self.pending_key())
+                dialog.accept()
+            self.window._interact(operation)
+        def finished():
+            self.key.clear()
+            self.key = None
+        buttons.accepted.connect(confirm)
+        buttons.rejected.connect(dialog.reject)
+        dialog.finished.connect(finished)
+        dialog.open()
 
     def invalidate(self, *_):
         if self.loading:
@@ -538,8 +601,8 @@ class SettingsPage(QWidget):
         self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
 
     def values(self):
-        value = {"provider": self.provider.currentData(), "base_url": self.url.text().strip(),
-                 "model": self.model.text().strip() or None, "max_requests": self.limit.value(),
+        value = {"provider": self.provider.currentData(), "base_url": self.url.text(),
+                 "model": self.model.text() or None, "max_requests": self.limit.value(),
                  "output_limit": self.output_limit.currentData()}
         if value["provider"] == "deepseek":
             value.update(thinking=self.thinking.isChecked(), reasoning_effort=self.effort.currentData())
@@ -551,6 +614,8 @@ class SettingsPage(QWidget):
 
     def submit(self):
         """交接/重载前提交尚未失焦的输入；禁用表单不回写旧配置。"""
+        if self.side == "user" and self.key is not None:
+            raise ValueError("请先确认或取消 API Key 输入")
         if self.dirty and self.isEnabled():
             self.save()
 
@@ -571,7 +636,7 @@ class SettingsPage(QWidget):
     def check(self, model):
         """测试当前表单快照；编辑期间完成的旧检查不得冒充当前配置结果。"""
         values, revision = self.values(), self.revision
-        key = self.key.text() or None
+        key = self.pending_key() or None
         self.check_status.setText("正在检查模型状态…" if model else "正在测试连接…")
         def operation():
             with self.host.service.activity("Agent Settings 检查"):
@@ -580,21 +645,28 @@ class SettingsPage(QWidget):
                 return check_settings(self.host.service.data_root, frozen, key=actual_key,
                                       check_model=model, snapshot=True)
         def done(result):
-            self.diagnostics.set_path(result["log_path"])
-            if not result["ok"]:
-                self.diagnostics.add_error(result["error"])
+            if self.side == "developer":
+                self.diagnostics.set_path(result["log_path"])
+                if not result["ok"]:
+                    self.diagnostics.add_error(result["error"])
             if revision != self.revision:
                 self.check_status.setText("检查期间设置已变更，请重新检查；本次结果已保存到日志。")
-                return
-            self.check_status.setText(("错误：" if not result["ok"] else "") + result["message"])
+            else:
+                self.check_status.setText(("错误：" if not result["ok"] else "") + result["message"])
             if not result["ok"]:
-                self.diagnostics.show_error()
+                if self.side == "developer":
+                    if revision == self.revision:
+                        self.diagnostics.show_error()
+                else:
+                    from .gui import ErrorDialog
+                    message = result["message"] if revision == self.revision else "原配置检查失败；当前设置已变更，请重新检查。"
+                    ErrorDialog(message, details_text(result["error"]), parent=self.window).open()
         self.window.launch(operation, done)
 
     def reload(self):
         self.loading = True
         try:
-            value = load_settings(self.host.service.data_root, side=self.side)
+            value = load_settings(self.host.service.data_root, side=self.side, for_use=False)
             self.provider.setCurrentIndex(self.provider.findData(value["provider"]))
             self.form_provider = value["provider"]
             self.deepseek_options.setVisible(value["provider"] == "deepseek")
@@ -605,7 +677,8 @@ class SettingsPage(QWidget):
             self.url.setText(value["base_url"])
             self.model.setText(value["model"] or "")
             self.limit.setValue(value["max_requests"])
-            self.key.clear()
+            if self.key is not None:
+                self.key.clear()
             self.show_secret(value)
             self.dirty = False
         finally:
@@ -615,21 +688,25 @@ class SettingsPage(QWidget):
         configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
         self.secret_state.setText("API Key：已设置" if configured else "API Key：未设置")
 
-    def save(self, *, clear=False):
+    def save(self, *, clear=False, secret=None):
         """本地保存不占用后台活动队列；失败保留表单和未保存状态。"""
         if not self.isEnabled():
             return
-        value, secret = self.values(), self.key.text()
+        value = self.values()
+        secret = self.pending_key() if secret is None else secret
         saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear,
                               side=self.side, temporary_keys=self.host.secrets)
         self.loading = True
         try:
-            self.key.clear()
+            if self.side == "developer":
+                self.key.clear()
             self.dirty = False
             self.show_secret(saved)
         finally:
             self.loading = False
         self.revision += 1
+        if secret or clear:
+            self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
         coordinator = getattr(self.window, "coordinator", None)
         if coordinator is not None:
             coordinator.refresh_agent()
@@ -660,6 +737,7 @@ class RepairPage(QWidget):
         row = QHBoxLayout()
         self.controls.append(button("New Conversation", self.new, row))
         self.workspace_button = button("打开 Agent 工作区", self.open_workspace, row)
+        self.pages_button = button("打开扩展配置页面文件夹", self.open_pages, row)
         layout.addLayout(row)
         self.identity = QLabel("尚未开始对话")
         layout.addWidget(self.identity)
@@ -701,6 +779,14 @@ class RepairPage(QWidget):
         index = self.baseline.findData(previous)
         if index >= 0:
             self.baseline.setCurrentIndex(index)
+
+    def open_pages(self):
+        """打开实际页面发现目录；首次使用时创建空目录，不重载页面。"""
+        def operation():
+            path = self.host.service.data_root / "pages"
+            path.mkdir(parents=True, exist_ok=True)
+            open_directory(self.window, path)
+        self.window._interact(operation)
 
     def open_workspace(self):
         from PySide6.QtCore import QUrl

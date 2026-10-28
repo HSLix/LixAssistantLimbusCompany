@@ -156,7 +156,7 @@
 
 ### example：Recovery Rule 示例
 
-- 新增 `example/recovery-rule/`，包含独立 manifest.json、触发恢复路径的 Step、Recovery Rule 源码及 README，展示 Step 失败后 detect、recover、重试当前 Step 的完整路径与 Trace 定位。
+- 新增 `example/workflow/`，包含独立 manifest.json、触发恢复路径的 Step、Recovery Rule 源码及 README，展示 Step 失败后 detect、recover、重试当前 Step 的完整路径与 Trace 定位。
 - 展示 detect 仅观察、recover 使用既有控制动作、两者均不调用其他正式 Component 的契约；沿用执行器最多重试当前 Step 一次、多个规则匹配时报错的既有语义。
 - README 给出素材/窗口准备、导入 Candidate、校验/发布和显式运行步骤。复用现有应用动作，不为演示新增业务专属 Trusted Action 或运行时 Agent Recovery。
 - 自动化可以使用平台替身验证控制流及失败分支，必须区分这些证据与 Windows/真实游戏验收。
@@ -176,7 +176,7 @@
 - 框选提供 5× 原图像素放大窗及中心十字，跟随鼠标更新，在边缘补底色，离开或换图隐藏；鼠标事件穿透，不改变框选和保存像素。Capture 已做 offscreen 渲染检查，示意产物位于本次本机 `/tmp/lalc-capture-increment.png`，不计 Windows 实机证据。
 - add_component / add_recovery_rule 接收 filename、logical_name、source；复用源码结构检查，不导入新源码。新建文件与 Manifest 登记以替换 Manifest 为提交点，失败/提交前取消会清理文件和新增目录。拒绝覆盖、跨分区重名、越界与符号链接；仅工具成功创建的文件可同轮继续编辑，进入快照和累计 Diff。取消时等待工具线程完成或回退再保存最终快照。
 - GUI 可累计多选图片，按钮显示数量和文件路径，清除整组；CLI 重复 --image。新增 Pillow 到 automation 依赖及 uv.lock，按实际内容识别 MIME 并校验图片，不自建格式白名单、转码或设置附件数量上限；纯文字不导入可选图片解码依赖。预检整组只计一次请求。原图通过 context hook 注入，跳过 pi RPC 的转码/静默丢图；日志独立保存附件名称/类型/顺序/原字节，格式纠正及后续消息沿用原图。服务拒绝走既有错误路径，不自动删图或重发。
-- 新增 example/recovery-rule/（独立 Manifest、Step、规则和 README），复用生产 observe/control 动作及确定性恢复；覆盖无弹窗、唯一目标恢复、点击无效、目标不唯一与多规则匹配。不新增运行时 Agent 或专属 Trusted Action。
+- 新增 example/workflow/（独立 Manifest、Step、规则和 README），复用生产 observe/control 动作及确定性恢复；覆盖无弹窗、唯一目标恢复、点击无效、目标不唯一与多规则匹配。不新增运行时 Agent 或专属 Trusted Action。
 
 验证：
 

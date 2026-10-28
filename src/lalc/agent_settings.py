@@ -32,8 +32,8 @@ def provider_defaults(provider: str) -> dict:
             {key: DEFAULTS[key] for key in ("base_url", "model", "thinking", "reasoning_effort")})
 
 
-def validate_settings(value: dict) -> dict:
-    """校验当前连接及平台密钥引用；不补写 API 路径，不进行网络检查。"""
+def validate_settings(value: dict, *, for_use: bool = True) -> dict:
+    """保存时只检查结构；使用前检查连接内容，不补路径或联网。"""
     if not isinstance(value, dict) or value.keys() - set(FIELDS) - {"provider_secrets"}:
         raise ValueError("Invalid Agent settings fields")
     provider = value.get("provider", "llama.cpp")
@@ -45,14 +45,16 @@ def validate_settings(value: dict) -> dict:
     address = result["base_url"]
     if not isinstance(address, str):
         raise ValueError("base-url must be a complete HTTP(S) API base URL")
-    parsed = urlsplit(address)
-    if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None
-            or parsed.password is not None or parsed.query or parsed.fragment):
-        raise ValueError("base-url must be a complete HTTP(S) API base URL without credentials, query or fragment")
+    if for_use:
+        parsed = urlsplit(address)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username is not None
+                or parsed.password is not None or parsed.query or parsed.fragment):
+            raise ValueError("base-url must be a complete HTTP(S) API base URL without credentials, query or fragment")
     if type(result["max_requests"]) is not int or result["max_requests"] < 2:
         raise ValueError("max-requests must be at least 2; reset the request limit")
     for field in ("model", "secret_name"):
-        if result[field] is not None and (not isinstance(result[field], str) or not result[field].strip()):
+        if result[field] is not None and (not isinstance(result[field], str) or
+                ((for_use or field == "secret_name") and not result[field].strip())):
             raise ValueError(f"{field} must be a non-empty string or null")
     if type(result["thinking"]) is not bool or result["reasoning_effort"] not in {"low", "high", "max"}:
         raise ValueError("Invalid thinking switch or reasoning effort")
@@ -78,7 +80,7 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
         repair = overrides or {}
         if repair.get("provider", saved.get("provider", "llama.cpp")) != saved.get("provider", "llama.cpp"):
             repair = {}
-        legacy = validate_settings({**saved, **repair})
+        legacy = validate_settings({**saved, **repair}, for_use=False)
         profiles = {}
         for provider in PROVIDERS:
             value = legacy if provider == legacy["provider"] else validate_settings({
@@ -94,12 +96,12 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
     for provider, profile in saved["profiles"].items():
         if not isinstance(profile, dict) or profile.get("provider") != provider:
             raise ValueError("Invalid provider profile")
-        validate_settings({**profile, "provider_secrets": saved.get("provider_secrets", {})})
+        validate_settings({**profile, "provider_secrets": saved.get("provider_secrets", {})}, for_use=False)
     return {name: saved[name] for name in ("profiles", "provider_secrets", "user_provider",
                                           "developer_provider", "user_enabled")}
 
 
-def load_settings(data_root: Path, overrides: dict | None = None, *, side="developer") -> dict:
+def load_settings(data_root: Path, overrides: dict | None = None, *, side="developer", for_use=True) -> dict:
     """两侧分别选用 provider；CLI 临时覆盖不写回共享设置。"""
     with SETTINGS_LOCK:
         overrides = dict(overrides or {})
@@ -108,7 +110,17 @@ def load_settings(data_root: Path, overrides: dict | None = None, *, side="devel
         if provider not in PROVIDERS:
             raise ValueError("仅支持 llama.cpp 或 deepseek provider")
         return validate_settings({**document["profiles"][provider],
-                                  "provider_secrets": document["provider_secrets"], **overrides})
+                                  "provider_secrets": document["provider_secrets"], **overrides}, for_use=for_use)
+
+
+def configuration_complete(value: dict, *, temporary_keys=None) -> bool:
+    """只判断选用配置的本地完整性，不解密凭据或测试服务连接。"""
+    try:
+        value = validate_settings(value)
+    except ValueError:
+        return False
+    return bool(value["model"] and (value["provider"] != "deepseek" or value["secret_name"]
+                                  or (temporary_keys or {}).get("deepseek")))
 
 
 def _save_document(data_root: Path, document: dict) -> None:
@@ -217,7 +229,7 @@ def save_settings(data_root: Path, values: dict, *, secret: str = "", clear: boo
     """原子保存一套配置；空密钥保留，明确清除不影响活动认证快照。"""
     with SETTINGS_LOCK:
         document = settings_document(data_root, values)
-        value = load_settings(data_root, values, side=side)
+        value = load_settings(data_root, values, side=side, for_use=False)
         previous = value["secret_name"]
         if clear:
             value["secret_name"] = None
