@@ -348,10 +348,12 @@ class CapturePage(QWidget):
             self.coordinates.setText(str(error))
 
     def open_assets(self):
+        """首次打开时创建 Asset 目录，创建或系统打开失败仍交给统一错误弹窗。"""
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
         def open_directory():
             path = self.host.service.asset_library.root
+            path.mkdir(parents=True, exist_ok=True)
             if not path.is_dir() or not QDesktopServices.openUrl(QUrl.fromLocalFile(str(path.absolute()))):
                 raise ValueError(f"无法打开 Asset 目录：{path}")
         self.window._interact(open_directory)
