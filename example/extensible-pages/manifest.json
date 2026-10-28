@@ -1,0 +1,8 @@
+{
+  "schema_version": 2,
+  "components": {
+    "plans.example": {"source_path": "plan.py"},
+    "tasks.message": {"source_path": "task.py"}
+  },
+  "recovery_rules": {}
+}

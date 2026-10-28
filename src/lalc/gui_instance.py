@@ -57,8 +57,12 @@ class GuiInstance:
                         return
                     command = bytes(socket.readLine(32))
                     if command in {b"developer\n", b"user\n"}:
-                        open_window(command == b"developer\n")
-                        socket.write(b"ok\n")
+                        try:
+                            open_window(command == b"developer\n")
+                        except Exception:
+                            socket.write(b"rejected\n")
+                        else:
+                            socket.write(b"ok\n")
                         socket.flush()
                     socket.disconnectFromServer()
                 socket.readyRead.connect(read)

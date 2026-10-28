@@ -1,5 +1,8 @@
 # Domain Docs
 
+2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](../fluent-gui-migration.md)。
+
+
 How engineering skills should consume this repository’s domain documentation.
 
 ## Before exploring, read these
@@ -39,7 +42,7 @@ If proposed work contradicts an existing ADR, surface the conflict explicitly in
 
 ## Stage 4 accepted target versus current implementation
 
-[ADR 0032](../adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) and the [Stage 4 specification](../stage-4-extensible-user-gui.md) are the accepted target: one immutable Python Automation Plan per Manifest, Plan→Task result boundaries, coexisting User/Developer windows and shared activity ownership, editable Candidate Python Plan, and no independent Developer Runner page. JSON Plan execution is replaced without compatibility; old immutable data is not rewritten. Shared settings pages remain outside Manifest/Agent writes. The source implements the #331 Python Plan and coexisting-window slice; see [implementation evidence](../stage-4-331-implementation.md). External pages, shared Agent profiles and bilingual panels remain pending in #332–#333. The Stage 2/3 descriptions below are historical where superseded: plan.json read-only and four-page descriptions are not current requirements. Do not claim Windows packaged acceptance is complete.
+[ADR 0032](../adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) and the [Stage 4 specification](../stage-4-extensible-user-gui.md) are the accepted target: one immutable Python Automation Plan per Manifest, Plan→Task result boundaries, coexisting User/Developer windows and shared activity ownership, editable Candidate Python Plan, and no independent Developer Runner page. JSON Plan execution is replaced without compatibility; old immutable data is not rewritten. Shared settings pages remain outside Manifest/Agent writes. The source implements the #331 Python Plan and coexisting-window slice; see [implementation evidence](../stage-4-331-implementation.md). The #332 external pages and per-provider shared Agent settings are implemented locally; see [#332 evidence](../stage-4-332-implementation.md). Bilingual panels remain pending in #333. Developer owns the only Agent settings editor while its window is open; User regains editing after saved handoff. Windows packaged acceptance remains pending. The Stage 2/3 descriptions below are historical where superseded: plan.json read-only and four-page descriptions are not current requirements. Do not claim Windows packaged acceptance is complete.
 
 ## Agent changes to Manifests and Assets
 

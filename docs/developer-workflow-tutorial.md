@@ -83,3 +83,7 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 [ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 取代旧专属库。旧 Asset 布局、Candidate 素材库及已发布专属库废弃，清理后重新准备，不做迁移或兼容；Component、Manifest、Default 和运行历史保留。相同 Manifest 的素材结果可随文件更新而变化。
 
 Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md) 收尾；邮箱和 Windows 集成/打包验收仍在 #317。Stage 3 不包含 Agent Asset 新增；未来 Stage 3.5 可新增素材，但仍不允许覆盖已有图片。
+
+## 外置业务页面与共享 Agent 设置
+
+#332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/extensible-pages/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。

@@ -12,7 +12,7 @@ import uuid
 
 from .pi_probe import PI_VERSION, configured_pi, rpc_event, rpc_session
 from .repair_tools import REPAIR_TOOLS, RepairTools
-from .agent_settings import effective_settings, resolve_key
+from .agent_settings import settings_snapshot
 from .developer import candidate_files, editable_files, file_diff
 from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 
@@ -276,12 +276,13 @@ class RepairConversation:
                 self.host.service.logger.error("Agent Repair 错误：%s", details)
                 return details
             try:
-                settings = effective_settings(args, self.host.service.data_root)
+                settings, actual_key = settings_snapshot(args, self.host.service.data_root,
+                                                         temporary_keys=self.host.secrets, key=key)
                 context["settings"] = settings
                 options = SimpleNamespace(**vars(args))
                 for field, value in settings.items():
                     setattr(options, field, value)
-                self.log.key = key if key is not None else resolve_key(options, settings, self.host.service.data_root)
+                self.log.key = actual_key
                 stage = "attachments"
                 attachments, attachment_records = image_attachments(images, round_path)
                 prompt = {"type": "prompt", "message": "本轮允许编辑的已有文件：" + json.dumps(names, ensure_ascii=False)

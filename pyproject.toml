@@ -10,7 +10,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [project.optional-dependencies]
-gui = ["PySide6-Essentials"]
+gui = ["PySide6==6.11.2", "PySide6-Fluent-Widgets==1.11.3"]
 automation = [
     "numpy>=2.0,<3",
     "opencv-python-headless>=4.10,<5",

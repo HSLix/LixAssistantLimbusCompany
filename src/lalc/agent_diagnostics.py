@@ -55,17 +55,17 @@ def details_text(details):
     return text + "\n\n" + details.get("traceback", "")
 
 
-def check_settings(data_root: Path, values: dict, *, key=None, check_model=False):
+def check_settings(data_root: Path, values: dict, *, key=None, check_model=False, snapshot=False):
     """检查表单快照并独立留证；不保存设置、不请求推理、不加载模型。"""
     from types import SimpleNamespace
-    from .agent_settings import load_settings, resolve_key
+    from .agent_settings import load_settings, resolve_key, validate_settings
     from .agent_repair import RepairLog
     from .pi_probe import _models
     log = RepairLog(data_root, key or "lalc-no-key", category="agent-diagnostics")
     context = {"operation": "model_status" if check_model else "connection",
                "settings": values, "log_path": str(log.path)}
     try:
-        settings = load_settings(data_root, values)
+        settings = validate_settings(values) if snapshot else load_settings(data_root, values)
         log.key = key if key is not None else resolve_key(SimpleNamespace(ask_api_key=False), settings, data_root)
         models = _models(settings["base_url"].rstrip("/"), log.key)
         result = {"ok": True, "message": f"连接成功，认证通过，可读取模型列表（{len(models)} 项）；未测试推理。"}

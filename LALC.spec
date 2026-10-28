@@ -1,6 +1,7 @@
 # Internal packaging spike. Build on Windows x64 for Windows acceptance.
 import sys
 from pathlib import Path
+from PyInstaller.utils.hooks import copy_metadata
 
 root = Path(SPECPATH)
 
@@ -8,7 +9,11 @@ a = Analysis(
     [str(root / "packaging_entry.py")],
     pathex=[str(root / "src")],
     binaries=[],
-    datas=[],
+    datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), ".")]
+    + sum((copy_metadata(name) for name in (
+        "PySide6", "PySide6-Essentials", "PySide6-Addons", "PySide6-Fluent-Widgets",
+        "PySideSix-Frameless-Window", "darkdetect",
+    )), []),
     hiddenimports=[],  # Add only imports promised by the Component Runtime Capability Contract.
     hookspath=[str(root / "packaging_hooks")],
     hooksconfig={},

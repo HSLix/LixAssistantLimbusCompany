@@ -141,6 +141,8 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 ## Stage 4 — Extensible User GUI and Python Plan
 
+2026-10-27 #332 更新：外置业务页、共享 provider 设置、即时保存与整应用重载已完成本地实现及自动化验证，见[实施记录](stage-4-332-implementation.md)。#333–#334 及 Windows 打包现场验收仍待完成。
+
 状态（2026-10-27）：grill 及 design-impact-review 已完成并经开发者确认，设计接受；#331 已在本地实现，#332–#334 待实施，验证与限制见[实施记录](stage-4-331-implementation.md)。正式规格集中在 [Stage 4](stage-4-extensible-user-gui.md)，取代此前逐轮草案；架构边界见 [ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md)。
 
 - 每 Manifest 唯一 Python Plan，直接替换 JSON Plan；由 Plan 调用 Task，普通任务失败可继续，取消/环境不可继续/Plan 自身错误结束。Developer Agent 可编辑 Candidate Plan并发布后试运行。

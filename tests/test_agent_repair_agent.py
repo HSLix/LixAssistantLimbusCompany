@@ -705,3 +705,34 @@ def test_python_plan_edit_publish_and_saved_trial_ignore_unpublished_changes(con
     assert result["status"] == "completed", result
     assert chat.host.manager.default_manifest_id() == original
     assert '{"value": 9}' in (chat.host.candidate / "plans.default.py").read_text()
+
+
+def test_round_freezes_shared_config_and_auth_until_next_message(conversation):
+    """轮次中清除/替换凭据和额度不改变当前工具循环，下一轮读取新设置。"""
+    from lalc.agent_settings import save_settings
+    chat, original, state = conversation
+    root, keys = chat.host.service.data_root, chat.host.secrets
+    save_settings(root, {"base_url": original.base_url, "model": original.model, "max_requests": 6},
+                  secret="example-round-A", temporary_keys=keys)
+    seen = []
+    def respond(body):
+        seen.append(state["authorization"])
+        if len(seen) == 1:
+            save_settings(root, {}, clear=True, temporary_keys=keys)
+            save_settings(root, {"max_requests": 7}, secret="example-round-B", temporary_keys=keys)
+            return tool("read", {"path": "steps.total.py"})
+        return answer("finished")
+    state["respond"] = respond
+    args = SimpleNamespace(pi="pi", ask_api_key=False)
+    first = asyncio.run(chat.run("inspect source", args))
+    assert first["status"] == "completed", first
+    assert seen == ["Bearer example-round-A", "Bearer example-round-A"]
+    second = asyncio.run(chat.run("continue", args))
+    assert second["status"] == "completed", second
+    assert seen[-1] == "Bearer example-round-B"
+    assert json.loads((chat.log.path / "round-1/input.json").read_text())["settings"]["max_requests"] == 6
+    assert json.loads((chat.log.path / "round-2/input.json").read_text())["settings"]["max_requests"] == 7
+    for path in chat.log.path.rglob("*"):
+        if path.is_file():
+            assert b"example-round-A" not in path.read_bytes()
+            assert b"example-round-B" not in path.read_bytes()

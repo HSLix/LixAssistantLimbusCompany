@@ -48,7 +48,7 @@ def _parser() -> argparse.ArgumentParser:
     repair.add_argument("--pi", default="pi")
     repair.add_argument("--ask-api-key", action="store_true")
     repair.add_argument("--secret-name", help="Windows DPAPI secret name for this invocation")
-    settings = commands.add_parser("agent-config", help="Show or update the single saved Agent connection")
+    settings = commands.add_parser("agent-config", help="Show or update shared provider settings using Developer selection")
     settings.add_argument("--base-url", help="Complete API base URL; no path is appended")
     settings.add_argument("--model")
     settings.add_argument("--max-requests", type=int)
@@ -323,6 +323,13 @@ def main(argv: list[str] | None = None) -> int:
         from .packaging_probe import run_probe
 
         return run_probe(args[1], args[2])
+    if len(args) == 1 and args[0].startswith("--restore-gui="):
+        restore = tuple(args[0].split("=", 1)[1].split(","))
+        if not restore or len(set(restore)) != len(restore) or set(restore) - {"user", "developer"}:
+            raise ValueError("Invalid GUI restoration request")
+        from .gui import run_gui
+        from .lifecycle import run_application
+        return run_application(lambda owner: run_gui(owner, restore=restore))
     if not args or args == ["--developer"]:
         from .lifecycle import run_application
 

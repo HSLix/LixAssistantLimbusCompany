@@ -10,3 +10,4 @@ dist/
 *.egg-info/
 candidate/
 .candidate-baseline.json
+/pages/

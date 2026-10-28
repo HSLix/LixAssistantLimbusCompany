@@ -4,6 +4,14 @@ LALC automates a Windows-native Unity game window during an exclusive focused au
 
 ## Language
 
+**Business Settings Page**:
+A user-installed, trusted GUI page that owns configuration under a stable page ID, independently of any Manifest. It may register one Loop Task or only provide shared settings.
+_Avoid_: Manifest Component, Agent-generated page, untrusted plugin
+
+**Loop Task**:
+A Dashboard repetition choice identified by a stable task ID registered by a Business Settings Page and explicitly supported by an Automation Plan. Its ID is distinct from the page ID and Component logical name; support declares configuration compatibility rather than successful execution.
+_Avoid_: Task Workflow, page ID, Component logical name
+
 **Target Window**:
 The unique existing Windows desktop window of Limbus Company that LALC selects to observe and operate. No window is selected when discovery finds zero or multiple matching windows.
 _Avoid_: Emulator, virtual device

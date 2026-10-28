@@ -1,10 +1,15 @@
 # Developer GUI — Accepted Design
 
+2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
+
+
 2026-10-27 #331 实施更新：当前使用唯一不可变 Python Plan、User/Developer 双窗口及跨进程游戏排他；已有 Candidate Plan 可编辑。现行入口和迁移步骤见[实施记录](stage-4-331-implementation.md)。下文旧 JSON Plan、Runner 页及 plan.json 只读内容保留为历史设计/验收，不能作为当前操作要求。
 
-2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，#331 已迁移，Stage 4 其余部分尚未实现，不得把这些旧操作说明当作新 Stage 4 规格。
+2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，#331 已迁移，#332 已实现外置页、共享设置与即时保存（[证据](stage-4-332-implementation.md)），#333–#334 尚未实现，不得把这些旧操作说明当作新 Stage 4 规格。
 
 状态（2026-10-26）：四页及后续增量已完成实现与回归核验，按开发者确认关闭 [#330](https://github.com/HSLix/LixAssistantLimbusCompany/issues/330)。真模型、Windows 和真实游戏验收仍分别记录，并由 #329 完成最终集成与交付；见文末关闭核验。历史记录不计为新的实机证据。
+
+2026-10-27 #332：User/Developer 共用现有 Agent 设置控件，每 provider 一套内容、两侧独立选用。输入框失焦保存、选择项立即保存；Developer 打开时 User Agent 区域禁用，关闭并提交后恢复。认证与配置每轮一起固定，整应用重载先保存/清理再释放单实例锁和启动新进程。详见[当前用法](stage-4-332-implementation.md)。
 
 ## Confirmed decisions
 

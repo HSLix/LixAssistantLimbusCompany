@@ -21,6 +21,7 @@ class ApplicationLifecycle:
         self._presented = False
         self.pending_details = ""
         self.shutdown: Callable[[], None] | None = None
+        self.restart: Callable[[], None] | None = None
 
     def report_fatal(self, error_type, error: BaseException, tb) -> None:
         """供主线程和后台线程的异常钩子共用，保留完整原始错误链。"""
@@ -97,4 +98,9 @@ def run_application(
             finally:
                 sys.excepthook, threading.excepthook = previous_sys, previous_thread
 
+    if not lifecycle.failed and lifecycle.restart is not None:
+        try:
+            lifecycle.restart()
+        except Exception as error:
+            lifecycle.report_fatal(type(error), error, error.__traceback__)
     return 1 if lifecycle.failed else result

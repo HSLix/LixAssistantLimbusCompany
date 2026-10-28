@@ -11,13 +11,19 @@ from types import SimpleNamespace
 from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QLineEdit, QPlainTextEdit,
-    QSpinBox, QComboBox, QCheckBox, QFileDialog,
+    QWidget, QVBoxLayout, QHBoxLayout,
+    QFileDialog,
     QMessageBox, QDialog, QDialogButtonBox,
 )
 
+from qfluentwidgets import (
+    BodyLabel as QLabel, PushButton as QPushButton, LineEdit as QLineEdit,
+    PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
+    CheckBox as QCheckBox,
+)
+
 from .repair_chat import RepairChat
-from .agent_settings import load_settings, save_settings, provider_defaults
+from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
 from .agent_diagnostics import check_settings, details_text
 
 
@@ -414,7 +420,7 @@ class DiagnosticPanel(QWidget):
         self.location.setText(str(self.path))
 
     def add_error(self, details):
-        self.errors.addItem(f"第 {details.get('round', '—')} 轮 · {details.get('stage', 'error')}：{details['message']}", details)
+        self.errors.addItem(f"第 {details.get('round', '—')} 轮 · {details.get('stage', 'error')}：{details['message']}", userData=details)
         self.errors.setCurrentIndex(self.errors.count() - 1)
 
     def select_error(self, *_):
@@ -451,15 +457,17 @@ class DiagnosticPanel(QWidget):
 class SettingsPage(QWidget):
     """只显示凭据是否设置；明文输入仅用于覆盖，不回读旧密钥。"""
 
-    def __init__(self, window):
+    def __init__(self, window, *, side="developer"):
         super().__init__()
         self.window, self.host = window, window.host
+        self.side = side
+        self.loading = True
+        self.dirty = False
         self.revision = 0
         layout = QVBoxLayout(self)
         self.provider = QComboBox()
-        self.provider.addItem("llama.cpp", "llama.cpp")
-        self.provider.addItem("DeepSeek", "deepseek")
-        self.provider_drafts = {}
+        self.provider.addItem("llama.cpp", userData="llama.cpp")
+        self.provider.addItem("DeepSeek", userData="deepseek")
         self.form_provider = "llama.cpp"
         layout.addWidget(QLabel("服务商（Provider）"))
         layout.addWidget(self.provider)
@@ -479,7 +487,7 @@ class SettingsPage(QWidget):
         self.thinking.setChecked(True)
         self.effort = QComboBox()
         for effort in ("low", "high", "max"):
-            self.effort.addItem(effort, effort)
+            self.effort.addItem(effort, userData=effort)
         self.effort.setCurrentIndex(1)
         options.addWidget(self.thinking)
         options.addWidget(QLabel("思考强度"))
@@ -490,13 +498,12 @@ class SettingsPage(QWidget):
         self.effort.currentIndexChanged.connect(self.invalidate)
         self.deepseek_options.hide()
         self.output_limit = QComboBox()
-        self.output_limit.addItem("使用服务端默认值", "server_default")
+        self.output_limit.addItem("使用服务端默认值", userData="server_default")
         layout.addWidget(QLabel("单次输出上限"))
         layout.addWidget(self.output_limit)
         self.secret_state = QLabel()
         layout.addWidget(self.secret_state)
-        self.save_button = button("保存设置", self.save, layout)
-        self.clear_button = button("明确清除 API Key", lambda: self.save(clear=True), layout)
+        self.clear_button = button("明确清除 API Key", lambda: self.window._interact(lambda: self.save(clear=True)), layout)
         row = QHBoxLayout()
         self.connection_button = button("测试连接", lambda: self.check(False), row)
         self.model_button = button("检查模型加载状态", lambda: self.check(True), row)
@@ -516,8 +523,17 @@ class SettingsPage(QWidget):
         self.provider.currentIndexChanged.connect(self.switch_provider)
         self.limit.valueChanged.connect(self.invalidate)
         self.window._interact(self.reload)
+        for control in (self.url, self.model, self.key):
+            control.editingFinished.connect(self.auto_save)
+        self.limit.editingFinished.connect(self.auto_save)
+        for control in (self.effort, self.output_limit):
+            control.currentIndexChanged.connect(self.auto_save)
+        self.thinking.toggled.connect(self.auto_save)
 
     def invalidate(self, *_):
+        if self.loading:
+            return
+        self.dirty = True
         self.revision += 1
         self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
 
@@ -529,32 +545,40 @@ class SettingsPage(QWidget):
             value.update(thinking=self.thinking.isChecked(), reasoning_effort=self.effort.currentData())
         return value
 
+    def auto_save(self, *_):
+        if not self.loading and self.dirty and self.isEnabled():
+            self.window._interact(self.save)
+
+    def submit(self):
+        """交接/重载前提交尚未失焦的输入；禁用表单不回写旧配置。"""
+        if self.dirty and self.isEnabled():
+            self.save()
+
     def switch_provider(self):
-        """保留各平台本次表单草稿；切换时清晰隔离未保存密钥。"""
-        self.provider_drafts[self.form_provider] = {
-            "base_url": self.url.text(), "model": self.model.text(), "key": self.key.text(),
-            "thinking": self.thinking.isChecked(), "reasoning_effort": self.effort.currentData()}
-        self.form_provider = self.provider.currentData()
-        value = self.provider_drafts.get(self.form_provider, provider_defaults(self.form_provider))
-        self.url.setText(value["base_url"])
-        self.model.setText(value["model"] or "")
-        self.key.setText(value.get("key", ""))
-        self.thinking.setChecked(value["thinking"])
-        self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
-        self.deepseek_options.setVisible(self.form_provider == "deepseek")
-        self.model.setReadOnly(self.form_provider == "deepseek")
-        self.model_button.setText("检查模型可用性" if self.form_provider == "deepseek" else "检查模型加载状态")
-        self.show_secret(load_settings(self.host.service.data_root, {"provider": self.form_provider}))
-        self.invalidate()
+        """先保存旧平台输入，再保存本侧选择，失败保留旧表单。"""
+        if self.loading:
+            return
+        provider = self.provider.currentData()
+        self.provider.blockSignals(True)
+        self.provider.setCurrentIndex(self.provider.findData(self.form_provider))
+        self.provider.blockSignals(False)
+        def switch():
+            self.submit()
+            save_selection(self.host.service.data_root, self.side, provider)
+            self.reload()
+        self.window._interact(switch)
 
     def check(self, model):
         """测试当前表单快照；编辑期间完成的旧检查不得冒充当前配置结果。"""
         values, revision = self.values(), self.revision
-        key = self.key.text() or self.host.secrets.get(values["provider"])
+        key = self.key.text() or None
         self.check_status.setText("正在检查模型状态…" if model else "正在测试连接…")
         def operation():
             with self.host.service.activity("Agent Settings 检查"):
-                return check_settings(self.host.service.data_root, values, key=key, check_model=model)
+                frozen, actual_key = settings_snapshot(SimpleNamespace(**values, ask_api_key=False),
+                    self.host.service.data_root, key=key, temporary_keys=self.host.secrets)
+                return check_settings(self.host.service.data_root, frozen, key=actual_key,
+                                      check_model=model, snapshot=True)
         def done(result):
             self.diagnostics.set_path(result["log_path"])
             if not result["ok"]:
@@ -568,46 +592,51 @@ class SettingsPage(QWidget):
         self.window.launch(operation, done)
 
     def reload(self):
-        value = load_settings(self.host.service.data_root)
-        self.provider.blockSignals(True)
-        self.provider.setCurrentIndex(self.provider.findData(value["provider"]))
-        self.provider.blockSignals(False)
-        self.form_provider = value["provider"]
-        self.deepseek_options.setVisible(value["provider"] == "deepseek")
-        self.model.setReadOnly(value["provider"] == "deepseek")
-        self.model_button.setText("检查模型可用性" if value["provider"] == "deepseek" else "检查模型加载状态")
-        self.thinking.setChecked(value["thinking"])
-        self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
-        self.url.setText(value["base_url"])
-        self.model.setText(value["model"] or "")
-        self.limit.setValue(value["max_requests"])
-        self.show_secret(value)
+        self.loading = True
+        try:
+            value = load_settings(self.host.service.data_root, side=self.side)
+            self.provider.setCurrentIndex(self.provider.findData(value["provider"]))
+            self.form_provider = value["provider"]
+            self.deepseek_options.setVisible(value["provider"] == "deepseek")
+            self.model.setReadOnly(value["provider"] == "deepseek")
+            self.model_button.setText("检查模型可用性" if value["provider"] == "deepseek" else "检查模型加载状态")
+            self.thinking.setChecked(value["thinking"])
+            self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
+            self.url.setText(value["base_url"])
+            self.model.setText(value["model"] or "")
+            self.limit.setValue(value["max_requests"])
+            self.key.clear()
+            self.show_secret(value)
+            self.dirty = False
+        finally:
+            self.loading = False
 
     def show_secret(self, value):
         configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
         self.secret_state.setText("API Key：已设置" if configured else "API Key：未设置")
 
     def save(self, *, clear=False):
-        value = self.values()
-        secret = self.key.text()
-        def operation():
-            saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear)
-            if clear:
-                self.host.secrets.pop(value["provider"], None)
-            elif secret and sys.platform != "win32":
-                self.host.secrets[value["provider"]] = secret
-            return saved
-        def done(saved):
-            self.invalidate()
+        """本地保存不占用后台活动队列；失败保留表单和未保存状态。"""
+        if not self.isEnabled():
+            return
+        value, secret = self.values(), self.key.text()
+        saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear,
+                              side=self.side, temporary_keys=self.host.secrets)
+        self.loading = True
+        try:
             self.key.clear()
-            if saved["provider"] in self.provider_drafts:
-                self.provider_drafts[saved["provider"]]["key"] = ""
+            self.dirty = False
             self.show_secret(saved)
-        self.window.launch(operation, done)
+        finally:
+            self.loading = False
+        self.revision += 1
+        coordinator = getattr(self.window, "coordinator", None)
+        if coordinator is not None:
+            coordinator.refresh_agent()
+        return saved
 
     def render(self, busy):
-        self.save_button.setEnabled(not self.window.jobs and not self.window.closing)
-        self.clear_button.setEnabled(not self.window.jobs and not self.window.closing)
+        self.clear_button.setEnabled(not self.window.closing)
         self.connection_button.setEnabled(not busy)
         self.model_button.setEnabled(not busy)
 
@@ -668,7 +697,7 @@ class RepairPage(QWidget):
         previous = self.baseline.currentData()
         self.baseline.clear()
         for value in values:
-            self.baseline.addItem(value["manifest_id"], value["manifest_id"])
+            self.baseline.addItem(value["manifest_id"], userData=value["manifest_id"])
         index = self.baseline.findData(previous)
         if index >= 0:
             self.baseline.setCurrentIndex(index)
@@ -745,7 +774,7 @@ class RepairPage(QWidget):
             self.message.clear()
             self.clear_image()
             def operation():
-                return conversation.run(message, args, images=images, key=self.host.secret,
+                return conversation.run(message, args, images=images, key=None,
                                         on_event=self.window.operation_event.emit)
             self.window.launch(operation, self.answered)
         self.window._interact(action)

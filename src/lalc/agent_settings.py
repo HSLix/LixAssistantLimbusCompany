@@ -9,6 +9,8 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
+from copy import deepcopy
 from urllib.parse import urlsplit
 
 from .runtime import atomic_write_json
@@ -20,6 +22,7 @@ DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "m
             "max_requests": 20, "secret_name": None, "output_limit": "server_default",
             "thinking": False, "reasoning_effort": "high"}
 PROVIDERS = {"llama.cpp", "deepseek"}
+SETTINGS_LOCK = threading.RLock()
 
 
 def provider_defaults(provider: str) -> dict:
@@ -65,26 +68,77 @@ def validate_settings(value: dict) -> dict:
     return result
 
 
-def load_settings(data_root: Path, overrides: dict | None = None) -> dict:
-    """兼容旧单平台凭据；切换平台不继承另一平台的连接或密钥。"""
+def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
+    """旧配置只在成功保存时迁移，保留所有已保存的凭据引用。"""
     path = data_root / "agent-settings.json"
     saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     if not isinstance(saved, dict):
         raise ValueError("Agent settings must be a JSON object")
-    overrides = dict(overrides or {})
-    old_provider = saved.get("provider", "llama.cpp")
-    secrets = saved.get("provider_secrets", {})
-    if not isinstance(secrets, dict):
-        raise ValueError("Invalid provider secret references")
-    secrets = dict(secrets)
-    if saved.get("secret_name"):
-        secrets[old_provider] = saved["secret_name"]
-    saved["provider_secrets"] = secrets
-    provider = overrides.get("provider", old_provider)
-    if provider != old_provider:
-        saved.update(provider_defaults(provider))
-        saved["secret_name"] = secrets.get(provider)
-    return validate_settings({**saved, **overrides})
+    if "profiles" not in saved:
+        repair = overrides or {}
+        if repair.get("provider", saved.get("provider", "llama.cpp")) != saved.get("provider", "llama.cpp"):
+            repair = {}
+        legacy = validate_settings({**saved, **repair})
+        profiles = {}
+        for provider in PROVIDERS:
+            value = legacy if provider == legacy["provider"] else validate_settings({
+                "provider": provider, "secret_name": legacy["provider_secrets"].get(provider)})
+            profiles[provider] = {field: value[field] for field in FIELDS}
+        return {"profiles": profiles, "provider_secrets": legacy["provider_secrets"],
+                "user_provider": legacy["provider"], "developer_provider": legacy["provider"],
+                "user_enabled": False}
+    if (not isinstance(saved["profiles"], dict) or set(saved["profiles"]) != PROVIDERS or
+            any(saved.get(side + "_provider") not in PROVIDERS for side in ("user", "developer")) or
+            type(saved.get("user_enabled")) is not bool):
+        raise ValueError("Invalid shared Agent settings")
+    for provider, profile in saved["profiles"].items():
+        if not isinstance(profile, dict) or profile.get("provider") != provider:
+            raise ValueError("Invalid provider profile")
+        validate_settings({**profile, "provider_secrets": saved.get("provider_secrets", {})})
+    return {name: saved[name] for name in ("profiles", "provider_secrets", "user_provider",
+                                          "developer_provider", "user_enabled")}
+
+
+def load_settings(data_root: Path, overrides: dict | None = None, *, side="developer") -> dict:
+    """两侧分别选用 provider；CLI 临时覆盖不写回共享设置。"""
+    with SETTINGS_LOCK:
+        overrides = dict(overrides or {})
+        document = settings_document(data_root, overrides)
+        provider = overrides.get("provider", document[side + "_provider"])
+        if provider not in PROVIDERS:
+            raise ValueError("仅支持 llama.cpp 或 deepseek provider")
+        return validate_settings({**document["profiles"][provider],
+                                  "provider_secrets": document["provider_secrets"], **overrides})
+
+
+def _save_document(data_root: Path, document: dict) -> None:
+    # 平面视图保留 Developer 有效字段，供现有 CLI/诊断消费者读取。
+    selected = document["profiles"][document["developer_provider"]]
+    atomic_write_json(data_root / "agent-settings.json", {**selected, **document})
+
+
+def save_selection(data_root: Path, side: str, provider: str, *, enabled=None) -> None:
+    """仅保存一侧选用项与 User 开关，不覆盖共享连接内容。"""
+    if side not in {"user", "developer"} or provider not in PROVIDERS:
+        raise ValueError("Invalid Agent selection")
+    if enabled is not None and (side != "user" or type(enabled) is not bool):
+        raise ValueError("Invalid User Agent switch")
+    with SETTINGS_LOCK:
+        document = settings_document(data_root)
+        document[side + "_provider"] = provider
+        if enabled is not None:
+            document["user_enabled"] = enabled
+        _save_document(data_root, document)
+
+
+def settings_snapshot(args, data_root: Path, *, temporary_keys=None, key=None) -> tuple[dict, str]:
+    """与保存/删除凭据互斥，一次固定设置与实际认证，不在轮次中重读。"""
+    with SETTINGS_LOCK:
+        value = effective_settings(args, data_root)
+        actual = key if key is not None else (temporary_keys or {}).get(value["provider"])
+        if actual is None:
+            actual = resolve_key(args, value, data_root)
+        return deepcopy(value), actual
 
 
 def effective_settings(args, data_root: Path) -> dict:
@@ -158,25 +212,35 @@ def resolve_key(args, settings: dict, data_root: Path) -> str:
     return dpapi(secret_path(data_root, name).read_bytes(), decrypt=True).decode("utf-8")
 
 
-def save_settings(data_root: Path, values: dict, *, secret: str = "", clear: bool = False) -> dict:
-    """GUI 普通空输入保留凭据；只有明确清除才解除引用，返回值不包含密钥。"""
-    value = load_settings(data_root, values)
-    previous = value["secret_name"]
-    if clear:
-        value["secret_name"] = None
-    elif secret and sys.platform == "win32":
-        # 新名称避免保存配置失败时覆盖仍被旧配置引用的凭据。
-        import uuid
-        value["secret_name"] = "developer-" + str(uuid.uuid4())
-        save_secret(data_root, value["secret_name"], secret)
-    if value["secret_name"]:
-        value["provider_secrets"][value["provider"]] = value["secret_name"]
-    else:
-        value["provider_secrets"].pop(value["provider"], None)
-    atomic_write_json(data_root / "agent-settings.json", value)
-    if clear and previous and previous not in value["provider_secrets"].values():
-        secret_path(data_root, previous).unlink(missing_ok=True)
-    return value
+def save_settings(data_root: Path, values: dict, *, secret: str = "", clear: bool = False,
+                  side="developer", temporary_keys=None) -> dict:
+    """原子保存一套配置；空密钥保留，明确清除不影响活动认证快照。"""
+    with SETTINGS_LOCK:
+        document = settings_document(data_root, values)
+        value = load_settings(data_root, values, side=side)
+        previous = value["secret_name"]
+        if clear:
+            value["secret_name"] = None
+        elif secret and sys.platform == "win32":
+            import uuid
+            value["secret_name"] = "developer-" + str(uuid.uuid4())
+            save_secret(data_root, value["secret_name"], secret)
+        if value["secret_name"]:
+            value["provider_secrets"][value["provider"]] = value["secret_name"]
+        else:
+            value["provider_secrets"].pop(value["provider"], None)
+        document["profiles"][value["provider"]] = {field: value[field] for field in FIELDS}
+        document["provider_secrets"] = value["provider_secrets"]
+        document[side + "_provider"] = value["provider"]
+        _save_document(data_root, document)
+        if temporary_keys is not None:
+            if clear:
+                temporary_keys.pop(value["provider"], None)
+            elif secret and sys.platform != "win32":
+                temporary_keys[value["provider"]] = secret
+        if clear and previous and previous not in value["provider_secrets"].values():
+            secret_path(data_root, previous).unlink(missing_ok=True)
+        return value
 
 
 def settings_command(args, data_root: Path) -> int:

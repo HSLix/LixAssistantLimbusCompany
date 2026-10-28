@@ -45,14 +45,50 @@ def windows(tmp_path, monkeypatch):
 
 
 def test_shared_windows_and_independent_idle_close(windows):
+    from qfluentwidgets import FluentWindow
     app, owner, user, developer = windows
+    assert isinstance(user, FluentWindow) and isinstance(developer, FluentWindow)
     assert user.service is developer.service and user.host is developer.host
     assert owner.open_window(True) is developer
-    assert user.navigation.item(0).text() == 'Dashboard'
-    assert [developer.tabs.tabText(i) for i in range(developer.tabs.count())] == ['Capture', 'Agent Settings', 'Agent Repair']
+    assert user.pages.widget(0).objectName() == 'dashboard'
+    assert [developer.pages.widget(i).objectName() for i in range(developer.pages.count())] == ['developer-capture', 'developer-settings', 'developer-repair']
     assert developer.close()
     assert owner.developer is None and owner.user is user
     assert owner.open_window(True) is not developer
+
+
+def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(windows):
+    from PySide6.QtCore import Qt
+    _, _, user, developer = windows
+    assert [user.pages.widget(i).objectName() for i in range(2)] == ["dashboard", "general-settings"]
+    user.switchTo(user.general_settings)
+    assert user.pages.currentWidget() is user.general_settings
+    assert not user.pages.isAnimationEnabled()
+    assert user.task_scroll.verticalScrollBarPolicy() == Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+    developer.switchTo(developer.settings_view)
+    assert developer.pages.currentWidget() is developer.settings_view
+    assert not developer.pages.isAnimationEnabled()
+
+
+def test_native_owned_modal_keeps_other_fluent_window_editable(windows):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from qfluentwidgets import MessageBox
+    app, _, user, developer = windows
+    if app.platformName() == "offscreen":
+        pytest.skip("原生焦点验收需要真实图形会话，不用 offscreen 代替")
+    dialog = MessageBox("窗口范围", "仅阻塞所属 User 窗口", user)
+    dialog.setWindowModality(Qt.WindowModality.WindowModal)
+    dialog.show()
+    try:
+        developer.switchTo(developer.settings_view)
+        developer.activateWindow()
+        developer.settings_page.url.setFocus()
+        QTest.qWait(150)
+        assert app.focusWidget() is developer.settings_page.url
+    finally:
+        dialog.accept()
+        QTest.qWait(150)
 
 
 def test_user_run_blocks_developer_activity_but_allows_settings_and_idle_close(windows, monkeypatch):
@@ -68,7 +104,7 @@ def test_user_run_blocks_developer_activity_but_allows_settings_and_idle_close(w
         app.processEvents()
         assert user.trial_dialog is not None
         assert not developer.capture_page.capture_button.isEnabled()
-        assert developer.settings_page.save_button.isEnabled()
+        assert developer.settings_page.url.isEnabled()
         developer.settings_page.url.setText('http://saved-for-next-round/v1')
         with pytest.raises(StartError):
             developer.host.capture()
@@ -95,7 +131,7 @@ def test_agent_activity_blocks_user_start_but_not_navigation_or_settings(windows
         assert not user.start_button.isEnabled()
         with pytest.raises(StartError):
             user.start_plan()
-        user.navigation.setCurrentRow(1)
+        user.switchTo(user.general_settings)
         assert user.pages.currentIndex() == 1 and user.pages.isEnabled()
         assert user.close()
         assert owner.user is None and owner.developer is developer
@@ -135,7 +171,8 @@ def test_notifications_coexist_and_require_manual_dismissal(windows):
     app.processEvents()
     assert user.notifications.messages.count() == 2
     row = user.notifications.messages.itemAt(0).widget()
-    row.findChild(QPushButton).click()
+    assert row.duration == -1
+    row.closeButton.click()
     from PySide6.QtCore import QCoreApplication, QEvent
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert user.notifications.messages.count() == 1
@@ -172,7 +209,7 @@ try:
 finally:
     instance.close()
 '''
-    env = {**os.environ, 'QT_QPA_PLATFORM': 'offscreen'}
+    env = {**os.environ, 'QT_QPA_PLATFORM': 'cocoa' if sys.platform == 'darwin' else 'offscreen'}
     process = subprocess.Popen([sys.executable, '-c', script, str(ready), str(received)], env=env,
                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:

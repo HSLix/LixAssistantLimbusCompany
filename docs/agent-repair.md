@@ -1,5 +1,8 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
+
+
 2026-10-27：#331 已替换 JSON Plan 与独立 Runner，使用并存 User/Developer 窗口及唯一 Python Plan；见[实施记录](stage-4-331-implementation.md)。本文保留的 Stage 3 历史验收只代表对应版本。
 
 #330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主，[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 增加 Developer Policy 的自主发布和试运行。使用当前 Candidate，可编辑全部已有文件（含已有 Python Plan），按每条用户消息处理一轮并保留上下文；不自动重建草稿、不执行可变 Candidate、不设置 Default。Agent 可 Publish 后显式选择保存的 Manifest 进行试运行。
@@ -12,7 +15,7 @@
 
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
 - **Developer Selected Manifest**：窗口上方独立选择已保存版本，点击“试运行所选 Plan”运行其唯一不可变 Python Plan。不修改 Default 或 Candidate 来源；没有独立 Runner 页。Task/Subworkflow/Step 的直接启动仍可用 CLI 或 Agent trial_run。
-- **Agent Settings**：保存完整 Base URL、Model 和每轮请求上限，默认 20、最小 2。API Key 普通空输入保留原值；新输入覆盖，明确清除解除凭据。界面仅显示是否设置，不回读旧明文。Windows 使用当前用户 DPAPI；其他平台仅在本次 GUI 内存中保留输入的临时密钥。不会读写其他 pi 实例的个人配置。
+- **Agent Settings**：User/Developer 复用同一控件，每 provider 保存一套完整设置，两侧分别选用；输入框失焦保存、选择项立即保存，无需保存按钮。Developer 打开时 User Agent 设置不可编辑，关闭时提交后交还编辑权。保存完整 Base URL、Model 和每轮请求上限，默认 20、最小 2。API Key 普通空输入保留原值；新输入覆盖，明确清除解除凭据。界面仅显示是否设置，不回读旧明文。Windows 使用当前用户 DPAPI；其他平台仅在本次 GUI 内存中保留输入的临时密钥。不会读写其他 pi 实例的个人配置。
 - **Agent Repair**：从已有 Manifest 明确初始化或重建 Candidate；非空替换须确认，成功后开启新对话，失败保留原草稿及原对话。通过“打开 Agent 工作区”在系统文件管理器查看 Candidate，无需选择编辑目标；Agent 可修改多个已有文件，已有 Python Plan 可编辑，不开放任意文件创建。支持纯文字及任意数量的可选图片，每条消息启动一轮，最终回答后等待主动发送下一条。New Conversation 保留 Candidate 和固定 Diff 基线，旧日志保留。提问和最终回答按轮分块，工具默认显示可展开摘要；“查看累计 Diff”主动打开可伸缩滚动窗口，无常驻预览框。
 
 实际 Diff 与 Validator 结果供人工审阅。Publish 重新校验并生成新的不可变 Manifest，不运行它，也不设置 Default；设置 Default 是另一个明确操作。GUI 不增加运行时审批流程。
@@ -241,3 +244,5 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 平台 Key 隔离、旧配置迁移及生成声明/Pyright。已检查 offscreen 的 llama.cpp/DeepSeek 设置页，
 未重新调用真实模型或执行 Windows/真实游戏验收。探针的大图测试改为生成测试自有截图，不依赖
 仓库外的个人图片。`git diff --check` 通过。
+
+#332 的外置页面、配置交接、整应用重载及验证边界见[实施记录](stage-4-332-implementation.md)。CLI 未指定 provider 时使用 Developer 当前选用项；显式覆盖仍不回写。

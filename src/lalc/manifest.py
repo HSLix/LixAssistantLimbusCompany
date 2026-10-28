@@ -53,6 +53,27 @@ class LoadedComponent:
     component_id: str
     module: types.ModuleType
     role: str
+    supported_task_ids: tuple[str, ...] = ()
+
+
+def plan_task_ids(content: str | bytes) -> tuple[str, ...]:
+    """只读取 Plan 的字面量任务声明，不推测调用或运行模块表达式。"""
+    tree = ast.parse(content)
+    declarations = []
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        if any(isinstance(target, ast.Name) and target.id == "SUPPORTED_TASK_IDS" for target in targets):
+            declarations.append(node.value)
+    if not declarations:
+        return ()
+    try:
+        value = ast.literal_eval(declarations[0])
+    except (ValueError, TypeError, SyntaxError):
+        raise ValueError("SUPPORTED_TASK_IDS must be a literal list of unique non-empty task IDs") from None
+    if (len(declarations) != 1 or type(value) is not list or
+            any(type(item) is not str or not item.strip() for item in value) or len(set(value)) != len(value)):
+        raise ValueError("SUPPORTED_TASK_IDS must be a literal list of unique non-empty task IDs")
+    return tuple(value)
 
 
 @dataclass(frozen=True)
@@ -646,6 +667,10 @@ class ManifestManager:
         condition = functions.get("condition", [])
         verify = functions.get("verify", [])
         if role == "automation_plan":
+            try:
+                plan_task_ids(ast.unparse(tree))
+            except ValueError as error:
+                errors.append(ValidationError("plan_tasks_invalid", str(error), logical_name))
             if condition or verify:
                 errors.append(ValidationError("plan_callable_forbidden", "Plan cannot define condition or verify.", logical_name))
             if execute and not (self._input_annotation_allowed(execute[0].returns)
@@ -947,7 +972,8 @@ class ManifestManager:
                         )
                         continue
                 loaded_sections[section][name] = LoadedComponent(
-                    component_id, module, role
+                    component_id, module, role,
+                    plan_task_ids(prepared.sources[component_id].content) if role == "automation_plan" else (),
                 )
         if errors:
             return None, errors

@@ -135,7 +135,7 @@ def wait_jobs(app, window):
 def test_three_pages_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
-    assert [window.tabs.tabText(i) for i in range(3)] == ["Capture", "Agent Settings", "Agent Repair"]
+    assert [window.pages.widget(i).objectName() for i in range(3)] == ["developer-capture", "developer-settings", "developer-repair"]
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
@@ -280,11 +280,13 @@ def test_crop_reselection_clears_old_outline_and_keeps_new_region(gui):
         QTest.mouseMove(view, QPoint(200, 120))
         QTest.mouseRelease(view, Qt.MouseButton.LeftButton, pos=QPoint(200, 120))
         assert view.region == {"x": 20, "y": 10, "width": 30, "height": 20}
-        assert view.grab().toImage().pixelColor(80, 40) != QColor(80, 50, 30)
+        image = view.grab().toImage()
+        ratio = image.devicePixelRatio()
+        assert image.pixelColor(round(80 * ratio), round(40 * ratio)) != QColor(80, 50, 30)
 
         QTest.mousePress(view, Qt.MouseButton.LeftButton, pos=QPoint(360, 160))
         assert view.region is None and selections[-1] == {}
-        assert view.grab().toImage().pixelColor(80, 40) == QColor(80, 50, 30)
+        assert view.grab().toImage().pixelColor(round(80 * ratio), round(40 * ratio)) == QColor(80, 50, 30)
         QTest.mouseMove(view, QPoint(240, 80))
         QTest.mouseRelease(view, Qt.MouseButton.LeftButton, pos=QPoint(240, 80))
         expected = {"x": 60, "y": 20, "width": 30, "height": 20}
@@ -420,7 +422,7 @@ def test_repair_error_is_not_agent_reply_and_normal_answer_stays_reply(gui, monk
 
 def test_interaction_error_uses_redacted_details_and_keeps_log_entry(gui, caplog):
     app, window = gui
-    window.tabs.setCurrentWidget(window.settings_page)
+    window.switchTo(window.settings_view)
     window.settings_page.key.setText("gui-secret")
     def fail():
         raise ValueError("gui-secret failed")
