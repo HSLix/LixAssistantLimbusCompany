@@ -59,10 +59,11 @@ def test_complete_developer_cli_lifecycle(
     assert cli.main(["init"]) == 0
     candidate = project / "candidate"
     manifest_path = candidate / "manifest.json"
-    assert json.loads(manifest_path.read_text(encoding="utf-8"))["components"] == {}
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["components"] == {"plans.default": {"source_path": "plan.py"}}
 
     for source in FIXTURE.iterdir():
-        shutil.copyfile(source, candidate / source.name)
+        if source.is_file():
+            shutil.copyfile(source, candidate / source.name)
 
     assert cli.main(["validate"]) == 0
     assert not (runtime / "manifests").exists()

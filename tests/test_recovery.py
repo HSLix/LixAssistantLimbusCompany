@@ -98,6 +98,8 @@ def _publish(
     }
     path = folder / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(path, '    ctx.call("tasks.run", value=1)\n')
     result = manager.publish(path)
     assert result.ok, result.errors
     return result.loaded.manifest_id
@@ -141,9 +143,7 @@ def test_recovery_failures_propagate_original_traceback(tmp_path: Path, phase: s
         choices = iter([replacement, None])
         choice = lambda *_: next(choices)
     service = ApplicationService(tmp_path, manifest_manager=manager, recovery_choice=choice)
-    plan = tmp_path / "plan.json"
-    plan.write_text(json.dumps({"items": [{"task": "tasks.run", "inputs": {"value": 1}}]}), encoding="utf-8")
-    state = _finish(service, service.start_plan(plan, manifest_id=base))
+    state = _finish(service, service.start_plan( manifest_id=base))
     item = state["result"]["items"][0]
     assert item["failure_code"] == "execution_failed"
     diagnostic = item["traceback"]

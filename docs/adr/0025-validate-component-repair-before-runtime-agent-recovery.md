@@ -5,6 +5,8 @@ supersedes: 0013 (Stage 3 scope only)
 
 # Validate Component repair before Runtime Agent Recovery
 
+2026-10-26 排期更新：本文原 Stage 3.5 的完整运行时维护范围已确认延后至 Stage 6；Stage 3 已有修复能力保留。其他 Stage 4–6 内容仅为[待讨论草案](../reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案)，不替代既有执行/权限契约。
+
 后续 [ADR 0029](0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 将 Developer GUI、显式候选生命周期、多文件授权与连续对话纳入独立修复；本 ADR 的单 Component 范围不再约束该新需求。运行中 Working Manifest 衔接、自动接管和正式运行时试跑仍属于 Stage 3.5。
 
 2026-10-23 修订：[ADR 0028](0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) 允许 Stage 3 使用实时截图和受限的现场裁剪新增 Asset 工具，并明确从 Default Manifest 重建 Developer Candidate。下文“不新增 Asset”的历史范围由其取代，运行时恢复仍留给 Stage 3.5。

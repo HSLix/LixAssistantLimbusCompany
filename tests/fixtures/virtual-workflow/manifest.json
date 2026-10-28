@@ -9,6 +9,9 @@
     },
     "steps.say_hello": {
       "source_path": "steps.say_hello.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
     }
   },
   "recovery_rules": {}

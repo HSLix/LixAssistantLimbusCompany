@@ -1,9 +1,6 @@
 {
   "schema_version": 2,
   "components": {
-    "tasks.example": {
-      "source_path": "tasks.example.py"
-    },
     "subworkflows.observe": {
       "source_path": "subworkflows.observe.py"
     },
@@ -27,7 +24,23 @@
     },
     "steps.match": {
       "source_path": "steps.match.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
+    },
+    "tasks.exp": {
+      "source_path": "exp.py"
+    },
+    "tasks.mirror": {
+      "source_path": "mirror.py"
+    },
+    "steps.check_popup": {
+      "source_path": "steps.check_popup.py"
     }
   },
-  "recovery_rules": {}
+  "recovery_rules": {
+    "recovery.close_popup": {
+      "source_path": "recovery.close_popup.py"
+    }
+  }
 }

@@ -9,6 +9,9 @@ import json
 from pathlib import Path
 import shutil
 import tempfile
+from contextlib import contextmanager
+
+from .process_lock import ProcessLock
 
 from .focused import FocusedAutomationSession, WindowError
 from .runtime import atomic_write_json
@@ -28,8 +31,8 @@ def candidate_files(candidate: Path) -> dict[str, bytes]:
 
 
 def editable_files(candidate: Path) -> tuple[str, ...]:
-    """冻结本轮全部已有文件；不按校验或 Manifest 引用过滤，plan.json 只读。"""
-    return tuple(name for name in candidate_files(candidate) if "plan.json" not in Path(name).parts)
+    """冻结本轮全部已有文件；不按校验或 Manifest 引用过滤，已有 Python Plan 可编辑。"""
+    return tuple(candidate_files(candidate))
 
 
 def file_diff(original: dict[str, bytes], current: dict[str, bytes]) -> str:
@@ -66,6 +69,16 @@ class DeveloperHost:
         self.monitored_window = None
         self.secrets = {}
 
+    def candidate_lock(self):
+        """同一草稿的跨进程锁；不受运行数据目录影响。"""
+        return ProcessLock("candidate:" + str(self.candidate.resolve()))
+
+    @contextmanager
+    def candidate_activity(self, name):
+        """同时检查本服务活动与其他进程对同一草稿的占用。"""
+        with self.service.activity(name), self.candidate_lock():
+            yield
+
     @property
     def secret(self):
         """当前已保存平台的临时凭据，不跨平台复用。"""
@@ -83,7 +96,7 @@ class DeveloperHost:
 
     def initialize(self, manifest_id: str | None, *, replace: bool = False) -> None:
         """先完整物化；替换或元数据保存失败时恢复原 Candidate 和基线。"""
-        with self.service.activity("Candidate 初始化"):
+        with self.candidate_activity("Candidate 初始化"):
             if self.candidate.is_symlink() or (self.candidate.exists() and not self.candidate.is_dir()):
                 raise ValueError("Candidate must be a real directory")
             if self.candidate.exists() and any(self.candidate.iterdir()) and not replace:
@@ -137,7 +150,9 @@ class DeveloperHost:
         tree = ast.parse(source, filename=filename)
         errors = []
         if section == "components":
-            self.manager._validate_component_source(tree, logical_name, errors)
+            role = self.manager._validate_component_source(tree, logical_name, errors)
+            if role == "automation_plan":
+                raise ValueError("Plan 由初始化提供；Agent 只能编辑已有 Plan，不能新增 Plan。")
         else:
             self.manager._validate_recovery_source(tree, logical_name, errors)
         self.manager._validate_source_structure(tree, [(section, logical_name)], errors)
@@ -182,7 +197,7 @@ class DeveloperHost:
         return file_diff(self.baseline(), candidate_files(self.candidate))
 
     def validate(self) -> dict:
-        with self.service.activity("Candidate 校验"):
+        with self.candidate_activity("Candidate 校验"):
             errors = self.manager.validate(self.candidate / "manifest.json")
             result = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
             if self.conversation:
@@ -190,14 +205,14 @@ class DeveloperHost:
             return result
 
     def publish(self) -> str:
-        with self.service.activity("Candidate 发布"):
+        with self.candidate_activity("Candidate 发布"):
             result = self.manager.publish(self.candidate / "manifest.json")
             if not result.ok:
                 raise ValueError(json.dumps([error.as_dict() for error in result.errors], ensure_ascii=False))
             return result.loaded.manifest_id
 
     def new_conversation(self):
-        with self.service.activity("新对话"):
+        with self.candidate_activity("新对话"):
             from .agent_repair import RepairConversation
             candidate_files(self.candidate)
             if not self.metadata.exists():

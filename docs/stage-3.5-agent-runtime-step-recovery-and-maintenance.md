@@ -1,4 +1,8 @@
-# Stage 3.5: Agent Runtime Step Recovery and Maintenance
+# Stage 6（原 Stage 3.5）: Agent Runtime Step Recovery and Maintenance
+
+2026-10-27 Stage 4 grill 已结束：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受 Python Plan 的身份、开发编辑和执行入口迁移，将这些基础工作提前纳入 Stage 4；下文 Python Plan TODO 的这部分不再待定。Plan 自身故障后的 Agent 评估/修复及试运行仍属 Stage 6，仅在 User Agent 启用时触发；续接/副作用/预算仍待讨论。其他 Stage 6 新提案不因本次同步自动接受。
+
+2026-10-26 排期确认：原 Stage 3.5 的完整 Runtime Agent Maintenance 延后至 **Stage 6**。保留本路径以维持引用；下文 Stage 3.5 为原阶段名，Confirmed scope 和待讨论项各保留其状态。其他 Stage 4–6 新提案见[路线图规划记录](reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案)，尚未接受为技术方案；下一轮 grill 聚焦 Stage 4 的重要设计和实现边界。本次不改运行时契约或代码。
 
 Status: deferred from Stage 3 by ADR 0025. The prior runtime architecture, including the #310 and #311 decisions, is retained as the Stage 3.5 design baseline; implementation and the recovery-ladder discussion remain future work. Stage 3.5 is not a prerequisite for the Stage 3 repair experiment.
 

@@ -1,6 +1,0 @@
-{
-  "items": [
-    {"task": "tasks.greet", "inputs": {"name": "Lix"}},
-    {"task": "tasks.greet", "inputs": {"name": "朋友"}}
-  ]
-}

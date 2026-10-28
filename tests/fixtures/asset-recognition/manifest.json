@@ -6,6 +6,9 @@
     },
     "steps.crop": {
       "source_path": "steps.crop.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
     }
   },
   "recovery_rules": {}

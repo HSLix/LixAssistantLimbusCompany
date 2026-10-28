@@ -84,6 +84,8 @@ def _publish(
     }
     path = candidate / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")
+    from runtime_support import add_plan
+    add_plan(path, '    ctx.call("tasks.rotate_teams", teams=["alpha"])\n')
     if manager is None:
         manager = ManifestManager(root)
         from runtime_support import register_sources
@@ -287,10 +289,10 @@ def test_gui_start_error_exposes_original_traceback(tmp_path: Path, monkeypatch)
         raise StartError("manifest_unavailable", "cannot start") from OSError("native startup failure")
 
     notices = []
-    monkeypatch.setattr(service, "start", reject)
+    monkeypatch.setattr(service, "start_plan", reject)
     monkeypatch.setattr(ErrorDialog, "open", lambda notice: notices.append(notice.details.toPlainText()))
     window = MainWindow(service)
-    window._start()
+    window._interact(window.service.start_plan)
     assert "OSError: native startup failure" in notices[0]
     assert "in reject" in notices[0]
     assert "StartError: cannot start" in notices[0]

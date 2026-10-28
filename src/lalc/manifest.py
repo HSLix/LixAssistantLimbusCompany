@@ -20,10 +20,12 @@ from .runtime import _exception_fields, atomic_write_json, sha256_bytes
 
 SCHEMA_VERSION = 2
 SECTIONS = ("components", "recovery_rules")
-ROLES = {"task_workflow", "sub_workflow", "step"}
+ROLES = {"task_workflow", "sub_workflow", "step", "automation_plan"}
 TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS}
 SAVED_TOP_LEVEL_FIELDS = {*TOP_LEVEL_FIELDS, "manifest_id"}
 COMPONENT_ID_PREFIX = "sha256:"
+EMPTY_PLAN = '"""空调度 Plan；由开发者填写 Task 调用。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:\n    return None\n'
+
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,27 @@ class LoadedComponent:
     component_id: str
     module: types.ModuleType
     role: str
+    supported_task_ids: tuple[str, ...] = ()
+
+
+def plan_task_ids(content: str | bytes) -> tuple[str, ...]:
+    """只读取 Plan 的字面量任务声明，不推测调用或运行模块表达式。"""
+    tree = ast.parse(content)
+    declarations = []
+    for node in tree.body:
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        if any(isinstance(target, ast.Name) and target.id == "SUPPORTED_TASK_IDS" for target in targets):
+            declarations.append(node.value)
+    if not declarations:
+        return ()
+    try:
+        value = ast.literal_eval(declarations[0])
+    except (ValueError, TypeError, SyntaxError):
+        raise ValueError("SUPPORTED_TASK_IDS must be a literal list of unique non-empty task IDs") from None
+    if (len(declarations) != 1 or type(value) is not list or
+            any(type(item) is not str or not item.strip() for item in value) or len(set(value)) != len(value)):
+        raise ValueError("SUPPORTED_TASK_IDS must be a literal list of unique non-empty task IDs")
+    return tuple(value)
 
 
 @dataclass(frozen=True)
@@ -326,6 +349,9 @@ class ManifestManager:
                 "components": {},
                 "recovery_rules": {},
             }
+            if not manifest["components"]:
+                (temporary / "plan.py").write_text(EMPTY_PLAN, encoding="utf-8")
+                candidate["components"]["plans.default"] = {"source_path": "plan.py"}
             for section in SECTIONS:
                 for logical_name, entry in manifest.get(section, {}).items():
                     filename = f"{logical_name}.py"
@@ -422,6 +448,9 @@ class ManifestManager:
         prepared.manifest = normalized
 
         self._parse_sources(normalized, prepared)
+        if sum(role == "automation_plan" for role in prepared.roles.values()) != 1:
+            prepared.errors.append(ValidationError("unique_plan_required",
+                "Manifest is incompatible: exactly one Python Automation Plan is required; explicitly republish to migrate."))
         self._validate_calls(normalized, prepared)
         return prepared
 
@@ -633,11 +662,21 @@ class ManifestManager:
                 )
             else:
                 role = decorators[0]
-                self._validate_execute_signature(execute[0], logical_name, errors)
+                self._validate_execute_signature(execute[0], logical_name, errors, plan=role == "automation_plan")
 
         condition = functions.get("condition", [])
         verify = functions.get("verify", [])
-        if role == "task_workflow":
+        if role == "automation_plan":
+            try:
+                plan_task_ids(ast.unparse(tree))
+            except ValueError as error:
+                errors.append(ValidationError("plan_tasks_invalid", str(error), logical_name))
+            if condition or verify:
+                errors.append(ValidationError("plan_callable_forbidden", "Plan cannot define condition or verify.", logical_name))
+            if execute and not (self._input_annotation_allowed(execute[0].returns)
+                                or isinstance(execute[0].returns, ast.Name) and execute[0].returns.id == "Any"):
+                errors.append(ValidationError("signature_invalid", "Plan return must be JSON-compatible.", logical_name))
+        elif role == "task_workflow":
             if execute and not self._input_annotation_allowed(execute[0].returns):
                 errors.append(
                     self._node_error(
@@ -799,7 +838,10 @@ class ManifestManager:
                             "component_call_unresolved", f"Unknown Component target: {target}", logical_name, call
                         )
                     )
-                elif target_role == "task_workflow":
+                elif target_role == "automation_plan" or (role == "automation_plan" and target_role != "task_workflow"):
+                    prepared.errors.append(self._node_error("component_call_role_invalid",
+                        "Plan may only call Task Workflows; Components cannot call Plan.", logical_name, call))
+                elif target_role == "task_workflow" and role != "automation_plan":
                     prepared.errors.append(
                         self._node_error(
                             "component_call_role_invalid", "Task Workflow cannot be called through ctx.call.", logical_name, call
@@ -837,6 +879,7 @@ class ManifestManager:
         errors: list[ValidationError],
     ) -> None:
         allowed = {
+            ("automation_plan", "execute"): set(),
             ("task_workflow", "execute"): {"observe"},
             ("sub_workflow", "execute"): {"observe"},
             ("step", "execute"): {"observe", "control"},
@@ -929,7 +972,8 @@ class ManifestManager:
                         )
                         continue
                 loaded_sections[section][name] = LoadedComponent(
-                    component_id, module, role
+                    component_id, module, role,
+                    plan_task_ids(prepared.sources[component_id].content) if role == "automation_plan" else (),
                 )
         if errors:
             return None, errors
@@ -1091,6 +1135,7 @@ class ManifestManager:
         function: ast.FunctionDef | ast.AsyncFunctionDef,
         logical_name: str,
         errors: list[ValidationError],
+        *, plan: bool = False,
     ) -> None:
         arguments = function.args
         valid = (
@@ -1103,7 +1148,12 @@ class ManifestManager:
             and function.returns is not None
             and all(item.annotation is not None for item in arguments.kwonlyargs)
         )
-        if valid:
+        if valid and plan:
+            valid = ([item.arg for item in arguments.kwonlyargs] == ["task_repetitions", "settings"]
+                     and [ast.unparse(item.annotation) for item in arguments.kwonlyargs]
+                     == ["dict[str, int]", "dict[str, Any]"]
+                     and all(default is None for default in arguments.kw_defaults))
+        elif valid:
             valid = all(self._input_annotation_allowed(item.annotation) for item in arguments.kwonlyargs)
         if valid:
             for default in arguments.kw_defaults:

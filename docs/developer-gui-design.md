@@ -1,6 +1,15 @@
 # Developer GUI — Accepted Design
 
-状态：设计已接受，四页及共享宿主已实现；自动化、真模型和 Windows 验收分开记录，见文末实施状态。[GitHub #330](https://github.com/HSLix/LixAssistantLimbusCompany/issues/330) 已创建并标记 ready-for-agent，作为 #329 的原生 blocker。架构修订见 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md)。以下为逐项确认的决定及从原草案保留的要求，不把当前 CLI 已有能力或文档完成视为 GUI 已实现。
+2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
+
+
+2026-10-27 #331 实施更新：当前使用唯一不可变 Python Plan、User/Developer 双窗口及跨进程游戏排他；已有 Candidate Plan 可编辑。现行入口和迁移步骤见[实施记录](stage-4-331-implementation.md)。下文旧 JSON Plan、Runner 页及 plan.json 只读内容保留为历史设计/验收，不能作为当前操作要求。
+
+2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，#331 已迁移，#332 已实现外置页、共享设置与即时保存（[证据](stage-4-332-implementation.md)），#333–#334 尚未实现，不得把这些旧操作说明当作新 Stage 4 规格。
+
+状态（2026-10-26）：四页及后续增量已完成实现与回归核验，按开发者确认关闭 [#330](https://github.com/HSLix/LixAssistantLimbusCompany/issues/330)。真模型、Windows 和真实游戏验收仍分别记录，并由 #329 完成最终集成与交付；见文末关闭核验。历史记录不计为新的实机证据。
+
+2026-10-27 #332：User/Developer 共用现有 Agent 设置控件，每 provider 一套内容、两侧独立选用。输入框失焦保存、选择项立即保存；Developer 打开时 User Agent 区域禁用，关闭并提交后恢复。认证与配置每轮一起固定，整应用重载先保存/清理再释放单实例锁和启动新进程。详见[当前用法](stage-4-332-implementation.md)。
 
 ## Confirmed decisions
 
@@ -147,7 +156,7 @@
 
 ### example：Recovery Rule 示例
 
-- 新增 `example/recovery-rule/`，包含独立 manifest.json、触发恢复路径的 Step、Recovery Rule 源码及 README，展示 Step 失败后 detect、recover、重试当前 Step 的完整路径与 Trace 定位。
+- 新增 `example/workflow/`，包含独立 manifest.json、触发恢复路径的 Step、Recovery Rule 源码及 README，展示 Step 失败后 detect、recover、重试当前 Step 的完整路径与 Trace 定位。
 - 展示 detect 仅观察、recover 使用既有控制动作、两者均不调用其他正式 Component 的契约；沿用执行器最多重试当前 Step 一次、多个规则匹配时报错的既有语义。
 - README 给出素材/窗口准备、导入 Candidate、校验/发布和显式运行步骤。复用现有应用动作，不为演示新增业务专属 Trusted Action 或运行时 Agent Recovery。
 - 自动化可以使用平台替身验证控制流及失败分支，必须区分这些证据与 Windows/真实游戏验收。
@@ -167,7 +176,7 @@
 - 框选提供 5× 原图像素放大窗及中心十字，跟随鼠标更新，在边缘补底色，离开或换图隐藏；鼠标事件穿透，不改变框选和保存像素。Capture 已做 offscreen 渲染检查，示意产物位于本次本机 `/tmp/lalc-capture-increment.png`，不计 Windows 实机证据。
 - add_component / add_recovery_rule 接收 filename、logical_name、source；复用源码结构检查，不导入新源码。新建文件与 Manifest 登记以替换 Manifest 为提交点，失败/提交前取消会清理文件和新增目录。拒绝覆盖、跨分区重名、越界与符号链接；仅工具成功创建的文件可同轮继续编辑，进入快照和累计 Diff。取消时等待工具线程完成或回退再保存最终快照。
 - GUI 可累计多选图片，按钮显示数量和文件路径，清除整组；CLI 重复 --image。新增 Pillow 到 automation 依赖及 uv.lock，按实际内容识别 MIME 并校验图片，不自建格式白名单、转码或设置附件数量上限；纯文字不导入可选图片解码依赖。预检整组只计一次请求。原图通过 context hook 注入，跳过 pi RPC 的转码/静默丢图；日志独立保存附件名称/类型/顺序/原字节，格式纠正及后续消息沿用原图。服务拒绝走既有错误路径，不自动删图或重发。
-- 新增 example/recovery-rule/（独立 Manifest、Step、规则和 README），复用生产 observe/control 动作及确定性恢复；覆盖无弹窗、唯一目标恢复、点击无效、目标不唯一与多规则匹配。不新增运行时 Agent 或专属 Trusted Action。
+- 新增 example/workflow/（独立 Manifest、Step、规则和 README），复用生产 observe/control 动作及确定性恢复；覆盖无弹窗、唯一目标恢复、点击无效、目标不唯一与多规则匹配。不新增运行时 Agent 或专属 Trusted Action。
 
 验证：
 
@@ -250,3 +259,13 @@ DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/archit
 实现：publish、trial_run、list_runs、read_run_log 由共享 Python 宿主和 pi 工具注册共同提供。trial_run 的说明提醒修改 Candidate 后先 Publish，参数必须显式指定 Manifest ID，入口是 logical_name + inputs 或 Candidate 内的 plan_path。Agent 活动始终保留排他权，仅允许宿主所属试运行进入普通执行器，其他 Runner/Capture/候选操作仍被阻止。运行结果作为工具返回值触发同轮后续模型请求，不另起用户消息轮次、不重置额度；取消本轮时先停试运行并等清理完成。模态窗口不接受 Escape/关闭按钮绕过运行，结束后自动关闭；普通试运行失败交给 Agent 而不重复弹主窗口错误框，应用致命错误仍沿用原有处理。
 
 2026-10-25 检查：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q` 为 **392 passed, 43 skipped**；显式 `--run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **38 passed, 4 skipped**。覆盖四类入口、已保存版本与未发布修改分离、启动拒绝无 Run ID、运行失败/停止反馈、取消等待收尾、交互日志失败时停止运行、日志分页与截图引用、模态窗口属性/控件/自动关闭，以及真实 pi + 本机 HTTP 替身的同轮编辑→发布→试运行→日志调用和额度连续性。Agent 测试首次因沙箱禁止本机监听而无法建立替身服务，授权本机监听后重新执行并得到上述结果；不把首次环境错误计为通过。4 项跳过的真实模型/Windows 检查未执行，真实 Windows 游戏焦点、接管、模态交互及真实模型开发循环仍待实机验收；offscreen/HTTP 替身不替代这些证据。
+
+## 2026-10-26 关闭核验
+
+按开发者本次确认，#330 的实现与回归范围完成并关闭；Windows、真实模型/游戏前后对照及 TA 交付继续由 #329 验收。此记录替代历史“#330 保持打开”的当前状态，不改变历史未执行项目的结果。
+
+- 核验源码版本：`83f63da46eeaa3508da1a89bb1fb9dbd216184b0`。四页共用应用服务；Candidate 显式重建/连续多文件编辑与 plan.json 只读、专用新增并登记源码、取消/并发/密钥/数据保留、轮次额度、诊断日志、多图片、Capture 尺寸与放大、对话工具去重及独立 Diff 均已有实现和回归覆盖。
+- 最新接受范围以 ADR 0029–0031 为准：包括 provider 设置、Developer Policy 发布/试运行/Run 日志、截图网格、裁剪预览后保存及 Asset 移除归档；早期禁止 Agent 发布/试运行或绝对禁止 Asset 移除的描述为历史边界。
+- 普通回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra` → **407 passed, 48 skipped**；跳过 47 项须显式启用的 Agent 测试及 1 项 Windows 原生 DPAPI。
+- 专项接入：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py` → **43 passed, 4 skipped**；通过项使用真实 pi + 本机 HTTP 替身。2 项真模型因未提供显式测试连接配置跳过，Windows DPAPI 认证及现场游戏窗口各 1 项因平台跳过。本次未调用真实模型，不以替身/offscreen 计为实机或游戏通过。
+- #329 原生依赖已核实包含 #326、#327、#328、#330；#329 保留真实缺陷修复前后对照、Windows/DPI/焦点/认证及最终交付责任。#328 的准备完成由开发者本次确认，本轮没有重新执行该游戏案例。

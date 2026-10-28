@@ -3,6 +3,9 @@
   "components": {
     "steps.control": {
       "source_path": "steps.control.py"
+    },
+    "plans.default": {
+      "source_path": "plan.py"
     }
   },
   "recovery_rules": {}

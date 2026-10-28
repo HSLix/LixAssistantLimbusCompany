@@ -145,7 +145,7 @@ def test_native_read_edit_and_validation_keep_completion_rows(gui):
 def test_history_scroll_position_is_kept_and_bottom_can_follow(gui):
     app, window = gui
     page, chat = window.repair_page, window.repair_page.chat
-    window.tabs.setCurrentWidget(page)
+    window.switchTo(page)
     window.resize(900, 800)
     window.show()
     app.processEvents()

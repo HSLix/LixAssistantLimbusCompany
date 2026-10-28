@@ -17,7 +17,7 @@ from test_assets import Window
 def test_three_level_example_and_all_production_actions(tmp_path):
     """使用生产注册动作，只替换 Windows 平台，证明样例走统一应用入口。"""
     candidate = tmp_path / "candidate"
-    shutil.copytree(Path(__file__).resolve().parents[1] / "example" / "trusted-actions", candidate)
+    shutil.copytree(Path(__file__).resolve().parents[1] / "example" / "workflow", candidate)
     manager = ManifestManager(tmp_path / "data", actions=application_actions())
     assert not manager.validate(candidate / "manifest.json")
     published = manager.publish(candidate / "manifest.json")
@@ -34,7 +34,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
         assert persisted == state["trace"]
         traces.extend(state["trace"])
         return state
-    state = run("tasks.example", {})
+    state = run("tasks.exp", {})
     entered = [e["role"] for e in state["trace"] if e["event"] == "component_started"]
     assert entered == ["task_workflow", "sub_workflow", "step", "step"]
     assert Path(state["result"]["output"]["evidence_path"]).is_file()
@@ -55,3 +55,37 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())
+
+
+def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
+    """两个真实页面的配置、循环次数进入已发布 Plan，并产生动作及 Task 记录。"""
+    from PySide6.QtWidgets import QApplication
+    from lalc.user_pages import UserSettings, discover_pages, task_inputs
+    app = QApplication.instance() or QApplication([])
+    example = Path(__file__).resolve().parents[1] / "example"
+    assert {path.name for path in example.iterdir()} == {"pages", "workflow"}
+    manager = ManifestManager(tmp_path / "data", actions=application_actions())
+    saved = manager.publish(example / "workflow/manifest.json")
+    assert saved.ok, saved.errors
+    store = UserSettings(manager.data_root)
+    pages, errors = discover_pages(example / "pages", store)
+    assert not errors
+    assert {page.page_id for page in pages} == {"exp", "mirror"}
+    for page in pages:
+        page.widget.message.setText(page.page_id + " message")
+        page.context.save(page.widget.submit())
+        store.save_task(page.task_id, True, 2 if page.task_id == "exp" else 1)
+    repetitions, settings, warnings = task_inputs(pages, ("exp", "mirror"), store)
+    assert not warnings
+    service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=Window())
+    service.start_plan(manifest_id=saved.loaded.manifest_id, task_repetitions=repetitions, settings=settings)
+    state = service.wait_for(lambda current: current["phase"] == "finished")
+    service._thread.join()
+    result = state["result"]
+    assert result["status"] == "completed" and result["all_tasks_succeeded"], result
+    assert [item["output"]["message"] for item in result["items"]] == ["exp message", "exp message", "mirror message"]
+    assert {event["logical_name"] for event in state["trace"] if event["event"] == "trusted_action_started"} == {
+        "observe.capture_screen", "control.wait"}
+    for page in pages:
+        page.widget.close()
+    app.processEvents()

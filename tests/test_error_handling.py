@@ -191,6 +191,8 @@ def test_fatal_report_always_exits_gui_event_loop(monkeypatch, capsys, dialog_fa
 
 
 def test_gui_outer_hooks_forward_main_and_thread_errors_then_restore(tmp_path: Path, monkeypatch) -> None:
+    # 本测试只验证生命周期错误出口；真实跨进程通道由 test_user_gui 覆盖。
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
     from PySide6.QtWidgets import QApplication
     import lalc.gui as gui
     app = QApplication.instance() or QApplication([])
@@ -277,23 +279,23 @@ def test_unhandled_completion_error_still_publishes_terminal_fatal_result(tmp_pa
     assert "OSError: completion failed" in result_diagnostics(state["result"])
 
 
-def test_gui_completed_task_failure_is_reported_once(tmp_path: Path, monkeypatch, caplog) -> None:
+def test_gui_completed_task_failure_is_reported_once(tmp_path, monkeypatch):
     from PySide6.QtWidgets import QApplication
-    from lalc.gui import MainWindow, ErrorDialog
+    from lalc.gui import GuiCoordinator
+    from lalc.lifecycle import ApplicationLifecycle
     app = QApplication.instance() or QApplication([])
-    window = MainWindow(ApplicationService(tmp_path))
-    dialogs = []
-    monkeypatch.setattr(ErrorDialog, "open", lambda dialog: dialogs.append(dialog.details.toPlainText()))
-    state = window.service.state
-    state.update(phase="finished", run_id=1, result={
-        "status": "failure", "failure_code": "execution_failed",
-        "traceback": "OSError: original execution error",
-    })
-    with caplog.at_level(logging.ERROR):
-        window.render_state(state)
-        window.render_state(state)
-    assert dialogs == ["OSError: original execution error"]
-    assert "OSError: original execution error" in caplog.text
+    service = ApplicationService(tmp_path)
+    owner = GuiCoordinator(service, ApplicationLifecycle())
+    window = owner.open_window()
+    notices = []
+    monkeypatch.setattr(window.notifications, "notify", lambda *args: notices.append(args))
+    window.owns_run = True
+    state = {**service.state, "phase": "finished", "run_id": 1, "result": {
+        "status": "interrupted", "reason": "execution_failed",
+        "traceback": "OSError: original execution error"}}
+    window.render_state(state)
+    window.render_state(state)
+    assert len(notices) == 1 and "OSError: original execution error" in notices[0][1]
     window.close()
     app.processEvents()
 
@@ -323,7 +325,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
     if failure_at == "worker":
         def fail(*args):
             raise RuntimeError("plan worker failed")
-        monkeypatch.setattr(service, "_run_plan", fail)
+        monkeypatch.setattr(service, "_run", fail)
     elif failure_at == "completion":
         def fail(result):
             raise RuntimeError("plan completion failed")
@@ -336,9 +338,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
             return teams
         execute.__lalc_role__ = "task_workflow"
         manager.default.components["tasks.rotate_teams"].module.execute = execute
-    path = tmp_path / "plan.json"
-    path.write_text(json.dumps({"items": [{"task": "tasks.rotate_teams", "inputs": {"teams": ["alpha"]}}]}), encoding="utf-8")
-    state = _finished(service, service.start_plan(path))
+    state = _finished(service, service.start_plan())
     result = state["result"]
     assert result["fatal"] and result["status"] == "interrupted"
     assert result["reason"] == "fatal_error" and "failure_code" not in result
@@ -386,6 +386,8 @@ def test_lifecycle_normal_gui_exit_restores_hooks(tmp_path: Path) -> None:
 
 
 def test_unhandled_background_thread_reports_fatal_on_gui_thread(tmp_path: Path, monkeypatch) -> None:
+    # 本测试只验证生命周期错误出口；真实跨进程通道由 test_user_gui 覆盖。
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
     from PySide6.QtWidgets import QApplication
     import lalc.gui as gui
     app = QApplication.instance() or QApplication([])
@@ -440,3 +442,68 @@ def test_shutdown_error_changes_normal_exit_to_fatal(tmp_path: Path, monkeypatch
         return 0
     assert run_application(start, data_root=tmp_path) == 1
     assert "OSError: application shutdown failed" in reports[0]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="真实 POSIX SIGINT；Windows 终端需手工验收")
+def test_ctrl_c_in_qt_event_filter_shows_one_dialog_and_exits(tmp_path, monkeypatch):
+    """真实 SIGINT 不打断事件过滤器；重复中断不重入，确认弹窗后失败退出。"""
+    import os
+    import signal
+    from PySide6.QtCore import QObject, QEvent, QTimer
+    from PySide6.QtWidgets import QApplication
+    import lalc.gui as gui
+
+    app = QApplication.instance() or QApplication([])
+    monkeypatch.setattr(gui, "default_data_root", lambda: tmp_path)
+    monkeypatch.setattr("lalc.application.default_data_root", lambda: tmp_path)
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.forward", lambda *_: False)
+    monkeypatch.setattr("lalc.gui_instance.GuiInstance.listen", lambda *_: None)
+    previous = signal.getsignal(signal.SIGINT)
+    filtered, reports, windows, filters = [], [], [], []
+
+    class InterruptFilter(QObject):
+        def eventFilter(self, watched, event):
+            if event.type() == QEvent.Type.User:
+                os.kill(os.getpid(), signal.SIGINT)
+                filtered.append("returned normally")
+            return False
+
+    open_window = gui.GuiCoordinator.open_window
+    def open_and_interrupt(owner, developer=False):
+        window = open_window(owner, developer)
+        windows.append(window)
+        event_filter = InterruptFilter(window)
+        filters.append(event_filter)
+        window.installEventFilter(event_filter)
+        QTimer.singleShot(0, lambda: app.sendEvent(window, QEvent(QEvent.Type.User)))
+        return window
+    monkeypatch.setattr(gui.GuiCoordinator, "open_window", open_and_interrupt)
+    original_exec = gui.ErrorDialog.exec
+    def confirm(dialog):
+        reports.append(dialog.details.toPlainText())
+        QTimer.singleShot(0, lambda: os.kill(os.getpid(), signal.SIGINT))
+        QTimer.singleShot(150, dialog.accept)
+        return original_exec(dialog)
+    monkeypatch.setattr(gui.ErrorDialog, "exec", confirm)
+    timed_out = []
+    watchdog = QTimer()
+    watchdog.setSingleShot(True)
+    def timeout():
+        timed_out.append(True)
+        for widget in app.topLevelWidgets():
+            if isinstance(widget, gui.ErrorDialog):
+                widget.reject()
+        app.exit(9)
+    watchdog.timeout.connect(timeout)
+    watchdog.start(3000)
+    try:
+        assert gui.run_gui() == 1
+    finally:
+        watchdog.stop()
+        for window in windows:
+            window.close()
+    assert not timed_out
+    assert filtered == ["returned normally"]
+    assert len(reports) == 1 and "KeyboardInterrupt" in reports[0]
+    assert signal.getsignal(signal.SIGINT) == previous
+    assert "KeyboardInterrupt" in (tmp_path / "logs/lalc.log").read_text()

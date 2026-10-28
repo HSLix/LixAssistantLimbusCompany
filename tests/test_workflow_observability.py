@@ -58,6 +58,8 @@ def make_service(tmp_path, source):
         'steps.drive': {'source_path': 'step.py'}, 'tasks.drive': {'source_path': 'task.py'}},
         'recovery_rules': {}}
     (candidate / 'manifest.json').write_text(json.dumps(manifest))
+    from runtime_support import add_plan
+    add_plan(candidate / 'manifest.json', '    ctx.call("tasks.drive")\n')
     manager = ManifestManager(tmp_path)
     published = manager.publish(candidate / 'manifest.json')
     assert published.ok, published.errors
@@ -72,9 +74,7 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
         '    ctx.log("已选中 Drive", screenshot=True)\n'
         '    ctx.log("无需点击", screenshot=True)\n')
     if plan:
-        path = tmp_path / 'plan.json'
-        path.write_text(json.dumps({'items': [{'task': 'tasks.drive', 'inputs': {}}]}))
-        run = service.start_plan(path, manifest_id=manifest)
+        run = service.start_plan(manifest_id=manifest)
     else:
         run = service.start('tasks.drive', {}, manifest_id=manifest)
     state = finish(service, run)

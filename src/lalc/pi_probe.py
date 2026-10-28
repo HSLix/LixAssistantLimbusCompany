@@ -228,6 +228,8 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
                "LALC_PI_MODEL": model["id"], "LALC_PI_SOURCE_ROOT": str(root),
                "LALC_PI_MAX_REQUESTS": str(args.max_requests), "LALC_PI_PROVIDER": provider,
                "LALC_PI_THINKING": "1" if provider == "deepseek" and getattr(args, "thinking", None) is not False else "0"}
+        # 使用系统已信任的 CA，保留显式覆盖；不关闭 TLS 证书校验。
+        env.setdefault("NODE_USE_SYSTEM_CA", "1")
         env.pop("LALC_PI_REPAIR_TARGET", None)
         env.pop("LALC_PI_PAYLOAD_DIR", None)
         env.pop("LALC_PI_PREFLIGHT", None)

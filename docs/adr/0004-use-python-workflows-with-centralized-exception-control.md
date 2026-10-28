@@ -4,6 +4,8 @@ status: accepted
 
 # Use Python Workflows with Centralized Exception Control
 
+2026-10-27：后续 [ADR 0032](0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受每 Manifest 唯一 Python Plan、同进程双 GUI 和 Candidate Plan 编辑/已发布试运行，按其列明范围替代本文的旧 Plan/GUI 边界；本文其余决定及历史实施证据保留，Stage 4 尚未实现。
+
 Task entry `condition` and independent final `verify` callbacks are removed. This decision supersedes the earlier proposal to extend recovery to those callbacks. Entry checks and business-result validation belong in ordinary Steps; only Step has a recoverable continuation.
 
 LALC models Task Workflows, Subworkflows, and independently recoverable Steps as immutable Python Components. Python supplies control flow, local variables, returns, and the call stack; this replaces the explicit YAML Step graph and avoids maintaining a growing custom Workflow language and interpreter. Each formal Component uses a typed `execute(ctx, *, ...)` signature as its sole input contract. Only Step may expose a matching read-only `condition(ctx, *, ...)`; Task Workflow and Subworkflow expose only `execute`; Trusted Actions provide low-level screenshot, recognition, input, and wait operations. Input annotations recursively support JSON scalars, `Literal`, optional values, `list[T]`, and `dict[str, T]`, with JSON-compatible defaults; arbitrary classes, Pydantic models, Enum types, sets, tuples, and non-optional unions are excluded. This supports UI and Agent inspection without an independent input schema or `ctx.inputs`. A module docstring is the sole natural-language Component description and is read by parsing source; there is no independent `description` field.

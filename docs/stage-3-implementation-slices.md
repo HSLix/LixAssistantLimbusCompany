@@ -1,6 +1,8 @@
 # Stage 3 — Implementation Slices
 
-状态：拆分与依赖已由开发者确认，六项均已发布并标记 ready-for-agent；步骤 1–3 已实现并有自动化及 Mac 真模型证据，步骤 3 的 Windows 工具实测按确认移至步骤 6；步骤 4 已通过自动化与开发者 Windows 原生 DPAPI 测试，开发者确认关闭 #327，新启动流程的真模型和实际认证延期至开发者 GUI 完成后验收，不计为已通过。步骤 5/6 尚待完成。新增 #330 Developer GUI 与共享多文件修复升级，四页全部在 2026-10-29 前交付并作为 #329 前置；详见 [设计](developer-gui-design.md) 和 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md)。步骤 1–4 的勾选记录原有 CLI 基线，不表示 #330 新契约已经实现。Spec：[GitHub #323](https://github.com/HSLix/LixAssistantLimbusCompany/issues/323)，关联阶段跟踪 #312。
+2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，代码尚未迁移，不得把这些旧操作说明当作新 Stage 4 规格。
+
+状态（2026-10-26）：步骤 1–4 已关闭；开发者确认 #328 案例已准备完成，#330 四页及后续增量已完成实现与回归核验，按本次确认关闭两项。#329 保留 Windows、真实模型/游戏前后对照与 TA 交付验收；未执行项不计为通过。#330 当前关闭核验见 [设计记录](developer-gui-design.md#2026-10-26-关闭核验)。以下早期测试记录保留其日期与证据范围。
 
 ## 1 — [Mac 贯通 pi、图片与受限工具的最小调用](https://github.com/HSLix/LixAssistantLimbusCompany/issues/324)
 
@@ -72,10 +74,12 @@
 
 **What it delivers:** 准备一个真实游戏中的可重复失败案例，确定只需修改一个现有 Component，保存原始版本、初始截图、异常、输入、复现步骤和预期行为，为最终前后对照提供固定基线。
 
-- [ ] 不是单纯语法错误；原始 Component 在既定前置状态下能够重复表现行为缺陷。
-- [ ] 缺陷种子、所需资源和人工准备游戏状态的方法被保存，不依赖已清空的 Developer Candidate。
-- [ ] 确定人工如何观察修复成功，以及如何安全重建前置状态；不实现游戏状态模拟或离线行为判定工具。
-- [ ] 由开发者选择并提供案例，作为最终 demo 的外部输入；不阻塞前四项的工具开发与接入验证。
+- [x] 不是单纯语法错误；原始 Component 在既定前置状态下能够重复表现行为缺陷。
+- [x] 缺陷种子、所需资源和人工准备游戏状态的方法被保存，不依赖已清空的 Developer Candidate。
+- [x] 确定人工如何观察修复成功，以及如何安全重建前置状态；不实现游戏状态模拟或离线行为判定工具。
+- [x] 由开发者选择并提供案例，作为最终 demo 的外部输入；不阻塞前四项的工具开发与接入验证。
+
+2026-10-26：以上准备项由开发者确认完成；本轮未重新运行缺陷案例或检查开发者保管的复现材料，真实游戏前后对照在 #329 验收。
 
 ## 6 — [Windows 集成验收并交付 TA demo](https://github.com/HSLix/LixAssistantLimbusCompany/issues/329)
 
@@ -86,7 +90,7 @@
 - [ ] 通过 Developer GUI 明确选择基础 Manifest 并初始化 Candidate，真实模型读取上下文与图片、使用受限工具并修改授权文件，完成最终 Validator 校验；案例仍可只需修改一个 Component。
 - [ ] Windows 确认实时截图、现场裁剪、重复图片原标签保护及 DPAPI；需要时引用同固定版本/同实现的已留存实测，不要求把不相关操作硬塞进缺陷案例。
 - [ ] 人工审阅并沿用既有 Publish/运行流程，保存修复前失败和修复后游戏行为成功的对照；只通过 Validator 不算完成。
-- [ ] 核对正式源码、已有 Manifest、原图、旧标签和 Default 的 Agent 写入边界；仅授权的已有候选文件变化与允许的 Asset 新增，plan.json 只读且不能新建/删除候选文件。
+- [ ] 核对正式源码、已有 Manifest、原图、旧标签和 Default 的 Agent 写入边界；已有候选文件编辑及专用新增/登记工具符合 ADR 0029；plan.json 只读，Asset 新增与移除归档遵循 ADR 0028/0031；Developer Policy 发布/已保存版本试运行遵循 ADR 0030，不改变 Default。
 - [ ] 提供启动、配置、工具范围、上限、信息不足/取消/错误、日志定位与人工验收说明，并说明 Candidate 仅在明确确认后重建，New Conversation 和后续修复保留草稿。
 - [ ] 在 2026-10-29 前完成 TA 交付；目标 10 月 28 日完成演示与证据，保留交付余量。未完成的真模型/实机验收明确列出，不以替身填补。
 
@@ -94,19 +98,20 @@
 
 **What it delivers:** 现有 PySide6 上的 Capture、Runner、Agent Settings、Agent Repair，及共享 GUI/CLI 的 Candidate 生命周期、多文件授权、可选图片、连续对话、累计 Diff 和逐轮日志；2026-10-29 前完成，作为 #329 的直接前置。完整边界与检查项见 [设计](developer-gui-design.md)。
 
-2026-10-23 实施：四页和共享宿主已实现；普通回归 235 passed、21 skipped，显式真实 pi/HTTP 替身检查 16 passed、4 skipped，四页已做 offscreen 渲染检查。下列作为整体验收清单保留；真模型连续修复、Windows DPI/焦点/坐标/裁剪及 GUI DPAPI 实际认证尚未验收，不能关闭 #330 或以旧证据代替，详见设计文档实施状态。
+2026-10-26：按最新已接受的 ADR 0029–0031 核对代码和回归，以下实现项完成；历史“未关闭”状态由本次关闭核验替代。真模型/Windows/真实游戏检查仍单列至 #329，不将替身或 offscreen 计为实机证据。
 
-- [ ] Capture 坐标复用 Runtime，失效后手动刷新；冻结截图、框选、预览和确认后保存同一裁剪及逻辑名/标签，支持打开 Asset 目录。
-- [ ] Runner 持久保存独立选择，四类入口/JSON/暂停恢复取消复用既有服务，实际 Base Manifest 可见，不改变 Default 或 Candidate。
-- [ ] Settings 复用配置与 DPAPI，密钥不回显，空输入不覆盖；请求上限默认 20、最小 2，按用户轮次计。
-- [ ] Repair 显式候选初始化/替换确认，多选/全选已有文件、无目标分析和素材工具；plan.json 只读，禁止文件新建/删除。
-- [ ] 连续对话、可选图片、真实 Host 状态、每对话逐轮日志、累计 Diff、人工 Validate/Publish/独立 Default，保留取消和失败产物。
-- [ ] 共享 Host 强制 Runner/Agent/Capture 互斥，关闭时安全取消，页面切换不取消。完成相关自动化、真模型与 Windows 验收，不以旧 CLI 证据代替新能力。
+- [x] Capture 复用 Runtime 坐标、冻结截图、重新框选、原像素预览保存及标签、Asset 目录；新增客户区尺寸设置与放大预览。
+- [x] Runner 独立持久选择、四类入口/JSON/暂停恢复取消及实际 Base Manifest，复用既有服务。
+- [x] Settings 复用配置与密钥边界；provider 预设、连接/模型检查、请求额度、服务端默认输出上限、版本警告及详细错误入口。
+- [x] Repair 显式初始化/重建，全部已有 Candidate 文件可编辑，plan.json 只读；专用新增 Component/Recovery Rule 工具同步登记，禁止任意创建/删除。
+- [x] 连续多图片对话、真实事件、轮次/请求进度、逐轮日志与手动校验上下文；角色/Markdown 区分、工具去重、工作区入口及独立累计 Diff 弹窗。
+- [x] Host 活动互斥、关闭取消及产物保留；Publish/Default 分开，按 ADR 0030 允许 Developer Policy 发布、试运行已保存版本与查日志；ADR 0031 提供裁剪预览/保存和移除归档。
+- [x] 相关自动化与 pi 接入回归完成，真实模型/Windows 跳过原因如实记录；最终真实游戏验收由 #329 继续承担。
 
 ## 依赖与时序建议
 
 - 原六步依赖保持；1–4 的已完成记录保留，5 的真实缺陷由开发者准备。
-- 当前推进 #328 案例和 #330 GUI；#329 等待两者及原有工具/配置前置，完成延期的新启动流程、Windows 认证/截图/裁剪和真实游戏验证。
+- #328 和 #330 已按本次确认完成；当前推进 #329，完成延期的新启动流程、Windows 认证/截图/裁剪和真实游戏验证。
 - #330 内按可验证增量落实：共享 Candidate/授权 → Runner 与 Host 互斥 → Capture → Settings → 连续 Repair/日志/Diff 与人工发布 → 真模型/Windows 联调。每个增量连接实际服务，不以假状态或假按钮冒充实现。
 - 目标 10 月 28 日完成 GUI 联调与演示证据，2026-10-29 前交付；这是排期目标，不是已完成证据。分发打包不作为本期门槛。
 - 原六项已建单，原生依赖保留；新增 #330 阻塞 #329。父 Spec #323 和原阶段跟踪 #312 不改写，不以本次扩展重开已验收票据。

@@ -1,5 +1,9 @@
 # Stage 3 — Agent-assisted Component Repair
 
+2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，代码尚未迁移，不得把这些旧操作说明当作新 Stage 4 规格。
+
+2026-10-26 排期更新：本文原 Stage 3.5 的完整运行时维护范围已确认延后至 Stage 6；Stage 3 已有修复能力保留。其他 Stage 4–6 内容仅为[待讨论草案](reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案)，不替代既有执行/权限契约。
+
 2026-10-25 更新：[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 接受 Developer Policy 的自主 Publish、已保存 Manifest 试运行及 Run ID/日志工具，GUI 使用不抢游戏焦点的模态日志子窗口。本页旧有“Agent 不自动发布/执行”、纯人工发起实机试运行及禁止历史列举的条款由该决定替代；Runtime Policy、Working Manifest 续接及监督审批仍属 Stage 3.5。当前接口见 [修复指南](agent-repair.md)，验收边界见 [GUI 设计](developer-gui-design.md)。
 
 Status: accepted scope under [ADR 0025](adr/0025-validate-component-repair-before-runtime-agent-recovery.md), revised by [ADR 0028](adr/0028-bound-manual-agent-repair-with-live-observation-and-asset-additions.md) and [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) (shared GUI/CLI implementation and automated checks complete; Windows/game acceptance pending); the #325 repair CLI and #326 tools have automated and Mac real-model evidence. #327 settings, startup checks and DPAPI storage have automated evidence plus a developer-reported Windows native DPAPI pass. The developer approved closing #327 and deferred its new real-model startup and Windows authentication checks until the developer GUI is complete; those checks remain unverified. Windows screenshot/crop and game acceptance also remain pending.

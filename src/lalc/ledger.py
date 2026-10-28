@@ -13,6 +13,7 @@ from .runtime import TraceWriteError, atomic_write_json
 
 class LedgerWriteError(TraceWriteError):
     """Workflow Run Ledger 无法持久化，执行必须停止。"""
+    code = "ledger_write_failed"
 
 
 _COUNTS = (
@@ -173,7 +174,7 @@ def workflow_health(root: Path) -> dict[str, dict[str, Any]]:
     groups: dict[str, list[dict[str, Any]]] = {}
     for path in sorted((root / "ledger").glob("*.json")):
         for record in json.loads(path.read_text(encoding="utf-8"))["records"]:
-            if record["result"] != "incomplete":
+            if record["result"] != "incomplete" and record["component_id"] is not None:
                 groups.setdefault(record["component_id"], []).append(record)
     result = {}
     for component_id, records in groups.items():

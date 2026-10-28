@@ -45,12 +45,13 @@ def test_rejected_start_has_no_run_and_failure_keeps_trace(tmp_path, monkeypatch
         assert result["status"] == "rejected" and result["run_id"] is None
         assert host.service.state["run_id"] is None
         assert "再次调用" in result["feedback"]
-        (host.candidate / "plan.json").write_text("broken")
-        result = tools.trial_run(saved.manifest_id, plan_path="plan.json")["details"]
-        assert result["run_id"] and result["result"]["status"] == "interrupted"
+        (host.candidate / "plans.default.py").write_text("broken")
+        result = tools.trial_run(saved.manifest_id)["details"]
+        assert result["result"]["status"] == "completed"
         assert tools.read_run_log(result["run_id"])["details"]["events"]
-        with pytest.raises(ValueError):
-            tools.trial_run(saved.manifest_id, plan_path="../outside.json")
+        with pytest.raises(TypeError):
+            tools.trial_run(saved.manifest_id, plan_path="../outside.py")
+
 
 
 @pytest.mark.parametrize("role", ["task_workflow", "sub_workflow", "step", "plan"])
@@ -68,11 +69,13 @@ def execute(ctx, *, n: int) -> int:
     return n
 '''
     tools.add_component("entry.py", name, source)
+    if role == "plan":
+        source = host.candidate / "plans.default.py"
+        source.write_text(source.read_text().replace("    return None", '    ctx.call("entry.compute", n=2)'))
     with host.service.activity("Agent"):
         identity = tools.publish()["details"]["manifest_id"]
         if role == "plan":
-            (host.candidate / "plan.json").write_text(json.dumps({"items": [{"task": name, "inputs": {"n": 2}}]}))
-            result = tools.trial_run(identity, plan_path="plan.json")["details"]
+            result = tools.trial_run(identity)["details"]
             assert result["result"]["status"] == "completed"
             assert result["result"]["items"][0]["result"] == "success"
         else:
