@@ -84,6 +84,11 @@ def run_application(
 ) -> int:
     """在 GUI 导入前建立错误保护；GUI 结束后恢复钩子并结束同一进程。"""
 
+    from .gui_privileges import ensure_gui_privileges
+
+    privilege_result = ensure_gui_privileges()
+    if privilege_result is not None:
+        return privilege_result
     lifecycle = ApplicationLifecycle()
     previous_sigint = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, lifecycle.request_interrupt)
