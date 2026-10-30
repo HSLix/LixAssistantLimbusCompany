@@ -39,6 +39,8 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - User：双击 `LALC.exe`。
 - Developer：双击 `Developer.cmd`，实际启动同一 `LALC.exe --developer`；重复入口归并到现有应用。
 - CLI：在终端运行 `LALC-console.exe` 加原有命令，保留标准输出与交互；它使用同一 main、服务及数据，并非另一套执行实现。
+- 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标。
+- Windows 的所有 GUI 入口（User、Developer、语言重启，以及源码 GUI）在创建服务、读写数据或归并窗口前检查管理员权限；未提权时通过 UAC 重新启动，保留启动参数与工作目录。拒绝或提权启动失败时显示中英双语提示并退出。CLI 命令不主动提权；其他平台维持原行为。若 UAC 使用另一个管理员账号，数据目录和 DPAPI 凭据也会属于该账号。
 - 成品数据统一在 `%LOCALAPPDATA%\LALC`：`candidate/`、`.candidate-baseline.json`、`pages/`、Manifest、Component、Assets、配置、日志与证据。替换程序目录不搬移数据；源码运行仍沿用项目 `candidate/`。不自动寻找、迁移或删除旧草稿。
 - 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出以后另做。
 - 默认 pi 选择：`LALC.exe` 同级 `pi/pi.exe` 优先，其次环境路径；显式 CLI `--pi` 保持调用者指定。
@@ -90,6 +92,7 @@ Copy-Item -Recurse "$repo\example\pages" "$data\pages"
 | 范围 | 检查 | 证据边界 |
 | --- | --- | --- |
 | 一个包的通用功能 | User／Developer 入口与重复归并，同一服务，独立关闭、活动所属窗口取消清理 | Windows 成品现场 |
+| 图标与管理员启动 | 两个 EXE 图标；User／Developer 未提权启动的 UAC 允许／拒绝、双语拒绝提示、已提权不重复请求、语言重启恢复窗口 | Windows 成品现场；源码入口亦需检查 |
 | 外置页与 Plan | 新增／修改无需重打包；保存、跨 Manifest、纯设置页、次数、warning、错误页隔离；上述失败／暂停／Stop 结果 | Windows 成品现场及 Trace／Ledger |
 | 语言／布局／资源 | 两语与跟随系统、整应用重启和恢复窗口、中文／空格路径、模态、缩放；占位卡不联网、Update 禁用 | Windows 成品现场 |
 | Agent 设置 | 两侧独立选用、共享内容、User 开关、Developer 独占编辑与保存交接、无效文本保存／修正、API Key 弹窗与原生 DPAPI、详情折叠／复制和脱敏 | 不要求真实模型 |

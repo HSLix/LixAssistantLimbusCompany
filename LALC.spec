@@ -39,13 +39,14 @@ exe = EXE(
     strip=False,
     upx=False,
     console=False,
-    icon=None,  # Placeholder until approved artwork exists.
+    icon=str(root / "MagicAndWonder.ico"),
     version=str(root / "LALC.version") if sys.platform == "win32" else None,
 )
 coll = COLLECT(
     exe,
     EXE(pyz, a.scripts, [], exclude_binaries=True, name="LALC-console", console=True,
         debug=False, strip=False, upx=False,
+        icon=str(root / "MagicAndWonder.ico"),
         version=str(root / "LALC.version") if sys.platform == "win32" else None),
     a.binaries,
     a.datas,
