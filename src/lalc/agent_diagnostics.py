@@ -68,7 +68,7 @@ def check_settings(data_root: Path, values: dict, *, key=None, check_model=False
         settings = validate_settings(values) if snapshot else load_settings(data_root, values)
         log.key = key if key is not None else resolve_key(SimpleNamespace(ask_api_key=False), settings, data_root)
         models = _models(settings["base_url"].rstrip("/"), log.key)
-        result = {"ok": True, "message": f"连接成功，认证通过，可读取模型列表（{len(models)} 项）；未测试推理。"}
+        result = {"ok": True, "model_count": len(models), "message": f"连接成功，认证通过，可读取模型列表（{len(models)} 项）；未测试推理。"}
         if check_model:
             if not settings["model"]:
                 raise AgentDiagnosticError("请填写需要检查的模型 ID。", "model_status")

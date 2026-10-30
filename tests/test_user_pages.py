@@ -135,10 +135,10 @@ def test_business_navigation_keeps_all_pages_and_uses_registered_icon(owner, app
     user = owner.open_window()
     panel = user.navigationInterface.panel
     widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
-    assert isinstance(widgets[0], NavigationItemHeader) and widgets[0].text() == "GENERAL"
+    assert isinstance(widgets[0], NavigationItemHeader) and widgets[0].text() == "通用"
     assert [widget.property("routeKey") for widget in widgets[1:3]] == ["dashboard", "general-settings"]
     assert isinstance(widgets[3], NavigationSeparator)
-    assert isinstance(widgets[4], NavigationItemHeader) and widgets[4].text() == "WORKFLOW SETTINGS"
+    assert isinstance(widgets[4], NavigationItemHeader) and widgets[4].text() == "业务设置"
     assert [widget.property("routeKey") for widget in widgets[5:]] == [page.page_id for page in user.business_pages]
     assert panel.widget(user.business_pages[0].page_id)._icon == FluentIcon.EDUCATION
     assert panel.widget(user.business_pages[1].page_id)._icon == FluentIcon.APPLICATION
@@ -374,6 +374,8 @@ def test_reload_through_real_process_restores_both_windows_and_rescans(tmp_path)
             probe_path.unlink(missing_ok=True)
     root = tmp_path / ("LALC" if sys.platform == "win32" else ".local/share/LALC")
     (root / "pages").mkdir(parents=True)
+    from lalc.i18n import save_language
+    save_language(root, "zh_CN")
     page = """from pathlib import Path
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication, QWidget
@@ -398,6 +400,9 @@ def create_page(context):
             assert isinstance(owner.user, FluentWindow) and isinstance(owner.developer, FluentWindow)
             assert owner.user.pages.count() == 4
             assert not owner.user.agent_controls.isEnabled()
+            assert context.language == "en_US"
+            assert owner.user.start_button.text() == "Start Plan"
+            assert owner.developer.trial_button.text() == "Trial selected Plan"
             atexit.register(lambda: (root / "clean-exit").write_text("normal"))
             (root / "ready").write_text("restored-and-rescanned")
             def close_when_requested():
@@ -409,6 +414,9 @@ def create_page(context):
                 assert owner.developer is None
             QTimer.singleShot(20, close_when_requested)
         else:
+            assert context.language == "zh_CN"
+            owner.user.language_choice.setCurrentIndex(owner.user.language_choice.findData("en_US"))
+            assert owner.user.start_button.text() == "开始运行 Plan"
             (root / "pages/new.py").write_text('from PySide6.QtWidgets import QWidget\\nPAGE_ID="new"\\nPAGE_NAME="new"\\nclass P(QWidget):\\n    def submit(self): return {}\\ndef create_page(ctx): return P()\\n')
             owner.request_reload()
     second = marker.exists()

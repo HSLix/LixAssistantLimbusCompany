@@ -739,3 +739,8 @@ def default_data_root() -> Path:
 
         return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "LALC"
     return Path.home() / ".local" / "share" / "LALC"
+
+
+def default_candidate_root(data_root: Path) -> Path:
+    """成品草稿随用户数据保存，源码开发仍使用当前项目；不迁移旧草稿。"""
+    return Path(data_root) / "candidate" if getattr(sys, "frozen", False) else Path.cwd() / "candidate"

@@ -51,6 +51,12 @@ class PageContext:
 
     def __init__(self, store: UserSettings, page_id: str):
         self.store, self.page_id = store, page_id
+        from .i18n import current_language
+        self.language = current_language()
+
+    def translate(self, chinese: str, english: str) -> str:
+        """页面自带两语文案；语言固定为本次应用启动时的选择。"""
+        return chinese if self.language == "zh_CN" else english
 
     def load(self, defaults: dict | None = None) -> dict:
         return deepcopy(self.store.value["pages"].get(self.page_id, defaults or {}))
@@ -106,6 +112,11 @@ def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessP
             from PySide6.QtWidgets import QWidget
             from qfluentwidgets import FluentIcon
             context = PageContext(store, page_id)
+            names = getattr(module, "PAGE_NAMES", {})
+            if (type(names) is not dict or any(key not in {"zh_CN", "en_US"} or
+                    type(value) is not str or not value.strip() for key, value in names.items())):
+                raise ValueError("PAGE_NAMES must map zh_CN/en_US to non-empty display names.")
+            name = names.get(context.language, name)
             widget = module.create_page(context)
             if not isinstance(widget, QWidget) or not callable(getattr(widget, "submit", None)):
                 raise ValueError("create_page 必须返回提供 submit() -> dict 的 QWidget。")

@@ -73,7 +73,7 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in a project checkout, explicitly initialized or rebuilt by the developer for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing Python Automation Plan and other authorized files and register new Component or Recovery Rule source through dedicated additions, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
+The one editable complete Manifest draft in the developer's workspace, explicitly initialized or rebuilt by the developer for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing Python Automation Plan and other authorized files and register new Component or Recovery Rule source through dedicated additions, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
 _Avoid_: Partial Manifest, global candidate registry
 
 **Agent-assisted Component Repair**:
@@ -117,7 +117,7 @@ The executor-owned chronological record of what one real execution attempt actua
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:
-The retained record of information supplied to an Agent, its tool operations and results, and its outputs. A continuous developer conversation groups its user messages and model/tool exchanges into one record with per-round outcomes; runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
+The complete reconstructable record of information supplied to an Agent, its tool operations and results, and its outputs. Each continuous developer conversation is an independent, self-contained retention unit with per-round outcomes; compact content references preserve the evidence rather than summarize or alter the model context, while runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
 _Avoid_: Execution Trace, Agent memory
 
 **Agent Adapter**:

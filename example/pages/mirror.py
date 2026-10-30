@@ -5,6 +5,7 @@ from qfluentwidgets import BodyLabel as QLabel, FluentIcon, LineEdit
 
 PAGE_ID = "mirror"
 PAGE_NAME = "镜牢教学示例"
+PAGE_NAMES = {"zh_CN": "镜牢教学示例", "en_US": "Mirror example"}
 PAGE_ICON = FluentIcon.GAME
 TASK_ID = "mirror"
 
@@ -16,7 +17,8 @@ class MirrorPage(QWidget):
         super().__init__()
         self.context = context
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("消息（必填；在开始运行或重载时保存）"))
+        layout.addWidget(QLabel(context.translate("消息（必填；在开始运行或重载时保存）",
+                                                  "Message (required; saved on run or reload)")))
         self.message = LineEdit()
         self.message.setText(context.load({"message": "Hello"})["message"])
         layout.addWidget(self.message)
@@ -25,7 +27,7 @@ class MirrorPage(QWidget):
     def submit(self):
         message = self.message.text().strip()
         if not message:
-            raise ValueError("消息不能为空。")
+            raise ValueError(self.context.translate("消息不能为空。", "Message cannot be empty."))
         return {"message": message}
 
 

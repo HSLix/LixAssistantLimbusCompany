@@ -4,6 +4,24 @@ import os
 import sys
 
 
+@pytest.fixture(autouse=True)
+def stable_gui_language(request):
+    """既有 GUI 回归固定中文；语言专项测试自行切换，不依赖机器区域设置。"""
+    if request.module.__name__ not in {
+        "test_user_gui", "test_user_gui_p0", "test_user_pages", "test_developer_gui",
+        "test_error_handling", "test_gui_language",
+        "test_repair_chat", "test_input_control", "test_example_workflow",
+    }:
+        yield
+        return
+    from PySide6.QtWidgets import QApplication
+    from lalc.i18n import install_translations
+    app = QApplication.instance() or QApplication([])
+    install_translations(app, "zh_CN")
+    yield
+    install_translations(app, "en_US")
+
+
 def pytest_addoption(parser):
     """仅在确需验证 Agent 功能时显式开启相关测试。"""
     parser.addoption("--run-agent-tests", action="store_true", help="Run explicitly selected Agent/pi tests")

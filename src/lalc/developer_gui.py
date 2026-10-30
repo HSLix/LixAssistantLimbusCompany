@@ -22,6 +22,8 @@ from qfluentwidgets import (
     CheckBox as QCheckBox,
 )
 
+from .i18n import tr
+
 from .repair_chat import RepairChat
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
 from .agent_diagnostics import check_settings, details_text
@@ -70,7 +72,7 @@ class TrialDialog(QDialog):
     def __init__(self, service, parent):
         super().__init__(parent)
         self.service = service
-        self.setWindowTitle("Agent 试运行")
+        self.setWindowTitle(tr('Agent trial'))
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
@@ -80,8 +82,8 @@ class TrialDialog(QDialog):
         self.logs.setReadOnly(True)
         layout.addWidget(self.logs)
         controls = QHBoxLayout()
-        self.pause = button("暂停", lambda: service.resume() if service.state["paused"] else service.pause(), controls)
-        self.stop = button("停止", service.stop, controls)
+        self.pause = button(tr('Pause'), lambda: service.resume() if service.state["paused"] else service.pause(), controls)
+        self.stop = button(tr('Stop'), service.stop, controls)
         layout.addLayout(controls)
         self.sequence = 0
         self.pause_notice = QLabel()
@@ -96,9 +98,9 @@ class TrialDialog(QDialog):
                 self.sequence = record["sequence"]
         info = state.get("pause_info")
         if info:
-            instruction = "恢复后将检查当前 Step 的 condition。" if info["has_condition"] else "恢复后将从头执行当前 Step。"
+            instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
             if not info.get("restart_step", True):
-                instruction = "恢复后继续 Workflow 的观察与调度。"
+                instruction = tr('Resuming continues Workflow observation and scheduling.')
             self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
             if not self._pause_notice_shown:
                 self._pause_notice_shown = True
@@ -109,7 +111,7 @@ class TrialDialog(QDialog):
         else:
             self._pause_notice_shown = False
             self.pause_notice.clear()
-        self.pause.setText("恢复" if state["paused"] else "暂停")
+        self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
         self.pause.setEnabled(not state.get("resume_pending", False))
 
     def reject(self):
@@ -223,7 +225,7 @@ class CropView(QWidget):
         painter = QPainter(self)
         rect = self.image_rect()
         if rect.isEmpty():
-            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "截图后拖动框选原图区域")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, tr('Capture a screenshot, then drag to select an area'))
             return
         painter.drawImage(rect, self.image)
         if self.region:
@@ -275,44 +277,44 @@ class CapturePage(QWidget):
         self.window, self.host = window, window.host
         layout = QVBoxLayout(self)
         controls = QHBoxLayout()
-        self.capture_button = button("截图", self.capture, controls)
-        button("刷新坐标监测", self.refresh, controls)
-        button("打开 Asset 目录", self.open_assets, controls)
+        self.capture_button = button(tr('Capture screenshot'), self.capture, controls)
+        button(tr('Refresh coordinate tracking'), self.refresh, controls)
+        button(tr('Open Asset directory'), self.open_assets, controls)
         layout.addLayout(controls)
         sizing = QHBoxLayout()
         self.window_width, self.window_height = QSpinBox(), QSpinBox()
-        for label, control, value in (("客户区宽（px）", self.window_width, 1280),
-                                      ("高（px）", self.window_height, 720)):
+        for label, control, value in ((tr('Client width (px)'), self.window_width, 1280),
+                                      (tr('Height (px)'), self.window_height, 720)):
             control.setRange(1, 32768)
             control.setValue(value)
             sizing.addWidget(QLabel(label))
             sizing.addWidget(control)
-        self.resize_button = button("重置窗口宽高", self.resize_window, sizing)
+        self.resize_button = button(tr('Resize window'), self.resize_window, sizing)
         layout.addLayout(sizing)
-        self.resize_result = QLabel("保持窗口位置、层叠顺序和焦点；调整后请重新截图观察。")
+        self.resize_result = QLabel(tr('Window position, stacking order and focus are preserved. Capture a new screenshot after resizing.'))
         self.resize_result.setWordWrap(True)
         layout.addWidget(self.resize_result)
-        self.coordinates = QLabel("请刷新窗口以监测坐标。")
+        self.coordinates = QLabel(tr('Refresh the window to track coordinates.'))
         layout.addWidget(self.coordinates)
-        self.instructions = QLabel("① 点击截图　② 在图上按住鼠标左键拖动框选（再次拖动会替换旧框）　③ 填写名称与标签，预览并保存")
+        self.instructions = QLabel(tr('1. Capture a screenshot. 2. Drag with the left mouse button to select an area (drag again to replace). 3. Enter a name and tags, then preview and save.'))
         self.instructions.setWordWrap(True)
         self.instructions.setStyleSheet("QLabel { background: #fff3cd; color: #332700; padding: 10px; font-weight: bold; }")
         layout.addWidget(self.instructions)
         self.view = CropView()
         layout.addWidget(self.view, 1)
-        self.region_label = QLabel("尚未框选")
+        self.region_label = QLabel(tr('No selection'))
         self.view.selected.connect(lambda r: self.region_label.setText(
-            f"已框选：起点 ({r['x']}, {r['y']})，大小 {r['width']} × {r['height']} 原始像素" if r else "尚未框选，请按住鼠标左键拖动。"))
+            tr('Selected: origin ({0}, {1}), size {2} × {3} original pixels').format(r['x'], r['y'], r['width'], r['height']) if r else tr('No selection. Drag with the left mouse button.')))
         layout.addWidget(self.region_label)
         self.name = QLineEdit()
-        self.name.setPlaceholderText("Asset 完整逻辑名，例如 ui/claim")
+        self.name.setPlaceholderText(tr('Full Asset logical name, e.g. ui/claim'))
         self.tags = QLineEdit()
-        self.tags.setPlaceholderText("例如 en, default；用英文逗号分隔，无标签留空")
-        layout.addWidget(QLabel("Asset 完整逻辑名"))
+        self.tags.setPlaceholderText(tr('E.g. en, default; comma-separated, leave empty for no tags'))
+        layout.addWidget(QLabel(tr('Full Asset logical name')))
         layout.addWidget(self.name)
-        layout.addWidget(QLabel("标签（可选，用英文逗号分隔）"))
+        layout.addWidget(QLabel(tr('Tags (optional, comma-separated)')))
         layout.addWidget(self.tags)
-        self.save_button = button("预览并确认保存", self.save, layout)
+        self.save_button = button(tr('Preview and confirm save'), self.save, layout)
         self.timer = QTimer(self)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self.poll)
@@ -321,14 +323,13 @@ class CapturePage(QWidget):
         width, height = self.window_width.value(), self.window_height.value()
         def done(result):
             before, after = result["before"], result["after"]
-            self.resize_result.setText(f"目标：{width} × {height}；调整前：{before['width']} × {before['height']}；"
-                                       f"实际：{after['width']} × {after['height']} px")
+            self.resize_result.setText(tr('Target: {0} × {1}; before: {2} × {3}; actual: {4} × {5} px').format(width, height, before['width'], before['height'], after['width'], after['height']))
         self.window.launch(lambda: self.host.resize_window(width, height), done)
 
     def capture(self):
         def shown(preview):
             self.view.set_image(preview[0], preview[1])
-            self.region_label.setText("截图已固定，请框选。")
+            self.region_label.setText(tr('Screenshot captured. Select an area.'))
         self.window.launch(self.host.capture, shown)
 
     def refresh(self):
@@ -338,7 +339,7 @@ class CapturePage(QWidget):
         self.window._interact(refresh)
 
     def show_coordinates(self, value):
-        self.coordinates.setText(f"客户区物理像素：({value['x']}, {value['y']})" + ("" if value["inside"] else " — 客户区外"))
+        self.coordinates.setText(tr('Client physical pixels: ({0}, {1})').format(value['x'], value['y']) + ("" if value["inside"] else tr(' — outside client area')))
 
     def poll(self):
         try:
@@ -372,9 +373,9 @@ class CapturePage(QWidget):
             pixels, size, _ = snapshot
             content, _ = self.host.service.asset_library.crop_content(pixels, size, region)
             dialog = QDialog(self)
-            dialog.setWindowTitle("确认保存 Asset")
+            dialog.setWindowTitle(tr('Confirm Asset save'))
             body = QVBoxLayout(dialog)
-            body.addWidget(QLabel(f"{name}\n标签：{json.dumps(tags, ensure_ascii=False)}\n原始像素区域：{region}"))
+            body.addWidget(QLabel(tr('{0}\nTags: {1}\nOriginal pixel region: {2}').format(name, json.dumps(tags, ensure_ascii=False), region)))
             label = QLabel()
             label.setPixmap(QPixmap.fromImage(QImage.fromData(content)).scaled(640, 400, Qt.AspectRatioMode.KeepAspectRatio))
             body.addWidget(label)
@@ -384,13 +385,13 @@ class CapturePage(QWidget):
             body.addWidget(controls)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 self.window.launch(lambda: self.host.save_crop(name, region, tags, preview=snapshot),
-                                   lambda value: self.region_label.setText(f"已保存：{value['image_path']}"))
+                                   lambda value: self.region_label.setText(tr('Saved: {0}').format(value['image_path'])))
         self.window._interact(preview)
 
     def render(self, busy):
         for control in (self.capture_button, self.save_button, self.resize_button, self.window_width, self.window_height):
             control.setEnabled(not busy)
-            control.setToolTip("运行、Agent 或其他操作尚未结束" if busy else "")
+            control.setToolTip(tr('A run, Agent or other operation has not finished') if busy else "")
 
 
 def open_directory(window, path):
@@ -414,10 +415,10 @@ class DiagnosticPanel(QWidget):
         self.errors = QComboBox()
         layout.addWidget(self.errors)
         row = QHBoxLayout()
-        self.details_button = button("查看错误详情", self.show_error, row)
-        self.copy_button = button("复制详情", self.copy_error, row)
-        button("打开日志目录", self.open_logs, row)
-        button("打开应用日志目录", lambda: self.open_directory(window.service.data_root / "logs"), row)
+        self.details_button = button(tr('View error details'), self.show_error, row)
+        self.copy_button = button(tr('Copy details'), self.copy_error, row)
+        button(tr('Open log directory'), self.open_logs, row)
+        button(tr('Open application log directory'), lambda: self.open_directory(window.service.data_root / "logs"), row)
         layout.addLayout(row)
         self.location = QLabel(str(root))
         self.location.setTextFormat(Qt.TextFormat.PlainText)
@@ -432,7 +433,7 @@ class DiagnosticPanel(QWidget):
         self.location.setText(str(self.path))
 
     def add_error(self, details):
-        self.errors.addItem(f"第 {details.get('round', '—')} 轮 · {details.get('stage', 'error')}：{details['message']}", userData=details)
+        self.errors.addItem(tr('Round {0} · {1}: {2}').format(details.get('round', '—'), details.get('stage', 'error'), details['message']), userData=details)
         self.errors.setCurrentIndex(self.errors.count() - 1)
 
     def select_error(self, *_):
@@ -476,7 +477,7 @@ class SettingsPage(QWidget):
         self.provider.addItem("llama.cpp", userData="llama.cpp")
         self.provider.addItem("DeepSeek", userData="deepseek")
         self.form_provider = "llama.cpp"
-        layout.addWidget(QLabel("服务商（Provider）"))
+        layout.addWidget(QLabel(tr('Provider')))
         layout.addWidget(self.provider)
         self.url, self.model = QLineEdit(), QLineEdit()
         self.limit = QSpinBox()
@@ -485,8 +486,8 @@ class SettingsPage(QWidget):
         if side == "developer":
             self.key = QLineEdit()
             self.key.setEchoMode(QLineEdit.EchoMode.Password)
-            self.key.setPlaceholderText("API Key：空输入保留已有值")
-        for label, control in (("Base URL", self.url), ("Model", self.model)):
+            self.key.setPlaceholderText(tr('API Key: leave empty to keep the existing key'))
+        for label, control in ((tr('Base URL'), self.url), (tr('Model'), self.model)):
             layout.addWidget(QLabel(label))
             layout.addWidget(control)
         self.secret_state = QLabel()
@@ -498,31 +499,31 @@ class SettingsPage(QWidget):
         else:
             key_layout = QHBoxLayout()
             key_layout.addWidget(self.secret_state, 1)
-            self.key_button = button("设置 API KEY", self.set_api_key, key_layout)
+            self.key_button = button(tr('Set API key'), self.set_api_key, key_layout)
             layout.addLayout(key_layout)
-        self.clear_button = button("清除 API Key", lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
+        self.clear_button = button(tr('Clear API key'), lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
         self.advanced = QWidget()
         advanced = QVBoxLayout(self.advanced)
         advanced.setContentsMargins(0, 0, 0, 0)
         if side == "user":
-            self.advanced_button = QPushButton("Advanced Settings")
+            self.advanced_button = QPushButton(tr('Advanced Settings'))
             self.advanced_button.setCheckable(True)
             self.advanced_button.toggled.connect(self.advanced.setVisible)
             layout.addWidget(self.advanced_button)
             self.advanced.hide()
-        advanced.addWidget(QLabel("每条消息模型请求上限"))
+        advanced.addWidget(QLabel(tr('Maximum model requests per message')))
         advanced.addWidget(self.limit)
         self.deepseek_options = QWidget()
         options = QVBoxLayout(self.deepseek_options)
         options.setContentsMargins(0, 0, 0, 0)
-        self.thinking = QCheckBox("开启思考模式")
+        self.thinking = QCheckBox(tr('Enable thinking'))
         self.thinking.setChecked(True)
         self.effort = QComboBox()
         for effort in ("low", "high", "max"):
             self.effort.addItem(effort, userData=effort)
         self.effort.setCurrentIndex(1)
         options.addWidget(self.thinking)
-        options.addWidget(QLabel("思考强度"))
+        options.addWidget(QLabel(tr('Reasoning effort')))
         options.addWidget(self.effort)
         advanced.addWidget(self.deepseek_options)
         self.thinking.toggled.connect(self.effort.setEnabled)
@@ -530,22 +531,22 @@ class SettingsPage(QWidget):
         self.effort.currentIndexChanged.connect(self.invalidate)
         self.deepseek_options.hide()
         self.output_limit = QComboBox()
-        self.output_limit.addItem("使用服务端默认值", userData="server_default")
-        advanced.addWidget(QLabel("单次输出上限"))
+        self.output_limit.addItem(tr('Use server default'), userData="server_default")
+        advanced.addWidget(QLabel(tr('Maximum output per request')))
         advanced.addWidget(self.output_limit)
         layout.addWidget(self.advanced)
         row = QHBoxLayout()
-        self.connection_button = button("测试连接", lambda: self.check(False), row)
-        self.model_button = button("检查模型加载状态", lambda: self.check(True), row)
+        self.connection_button = button(tr('Test connection'), lambda: self.check(False), row)
+        self.model_button = button(tr('Check model loading status'), lambda: self.check(True), row)
         layout.addLayout(row)
-        self.check_status = QLabel("尚未检查；检查只查询，不加载模型或发送推理请求。")
+        self.check_status = QLabel(tr('Not checked. Checks only query; they do not load models or send inference requests.'))
         self.check_status.setWordWrap(True)
         self.check_status.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(self.check_status)
         if side == "developer":
             self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-diagnostics")
             layout.addWidget(self.diagnostics)
-        self.notice = QLabel("Windows：凭据使用当前用户 DPAPI。其他平台：凭据仅在本次 GUI 内存中保留。")
+        self.notice = QLabel(tr("Windows: credentials use the current user's DPAPI. Other platforms: credentials remain in memory for this GUI session only."))
         self.notice.setWordWrap(True)
         layout.addWidget(self.notice)
         layout.addStretch()
@@ -570,13 +571,13 @@ class SettingsPage(QWidget):
     def set_api_key(self):
         """密钥只在输入弹窗存活期间保留，成功保存后关闭。"""
         dialog = QDialog(self)
-        dialog.setWindowTitle("设置 API KEY")
+        dialog.setWindowTitle(tr('Set API key'))
         dialog.setWindowModality(Qt.WindowModality.WindowModal)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         layout = QVBoxLayout(dialog)
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setPlaceholderText("输入新的 API Key")
+        self.key.setPlaceholderText(tr('Enter a new API key'))
         layout.addWidget(self.key)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
@@ -600,7 +601,7 @@ class SettingsPage(QWidget):
             return
         self.dirty = True
         self.revision += 1
-        self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
+        self.check_status.setText(tr('Settings changed. Check again; previous results remain in the logs.'))
 
     def values(self):
         value = {"provider": self.provider.currentData(), "base_url": self.url.text(),
@@ -617,7 +618,7 @@ class SettingsPage(QWidget):
     def submit(self):
         """交接/重载前提交尚未失焦的输入；禁用表单不回写旧配置。"""
         if self.side == "user" and self.key is not None:
-            raise ValueError("请先确认或取消 API Key 输入")
+            raise ValueError(tr('Confirm or cancel API key entry first'))
         if self.dirty and self.isEnabled():
             self.save()
 
@@ -639,7 +640,7 @@ class SettingsPage(QWidget):
         """测试当前表单快照；编辑期间完成的旧检查不得冒充当前配置结果。"""
         values, revision = self.values(), self.revision
         key = self.pending_key() or None
-        self.check_status.setText("正在检查模型状态…" if model else "正在测试连接…")
+        self.check_status.setText(tr('Checking model status…') if model else tr('Testing connection…'))
         def operation():
             with self.host.service.activity("Agent Settings 检查"):
                 frozen, actual_key = settings_snapshot(SimpleNamespace(**values, ask_api_key=False),
@@ -652,16 +653,27 @@ class SettingsPage(QWidget):
                 if not result["ok"]:
                     self.diagnostics.add_error(result["error"])
             if revision != self.revision:
-                self.check_status.setText("检查期间设置已变更，请重新检查；本次结果已保存到日志。")
+                self.check_status.setText(tr('Settings changed during the check. Check again; this result was saved to the logs.'))
             else:
-                self.check_status.setText(("错误：" if not result["ok"] else "") + result["message"])
+                message = result["message"]
+                if result["ok"]:
+                    if not model:
+                        message = tr("Connected and authenticated; model list available ({0} entries). Inference was not tested.").format(result.get("model_count", "—"))
+                    elif values["provider"] == "deepseek":
+                        message = tr("deepseek-flash is available and supports images. Inference was not tested.")
+                    else:
+                        status = result.get("model_status", "unknown")
+                        label = {"loaded": tr("Loaded"), "unloaded": tr("Not loaded"),
+                                 "loading": tr("Loading"), "unknown": tr("Status unavailable")}.get(status, status)
+                        message = tr("Model status: {0} ({1}). Inference was not tested.").format(label, status)
+                self.check_status.setText((tr('Error: ') if not result["ok"] else "") + message)
             if not result["ok"]:
                 if self.side == "developer":
                     if revision == self.revision:
                         self.diagnostics.show_error()
                 else:
                     from .gui import ErrorDialog
-                    message = result["message"] if revision == self.revision else "原配置检查失败；当前设置已变更，请重新检查。"
+                    message = result["message"] if revision == self.revision else tr('The previous configuration check failed. Settings have changed; check again.')
                     ErrorDialog(message, details_text(result["error"]), parent=self.window).open()
         self.window.launch(operation, done)
 
@@ -673,7 +685,7 @@ class SettingsPage(QWidget):
             self.form_provider = value["provider"]
             self.deepseek_options.setVisible(value["provider"] == "deepseek")
             self.model.setReadOnly(value["provider"] == "deepseek")
-            self.model_button.setText("检查模型可用性" if value["provider"] == "deepseek" else "检查模型加载状态")
+            self.model_button.setText(tr('Check model availability') if value["provider"] == "deepseek" else tr('Check model loading status'))
             self.thinking.setChecked(value["thinking"])
             self.effort.setCurrentIndex(self.effort.findData(value["reasoning_effort"]))
             self.url.setText(value["base_url"])
@@ -688,7 +700,7 @@ class SettingsPage(QWidget):
 
     def show_secret(self, value):
         configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
-        self.secret_state.setText("API Key：已设置" if configured else "API Key：未设置")
+        self.secret_state.setText(tr('API Key: set') if configured else tr('API Key: not set'))
 
     def save(self, *, clear=False, secret=None):
         """本地保存不占用后台活动队列；失败保留表单和未保存状态。"""
@@ -708,7 +720,7 @@ class SettingsPage(QWidget):
             self.loading = False
         self.revision += 1
         if secret or clear:
-            self.check_status.setText("设置已变更，请重新检查；旧结果仅保留在日志中。")
+            self.check_status.setText(tr('Settings changed. Check again; previous results remain in the logs.'))
         coordinator = getattr(self.window, "coordinator", None)
         if coordinator is not None:
             coordinator.refresh_agent()
@@ -733,40 +745,40 @@ class RepairPage(QWidget):
         row = QHBoxLayout()
         self.baseline = QComboBox()
         row.addWidget(self.baseline)
-        self.controls.append(button("刷新 Manifest", self.refresh_manifests, row))
-        self.controls.append(button("初始化／重建 Candidate", self.initialize, row))
+        self.controls.append(button(tr('Refresh Manifests'), self.refresh_manifests, row))
+        self.controls.append(button(tr('Initialize / rebuild Candidate'), self.initialize, row))
         layout.addLayout(row)
         row = QHBoxLayout()
-        self.controls.append(button("New Conversation", self.new, row))
-        self.workspace_button = button("打开 Agent 工作区", self.open_workspace, row)
-        self.pages_button = button("打开扩展配置页面文件夹", self.open_pages, row)
+        self.controls.append(button(tr("New Conversation"), self.new, row))
+        self.workspace_button = button(tr('Open Agent workspace'), self.open_workspace, row)
+        self.pages_button = button(tr('Open external settings page directory'), self.open_pages, row)
         layout.addLayout(row)
-        self.identity = QLabel("尚未开始对话")
+        self.identity = QLabel(tr('No conversation started'))
         layout.addWidget(self.identity)
         self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-interactions")
         layout.addWidget(self.diagnostics)
         self.chat = RepairChat()
         layout.addWidget(self.chat, 1)
         self.message = QPlainTextEdit()
-        self.message.setPlaceholderText("输入问题、异常或下一步要求；可纯文字发送")
+        self.message.setPlaceholderText(tr('Enter a question, error or next instruction; text-only messages are supported'))
         self.message.setMaximumHeight(85)
         layout.addWidget(self.message)
         row = QHBoxLayout()
-        self.attach = button("附加图片", self.attach_image, row)
+        self.attach = button(tr('Attach images'), self.attach_image, row)
         self.controls.append(self.attach)
-        self.controls.append(button("清除附件", self.clear_image, row))
-        self.controls.append(button("发送", self.send, row))
-        self.cancel_button = button("取消本轮", window.cancel_operation, row)
+        self.controls.append(button(tr('Clear attachments'), self.clear_image, row))
+        self.controls.append(button(tr('Send'), self.send, row))
+        self.cancel_button = button(tr('Cancel round'), window.cancel_operation, row)
         layout.addLayout(row)
-        self.request_progress = QLabel("对话轮次：尚未开始；本轮模型请求：0")
+        self.request_progress = QLabel(tr('Conversation round: not started; model requests this round: 0'))
         layout.addWidget(self.request_progress)
         self.status = QLabel()
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         row = QHBoxLayout()
-        for text, callback in (("查看累计 Diff", self.show_diff), ("Validate", self.validate),
-                               ("Publish", self.publish), ("设置 Default", self.set_default)):
+        for text, callback in ((tr('View cumulative Diff'), self.show_diff), (tr('Validate'), self.validate),
+                               (tr('Publish'), self.publish), (tr('Set Default'), self.set_default)):
             self.controls.append(button(text, callback, row))
         layout.addLayout(row)
 
@@ -803,20 +815,20 @@ class RepairPage(QWidget):
     def initialize(self):
         identity = self.baseline.currentData()
         if identity is None:
-            self.status.setText("请先刷新并选择基础 Manifest。")
+            self.status.setText(tr('Refresh and select a base Manifest first.'))
             return
         exists = self.host.candidate.exists() and any(self.host.candidate.iterdir())
         if exists or self.host.conversation is not None:
-            response = QMessageBox.question(self, "重建 Candidate", "成功后将替换非空 Candidate 并自动开启新对话；原对话与产物保留。继续？")
+            response = QMessageBox.question(self, tr('Rebuild Candidate'), tr('Success replaces the non-empty Candidate and starts a new conversation; the previous conversation and artifacts are retained. Continue?'))
             if response != QMessageBox.StandardButton.Yes:
                 return
         def done(_):
             self.chat.clear()
             self.tool_errors.clear()
-            self.request_progress.setText("对话轮次：尚未开始；本轮模型请求：0")
+            self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
             self.diagnostics.errors.clear()
             self.diagnostics.set_path(self.host.conversation.log.path)
-            self.identity.setText(f"对话：{self.host.conversation.log.path.name}\nCandidate 已重建；日志：{self.host.conversation.log.path}")
+            self.identity.setText(tr('Conversation: {0}\nCandidate rebuilt; log: {1}').format(self.host.conversation.log.path.name, self.host.conversation.log.path))
         self.window.launch(lambda: self.host.initialize(identity, replace=exists), done)
 
     def new(self):
@@ -824,24 +836,24 @@ class RepairPage(QWidget):
             conversation = self.host.new_conversation()
             self.chat.clear()
             self.tool_errors.clear()
-            self.request_progress.setText("对话轮次：尚未开始；本轮模型请求：0")
+            self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
             self.diagnostics.errors.clear()
             self.diagnostics.set_path(conversation.log.path)
             self.clear_image()
             self.message.clear()
-            self.identity.setText(f"对话：{conversation.log.path.name}\n日志：{conversation.log.path}")
+            self.identity.setText(tr('Conversation: {0}\nLog: {1}').format(conversation.log.path.name, conversation.log.path))
         self.window._interact(action)
 
     def attach_image(self):
-        names, _ = QFileDialog.getOpenFileNames(self, "选择图片（可多选）", "", "所有文件 (*)")
+        names, _ = QFileDialog.getOpenFileNames(self, tr('Choose images (multiple selection allowed)'), "", tr('All files (*)'))
         if names:
             self.images.extend(Path(name) for name in names)
-            self.attach.setText(f"已附加 {len(self.images)} 张图片")
+            self.attach.setText(tr('{0} images attached').format(len(self.images)))
             self.attach.setToolTip("\n".join(str(path) for path in self.images))
 
     def clear_image(self):
         self.images = []
-        self.attach.setText("附加图片")
+        self.attach.setText(tr('Attach images'))
         self.attach.setToolTip("")
 
     def send(self):
@@ -856,9 +868,9 @@ class RepairPage(QWidget):
             images = list(self.images)
             args = SimpleNamespace(pi="pi", ask_api_key=False)
             limit = load_settings(self.host.service.data_root)["max_requests"]
-            self.request_progress.setText(f"对话轮次：{conversation.log.group + 1}；本轮模型请求：0/{limit}")
+            self.request_progress.setText(tr('Conversation round: {0}; model requests this round: 0/{1}').format(conversation.log.group + 1, limit))
             self.chat.add_message("你", message, conversation.log.group + 1)
-            self.identity.setText(f"对话：{conversation.log.path.name}\n日志：{conversation.log.path}")
+            self.identity.setText(tr('Conversation: {0}\nLog: {1}').format(conversation.log.path.name, conversation.log.path))
             self.message.clear()
             self.clear_image()
             def operation():
@@ -879,19 +891,18 @@ class RepairPage(QWidget):
         elif result["reason"] == "answered":
             self.chat.add_message("Agent", str(answer.get("message", "")),
                                   result.get("round", self.host.conversation.log.group if self.host.conversation else 0))
-        summary = "错误：" + result["error"] if result.get("error") else "本轮结束：" + result["reason"]
-        self.status.setText(f"{summary}；实际请求 {result['requests']} 次")
+        summary = tr('Error: ') + result["error"] if result.get("error") else tr('Round ended: ') + result["reason"]
+        self.status.setText(tr('{0}; actual requests: {1}').format(summary, result['requests']))
 
     def show_event(self, event):
         value = event["event"]
         kind, number = value.get("type"), event.get("round", 0)
         if kind == "lalc_request":
-            self.request_progress.setText(f"对话轮次：{number}；本轮模型请求："
-                                          f"{value['requests']}/{value.get('request_limit', '—')}")
-            self.status.setText(f"已发出模型请求：{value['requests']}")
+            self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(number, value['requests'], value.get('request_limit', '—')))
+            self.status.setText(tr('Model requests sent: {0}').format(value['requests']))
         elif kind == "final_answer_retry":
             self.diagnostics.add_error(value["diagnostics"])
-            self.status.setText(f"最终回复格式错误，正在要求重新生成；剩余请求 {value['requests_remaining']} 次。")
+            self.status.setText(tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining']))
         elif kind == "pi_version_warning":
             self.chat.add_message("系统", "WARNING: " + value["message"], number)
         elif kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation"}:
@@ -901,7 +912,7 @@ class RepairPage(QWidget):
             name = value.get("toolName") or value.get("name") or "validate"
             entry = self.chat.upsert_tool(number, identity, name, kind, value)
             if kind == "tool_execution_start":
-                self.status.setText("正在调用工具：" + name)
+                self.status.setText(tr('Calling tool: ') + name)
             if entry["failed"]:
                 host = entry["events"].get("repair_tool", {}).get("result", {}).get("details", {})
                 validation = entry["events"].get("validation", {})
@@ -919,7 +930,7 @@ class RepairPage(QWidget):
                 else:
                     self.diagnostics.errors.setItemData(self.tool_errors[key], details)
                     self.diagnostics.select_error()
-                self.status.setText("错误：" + details["message"] + "；可查看详情，本轮继续处理。")
+                self.status.setText(tr('Error: ') + details["message"] + tr('; details are available, processing continues this round.'))
 
     def show_diff(self):
         self.window.launch(self.host.diff, self.open_diff)
@@ -928,7 +939,7 @@ class RepairPage(QWidget):
         """只在主动审阅时打开固定基线 Diff，不阻塞对话页面。"""
         dialog = QDialog(self)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        dialog.setWindowTitle("累计 Diff（Candidate 固定基线）")
+        dialog.setWindowTitle(tr('Cumulative Diff (fixed Candidate baseline)'))
         dialog.resize(900, 650)
         dialog.setSizeGripEnabled(True)
         layout = QVBoxLayout(dialog)
@@ -936,7 +947,7 @@ class RepairPage(QWidget):
         text.setReadOnly(True)
         text.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         text.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
-        text.setPlainText(value or "暂无修改")
+        text.setPlainText(value or tr('No changes'))
         layout.addWidget(text)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(dialog.close)
@@ -953,7 +964,7 @@ class RepairPage(QWidget):
         self.window.launch(self.host.validate, done)
 
     def publish(self):
-        self.window.launch(self.host.publish, lambda identity: self.chat.add_message("系统", "已发布新 Manifest：" + identity + "；Default 未改变。"))
+        self.window.launch(self.host.publish, lambda identity: self.chat.add_message("系统", tr('Published new Manifest: ') + identity + tr('; Default is unchanged.')))
 
     def set_default(self):
         identity = self.baseline.currentData()
@@ -969,6 +980,6 @@ class RepairPage(QWidget):
     def render(self, busy):
         for control in self.controls:
             control.setEnabled(not busy)
-            control.setToolTip("当前活动尚未结束" if busy else "")
+            control.setToolTip(tr('The current activity has not finished') if busy else "")
         self.baseline.setEnabled(not busy)
         self.cancel_button.setEnabled(self.window.service.state.get("activity") == "Agent")

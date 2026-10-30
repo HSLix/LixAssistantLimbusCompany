@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-10-30 #334：成品草稿和基线随用户数据保存；默认随包 pi 优先、请求前限定故障回退一次。模型预检也会锁定本轮 pi，后续修复进程启动失败不能重开回退。源码仍保留项目草稿及显式 `--pi`；当前构建与证据见[#334 记录](stage-4-334-implementation.md)。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
 
 
@@ -99,6 +101,8 @@ GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停
 - `round-N/request-K.json`：实际模型请求；连接预检消耗计入同一轮额度。
 - `round-N/original/`、`final/`、`cumulative.diff`、`result.json`：真实候选快照、相对固定基线的累计 Diff、请求次数及结束原因。
 - `context.json`、`tool-N.json` 和图片：保留消息、图片及工具结果；工具序号跨轮递增，不覆盖旧产物。
+
+2026-10-28 起新对话采用 [ADR 0033](adr/0033-deduplicate-agent-logs-with-conversation-local-references.md) 的去重表示：log-format.json 标识格式，重复内容通过对话内相对路径和 SHA-256 引用保存，图片优先引用本对话已留存的原图。上述请求、事件、上下文和工具 JSON 可包含引用，完整信息、事件顺序、模型实际接收内容与 GUI 实时事件不变。复制整个对话目录即可按需展开；旧日志不迁移、不重写。本次不提供历史加载/展示界面。诊断命令与验证见[日志设计](agent-interaction-log-design.md)。
 
 每轮回收 pi 进程，下一轮通过 pi context hook 显式带入此前消息、图片和工具结果，不重写模型工具循环。最终回答必须是严格 JSON，不剥离说明或代码块；解析或字段错误自动反馈具体错误，要求在同一会话重新生成 JSON，同时禁用剩余工具，避免重复修改。纠正请求计入本轮共享上限；合法回答、超限、服务错误或取消结束本轮，不自动开启下一轮。最终 JSON 中 `revise_success` 是模型报告，不能代替 Validator、人工审阅或游戏验收。
 

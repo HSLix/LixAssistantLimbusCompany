@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from .application import ApplicationService, StartError, default_data_root
+from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .focused import WindowError
 from .manifest import ManifestManager, ValidationError
 from .errors import FATAL_MESSAGE, configure_logging, result_diagnostics
@@ -236,7 +236,7 @@ def _dispatch(args: argparse.Namespace) -> int:
 
         return settings_command(args, data_root)
     manager = ManifestManager(data_root)
-    candidate = Path.cwd() / "candidate"
+    candidate = default_candidate_root(data_root)
     manifest_path = candidate / "manifest.json"
 
     if args.command == "repair":
@@ -343,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         parsed = _parser().parse_args(args)
         if parsed.command in {"validate", "publish", "clear"}:
             from .process_lock import ProcessLock
-            with ProcessLock("candidate:" + str((Path.cwd() / "candidate").resolve())):
+            with ProcessLock("candidate:" + str(default_candidate_root(default_data_root()).resolve())):
                 return _dispatch(parsed)
         return _dispatch(parsed)
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:

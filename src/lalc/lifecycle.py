@@ -66,7 +66,10 @@ class ApplicationLifecycle:
             app = QApplication.instance() or QApplication([])
             from .gui import ErrorDialog
 
-            ErrorDialog(FATAL_MESSAGE, details, fatal=True).exec()
+            from .i18n import tr
+            ErrorDialog(tr("A fatal error occurred. The application cannot continue.\n"
+                           "You can copy the original error information and report it to the developer."),
+                        details, fatal=True).exec()
         except Exception:
             logging.getLogger(__name__).exception("Fatal dialog unavailable")
             print(FATAL_MESSAGE, file=sys.stderr)

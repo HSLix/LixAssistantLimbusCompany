@@ -174,11 +174,12 @@ def test_pi_version_mismatch_warns_and_continues(monkeypatch, tmp_path, caplog, 
             assert command[0] == "/pi"
             assert env["LALC_PI_VERSION"] == version
     warning = version != probe.PI_VERSION
-    assert bool(events) == warning
+    warnings = [item for item in events if item["event"].get("type") == "pi_version_warning"]
+    assert bool(warnings) == warning
     assert bool(caplog.records) == warning
     assert bool(capsys.readouterr().err) == warning
     if warning:
-        event = events[0]["event"]
+        event = warnings[0]["event"]
         assert event["type"] == "pi_version_warning"
         assert event["actual_version"] == version and event["expected_version"] == probe.PI_VERSION
         assert caplog.records[0].levelno == logging.WARNING

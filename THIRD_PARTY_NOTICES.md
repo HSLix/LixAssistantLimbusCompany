@@ -17,3 +17,11 @@ The packaged application includes the following distributions' metadata and lice
 
 Platform libraries, Python, and other runtime dependencies retain their original
 licenses and notices. Refer to the corresponding distributions and packaged metadata.
+
+The optional with-pi ZIP also contains the complete official Windows x64 pi 1.4.0
+release under `pi/`, including its runtime resources, documentation and metadata.
+Pi is Copyright (c) 2025 Mario Zechner, under the MIT license reproduced in
+`pi/LICENSE.txt` (source: `packaging/pi-LICENSE.txt`). Upstream source and release:
+https://github.com/earendil-works/pi/releases/tag/v1.4.0
+Bundled upstream dependencies retain their respective licenses. The plain LALC ZIP
+does not contain the pi runtime; this notice does not imply it is installed.

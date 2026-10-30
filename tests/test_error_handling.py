@@ -118,7 +118,7 @@ def test_gui_interaction_logs_error_and_dialog_copies_original_traceback(tmp_pat
         window._interact(fail)
     dialog = window.findChild(ErrorDialog)
     assert dialog is not None
-    copy = next(button for button in dialog.findChildren(QPushButton) if "Copy error" in button.text())
+    copy = next(button for button in dialog.findChildren(QPushButton) if "复制错误信息" in button.text())
     copy.click()
     assert "OSError: interaction failed" in app.clipboard().text()
     assert "ValueError: interaction cause" in app.clipboard().text()
@@ -128,7 +128,7 @@ def test_gui_interaction_logs_error_and_dialog_copies_original_traceback(tmp_pat
     app.processEvents()
 
 
-def test_gui_fatal_error_shows_bilingual_copyable_message_and_exits(tmp_path: Path, monkeypatch) -> None:
+def test_gui_fatal_error_shows_localized_copyable_message_and_exits(tmp_path: Path, monkeypatch) -> None:
     from PySide6.QtWidgets import QApplication
     from lalc.gui import ErrorDialog, MainWindow
     app = QApplication.instance() or QApplication([])
@@ -138,7 +138,7 @@ def test_gui_fatal_error_shows_bilingual_copyable_message_and_exits(tmp_path: Pa
     monkeypatch.setattr(app, "exit", exits.append)
     window.fatal_error("OSError: original fatal error")
     window.fatal_error("duplicate")
-    assert len(notices) == 1 and "Fatal error" in notices[0][0]
+    assert len(notices) == 1 and "致命错误" in notices[0][0]
     assert notices[0][1] == "OSError: original fatal error"
     assert "无法继续运行" in FATAL_MESSAGE and "cannot continue" in FATAL_MESSAGE
     assert exits == [1] and not window.isEnabled()

@@ -12,6 +12,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from lalc.agent_log import read_json, read_events
+
 from test_pi_probe import probe
 from test_agent_repair import host_for
 
@@ -286,7 +288,7 @@ def test_real_model_inspects_assets_and_actions(tmp_path):
     result = asyncio.run(chat.run("只分析。实际调用 asset_tree 和 action_contracts，简短报告结果，不修改候选。", options))
     print(f"Real model inspection evidence: {chat.log.path}")
     assert result["status"] == "completed", result
-    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     assert {"asset_tree", "action_contracts"} <= {e.get("name") for e in events if e.get("type") == "repair_tool" and not e["result"].get("isError")}
 
 
@@ -331,7 +333,7 @@ def test_windows_real_model_captures_and_reuses_crop(tmp_path):
     result = asyncio.run(chat.run(message, options))
     print(f"Windows live screenshot/crop evidence: {chat.log.path}")
     assert result["status"] == "completed", result
-    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     crops = [e["result"]["details"] for e in events if e.get("type") == "repair_tool" and e.get("name") == "crop_asset" and not e["result"].get("isError")]
     assert len(crops) >= 2
     assert not crops[0]["existed"] and crops[1]["existed"]
@@ -374,7 +376,7 @@ def test_invalid_final_gets_error_feedback_then_strict_json_without_tools(conver
                for body in state["calls"])
     assert any(part.get("text") == invalid for message in chat.history for part in message.get("content", []))
     assert {p.name: p.read_bytes() for p in chat.host.candidate.iterdir()} == before
-    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     retry = next(e for e in events if e.get("type") == "final_answer_retry")
     assert retry["diagnostics"]["raw_text"] == invalid
     assert retry["diagnostics"]["stage"] == "final_answer"
@@ -404,7 +406,7 @@ def test_output_truncation_records_reason_and_does_not_format_retry(conversation
     assert details["stop_reason"] == "length" and details["text_chars"] == 0
     assert details["thinking_chars"] == len("unfinished reasoning")
     assert details["stage"] == ("model_preflight" if preflight else "provider_request")
-    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     assert not any(event.get("type") == "final_answer_retry" for event in events)
 
 
@@ -446,11 +448,16 @@ def test_live_asset_tool_images_retained_across_rounds_without_overwrite(convers
     state["respond"] = lambda body: next(steps)(body)
     first = asyncio.run(chat.run("inspect and crop", options))
     assert first["status"] == "completed", first
+    for index, body in enumerate(state["calls"], 1):
+        assert read_json(chat.log.path / f"round-1/request-{index}.json") == chat.log.clean(body)
+    first_requests = len(state["calls"])
     retained = {p: p.read_bytes() for p in chat.log.path.glob("tool-*") if p.is_file()}
     steps = iter([lambda body: tool("preview_crop", {**crop, "tags": ["replace"]}), save_preview, lambda body: answer()])
     state["respond"] = lambda body: next(steps)(body)
     second = asyncio.run(chat.run("reuse the same crop", options))
     assert second["status"] == "completed", second
+    for index, body in enumerate(state["calls"][first_requests:], 1):
+        assert read_json(chat.log.path / f"round-2/request-{index}.json") == chat.log.clean(body)
     assert all(p.read_bytes() == value for p, value in retained.items())
     assert "data:image/png;base64," in json.dumps(state["calls"][-1])
     mapping = json.loads((chat.host.service.data_root / "assets/ui/new/asset-tag.json").read_text())
@@ -489,7 +496,7 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
     assert state["calls"][-1]["messages"][:len(first_calls[-1]["messages"])] == first_calls[-1]["messages"]
     budgets = [message for message in chat.history if "LALC_REQUEST_BUDGET" in json.dumps(message)]
     assert len(budgets) == 3  # 两轮预检的通知不进入修复历史。
-    assert json.loads((chat.log.path / "context.json").read_text()) == chat.history
+    assert read_json(chat.log.path / "context.json") == chat.history
 
 
 def test_add_both_source_kinds_then_edit_new_files_in_same_round(conversation):
@@ -528,7 +535,7 @@ def test_multiple_image_formats_are_forwarded_without_conversion_and_retained(co
             prefix, data = url.split(",", 1)
             assert prefix == f"data:{mime};base64"
             assert base64.b64decode(data) == path.read_bytes()
-    files = json.loads((chat.log.path / "round-1/input.json").read_text())["attachments"]
+    files = read_json(chat.log.path / "round-1/input.json")["attachments"]
     assert len(files) == len(paths)
     originals = {path: path.read_bytes() for path in (chat.log.path / "round-1").glob("input-*.*")}
     result = asyncio.run(chat.run("remember images from previous message", options))
@@ -548,7 +555,7 @@ def test_image_batch_service_rejection_keeps_details_and_no_automatic_retry(conv
     assert result["status"] == "incomplete" and result["requests"] == 1
     assert "too many image bytes" in result["error"]
     assert len(state["calls"]) == 1
-    assert len(json.loads((chat.log.path / "round-1/input.json").read_text())["attachments"]) == 2
+    assert len(read_json(chat.log.path / "round-1/input.json")["attachments"]) == 2
 
 
 def test_images_stay_original_during_format_correction(conversation, tmp_path):
@@ -621,7 +628,7 @@ def test_host_and_pi_events_share_call_ids_without_removing_raw_logs(conversatio
     script(state, [*calls, answer()])
     result = asyncio.run(chat.run("inspect contracts twice, read, edit and validate", options))
     assert result["status"] == "completed", result
-    events = [json.loads(line)["event"] for line in (chat.log.path / "events.jsonl").read_text().splitlines()]
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     hosted = [event for event in events if event["type"] == "repair_tool"]
     assert len(hosted) == 2
     assert len({event["toolCallId"] for event in hosted}) == 2
@@ -730,8 +737,8 @@ def test_round_freezes_shared_config_and_auth_until_next_message(conversation):
     second = asyncio.run(chat.run("continue", args))
     assert second["status"] == "completed", second
     assert seen[-1] == "Bearer example-round-B"
-    assert json.loads((chat.log.path / "round-1/input.json").read_text())["settings"]["max_requests"] == 6
-    assert json.loads((chat.log.path / "round-2/input.json").read_text())["settings"]["max_requests"] == 7
+    assert read_json(chat.log.path / "round-1/input.json")["settings"]["max_requests"] == 6
+    assert read_json(chat.log.path / "round-2/input.json")["settings"]["max_requests"] == 7
     for path in chat.log.path.rglob("*"):
         if path.is_file():
             assert b"example-round-A" not in path.read_bytes()
