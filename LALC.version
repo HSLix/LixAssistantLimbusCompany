@@ -3,7 +3,7 @@ VSVersionInfo(
   kids=[
     StringFileInfo([StringTable('040904B0', [
       StringStruct('CompanyName', 'HSLix'),
-      StringStruct('FileDescription', 'LALC Internal Packaging Spike'),
+      StringStruct('FileDescription', 'LALC'),
       StringStruct('FileVersion', '0.1.0.0'),
       StringStruct('InternalName', 'LALC'),
       StringStruct('OriginalFilename', 'LALC.exe'),

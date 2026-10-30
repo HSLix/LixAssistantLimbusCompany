@@ -14,3 +14,5 @@ User/Developer 双窗口同进程共享服务和活动门控，同时允许打�
 既有不可变源码、Asset、Trusted Action、Step 恢复、Developer 认证/权限与证据边界保持；本 ADR 不开放任意层自动恢复或任意文件执行。旧文档的冲突范围按本决定替代，历史实施证据保留。#331 的 Python Plan 与双窗口闭环已在本地实现，证据及剩余边界见[实施记录](../stage-4-331-implementation.md)；#332 外置页面、共享 provider 配置、单一编辑入口及整应用重载也已完成本地实现，追加确认和证据见[#332 实施记录](../stage-4-332-implementation.md)；#333 双语与语言重载已完成本地实现，已获开发者人工验收确认并关闭 #333，见[#333 实施记录](../stage-4-333-implementation.md)；#334 Windows 打包验收仍未完成。
 
 2026-10-27 经可行性实验后，开发者授权将两个窗口完整迁移为 FluentWindow，采用官方基础控件和导航；不改变本文的单进程/共享服务、独立窗口、页面/Manifest 分离及活动契约。当前实现、退出顺序适配和 Windows 未验收边界见[迁移记录](../fluent-gui-migration.md)。
+
+2026-10-30 #334 分发细节已确认：Windows x64 onedir 双 ZIP（含／不含 pi），程序不附业务数据，后续数据导入导出另行实现；成品草稿随用户数据，源码草稿仍随项目。默认随包 pi 优先、请求前限定故障可回退一次，连接／图片预检 prompt 也关闭本轮回退。构建脚本从忽略的 pi_resources 读取固定原始 ZIP，通用 Windows 功能仅验一个包、pi 差异分别覆盖；真实模型验证不属于本票，Actions 在 Stage 6 完成后考虑。现有 main 增加共享实现的 console 打包入口，仅恢复 CLI 交互，不另建服务或 Developer 业务执行路径。见[决策](../stage-4-334-decisions.md)和[构建验收说明](../windows-packaging.md)；Windows 现场通过门槛及开发者确认后关闭规则保持。

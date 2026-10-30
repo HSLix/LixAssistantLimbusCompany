@@ -29,7 +29,7 @@ from qfluentwidgets import (
 
 from .i18n import activity_text, tr
 
-from .application import ApplicationService, StartError, default_data_root
+from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
 from .lifecycle import ApplicationLifecycle, run_application
 
@@ -94,7 +94,7 @@ class MainWindow(FluentWindow):
         self.trial_dialog = None
         from .developer import DeveloperHost
         from .developer_gui import CapturePage, SettingsPage, RepairPage
-        self.host = host or DeveloperHost(service, Path.cwd() / "candidate")
+        self.host = host or DeveloperHost(service, default_candidate_root(service.data_root))
         self.jobs = []
         self.owns_run = False
         self.closing = False
@@ -798,7 +798,7 @@ class GuiCoordinator:
             install_translations(app, resolve_language(load_language(service.data_root)))
         from .developer import DeveloperHost
         self.service, self.lifecycle = service, lifecycle
-        self.host = DeveloperHost(service, Path.cwd() / "candidate")
+        self.host = DeveloperHost(service, default_candidate_root(service.data_root))
         self.user = None
         self.developer = None
         self.reloading = False

@@ -1,4 +1,4 @@
-# Internal packaging spike. Build on Windows x64 for Windows acceptance.
+# Build on Windows x64; user data and optional pi are assembled separately.
 import sys
 from pathlib import Path
 from PyInstaller.utils.hooks import copy_metadata
@@ -11,6 +11,7 @@ a = Analysis(
     pathex=[str(root / "src")],
     binaries=[],
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
+           (str(root / "src/lalc/pi_probe.ts"), "lalc"),
            (str(root / "src/lalc/translations/lalc_zh_CN.qm"), "lalc/translations"),
            (str(Path(QLibraryInfo.path(QLibraryInfo.TranslationsPath)) / "qtbase_zh_CN.qm"),
             "PySide6/translations" if sys.platform == "win32" else "PySide6/Qt/translations")]
@@ -43,6 +44,9 @@ exe = EXE(
 )
 coll = COLLECT(
     exe,
+    EXE(pyz, a.scripts, [], exclude_binaries=True, name="LALC-console", console=True,
+        debug=False, strip=False, upx=False,
+        version=str(root / "LALC.version") if sys.platform == "win32" else None),
     a.binaries,
     a.datas,
     strip=False,

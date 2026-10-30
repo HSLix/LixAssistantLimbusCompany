@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-10-30 #334：成品草稿和基线随用户数据保存；默认随包 pi 优先、请求前限定故障回退一次。模型预检也会锁定本轮 pi，后续修复进程启动失败不能重开回退。源码仍保留项目草稿及显式 `--pi`；当前构建与证据见[#334 记录](stage-4-334-implementation.md)。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
 
 

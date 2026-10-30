@@ -1,0 +1,9 @@
+{
+  "schema_version": 2,
+  "components": {
+    "plans.acceptance": {"source_path": "plan.py"},
+    "tasks.acceptance": {"source_path": "task.py"},
+    "steps.acceptance_wait": {"source_path": "wait.py"}
+  },
+  "recovery_rules": {}
+}

@@ -13,7 +13,7 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
 - Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
 - Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; final Windows/model/game acceptance remains tracked in #329.
-- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed; #334 Windows acceptance remains pending. See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
+- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 local build implementation is available, with Windows acceptance pending; see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
 - Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: deferral confirmed on 2026-10-26; prior runtime architecture retained. Other Stage 5–6 proposals remain [pending discussion](docs/reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案).
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
 - Agent-assisted Workflow Drafting and autonomous Capability Expansion: explicitly deferred.
@@ -90,13 +90,20 @@ Manifest. `clear` is the only command that removes it and asks for confirmation.
 `init` creates and registers an empty `plan.py`. Edit it in the Candidate, then validate and publish. Each runnable Manifest requires exactly one `@automation_plan`; `run-plan` executes its saved immutable source, with optional `--inputs` / `--inputs-file` containing `task_repetitions` and `settings`. JSON Plan paths are no longer executable; old data is preserved and requires explicit republication. CLI returns 1 for completed Plans containing failed tasks. Each Plan uses one Run ID, and its Task/Subworkflow records are saved
 under the local data directory's `ledger/` folder.
 
-Release-like dependency installation and the internal `onedir` spike use a
-non-editable environment:
+Windows x64 builds use a separate non-editable environment and produce two ZIPs,
+with and without pi. Place the original pi 1.4.0 Windows x64 ZIP in the ignored
+`pi_resources/pi-windows-x64.zip`, then run on Windows:
 
-```bash
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --locked --no-editable --no-default-groups --group build --all-extras
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run --no-sync pyinstaller --clean --noconfirm LALC.spec
+```powershell
+uv run --no-project --python 3.12 python scripts/build_windows.py
 ```
+
+Outputs are under `dist/`. Neither package contains business data or installs
+examples on first launch. Run `LALC.exe` for User, `Developer.cmd` for Developer,
+and `LALC-console.exe` for CLI commands. Packaged Candidate and other data use
+`%LOCALAPPDATA%\LALC`; source development retains the project Candidate.
+See [build and Windows acceptance instructions](docs/windows-packaging.md) and
+[#334 local implementation evidence](docs/stage-4-334-implementation.md).
 
 `--packaging-probe EXTERNAL.py RESULT.json` is a temporary internal diagnostic;
 delete it after the later formal external-process runner covers external source

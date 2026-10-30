@@ -1,5 +1,7 @@
 # Developer Workflow
 
+2026-10-30：本文 uv 命令针对源码项目；Windows 成品通过 `LALC-console.exe` 使用同一 CLI，Candidate 固定在用户数据目录，不随终端工作目录改变。构建输入、独立示例准备与验收见[Windows 说明](windows-packaging.md)。
+
 2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。外置页面及共享 Agent 配置已在 #332 本地实现，#333 双语与语言重载也已完成本地实现、已获开发者人工验收确认并关闭 #333（[使用与证据](stage-4-333-implementation.md)）；#334 Windows 打包验收仍待完成。
 
 正式 Run 要求唯一可用的 Windows 游戏窗口。运行开始时连接、聚焦并启动物理输入监听，结束时清理；自动化测试提供平台替身。

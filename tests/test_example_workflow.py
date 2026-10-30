@@ -64,7 +64,7 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     from lalc.user_pages import UserSettings, discover_pages, task_inputs
     app = QApplication.instance() or QApplication([])
     example = Path(__file__).resolve().parents[1] / "example"
-    assert {path.name for path in example.iterdir() if not path.name.startswith(".")} == {"pages", "workflow"}
+    assert {path.name for path in example.iterdir() if not path.name.startswith(".")} == {"pages", "workflow", "acceptance"}
     manager = ManifestManager(tmp_path / "data", actions=application_actions())
     saved = manager.publish(example / "workflow/manifest.json")
     assert saved.ok, saved.errors

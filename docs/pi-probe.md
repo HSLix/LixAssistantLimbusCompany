@@ -1,5 +1,7 @@
 # pi 最小接入验证（#324）
 
+2026-10-30 #334：成品默认优先同级 `pi/pi.exe`，请求前的限定故障最多回退一次到环境 pi；显式 `--pi` 保持指定。版本差异仍只警告，超时／协议错误／清理失败及任何模型 prompt 发送后的错误不回退；见[Windows 构建说明](windows-packaging.md)。本命令会请求模型，不能作为普通回归或仅检查路径的附带步骤。
+
 此命令只验证 Python → 独立 pi 二进制 → 图片模型 → 受限源码读取 → 最终回答，不创建 Workflow Run，不重建 Developer Candidate，不编辑源码、不执行游戏点击。仅终端展示过程，不保存 Agent Interaction Log 或 pi 会话；#325 的正式修复入口与日志见 [单 Component 修复](agent-repair.md)。
 
 ## 运行

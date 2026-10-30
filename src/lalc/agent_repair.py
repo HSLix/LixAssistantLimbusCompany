@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import uuid
 
-from .pi_probe import PI_VERSION, configured_pi, rpc_event, rpc_session
+from .pi_probe import PI_VERSION, PiStartup, configured_pi, rpc_event, rpc_session
 from .repair_tools import REPAIR_TOOLS, RepairTools
 from .agent_settings import settings_snapshot
 from .developer import candidate_files, editable_files, file_diff
@@ -215,7 +215,7 @@ def image_attachments(paths, directory):
     return result, records
 
 
-async def check_model_image(command, env, temporary, images, log):
+async def check_model_image(command, env, temporary, images, log, *, startup=None):
     """整组图片只预检一次；成功前不修改候选，计数沿用到修复。"""
     checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
                 "LALC_PI_MAX_REQUESTS": "1"}
@@ -225,7 +225,7 @@ async def check_model_image(command, env, temporary, images, log):
                   "images": images}
     checking["LALC_PI_INPUT_MESSAGE"] = prompt["message"]
     last = {}
-    async with rpc_session(command, checking, temporary, log.record) as (send, event):
+    async with rpc_session(command, checking, temporary, log.record, startup=startup) as (send, event):
         await configure_session(send, event, log, [])
         log.record({"type": "model_check_started", "prompt": prompt})
         await send({key: value for key, value in prompt.items() if key != "images"})
@@ -322,8 +322,10 @@ class RepairConversation:
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": SYSTEM_PROMPT}
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
+                startup = PiStartup()
                 with configured_pi(options, self.host.candidate.resolve(), self.log.key, SYSTEM_PROMPT,
-                                   require_image=bool(attachments), on_warning=self.log.record) as (command, env, temporary, model):
+                                   require_image=bool(attachments), on_warning=self.log.record,
+                                   startup=startup) as (command, env, temporary, model):
                     self.log.transport_dir = Path(temporary)
                     payloads = Path(temporary) / "payloads"
                     payloads.mkdir()
@@ -342,9 +344,12 @@ class RepairConversation:
                     self.log.path = round_path
                     try:
                         stage = "model_preflight"
-                        await check_model_image(command, env, temporary, attachments, self.log)
+                        await check_model_image(command, env, temporary, attachments, self.log, startup=startup)
                     finally:
                         self.log.path = old_path
+                        input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
+                        context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
+                        self.log.save_json(f"{prefix}/input.json", input_record)
                     env["LALC_PI_REQUESTS_USED"] = str(self.log.requests)
                     env["LALC_PI_REPAIR_FILES"] = json.dumps([str((self.host.candidate / name).resolve()) for name in names])
                     history_path = Path(temporary) / "history.json"
@@ -353,7 +358,7 @@ class RepairConversation:
                     expected = list(REPAIR_TOOLS)
                     command[command.index("--tools") + 1] = ",".join(expected)
                     stage = "pi_start"
-                    async with rpc_session(command, env, temporary, self.log.record) as (send, event):
+                    async with rpc_session(command, env, temporary, self.log.record, startup=startup) as (send, event):
                         await configure_session(send, event, self.log, expected)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})

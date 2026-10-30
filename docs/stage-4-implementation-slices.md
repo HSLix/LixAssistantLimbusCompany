@@ -66,6 +66,8 @@
 
 ## 4 — Windows 打包成品与框架验收
 
+2026-10-30：双包、本地构建、pi 选择与成品数据路径已本地实现；[构建及现场验收步骤](windows-packaging.md)、[本地证据与待验收边界](stage-4-334-implementation.md)。以下成品验收项仍需实际 Windows 结果，不能因源码／替身检查通过而整体勾选。
+
 **GitHub：** [#334](https://github.com/HSLix/LixAssistantLimbusCompany/issues/334)
 
 **直接阻塞：** [#333](https://github.com/HSLix/LixAssistantLimbusCompany/issues/333)

@@ -1,5 +1,7 @@
 # LALC Reconstruction Plan
 
+2026-10-30：#334 本地实现 Windows x64 双 ZIP 构建、pi 优先／回退与成品数据路径，见[实施记录](stage-4-334-implementation.md)。Windows 成品现场验收与开发者确认仍待完成；不带业务数据，导入导出另做，GitHub Actions 仅在 Stage 6 完成后考虑。
+
 This plan keeps the reconstruction dependency-ordered. Accepted boundaries may change only through an explicit reopening such as the Python-first decision below.
 
 ## 2026-10-26 规划记录：已确认排期与待讨论草案

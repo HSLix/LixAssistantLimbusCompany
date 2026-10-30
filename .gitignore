@@ -11,3 +11,4 @@ dist/
 candidate/
 .candidate-baseline.json
 /pages/
+pi_resources/

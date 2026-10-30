@@ -1,5 +1,7 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
+2026-10-30：#334 采用 Windows x64 本地 onedir 双 ZIP（含／不含 pi），程序不带可修改业务数据，成品 Candidate 随用户数据保存；源码仍用项目草稿。默认随包 pi 优先，请求前限定故障可回退一次，预检发出 prompt 后也不再回退。真实模型验证不属于本票，Actions 留到 Stage 6 完成后；构建输入 `pi_resources/` 不提交。详见[接受决策](stage-4-334-decisions.md)、[实施记录](stage-4-334-implementation.md)及[构建／验收说明](windows-packaging.md)。Windows 现场验收未完成，#334 不因此关闭。
+
 2026-10-28：[User GUI P0](user-gui-p0-layout.md) 已获确认并完成本地实现，配置文本保存/使用校验及错误详情折叠按该记录更新；#333 双语/语言重载已完成本地实现，已获开发者人工验收确认并关闭 #333；#334 Windows 成品验收仍未完成，见[#333 记录](stage-4-333-implementation.md)。
 
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。

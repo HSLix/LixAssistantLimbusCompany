@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
+from collections import deque
 import getpass
 import hashlib
 import json
@@ -15,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -22,6 +24,119 @@ from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 
 
 PI_VERSION = "1.4.0"
+_spawn_lock = threading.Lock()
+
+
+@contextmanager
+def pi_process_environment(env):
+    """冻结宿主启动独立 pi 时隔离其库查找路径，随后恢复 Qt 的 DLL 路径。"""
+    if not getattr(sys, "frozen", False):
+        yield env
+        return
+    root = Path(sys._MEIPASS).resolve()
+    prepared = dict(env)
+    for name in ("PATH", "DYLD_LIBRARY_PATH", "LD_LIBRARY_PATH"):
+        if name in prepared:
+            prepared[name] = os.pathsep.join(value for value in prepared[name].split(os.pathsep)
+                                            if value and not Path(value).resolve().is_relative_to(root))
+    if sys.platform != "win32":
+        yield prepared
+        return
+    import ctypes
+    with _spawn_lock:
+        kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel.GetDllDirectoryW.argtypes = [ctypes.c_uint32, ctypes.c_wchar_p]
+        kernel.SetDllDirectoryW.argtypes = [ctypes.c_wchar_p]
+        original = ctypes.create_unicode_buffer(kernel.GetDllDirectoryW(0, None) + 1)
+        kernel.GetDllDirectoryW(len(original), original)
+        if not kernel.SetDllDirectoryW(None):
+            raise AgentDiagnosticError("无法隔离 pi 的 DLL 查找环境。", "pi_environment") from ctypes.WinError(ctypes.get_last_error())
+        try:
+            yield prepared
+        finally:
+            if not kernel.SetDllDirectoryW(original.value or None):
+                raise AgentDiagnosticError("无法恢复应用 DLL 查找环境。", "pi_cleanup") from ctypes.WinError(ctypes.get_last_error())
+
+
+class PiStartError(AgentDiagnosticError):
+    """仅表示操作系统未能建立 pi 进程，区别于清理或模型错误。"""
+
+
+class PiExited(RuntimeError):
+    """pi 输出流结束；是否可回退由本轮是否已发送请求决定。"""
+
+
+class PiVersionError(RuntimeError):
+    """版本探测未给出有效输出，允许在请求前尝试环境 pi。"""
+
+
+class PiStartup:
+    """同一轮共享 pi 选择及请求边界；模型预检之后也不重新开放回退。"""
+
+    def __init__(self):
+        self.fallback = None
+        self.request_started = False
+        self.env = None
+        self.on_warning = None
+
+    def select(self, requested, env, cwd, on_warning):
+        self.env, self.on_warning = env, on_warning
+        bundled = Path(sys.executable).resolve().parent / "pi" / "pi.exe"
+        environmental = shutil.which(requested)
+        if getattr(sys, "frozen", False) and requested == "pi" and bundled.is_file():
+            if environmental and Path(environmental).resolve() != bundled:
+                self.fallback = environmental
+            executable = str(bundled)
+        else:
+            executable = environmental
+            if getattr(sys, "frozen", False) and requested == "pi" and executable:
+                self.record_fallback(str(bundled), executable, "bundled pi not found")
+        if not executable:
+            raise AgentDiagnosticError(f"pi executable not found: {requested}", "pi_start")
+        command = [executable]
+        try:
+            self.version(command, env, cwd)
+        except (OSError, subprocess.SubprocessError, PiVersionError, UnicodeError) as error:
+            if not self.retry(command, env, cwd, error):
+                raise
+        return command
+
+    def version(self, command, env, cwd):
+        with pi_process_environment(env) as prepared:
+            version = subprocess.run([command[0], "--version"], env=prepared, cwd=cwd,
+                                     check=True, capture_output=True, text=True, encoding="utf-8", timeout=10,
+                                     **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {})).stdout.strip()
+        if not version:
+            raise PiVersionError("pi --version returned no version")
+        if version != PI_VERSION:
+            message = f"pi 版本不匹配：已验证 {PI_VERSION}，实际 {version}；继续启动，但兼容性尚未验证。"
+            logging.getLogger(__name__).warning(message)
+            if sys.stderr is not None:
+                print("WARNING: " + message, file=sys.stderr, flush=True)
+            if self.on_warning:
+                self.on_warning({"type": "pi_version_warning", "expected_version": PI_VERSION,
+                                 "actual_version": version, "message": message})
+        for target in (self.env, env):
+            target["LALC_PI_VERSION"] = version
+            target["LALC_PI_EXECUTABLE"] = command[0]
+        if self.on_warning:
+            self.on_warning({"type": "pi_selected", "path": command[0], "version": version})
+
+    def retry(self, command, env, cwd, error):
+        """先消费唯一回退机会，再探测另一程序；探测失败直接保留异常。"""
+        if self.request_started or self.fallback is None:
+            return False
+        previous, command[0], self.fallback = command[0], self.fallback, None
+        self.record_fallback(previous, command[0], str(error))
+        self.version(command, env, cwd)
+        return True
+
+    def record_fallback(self, previous, selected, reason):
+        event = {"type": "pi_fallback", "previous_path": previous, "path": selected,
+                 "reason": redact(reason, [self.env.get("LALC_PI_API_KEY", "")])}
+        logging.getLogger(__name__).warning("pi fallback: %s", event)
+        if self.on_warning:
+            self.on_warning(event)
 
 
 def _models(base_url: str, key: str) -> list[dict]:
@@ -53,16 +168,25 @@ def _models(base_url: str, key: str) -> list[dict]:
 
 
 @asynccontextmanager
-async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
+async def _rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
     """共享 pi RPC 传输；调用者负责事件含义，取消时回收子进程。"""
+    process = None
     try:
-        process = await asyncio.create_subprocess_exec(
-            *command, env=env, cwd=cwd,
-            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
-            limit=16 * 1024 * 1024,
-        )
-    except OSError as error:
-        raise AgentDiagnosticError("pi 进程启动失败，请查看错误详情。", "pi_start") from error
+        with pi_process_environment(env) as prepared:
+            process = await asyncio.create_subprocess_exec(
+                *command, env=prepared, cwd=cwd,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                limit=16 * 1024 * 1024,
+                **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}),
+            )
+    except BaseException as error:
+        if process is not None:
+            if process.returncode is None:
+                process.kill()
+            await process.wait()
+        elif isinstance(error, OSError):
+            raise PiStartError("pi 进程启动失败，请查看错误详情。", "pi_start") from error
+        raise
     async def send(value) -> None:
         process.stdin.write((json.dumps(value) + "\n").encode())
         await process.stdin.drain()
@@ -74,7 +198,7 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show):
     async def event() -> dict:
         line = await process.stdout.readline()
         if not line:
-            raise RuntimeError(f"pi exited before completion (exit={await process.wait()})")
+            raise PiExited(f"pi exited before completion (exit={await process.wait()})")
         return json.loads(line)
 
     errors = asyncio.create_task(stderr())
@@ -116,7 +240,40 @@ async def rpc_event(event, waiting_for: str) -> dict:
         raise TimeoutError(f"等待 pi {waiting_for} 超时（30 秒）；请查看 pi stderr 诊断。") from error
 
 
-async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str) -> int:
+@asynccontextmanager
+async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *, startup=None):
+    """就绪前允许一次程序回退；清理、取消及调用者主体异常永不重试。"""
+    while True:
+        failure = None
+        buffered = deque()
+        async with AsyncExitStack() as stack:
+            try:
+                send, event = await stack.enter_async_context(_rpc_session(command, env, cwd, show))
+                if startup is not None and not startup.request_started:
+                    while True:
+                        item = await rpc_event(event, "就绪事件 lalc_ready")
+                        buffered.append(item)
+                        if item.get("type") in {"lalc_ready", "extension_error"}:
+                            break
+            except (PiStartError, PiExited) as error:
+                failure = error
+            if failure is None:
+                async def tracked_send(value):
+                    if startup is not None and value.get("type") == "prompt":
+                        startup.request_started = True
+                    await send(value)
+
+                async def buffered_event():
+                    return buffered.popleft() if buffered else await event()
+
+                yield tracked_send, buffered_event
+                return
+        # 离开进程作用域后再切换，避免遗留两个活动 pi；清理失败不会走到这里。
+        if startup is None or not startup.retry(command, env, cwd, failure):
+            raise failure
+
+
+async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str, *, startup=None) -> int:
     """验证受限读取并展示事件；完整修复复用 RPC 传输而非此成功判据。"""
     requests = 0
     read_ok = False
@@ -135,7 +292,7 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
         shown = redact(clean(value), [key])
         print(shown if isinstance(shown, str) else json.dumps(shown, ensure_ascii=False), flush=True)
 
-    async with rpc_session(command, env, cwd, show) as (send, event):
+    async with rpc_session(command, env, cwd, show, startup=startup) as (send, event):
         async def configure(kind: str) -> None:
             await send({"id": kind, "type": kind, "enabled": False})
             while True:
@@ -194,10 +351,10 @@ async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: d
 
 
 @contextmanager
-def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None):
+def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None, startup=None):
     """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
-    executable = shutil.which(args.pi)
-    if executable is None:
+    if not shutil.which(args.pi) and not (getattr(sys, "frozen", False) and args.pi == "pi" and
+            (Path(sys.executable).resolve().parent / "pi" / "pi.exe").is_file()):
         raise AgentDiagnosticError(f"pi executable not found: {args.pi}", "pi_start")
     base = args.base_url.rstrip("/")
     if not args.model:
@@ -236,17 +393,9 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
         env.pop("LALC_PI_REQUESTS_USED", None)
         env.pop("LALC_PI_REPAIR_FILES", None)
         env.pop("LALC_PI_HISTORY", None)
-        version = subprocess.run([executable, "--version"], env=env, cwd=temporary,
-                                 check=True, capture_output=True, text=True).stdout.strip()
-        if version != PI_VERSION:
-            message = f"pi 版本不匹配：已验证 {PI_VERSION}，实际 {version}；继续启动，但兼容性尚未验证。"
-            logging.getLogger(__name__).warning(message)
-            print("WARNING: " + message, file=sys.stderr, flush=True)
-            if on_warning:
-                on_warning({"type": "pi_version_warning", "expected_version": PI_VERSION,
-                            "actual_version": version, "message": message})
-        env["LALC_PI_VERSION"] = version
-        command = [executable, "--mode", "rpc", "--no-session", "--no-extensions",
+        startup = startup or PiStartup()
+        command = startup.select(args.pi, env, temporary, on_warning)
+        command += ["--mode", "rpc", "--no-session", "--no-extensions",
                    "--no-skills", "--no-prompt-templates", "--no-context-files", "--no-themes",
                    "--no-approve", "--offline", "--no-builtin-tools", "--tools", "read",
                    "--extension", str(Path(__file__).with_suffix(".ts")),
@@ -278,13 +427,15 @@ def run_probe(args) -> int:
                         f"然后根据随附图片回答：{args.prompt}\n必须实际读取源码，不能只提出读取计划。"),
             "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(data).decode()}],
         }
-        with configured_pi(args, root, key, "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。") as (command, env, temporary, model):
+        startup = PiStartup()
+        with configured_pi(args, root, key, "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。", startup=startup,
+                           on_warning=lambda event: print(json.dumps(redact(event, [key]), ensure_ascii=False), flush=True)) as (command, env, temporary, model):
             print(json.dumps({"pi": env["LALC_PI_VERSION"], "tested_pi_version": PI_VERSION,
                               "base_url": env["LALC_PI_BASE_URL"], "model": model["id"],
                               "model_status": model.get("status", {}).get("value"),
                               "image": str(image), "sha256": hashlib.sha256(data).hexdigest(),
                               "prompt": prompt["message"], "max_requests": args.max_requests}, ensure_ascii=False), flush=True)
-            return asyncio.run(_interact(command, env, temporary, prompt, key))
+            return asyncio.run(_interact(command, env, temporary, prompt, key, startup=startup))
     except KeyboardInterrupt:
         return 130
     except Exception as error:
