@@ -45,6 +45,30 @@ def script(state, steps):
     state["respond"] = lambda body: next(iterator)
 
 
+def test_single_model_response_can_call_multiple_host_tools(conversation):
+    """同一响应可调用多个宿主工具；下一次请求必须携带全部工具结果。"""
+    chat, options, state = conversation
+    batch = []
+    for index, name in enumerate(("action_contracts", "asset_tree")):
+        call = tool(name, {})[0]["tool_calls"][0]
+        call["index"] = index
+        batch.append(call)
+    script(state, [({"role": "assistant", "tool_calls": batch}, "tool_calls"), answer()])
+    result = asyncio.run(chat.run("inspect contracts and assets together", options))
+    assert result["status"] == "completed", result
+    # 一次连接预检、一次双工具响应、一次携带双结果的最终回答请求。
+    assert len(state["calls"]) == result["requests"] == 3
+    messages = state["calls"][-1]["messages"]
+    requested = next(message for message in reversed(messages) if message.get("tool_calls"))
+    assert len(requested["tool_calls"]) == 2
+    returned = {message["tool_call_id"] for message in messages if message["role"] == "tool"}
+    assert returned == {call["id"] for call in batch}
+    hosted = [row["event"] for row in read_events(chat.log.path / "events.jsonl")
+              if row["event"]["type"] == "repair_tool"]
+    assert {event["name"] for event in hosted} == {"action_contracts", "asset_tree"}
+    assert all(not event["result"].get("isError") for event in hosted)
+
+
 def test_multifile_edit_manifest_and_plan_enforced(conversation):
     chat, options, state = conversation
     candidate = chat.host.candidate

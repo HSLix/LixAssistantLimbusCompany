@@ -67,7 +67,7 @@ def source_snapshot() -> dict:
 def assemble(application: Path, archive: Path, destination: Path, info: dict) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
-    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/pi_probe.ts",
+    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts",
                      "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm"):
         if not (application / relative).is_file():
             raise ValueError(f"Missing packaged resource: {relative}")

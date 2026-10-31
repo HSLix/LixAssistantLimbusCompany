@@ -1,5 +1,11 @@
 # Developer GUI — Accepted Design
 
+2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer Selected Manifest 移入工作台折叠区，选择前刷新，不随 Session 或 Publish 自动切换。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
+
+2026-10-31 外部知识库目标（待实现）：数据目录中的 Git / 非 Git 资料供 GUI 两种模式只读查阅。每轮首次访问仓库自动尝试一次 fetch，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交报告更新，无 upstream / detached HEAD 报告不确定。受控工具限 diff / show / fetch / log，不更新工作区，不授予通用终端或编辑权限；CLI 不自动继承 GUI 新授权，Runtime 保持 Stage 6 边界。详见[版本语义](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)。
+
+2026-10-30：开发者明确关闭 #329、#323、#312 及 #334，阶段跟踪不再等待完整验收；未执行的真实模型／Windows／游戏及 TA 交付检查不计为通过。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)；下文历史“继续由 #329 验收”的当前跟踪要求由本次决定替代。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
 
 

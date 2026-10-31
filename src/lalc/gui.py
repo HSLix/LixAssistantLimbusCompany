@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -101,6 +101,7 @@ class MainWindow(FluentWindow):
         self.close_timer = QTimer(self)
         self.close_timer.setInterval(100)
         self.close_timer.timeout.connect(self._finish_close)
+        self.setWindowIcon(QApplication.windowIcon())
         self.setWindowTitle(tr('LALC — Developer'))
         self.resize(1150, 900)
         self.navigationInterface.setExpandWidth(220)
@@ -392,6 +393,7 @@ class UserWindow(MainWindow):
         self.close_timer.setInterval(100)
         self.close_timer.timeout.connect(self._finish_close)
         self.setWindowTitle("LALC")
+        self.setWindowIcon(QApplication.windowIcon())
         self.resize(1100, 800)
         self.navigationInterface.setExpandWidth(220)
         self.pages = self.stackedWidget
@@ -794,6 +796,9 @@ class GuiCoordinator:
     def __init__(self, service, lifecycle):
         from .i18n import install_translations, load_language, resolve_language
         app = QApplication.instance()
+        icon_path = (Path(__file__).with_name("MagicAndWonder.ico") if getattr(sys, "frozen", False)
+                     else Path(__file__).resolve().parents[2] / "MagicAndWonder.ico")
+        app.setWindowIcon(QIcon(str(icon_path)))
         if not hasattr(app, "_lalc_language"):
             install_translations(app, resolve_language(load_language(service.data_root)))
         from .developer import DeveloperHost

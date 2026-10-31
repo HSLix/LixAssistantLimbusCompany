@@ -1,5 +1,7 @@
 # exp、mirror 教学页面
 
+2026-10-30 后续 Stage 5 设计已允许 Agent 构建页面草稿，经独立预览和人工版本确认后安装，尚未实现。下文“内置 Agent 无权编辑”描述当前实现，正式目录仍不开放通用编辑；新流程见[Stage 5 规格](../../docs/stage-5-agent-workbench.md)，不要把设计当作现有入口。
+
 将本目录 `exp.py`、`mirror.py` 手动复制到 `lalc data-dir` 显示的数据目录下的 `pages/`。同名用户页先检查，不能直接覆盖。重启应用或在通用设置中保存并重新加载整个应用。
 
 两个页面分别使用 `PAGE_ID = TASK_ID = "exp"`、`"mirror"`，配置教学消息；Dashboard 管理是否启用和重复次数。页面 ID、任务 ID 与 Component 名称是不同概念，这里只是有意取相同字符串。

@@ -5,6 +5,8 @@ supersedes: 0025 and 0028 (independent repair lifecycle and edit scope only)
 
 # Use existing Candidate files and continuous developer chat
 
+2026-10-31：[ADR 0034](0034-extend-developer-agent-with-reviewed-page-drafts.md) 接受统一 Agent 工作台、按模式和入口限权、每 Session 独立 Candidate 与连续聊天、CLI / GUI 互通、取消 Session 重建及同进程模态双页对比后人工安装。GUI 两种模式均可请求人工反馈，仅 Construct 构建页面；手工 Candidate 不再由 Agent 接管。以上待实现，本文相关旧生命周期 / GUI 边界由新规格替代，历史实现和验收证据保留。Runtime 无删除工具，人工交互仅有人值守开放，其余接入留 Stage 6。
+
 2026-10-27：后续 [ADR 0032](0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受每 Manifest 唯一 Python Plan、同进程双 GUI 和 Candidate Plan 编辑/已发布试运行，按其列明范围替代本文的旧 Plan/GUI 边界；本文其余决定及历史实施证据保留，Stage 4 尚未实现。
 
 2026-10-25：下文禁止 Developer Agent 自动 Publish/试运行的部分由 [ADR 0030](0030-developer-policy-publish-and-trial-tools.md) 替代，其余候选、编辑、素材及对话边界继续有效。

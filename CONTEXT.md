@@ -6,7 +6,7 @@ LALC automates a Windows-native Unity game window during an exclusive focused au
 
 **Business Settings Page**:
 A user-installed, trusted GUI page that owns configuration under a stable page ID, independently of any Manifest. It may register one Loop Task or only provide shared settings.
-_Avoid_: Manifest Component, Agent-generated page, untrusted plugin
+_Avoid_: Manifest Component, unreviewed generated page, untrusted plugin
 
 **Loop Task**:
 A Dashboard repetition choice identified by a stable task ID registered by a Business Settings Page and explicitly supported by an Automation Plan. Its ID is distinct from the page ID and Component logical name; support declares configuration compatibility rather than successful execution.
@@ -73,15 +73,39 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Developer Candidate**:
-The one editable complete Manifest draft in the developer's workspace, explicitly initialized or rebuilt by the developer for validation and publication. Repair and conversation changes preserve the current draft; the Agent may edit its existing Python Automation Plan and other authorized files and register new Component or Recovery Rule source through dedicated additions, while formal source remains immutable. Runtime proposals share the Manifest format and validation rules but use separate runtime storage.
-_Avoid_: Partial Manifest, global candidate registry
+The temporary editable staging workspace for a complete Manifest draft, used to prepare, validate and publish changes. It is neither the authoritative source of released capabilities nor the Working Manifest of an active execution; unpublished contents remain drafts.
+_Avoid_: Formal source repository, released Manifest, active Working Manifest, global candidate registry
+
+**Agent Workbench**:
+The unified developer-directed workspace for constructing, extending and repairing Workflows and their business settings pages using explicitly authorized LALC Agent tools. Each development Session owns its Candidate and a Construct or Repair mode fixed once conversation begins, with mode-specific tool permissions and initial instructions; the workspace remains distinct from Runtime Policy.
+_Avoid_: Unrestricted coding agent, Runtime Agent Session, shared global Agent Candidate
+
+**Developer Session**:
+A persistent, resumable developer conversation with its own Candidate, fixed comparison baseline, page drafts, and a Construct or Repair mode fixed once conversation begins. It is distinct from a model request, a runtime recovery session, and the shared installed environment.
+_Avoid_: Runtime Agent Session, model request, global Candidate
+
+**External Knowledge Library**:
+The collection of reference repositories, documents and images readable by both developer Agent interfaces without permission to edit the reference content. Repository synchronization can obtain newer committed versions without making them the checked-out or working copy.
+_Avoid_: Developer Candidate, editable project source, runtime state
+
+**Page Draft**:
+A proposed complete Business Settings Page created from scratch or copied from an existing page for review. It has no effect on the installed page until a developer approves the previewed version for installation.
+_Avoid_: Manifest Component, installed page, preview configuration
+
+**Page Preview**:
+A human comparison of the current installed Business Settings Page, when present, and one proposed Page Draft version, each using independent disposable configuration. Approval applies only to the previewed draft version and does not adopt trial configuration.
+_Avoid_: Workflow trial, formal page installation, business acceptance
+
+**Human Intervention Request**:
+An Agent request for information or a human operation needed to continue the current development round. The reply reports an answer or actual operation outcome rather than proving the target state, and skipping grants no authorization or completion claim.
+_Avoid_: Runtime approval, automatic authorization, page installation approval
 
 **Agent-assisted Component Repair**:
-A developer-initiated conversation that develops and repairs a Developer Candidate under Developer Policy, using the developer’s objective, game observations and retained execution evidence. It may edit the Candidate Automation Plan, but does not take over a paused runtime caller or edit shared GUI settings pages.
-_Avoid_: Runtime Agent Session, automatic recovery, Capability Expansion
+The developer-initiated repair capability for Workflows and Assets under its bounded tool and edit permissions, provided within the unified Agent Workbench. Sharing its infrastructure with Runtime Policy does not itself grant authority to resume a paused caller.
+_Avoid_: Agent Workbench, automatic runtime recovery, unrestricted coding agent
 
 **Developer Policy**:
-The Agent's authority to iteratively develop a Developer Candidate, validate and publish immutable versions, run explicitly selected saved versions, and inspect their actual results within one developer-authorized conversation round. Publication is separate from runtime permanent approval and Default selection.
+The Agent's authority to develop a Developer Candidate and page drafts using approved reference material, validate and publish immutable Workflow versions, run explicitly selected saved versions, and inspect results within a developer-authorized round. Page installation requires human review; publication is separate from runtime permanent approval and Default selection.
 _Avoid_: Runtime Policy, runtime recovery
 
 **Asset Crop Preview**:
@@ -97,8 +121,8 @@ An independent Top-level Execution of an explicitly selected saved Manifest and 
 _Avoid_: Runtime Step Recheck, Candidate execution
 
 **Runtime Policy**:
-The Agent's runtime maintenance responsibility governed by Stage 6 (formerly Stage 3.5), distinct from developer-directed iterative development. Its paused-caller recovery and supervision contracts do not follow from Developer Trial permission.
-_Avoid_: Developer Policy
+The Agent's runtime maintenance responsibility governed by Stage 6 (formerly Stage 3.5), distinct from developer-directed work. It has no deletion tools or deletion authority and does not inherit Workbench permissions; other repair changes and paused-caller integration remain subject to the Stage 6 contract.
+_Avoid_: Developer Policy, full Repair tool set, Workbench tool set
 
 **Capability Bundle**:
 The transport-neutral software-release data package containing one complete retained Component Manifest, immutable Component source and the Asset metadata and images needed by the distributed capabilities. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.

@@ -39,7 +39,7 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - User：双击 `LALC.exe`。
 - Developer：双击 `Developer.cmd`，实际启动同一 `LALC.exe --developer`；重复入口归并到现有应用。
 - CLI：在终端运行 `LALC-console.exe` 加原有命令，保留标准输出与交互；它使用同一 main、服务及数据，并非另一套执行实现。
-- 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标。
+- 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标；同一 ICO 随包提供给 Qt，User／Developer 窗口与任务栏显式使用该图标。若覆盖旧成品后文件图标未更新，可先临时改名 EXE 验证 Windows 图标缓存。
 - Windows 的所有 GUI 入口（User、Developer、语言重启，以及源码 GUI）在创建服务、读写数据或归并窗口前检查管理员权限；未提权时通过 UAC 重新启动，保留启动参数与工作目录。拒绝或提权启动失败时显示中英双语提示并退出。CLI 命令不主动提权；其他平台维持原行为。若 UAC 使用另一个管理员账号，数据目录和 DPAPI 凭据也会属于该账号。
 - 成品数据统一在 `%LOCALAPPDATA%\LALC`：`candidate/`、`.candidate-baseline.json`、`pages/`、Manifest、Component、Assets、配置、日志与证据。替换程序目录不搬移数据；源码运行仍沿用项目 `candidate/`。不自动寻找、迁移或删除旧草稿。
 - 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出以后另做。
@@ -102,4 +102,4 @@ Copy-Item -Recurse "$repo\example\pages" "$data\pages"
 
 GUI Agent 对话会请求配置中的模型，不能为了“检查路径”随意发消息到真实服务；无真实模型验收要求，可使用受控替身。两包选择／回退的自动化边界检查参见 `tests/test_pi_startup.py`，冻结资源／双包内容检查参见 `tests/test_windows_packaging.py`。
 
-Windows 现场检查完成后，由开发者确认结果，再关闭 #334。功能实现、构建成功、源码／offscreen／HTTP 替身通过都不能单独替代该确认。
+2026-10-30：开发者试用反馈“没明显问题”，明确决定不等待完整验收并关闭 #334；见[关闭记录](stage-3-4-closure-2026-10-30.md)。上表保留可执行的验收方法，未执行项仍未验证，不因关闭变成通过。

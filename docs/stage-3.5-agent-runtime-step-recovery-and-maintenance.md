@@ -1,5 +1,7 @@
 # Stage 6（原 Stage 3.5）: Agent Runtime Step Recovery and Maintenance
 
+2026-10-30 追加边界：Runtime Repair 不提供删除工具或删除权限，包括开发 Repair 的 remove_asset；不因复用 Repair 继承其完整工具集。Recovery Rule 修改范围、生效与运行时修复接口等变更保留为 [Stage 6 TODO](#stage-6-todo-repair-integration)，本阶段不据此改写下文原有执行基线或放宽源码检查。
+
 2026-10-27 Stage 4 grill 已结束：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受 Python Plan 的身份、开发编辑和执行入口迁移，将这些基础工作提前纳入 Stage 4；下文 Python Plan TODO 的这部分不再待定。Plan 自身故障后的 Agent 评估/修复及试运行仍属 Stage 6，仅在 User Agent 启用时触发；续接/副作用/预算仍待讨论。其他 Stage 6 新提案不因本次同步自动接受。
 
 2026-10-26 排期确认：原 Stage 3.5 的完整 Runtime Agent Maintenance 延后至 **Stage 6**。保留本路径以维持引用；下文 Stage 3.5 为原阶段名，Confirmed scope 和待讨论项各保留其状态。其他 Stage 4–6 新提案见[路线图规划记录](reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案)，尚未接受为技术方案；下一轮 grill 聚焦 Stage 4 的重要设计和实现边界。本次不改运行时契约或代码。
@@ -145,3 +147,20 @@ flowchart TD
 - 已检查的实现：runtime.py 的 _invoke_step 保留外层调用链，_try_manifest_choices 在原链内调用替换 Step 并校验结果，_replacement_problem 限制续接契约；_recover_step 当前最多重试一次，即使无规则匹配也会重试，并未实现本节的重复 Rule/Agent 循环。tests/test_recovery.py 已有保留调用者、后续调用使用新映射和失败版本留档的测试源码，本次未执行。
 - 若采纳，需协调 CONTEXT.md、Stage 2 执行契约、Stage 3.5 Confirmed scope、ADR 0015 的审批边界和既有恢复阶梯讨论，随后修改 runtime/application 的恢复调度、Agent 协议/日志和监督 GUI。任意 Component 辅助执行涉及额外角色权限与返回协议，不能作为普通 Recheck 的小改动处理。
 - 最小验收证据应覆盖：原调用者只进入一次且局部值保留；成功试跑结果只交付一次；已进入帧不替换而后续调用采用新映射；失败试跑保留 Manifest/游戏副作用事实；重复规则能退出/升级；审批拒绝、取消和预算耗尽；同一 Run 多次尝试可从交互日志准确追溯。真实模型与真实游戏状态衔接另行验收，静态校验或假环境测试不能代替。
+
+<a id="stage-6-todo-repair-integration"></a>
+
+## Stage 6 TODO：Repair 修改与接入
+
+2026-10-31 已确认的人工交互权限：Developer GUI 中的 Construct / Repair 均开放“请求人工答复或操作并等待反馈”；User GUI 执行期间的 Runtime Repair 由 Stage 6 实现，仅有人监督 / 值守时开放，无人值守时不开放。不能因共用开发工具自动继承该权限。值守状态如何确定、何时允许变更，以及已有等待如何在转为无人值守时结束，留 Stage 6 讨论与验证；本次不实现运行时接入。
+
+2026-10-30：以下只记录下一阶段讨论范围，不作为 Stage 5 实施项或运行时能力已接受 / 已实现的证明。**已确定的排除项是 Runtime 不提供删除工具及权限**，包括 remove_asset、通用文件删除及经其他工具绕行的删除；开发 Repair 可追溯归档删除不改变此边界。图片覆盖也未纳入需求。
+
+- 界定运行时可维护的 Workflow / Recovery Rule 范围、工具子集和写入边界；保留 Repair 并复用其底层，不等于完整复用开发 Prompt、Publish、独立 trial_run 或工作台工具。
+- 明确 Recovery Rule 修改后的校验、批准、Manifest 选择及生效时机；是否在当前 Step Recheck 前重新检测 / 执行规则，以及规则本身失败如何反馈，均留待讨论。不把允许修改规则自动解释为新增恢复边界。
+- 审查 `WorkflowExecutor._replacement_problem` 当前拒绝 recovery_rules 变化的检查；何时及如何调整依赖上述决定，Stage 5 不直接移除此限制。
+- 明确父 Run 的活动所有权、当前 Step 的 Recheck / 续接、取消与预算。当前 Repair 的独占活动和独立 trial_run 不能直接套入暂停 Run，不为复用而绕过已有互斥。
+- 明确运行时临时草稿、完整校验后版本、Working Manifest 和已进入调用帧的关系。Candidate 只是临时草稿台，不是持久运行状态，也不是复用开发草稿的默认授权。
+- 在父 Run / 修复轮次 / 尝试版本之间关联实际工具操作及日志，验证允许工具可用、删除工具不可见且宿主拒绝越权请求；覆盖取消、失败和重新选择等路径。
+
+本轮不替代既有当前 Step 恢复边界、完整 Manifest 校验、人工运行许可、输入释放和正式源码完整性要求。

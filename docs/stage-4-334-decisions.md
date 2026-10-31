@@ -1,6 +1,6 @@
 # Stage 4 #334：Windows 成品关键决策
 
-状态：2026-10-28 grill 已结束；2026-10-30 开发者确认继续实施，接受影响评审方案。当前本地实现及未验收边界见[实施记录](stage-4-334-implementation.md)，Windows 构建与现场验收说明见[构建文档](windows-packaging.md)。#334 尚未关闭。
+状态：2026-10-28 grill 已结束；2026-10-30 开发者确认继续实施，接受影响评审方案。当前本地实现及未验收边界见[实施记录](stage-4-334-implementation.md)，Windows 构建与现场验收说明见[构建文档](windows-packaging.md)。#334 已按开发者本轮试用反馈与阶段收尾决定关闭；完整验收未补齐，见[关闭记录](stage-3-4-closure-2026-10-30.md)。
 
 ## 已确认
 

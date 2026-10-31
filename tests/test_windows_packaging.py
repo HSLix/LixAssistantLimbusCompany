@@ -33,7 +33,7 @@ def archive(tmp_path, monkeypatch):
 
 def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive):
     app = tmp_path / "application"
-    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/pi_probe.ts",
+    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts",
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm"):
         target = app / name
         target.parent.mkdir(parents=True, exist_ok=True)

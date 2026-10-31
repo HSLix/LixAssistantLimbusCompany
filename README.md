@@ -12,11 +12,12 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 1 product and Agent boundaries: accepted.
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
 - Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
-- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; final Windows/model/game acceptance remains tracked in #329.
-- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 local build implementation is available, with Windows acceptance pending; see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
-- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: deferral confirmed on 2026-10-26; prior runtime architecture retained. Other Stage 5–6 proposals remain [pending discussion](docs/reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案).
+- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; tracking issues #329, #323 and #312 are closed by developer decision after trial use, without completing the full acceptance matrix; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
+- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 is closed by developer decision after trial use; full Windows acceptance was not completed ([closure record](docs/stage-3-4-closure-2026-10-30.md)); see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
+- Stage 5 Agent Workbench: design revised and accepted on 2026-10-31, not implemented. One GUI workspace provides Construct / Repair modes with separate prompts and tool permissions, persistent per-session Candidates, and shared GUI / CLI Repair sessions. Developer trials move into the workspace; GUI human feedback is available in both modes. Construct pages use an application-modal, in-process before/after preview and human version approval. Bounded reference-library Git fetch preserves checked-out files. Manual Candidates and old logs remain untouched. See [specification](docs/stage-5-agent-workbench.md) and [impact review](docs/stage-5-design-impact-review.md).
+- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: Runtime has no deletion tools or authority and inherits no Workbench permissions; other repair changes and integration remain Stage 6 discussion TODOs. Additional proposals remain [pending discussion](docs/reconstruction-plan.md).
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
-- Agent-assisted Workflow Drafting and autonomous Capability Expansion: explicitly deferred.
+- Developer-directed Workflow construction is accepted for Stage 5; autonomous Capability Expansion remains deferred.
 
 Start with:
 
@@ -31,7 +32,7 @@ Start with:
 
 ## Development
 
-The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages and shared Agent profiles are implemented in #332. Bilingual GUI controls and restart-based language changes are implemented locally in #333; Windows packaged acceptance remains in #334.
+The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages and shared Agent profiles are implemented in #332. Bilingual GUI controls and restart-based language changes are implemented locally in #333; #334 has since been closed by developer decision without completing full Windows acceptance; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).

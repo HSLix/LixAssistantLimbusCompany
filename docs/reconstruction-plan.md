@@ -1,17 +1,19 @@
 # LALC Reconstruction Plan
 
+2026-10-30 后续收尾：#334、#329、#323、#312 已由开发者明确确认关闭为 completed，完整验收不再作为这些票本次关闭前置；未补验的项目保持未验证。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)。既有 Stage 5／6 排期不变。
+
 2026-10-30：#334 本地实现 Windows x64 双 ZIP 构建、pi 优先／回退与成品数据路径，见[实施记录](stage-4-334-implementation.md)。Windows 成品现场验收与开发者确认仍待完成；不带业务数据，导入导出另做，GitHub Actions 仅在 Stage 6 完成后考虑。
 
 This plan keeps the reconstruction dependency-ordered. Accepted boundaries may change only through an explicit reopening such as the Python-first decision below.
 
 ## 2026-10-26 规划记录：已确认排期与待讨论草案
 
-2026-10-26 首次按 grill-with-docs 仅记录；2026-10-27 已完成 Stage 4 grill 与影响审查并接受设计，随后经 #331 补充 grill 和影响审查确认，已在本地实现其 Python Plan 与双窗口闭环；后续票及 Windows 打包验收仍未完成，见[实施记录](stage-4-331-implementation.md)。首次输入为开发者提供的 AI 整理稿，可能含推演或扩写；其内容不因粘贴自动接受。Stage 4 已经后续逐项 grill 并确认，Stage 5/6 未确认内容继续作为讨论材料。
+2026-10-26 首次按 grill-with-docs 仅记录；2026-10-27 已完成 Stage 4 grill 与影响审查并接受设计，随后经 #331 补充 grill 和影响审查确认，已在本地实现其 Python Plan 与双窗口闭环；后续票及 Windows 打包验收仍未完成，见[实施记录](stage-4-331-implementation.md)。首次输入为开发者提供的 AI 整理稿，可能含推演或扩写；其内容不因粘贴自动接受。Stage 4 已经后续逐项 grill 并确认，Stage 5 工具边界已于 2026-10-30 逐项确认，见[接受规格](stage-5-agent-workbench.md)；其余未确认内容及 Stage 6 新增提案继续作为讨论材料。
 
 - **已确认：原 Stage 3.5 的完整 Runtime Agent Maintenance 延后至 Stage 6。** 原设计和讨论记录保留，不因改期自动修改执行契约，也不表示已经实现。
-- **路线主线：** Stage 4 — Extensible GUI → Stage 5 — Workflow Construction & External Knowledge Transfer → Stage 6 — Runtime Maintenance & Continual Learning。Stage 4 已接受，Stage 5/6 的具体目标、交付和依赖仍待确认；Stage 6 承接原 Stage 3.5 的排期已确定。
+- **路线主线：** Stage 4 — Extensible GUI → Stage 5 — Workflow Construction & External Knowledge Transfer → Stage 6 — Runtime Maintenance & Continual Learning。Stage 4 已接受；Stage 5 工作台工具边界已接受、待实现，具体业务由开发者推进；Stage 6 承接原 Stage 3.5 的排期已确定，新增设计仍待确认。
 - Stage 3 已有 Agent Repair、Developer Candidate、Validate、Developer Policy Publish/独立试运行/Run 日志等能力保留，权限以 ADR 0029–0031 为准。延期不取消这些能力，也不把独立试运行等同于恢复运行中的调用者。实施及验收见 [Stage 3 实施记录](stage-3-implementation-slices.md) 和 [Developer GUI](developer-gui-design.md)。
-- Stage 4 重要设计和实现边界已完成 grill，正式接受范围见下文；Stage 5/6 除已确认改期及 Plan Agent 评估方向外仍为后续议题，不顺带定案。
+- Stage 4 重要设计和实现边界已完成 grill；Stage 5 已接受本轮工作台边界，见下文。Stage 6 除既有排期及契约外的新增设计仍为后续议题，不顺带定案。
 
 下文 Stage 1–3 保留既有基线；其中 Stage 3.5 均指原阶段名，现排至 Stage 6。旧 Stage 4 范围不直接成为新提案的交付承诺。
 
@@ -156,25 +158,19 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 [影响审查与验证证据](stage-4-design-impact-review.md)；[可独立验证的垂直实施阶段](stage-4-implementation-slices.md)。四个阶段已发布为 [#331](https://github.com/HSLix/LixAssistantLimbusCompany/issues/331) → [#332](https://github.com/HSLix/LixAssistantLimbusCompany/issues/332) → [#333](https://github.com/HSLix/LixAssistantLimbusCompany/issues/333) → [#334](https://github.com/HSLix/LixAssistantLimbusCompany/issues/334)，使用原生阻塞关系。不得把设计接受视为已完成实现。
 
-## Stage 5 提案：Workflow Construction & External Knowledge Transfer
+## Stage 5：Agent 工作台与外部知识迁移
 
-**状态：Planning / Pending Discussion。**
+**状态：2026-10-31 grill 已确认，设计影响审查及文档同步；待实现。** [完整规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)、[影响审查](stage-5-design-impact-review.md)。
 
-### 候选目标、交付与边界
+- 单一工作台保留 Construct / Repair，Session 开始对话后固定模式，每种模式有初始 Prompt 和工具白名单，模型声明和宿主分发都执行权限。GUI 两种模式均可请求人工反馈，仅 Construct 可构建页面。
+- 每 Session 独立保存 Candidate、固定基线、聊天和页面草稿，可跨重启继续；不重建、不自动删除。Construct 可空白 / 已发布来源，Repair 从已发布来源开始；CLI Repair / GUI 共用存储与互斥，Agent 不再接管手工 Candidate，旧草稿和日志不自动迁移。
+- Developer Selected Manifest 移至工作台折叠区，列表展开前刷新，全局选择不随 Session / Publish 自动切换，不修改 Default 或草稿来源。试运行只执行明确的已发布版本。
+- 知识库供 GUI 两种模式只读查阅，每轮首次访问仓库自动尝试 fetch 一次，可显式 fetch，每次后 status；以 upstream 前后提交比较，无参考分支时报告不确定。受控 diff / show / fetch / log 不修改工作区，不开放通用终端。
+- 页面采用同进程应用级模态双栏对比，当前正式页 / 拟安装页分别运行及内存试填，锁住其他 LALC 窗口，人工确认实际预览版本后安装。由人判断覆盖，不做自动版本冲突检测 / 合并；失败保留原页，正式接入由人主动整应用重载。
+- 活动和预览期间不切换 / 新建 Session；意外退出标记中断，不自动重放操作或确认。全局 Asset / 正式页面 / 配置不随 Session 切换回滚。
+- 业务选择、搭建和验收由开发者承担，不以特定业务交付作为工具增量前置。Runtime 无删除工具，其人工交互仅有人值守开放，其余接入仍留 Stage 6。模型、Windows 成品、实际游戏证据分别记录。
 
-- 开发者给出业务目标，Agent 参考外部成熟项目和 LALC 实现，协助构建完整 Python Workflow；不要求开放世界自主探索或从零学习全部游戏机制。
-- 候选验收目标：一版覆盖旧版本主要业务功能的 Workflow，层级和 ctx.call 边界合理，Asset/业务参数完整，可经 User GUI 配置启动，核心流程实际运行，保留来源、迁移及验证记录，减少手工业务代码编写。覆盖清单与验收标准尚未确定。
-- AALC（AhabAssistantLimbusCompany）、Charge-Grinder 等仅为候选只读知识来源；参考业务流程、状态判断、识别、策略和异常处理，迁移后遵守 LALC Component、Trusted Action、Manifest、Asset 和验证规范。许可证及复用限制待核实，不直接执行外部源码。
-- 将 Agent Repair 扩成 Workbench 的 Construction Mode 是提案：共享 Candidate、文档/源码检索、Asset、Validate、试跑、日志和发布工具；Repair 聚焦失败和兼容性，Construction 聚焦业务目标，各自 Prompt/Policy 待定。允许创建 Plan/Task/Subworkflow/Step/GUI Page 是权限议题，不能覆盖当前 plan.json 只读及专用新增工具边界。Explore Mode 未定。
-- 检索候选：本地只读源码、rg/路径/符号搜索、Git Diff/Commit、图片定位与检查、简短 Pi Skill、可搜索迁移历史。按任务读取最小范围、复用经验、更新时优先看差异，每次扩大范围有信息需求，有充分依据后进入修改和验证。
-- 先不引入传统 Embedding RAG/向量数据库也是待讨论倾向；实际定位成本高时再评估 Repo Map、轻量索引、BM25 或 Embedding，均未选型。
-
-### Open Questions
-
-- 外部仓库获取、固定版本/更新、许可证；外部逻辑与 LALC 的对应关系如何低成本保存。
-- Pi Skill 触发、Repo Map 价值、成熟 Coding Agent 的按需上下文策略；源码阅读、工具调用和探索范围的成本控制。
-- Construction Prompt、工具权限、任务拆分；如何保持 ctx.call 层级及恢复语义。
-- 旧功能覆盖清单、游戏状态/策略/后置条件验收；如何衡量外部知识减少开发成本。
+Stage 5 六票已发布：[#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335) → [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)，其后可分别推进 [#337 知识库](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337)、[#338 人工反馈](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338)、[#339 页面预览](https://github.com/HSLix/LixAssistantLimbusCompany/issues/339)，[#340 安装](https://github.com/HSLix/LixAssistantLimbusCompany/issues/340) 由 #339 阻塞。使用原生阻塞关系，详见[实施拆分](stage-5-implementation-slices.md)。
 
 ## Stage 6（原 Stage 3.5）：Runtime Agent Maintenance
 
@@ -192,6 +188,11 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 - 经验检索候选为 Raw Agent Interaction History + grep：保留交互/工具、Candidate Revision、Trace/错误、Recheck/截图引用及最终结果；新轮次获得当前故障及上次必要反馈，按需检索更早历史。暂不承诺复杂摘要、知识图谱或 Embedding。
 - 严格区分 Runtime Execution State 与 Agent Experience History；经验检索不能代替保证正确性的确定性执行状态，也没有 grep 效果已被证明的结论。
 
+### Runtime Repair 本轮边界与 TODO
+
+- Runtime Repair 不提供任何删除工具或对应权限，包括开发 Repair 已有的 remove_asset；可追溯归档不构成运行时删除授权。
+- Recovery Rule 修改范围与生效、运行时接口复用、草稿 / Working Manifest / Recheck 衔接等修改问题，留到 Stage 6 逐项讨论；不作为 Stage 5 前置，也不在本阶段删除现有运行时检查。详见[统一 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#stage-6-todo-repair-integration)。
+
 ### Open Questions 与既有契约差异
 
 - 嵌套 ctx.call/父子 Recheck 调度、原 Python 调用栈续接、游戏副作用及安全重试、业务后置条件。
@@ -204,7 +205,7 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 ## 待讨论的阶段依赖与旧范围去向
 
-草案建议 Stage 4 提供页面/设置基础，Stage 5 构建真实业务 Workflow，Stage 6 以其验证运行时维护及经验复用。Stage 4 的实际完成门槛以已接受规格为准；Stage 5/6 的具体业务与恢复细节仍待后续讨论，不扩大 Stage 4 范围。
+Stage 4 提供页面 / 设置基础，Stage 5 已接受开发工作台工具的分批迭代，具体业务由开发者使用工具推进；Stage 6 以实际流程验证运行时维护及经验复用的新增方案仍待讨论。各阶段按已接受范围推进，不将具体业务交付前置到工具增量，也不扩大 Stage 4 范围。
 
 旧 Stage 4 曾列出的监督源码/提案审批及 Manifest 恢复界面，其运行时部分随原 Stage 3.5 延后至 Stage 6；具体 GUI 交付仍待讨论。原统计界面（成功率、Agent 完成率、恢复分布和耗时）、资源清理/引用扫描/Component Usage Index、分发渠道及首版后的执行器子进程评估仍为待讨论事项；Windows 打包版页面逻辑已明确是 Stage 4 门槛。模型可选、确定性流程不依赖模型的现有产品边界保持。
 
@@ -233,6 +234,10 @@ All three channels distribute the same Bundle. The client uses one version, full
 - autonomous Capability Expansion for unsupported goals;
 - Unattended Operation for Agent-generated candidate trials;
 - skill-maturity labels and broad autonomous general-computer control.
+
+## Stage 6 之后 TODO — 对外 MCP 接入
+
+2026-10-30：考虑由 LALC 对外提供 MCP 接口，让 Codex 等外部 Agent 接入 LALC。后续讨论暴露的能力、授权范围、人工确认及与现有工具 / 执行服务的复用方式；目前仅记录待评估方向，不作为 Stage 5 / 6 的交付前置，也不预先扩大外部 Agent 权限。
 
 ## Stage 6 之后 TODO — User GUI 后续信息功能
 

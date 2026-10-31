@@ -1,5 +1,9 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
+2026-10-31 Stage 5 已接受后续工作台边界，尚未实现：统一 Agent 工作台、每 Session 独立 Candidate；GUI Construct 可构建页面草稿，经同进程应用级模态窗口对照当前正式页与拟安装页，由人确认安装，预览期间锁住其他 LALC 窗口。试填配置仅内存，正式页面仍主动整应用重载生效。该增量不扩大 Stage 4 历史验收范围，见 [Stage 5 规格](stage-5-agent-workbench.md)。
+
+2026-10-30 后续状态：#334 已按开发者试用反馈及明确收尾决定关闭；完整 Windows 验收未补齐，不作为本次关闭前置。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)；这替代下方历史“保持开放／等待完整验收”的当前状态，不改变执行和权限契约。
+
 2026-10-30：#334 采用 Windows x64 本地 onedir 双 ZIP（含／不含 pi），程序不带可修改业务数据，成品 Candidate 随用户数据保存；源码仍用项目草稿。默认随包 pi 优先，请求前限定故障可回退一次，预检发出 prompt 后也不再回退。真实模型验证不属于本票，Actions 留到 Stage 6 完成后；构建输入 `pi_resources/` 不提交。详见[接受决策](stage-4-334-decisions.md)、[实施记录](stage-4-334-implementation.md)及[构建／验收说明](windows-packaging.md)。Windows 现场验收未完成，#334 不因此关闭。
 
 2026-10-28：[User GUI P0](user-gui-p0-layout.md) 已获确认并完成本地实现，配置文本保存/使用校验及错误详情折叠按该记录更新；#333 双语/语言重载已完成本地实现，已获开发者人工验收确认并关闭 #333；#334 Windows 成品验收仍未完成，见[#333 记录](stage-4-333-implementation.md)。

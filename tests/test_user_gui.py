@@ -57,6 +57,40 @@ def test_shared_windows_and_independent_idle_close(windows):
     assert owner.open_window(True) is not developer
 
 
+@pytest.mark.parametrize("frozen", [False, True])
+def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, frozen):
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QApplication
+    import lalc.gui as gui
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+    previous = app.windowIcon()
+    icon_path = Path(__file__).parents[1] / "MagicAndWonder.ico"
+    expected = QIcon(str(icon_path)).pixmap(32, 32).toImage()
+    assert not expected.isNull()
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    if frozen:
+        packaged = tmp_path / "_internal/lalc"
+        packaged.mkdir(parents=True)
+        (packaged / "MagicAndWonder.ico").write_bytes(icon_path.read_bytes())
+        monkeypatch.setattr(gui, "__file__", str(packaged / "gui.py"))
+    monkeypatch.chdir(tmp_path)
+    host, _ = host_for(tmp_path)
+    owner = gui.GuiCoordinator(host.service, ApplicationLifecycle())
+    try:
+        for window in (owner.open_window(), owner.open_window(True)):
+            assert window.windowIcon().pixmap(32, 32).toImage() == expected
+            assert not window.titleBar.iconLabel.pixmap().isNull()
+        assert app.windowIcon().pixmap(32, 32).toImage() == expected
+    finally:
+        owner.shutdown()
+        for window in (owner.user, owner.developer):
+            if window:
+                window.close()
+        app.processEvents()
+        app.setWindowIcon(previous)
+
+
 def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(windows):
     from PySide6.QtCore import Qt
     _, _, user, developer = windows

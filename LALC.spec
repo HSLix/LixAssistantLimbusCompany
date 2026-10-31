@@ -11,6 +11,7 @@ a = Analysis(
     pathex=[str(root / "src")],
     binaries=[],
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
+           (str(root / "MagicAndWonder.ico"), "lalc"),
            (str(root / "src/lalc/pi_probe.ts"), "lalc"),
            (str(root / "src/lalc/translations/lalc_zh_CN.qm"), "lalc/translations"),
            (str(Path(QLibraryInfo.path(QLibraryInfo.TranslationsPath)) / "qtbase_zh_CN.qm"),
