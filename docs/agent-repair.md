@@ -1,6 +1,12 @@
 # Agent Repair — Developer Candidate 开发与修复
 
-2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer Selected Manifest 移入工作台折叠区，选择前刷新，不随 Session 或 Publish 自动切换。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
+2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](stage-5-manifest-reference-impact-review.md)。
+
+2026-10-31 #335 本地实现：CLI Repair 已改用独立持久 Session，创建 / 恢复用法见下文 CLI；不再操作手工 Candidate。GUI 尚沿用旧入口，Session 历史及 CLI / GUI 互通待 #336。实施与验收边界见[记录](stage-5-335-implementation.md)，#335 已由开发者基于回归结果确认关闭，后续重点为 #336 GUI 工作台。
+
+2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer GUI 的 Manifest 选择及人工运行入口删除，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持，Agent 的显式版本试运行和日志能力完整保留。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
 
 2026-10-31 外部知识库目标（待实现）：数据目录中的 Git / 非 Git 资料供 GUI 两种模式只读查阅。每轮首次访问仓库自动尝试一次 fetch，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交报告更新，无 upstream / detached HEAD 报告不确定。受控工具限 diff / show / fetch / log，不更新工作区，不授予通用终端或编辑权限；CLI 不自动继承 GUI 新授权，Runtime 保持 Stage 6 边界。详见[版本语义](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)。
 
@@ -35,19 +41,27 @@ uv run --frozen lalc init --from <saved-manifest-uuid>
 # 明确确认替换现有草稿时才使用：
 uv run --frozen lalc init --from <saved-manifest-uuid> --replace
 
-# Agent 自行读取和修改所需已有文件，包括现有 Python Plan
+# 从明确已发布版本创建独立 Repair Session；不需要先执行手工 init
 uv run --frozen lalc repair \
+  --from <saved-manifest-uuid> \
   --problem '问题、复现步骤和预期行为' \
   --image /absolute/path/to/optional.png --image /absolute/path/to/another.jpg
 
 # 可通过消息要求只分析
-uv run --frozen lalc repair --problem '请分析这个问题'
+uv run --frozen lalc repair --from <saved-manifest-uuid> --problem '请分析这个问题'
 
 # 主动续聊，空行退出
-uv run --frozen lalc repair --chat --problem '请修复所述问题'
+uv run --frozen lalc repair --from <saved-manifest-uuid> --chat --problem '请修复所述问题'
+
+# 退出或重启后，按创建时输出的 Session ID 继续
+uv run --frozen lalc repair --session <session-uuid> --problem '检查当前状态后继续'
 ```
 
 CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用当前对话。模型连接可由 `agent-config` 保存，也可用本次 `--base-url`、`--model`、`--max-requests` 覆盖，覆盖不回写。`--ask-api-key` 从终端临时输入，不接受明文参数。Windows 的 `secret-set <name>` 保存命名 DPAPI 密钥；`agent-config --secret-name <name>` 引用它，`--clear-secret` 解除引用。
+
+`--from` 与 `--session` 必须二选一，不隐式使用 Default。创建成功先输出 `session_id`，即使随后模型请求失败也可按 ID 继续。状态保存在 `lalc data-dir` 下的 `developer-sessions/<session-uuid>/`，Candidate、固定基线和自包含日志分别保留；不迁移旧草稿或旧日志，不提供重建、删除或自动清理。手工 init / validate / publish / clear 仍操作原 Candidate。
+
+同 Session 每轮加跨进程锁并读取最新状态，空闲等输入释放锁，游戏活动仍全局互斥。意外退出的轮次恢复时标为中断；已保存的实际工具结果继续可用，缺少结果者只报告未知，由 Agent 检查现状后决定如何继续，不自动请求模型、重放工具或回滚共享 Asset / 已发布版本。旧裁剪预览 ID 重启后失效。损坏的完整日志或内容引用明确报错；未写完的事件尾部另存原字节后隔离，不丢弃完整历史。
 
 旧 `repair <Component逻辑名>`、自动 Default 重建及必填图片不再是当前契约。`pi-probe` 仍是独立的图片/受限读取检查，不使用连续修复宿主，不作为普通回归附带运行。
 
@@ -228,7 +242,7 @@ uv run lalc agent-config --provider deepseek --thinking --reasoning-effort high
 # Windows: first save a named key using secret-set, then reference it:
 uv run lalc agent-config --secret-name deepseek-service
 # macOS: use the GUI's temporary platform key, or prompt in the CLI:
-uv run lalc repair --problem "检查候选流程" --ask-api-key
+uv run lalc repair --from <saved-manifest-uuid> --problem "检查候选流程" --ask-api-key
 ```
 
 CLI repair overrides `--provider`, `--thinking/--no-thinking` and `--reasoning-effort` affect only the

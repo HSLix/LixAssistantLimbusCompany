@@ -1,6 +1,6 @@
 # #335 — CLI Repair Session 设计影响审查
 
-2026-10-31。状态：关键实践边界已逐项确认；本票审查已完成，待开发者确认后实现。依据 [#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335)、[Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及本次讨论。GitHub 票据已读取，当前 OPEN、无评论；本报告不表示产品已实现或验收通过。
+2026-10-31。状态：关键实践边界已逐项确认；开发者已以“开始实现”接受本票审查并授权实施。下文保留审查时的差距，实施结果另见[记录](stage-5-335-implementation.md)。依据 [#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335)、[Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及本次讨论。GitHub 票据读取时 OPEN、无评论；本报告不表示产品已实现或验收通过。
 
 ## 设计变化与范围
 

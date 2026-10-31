@@ -107,31 +107,6 @@ class MainWindow(FluentWindow):
         self.navigationInterface.setExpandWidth(220)
         root = QWidget()
         layout = QVBoxLayout(root)
-        self.runner_manifest = QComboBox()
-        self.runner_manifest.addItem(tr('Use Default'), userData=None)
-        self.runner_selection_error = None
-        try:
-            selected = self.host.runner_selection()
-            if selected is not None:
-                self.runner_manifest.addItem(selected, userData=selected)
-                self.runner_manifest.setCurrentIndex(1)
-        except Exception as error:
-            self.runner_selection_error = str(error)
-        for item in self.host.manager.list_manifests():
-            if self.runner_manifest.findData(item["manifest_id"]) < 0:
-                self.runner_manifest.addItem(item["manifest_id"], userData=item["manifest_id"])
-        self.runner_manifest.currentIndexChanged.connect(self._runner_selected)
-        layout.addWidget(QLabel(tr('Developer Selected Manifest (does not change Default or Candidate source)')))
-        layout.addWidget(self.runner_manifest)
-        self.runner_notice = QLabel(self.runner_selection_error or tr('The selected version is used for subsequent developer trials.'))
-        self.runner_notice.setWordWrap(True)
-        layout.addWidget(self.runner_notice)
-        self.refresh_manifest_button = QPushButton(tr('Refresh Manifests'))
-        self.refresh_manifest_button.clicked.connect(self._refresh_runner)
-        layout.addWidget(self.refresh_manifest_button)
-        self.trial_button = QPushButton(tr('Trial selected Plan'))
-        self.trial_button.clicked.connect(lambda: self._interact(self.start_selected_plan))
-        layout.addWidget(self.trial_button)
         self.pages = self.stackedWidget
         self.pages.setAnimationEnabled(False)
         self.capture_page = CapturePage(self)
@@ -144,11 +119,10 @@ class MainWindow(FluentWindow):
         for page, identity, name, icon in (
             (self.capture_page, "developer-capture", tr('Capture'), FluentIcon.CAMERA),
             (self.settings_view, "developer-settings", tr('Agent Settings'), FluentIcon.SETTING),
-            (self.repair_page, "developer-repair", tr('Agent Repair'), FluentIcon.CHAT),
+            (self.repair_page, "developer-workbench", tr('Agent Workbench'), FluentIcon.CHAT),
         ):
             page.setObjectName(identity)
             self.addSubInterface(page, icon, name)
-        self.repair_page.set_manifests(self.host.manager.list_manifests())
         self.widgetLayout.removeWidget(self.stackedWidget)
         layout.addWidget(self.stackedWidget, 1)
         self.status = QLabel()
@@ -186,58 +160,6 @@ class MainWindow(FluentWindow):
     def cancel_operation(self):
         for job in self.jobs:
             job.cancel()
-
-    def _runner_selected(self):
-        self.runner_selection_error = None
-        identity = self.runner_manifest.currentData()
-        def saved(_):
-            self._refresh_runner()
-        def operation():
-            try:
-                self.host.select_runner(identity)
-            except Exception as error:
-                self.runner_selection_error = str(error)
-                raise
-        self.launch(operation, saved)
-
-    def start_selected_plan(self):
-        """显式运行 Developer 所选已发布版本；不改变 Default。"""
-        if self.runner_selection_error:
-            raise ValueError(self.runner_selection_error)
-        identity = self.host.runner_selection() or self.host.manager.default_manifest_id()
-        if identity is None:
-            raise ValueError("请先选择已发布 Manifest。")
-        self.service.start_plan(manifest_id=identity)
-        self.owns_run = True
-        self.render_state(self.service.state)
-
-    def _refresh_runner(self):
-        identity = self.runner_manifest.currentData()
-        def operation():
-            manifests = self.host.manager.list_manifests()
-            try:
-                self.service._loaded_manifest(identity)
-                return manifests, None
-            except Exception as error:
-                return manifests, str(error)
-        def done(values):
-            manifests, error = values
-            self.runner_manifest.blockSignals(True)
-            self.runner_manifest.clear()
-            self.runner_manifest.addItem(tr('Use Default'), userData=None)
-            for item in manifests:
-                self.runner_manifest.addItem(item["manifest_id"], userData=item["manifest_id"])
-            index = self.runner_manifest.findData(identity)
-            if index < 0 and identity is not None:
-                self.runner_manifest.addItem(identity, userData=identity)
-                index = self.runner_manifest.count() - 1
-            self.runner_manifest.setCurrentIndex(max(0, index))
-            self.runner_manifest.blockSignals(False)
-            self.runner_selection_error = error
-            self.runner_notice.setText(error or tr('Selected is used for subsequent trials; Default and Candidate remain unchanged.'))
-            self.repair_page.set_manifests(manifests)
-            self.render_state(self.service.state)
-        self.launch(operation, done)
 
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
@@ -288,7 +210,8 @@ class MainWindow(FluentWindow):
             from .agent_repair import RepairLog
             settings_page = getattr(self, "settings_page", None)
             keys = {*self.host.secrets.values(), settings_page.pending_key() if settings_page else None} - {None, ""}
-            conversation = self.host.conversation
+            workbench = getattr(self, "repair_page", None)
+            conversation = workbench.host.conversation if workbench and workbench.session else self.host.conversation
             if conversation:
                 keys.update(conversation.log.keys)
             page = self.pages.currentWidget() if hasattr(self, "pages") else None
@@ -347,9 +270,6 @@ class MainWindow(FluentWindow):
                 self.fatal_error(result_diagnostics(result))
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
         self.status.setText(tr('Current activity: ') + (activity_text(state["activity"]) if state.get("activity") else (tr('Running') if state["phase"] == "running" else tr('Idle'))))
-        self.trial_button.setEnabled(not busy and not self.runner_selection_error)
-        self.runner_manifest.setEnabled(not busy)
-        self.refresh_manifest_button.setEnabled(not busy)
         for page in (self.capture_page, self.settings_page, self.repair_page):
             page.render(busy)
 

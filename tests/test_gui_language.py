@@ -89,7 +89,7 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
     assert owner.service.game_language == game_language
     developer.close()
     new_developer = owner.open_window(True)
-    assert new_developer.trial_button.text() == "试运行所选 Plan"
+    assert new_developer.repair_page.new_button.text() == "新建会话"
     assert reopened.business_pages[0].context.language == "zh_CN"
 
 
@@ -114,7 +114,7 @@ from lalc.i18n import current_language
 owner = GuiCoordinator(ApplicationService(Path(sys.argv[1])), ApplicationLifecycle())
 developer = owner.open_window(True)
 user = owner.open_window()
-print(json.dumps([current_language(), user.start_button.text(), developer.trial_button.text(),
+print(json.dumps([current_language(), user.start_button.text(), developer.repair_page.new_button.text(),
                   [page.context.language for page in user.business_pages], owner.service.game_language]))
 user.close()
 developer.close()
@@ -124,7 +124,7 @@ developer.close()
                             text=True, timeout=20, check=True)
     values = json.loads(result.stdout.splitlines()[-1])
     assert values == [language, "开始运行 Plan" if language == "zh_CN" else "Start Plan",
-                      "试运行所选 Plan" if language == "zh_CN" else "Trial selected Plan",
+                      "新建会话" if language == "zh_CN" else "New Session",
                       [language] * 3, "en"]
 
 

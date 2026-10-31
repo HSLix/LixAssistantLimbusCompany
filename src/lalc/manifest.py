@@ -305,9 +305,9 @@ class ManifestManager:
         return sorted(summaries, key=lambda item: item["saved_at"], reverse=True)
 
     def initialize_candidate(
-        self, candidate_dir: Path, *, manifest_id: str | None = None
+        self, candidate_dir: Path, *, manifest_id: str | None = None, empty: bool = False
     ) -> tuple[ValidationError, ...]:
-        """把一个 retained Manifest 原子物化为扁平 Developer Candidate。"""
+        """原子物化已保存版本；显式 empty 不使用 Default，手工 None 语义保持。"""
 
         target = Path(candidate_dir)
         if target.exists() and (not target.is_dir() or any(target.iterdir())):
@@ -318,7 +318,11 @@ class ManifestManager:
                 ),
             )
 
-        if manifest_id is None:
+        if empty and manifest_id is not None:
+            return (ValidationError("candidate_source_conflict", "Empty Candidate cannot name a Manifest."),)
+        if empty:
+            manifest = {"schema_version": SCHEMA_VERSION, "components": {}, "recovery_rules": {}}
+        elif manifest_id is None:
             retained = any(
                 path.name != "default.json" for path in self.manifests_dir.glob("*.json")
             )

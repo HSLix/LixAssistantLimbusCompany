@@ -1,6 +1,8 @@
 # Stage 5 — Agent 工作台
 
-状态：2026-10-31 逐项 grill 已确认，开发者授权进入影响审查和正式文档统一；尚未实现。[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)记录架构取舍，[影响审查](stage-5-design-impact-review.md)记录代码差距及验收边界，[讨论记录](stage-5-2026-10-31-decisions.md)保留决定来源。本文是当前完整规格，替代旧双入口、共享 Agent Candidate 及独立进程预览方案。
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
+状态：2026-10-31 逐项 grill 已确认。#335 的 CLI Repair Session 已本地实现并经开发者确认关闭，见[实施记录](stage-5-335-implementation.md)；GUI Session 接入及 Manifest 参考能力已在 #336 本地实现并等待开发者验收，其余工作台能力由后续票实现。[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)记录架构取舍，[影响审查](stage-5-design-impact-review.md)记录审查时的代码差距及验收边界，[讨论记录](stage-5-2026-10-31-decisions.md)保留决定来源。本文是当前完整规格，替代旧双入口、共享 Agent Candidate 及独立进程预览方案。
 
 ## 目标与责任
 
@@ -8,13 +10,14 @@
 
 Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保留 Construct / Repair 两种模式，复用模型接入、Agent Loop、工具实现、校验及日志，不复制两套核心。Construct 面向开发、扩展和修复 Workflow 及业务配置页；Repair 面向 Workflow / Asset 修复。二者均是开发能力，与 Stage 6 Runtime Repair 分开。
 
-## 工作台与 Manifest 选择
+## 工作台与运行入口
 
-- 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建 Session 使用小按钮。保留图片附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
-- 新建时选择 Construct / Repair，开始对话后模式固定；打开历史 Session 显示其真实模式，模式按钮不得隐式改动旧 Session。
-- 删除 Developer GUI 各页面上方共用的 Manifest 选择、刷新和试运行区域。Developer Selected Manifest 选择及所选 Plan 试运行放入工作台右上角可展开 / 收起的区域，不另设 Runner 页面。
-- 每次展开 Manifest 选择列表前自动刷新，保留当前选择，不设独立刷新按钮。刷新失败或所选版本不可用须明确报错，不悄悄改选其他版本。
-- Developer Selected Manifest 是开发者级全局选择，切换 Session 不改变它；只影响后续界面试运行，不改变 Default、Session 来源或固定 Diff 基线。Publish 显示新 Manifest ID，不自动选中新版本。界面试运行沿用共享执行服务和活动约束；Agent 的 trial_run 仍须显式传入已发布 Manifest ID。
+- 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建 Session 使用小按钮。保留图片 / Manifest 参考附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
+- 新建并选好 Construct / Repair 模式和来源后，首条用户消息提交前仍可调整两者；首次提交时固定模式、来源及其对应 Candidate / Diff 基线。开始对话后，更换模式或来源须新建 Session。打开历史 Session 显示其真实模式。
+- 删除 Developer GUI 各页上方共用的 Manifest 选择、刷新和手动试运行区域，不移入工作台，不新增 Runner 页或“应用到 User GUI”快捷设置。普通启动继续使用 User GUI。
+- 保留 Agent 的完整开发试运行闭环：修改、完整 Validate、Publish 后以明确已发布 Manifest ID 和输入调用 trial_run，再读取 Run 结果和日志。保留活动互斥、取消收尾及试运行日志窗口；删除人工入口不撤销 Agent 工具权限。
+- 创建 Session 的来源选择和消息的 Manifest 参考附件选择继续存在，分别服务初始化和只读参考，不是运行版本选择；Publish 不自动修改 Default 或 Session 来源 / 固定基线。
+- 旧 Developer Selected Manifest 不再作为工作台状态或运行依据；旧设置文件不迁移、不删除，停止读写其中已废弃的选择。
 - 工作台和新增交互遵守现有启动语言及中英文本机制，Capture / Agent Settings 的既有职责不变。
 
 ## Developer Session 与 Candidate
@@ -24,8 +27,8 @@ Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保
 ### 创建与来源
 
 - Construct 可从空白草稿（含最小 Python Plan）开始，或显式选择已发布 Manifest 作为扩展基线；Repair 必须选择已发布 Manifest 作为修复基线。
-- 来源在创建时确定，每轮读取本 Session 的最新草稿；选择空白不能被现有隐式选用 Default 的初始化行为替代。创建失败不能损坏既有 Session 或留下一个被误报为可用的会话。
-- Session 内不提供“重建 Candidate”。换基线或从头开始就新建 Session，旧 Session 保留。新建 Session 不清空其他会话，不借用开发者手工 Candidate。
+- 来源在首条用户消息提交时确定，每轮读取本 Session 的最新草稿；选择空白不能被现有隐式选用 Default 的初始化行为替代。创建失败不能损坏既有 Session 或留下一个被误报为可用的会话。
+- 首条用户消息提交前，模式和来源属于可调整的准备状态，不视为重建已开始的 Session。开始对话后不提供“重建 Candidate”；换基线或从头开始就新建 Session，旧 Session 保留。新建 Session 不清空其他会话，不借用开发者手工 Candidate。
 - Candidate 是准备、校验、发布完整 Manifest 的临时草稿台，不是长期正式源码仓库或运行中的 Working Manifest。“临时”不代表自动清空；草稿在本 Session 生命周期内持续保留。
 
 ### 保存、恢复与互斥
@@ -58,13 +61,30 @@ Asset Library、已发布 Manifest、正式页面、业务配置及外部知识�
 | 本 Session Candidate 读 / 编辑、专用 Component / Recovery Rule 新增、完整校验 | 是 | 是 | 是 |
 | Asset / Trusted Action 契约检查、游戏截图、专用 crop / 归档 remove_asset | 是 | 是 | 是 |
 | Publish、显式已发布版本 trial_run、Run 日志 | 是 | 是 | 是 |
+| 任意已发布 Manifest 结构及登记源码只读查看 | 是 | 是 | 是 |
 | 外部知识库只读检索及受控 Git | 是 | 是 | 不自动继承 GUI 新授权 |
 | 请求人工答复或操作并等待反馈 | 是 | 是 | 否 |
 | 页面草稿构建、当前正式页受控只读访问、预览及人工版本确认安装流程 | 否 | 是 | 否 |
 
 Candidate Python Plan、Task Workflow、Subworkflow、Step、Recovery Rule 的调用层级与专用新增路径保持；正式源码不可变、完整 Validate、Publish 后才可执行、不自动设置 Default 的边界保持。read 的新增根目录不能自动扩大 edit。正式页面只通过人工确认安装流程写入，不加入通用编辑范围。保留认证、日志脱敏、Trusted Action 和用户取消要求；无通用终端、任意文件创建 / 删除、任意外部程序执行权限。
 
-Stage 6 Runtime Repair 不提供删除工具或删除权限，也不继承上述开发工具集。其人工交互只在有人监督 / 值守时开放，无人值守时不开放；值守来源、变化及已有等待如何处理留 Stage 6。其余 Recovery Rule 修改、生效、Working Manifest / Recheck 等见 [Stage 6 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#stage-6-todo-repair-integration)，不为 Stage 5 放宽运行时替换检查。
+2026-10-31 #336 实施前补充确认：两种模式分别定义初始 Prompt 和白名单，本票已实现工具集合可以相同；Repair 保留新增修复所需 Component / Recovery Rule 的能力。后续知识库、人工反馈及页面工具分别在 #337 / #338 / #339 实现后接入，页面构建仅 Construct，未实现工具不提前暴露。
+
+Stage 6 Runtime Repair 不提供删除工具或删除权限，不整体继承上述开发工具集；任意已发布 Manifest 内容只读查看已单独获准纳入其白名单，见下节。其人工交互只在有人监督 / 值守时开放，无人值守时不开放；值守来源、变化及已有等待如何处理留 Stage 6。其余 Recovery Rule 修改、生效、Working Manifest / Recheck 等见 [Stage 6 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#stage-6-todo-repair-integration)，不为 Stage 5 放宽运行时替换检查。
+
+## 已发布 Manifest 参考附件与只读查看
+
+2026-10-31 补充确认，纳入 #336；[讨论记录](stage-5-manifest-reference-decisions.md)与[专项影响审查](stage-5-manifest-reference-impact-review.md)保留设计及证据。
+
+GUI 附件可选择一个或多个已发布 Manifest，参考整个版本还是其中部分内容由开发者直接在聊天消息说明，例如某版本的 Workflow 或 Recovery Rules；首版不做逐 Component 树形勾选。Manifest ID 及参考提示作为消息信息随 Session 上下文保存 / 恢复，不因发送附件把整个版本源码一次性注入模型上下文。
+
+附件是参考提示，不是访问授权清单。GUI Construct / Repair、CLI Repair 均可通过专用只读工具自行查阅任意已发布 Manifest，无须先附加；不维护按附件 / Session 的 Manifest 访问白名单或撤销机制。按需列出已发布版本、查看 Manifest 结构及其登记源码，返回明确 Manifest ID、分区 / 逻辑名、Component ID 和所读位置，避免混淆同名 Component 的不同版本；输出截断明确并可继续读取。不存在、损坏或源码身份校验失败时如实报错，不静默换版本。
+
+查看只读取数据与源码，不导入或执行参考 Python，不能直接使用会导入模块的执行加载路径。按已发布 Manifest 的成员关系解析源码并核验内容哈希，限定真实路径与符号链接，不允许任意文件读取，也不扩大当前 Candidate 的 edit 权限。该工具不提供创建、编辑、删除、复制落盘或执行入口；Agent 如需借鉴逻辑，仍通过当前模式已有的 Candidate 编辑 / 新增路径完成开发。
+
+附加或查看不改变当前 Candidate、来源 / 固定基线、Default 或运行中的 Working Manifest，不启动试运行或切换执行版本。已有 trial_run 权限仍是另一条显式执行路径，不能把查看权限当作执行授权。
+
+Stage 6 已确定将同一“任意已发布 Manifest 内容只读查看”能力纳入 Runtime Repair 工具白名单，不受有人 / 无人值守限制；本阶段提供可复用只读核心及 GUI / CLI 工具，Runtime 接入仍在 Stage 6，不在 #336 提前实现运行时恢复。此授权不包括工作台 GUI 附件界面、其他开发工具或修改 / 切换 Working Manifest。
 
 ## 外部知识与 Git 内容的版本语义
 

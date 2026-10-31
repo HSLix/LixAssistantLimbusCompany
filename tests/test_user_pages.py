@@ -402,7 +402,7 @@ def create_page(context):
             assert not owner.user.agent_controls.isEnabled()
             assert context.language == "en_US"
             assert owner.user.start_button.text() == "Start Plan"
-            assert owner.developer.trial_button.text() == "Trial selected Plan"
+            assert not hasattr(owner.developer, "trial_button")
             atexit.register(lambda: (root / "clean-exit").write_text("normal"))
             (root / "ready").write_text("restored-and-rescanned")
             def close_when_requested():

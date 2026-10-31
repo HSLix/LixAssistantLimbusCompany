@@ -14,15 +14,17 @@ from .focused import FocusedAutomationSession, WindowsWindowPlatform
 from .agent_diagnostics import error_details
 
 
-REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-                "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset"]
+from .agent_policy import BASE_TOOLS
+from .manifest_reference import ManifestReference
+
+REPAIR_TOOLS = list(BASE_TOOLS)
 
 
 class RepairTools:
     """通过宿主实现固定工具集；图片与返回值独立留存在本次交互目录。"""
 
-    def __init__(self, data_root, log, *, platform=None, host=None):
+    def __init__(self, data_root, log, *, platform=None, host=None, allowed=None):
+        self.allowed = frozenset(REPAIR_TOOLS if allowed is None else allowed)
         self.host = host
         self.created_files = set()
         self.library = AssetLibrary(data_root)
@@ -39,15 +41,20 @@ class RepairTools:
     def call(self, name, arguments, *, tool_call_id=None):
         """工具错误原样反馈模型；不把工具失败当作整个修复进程失败。"""
         self.sequence += 1
+        self.log.record({"type": "tool_reserved", "sequence": self.sequence})
         self.checkpoint()
         try:
+            if name not in self.allowed:
+                raise ValueError("当前模式和入口不允许此工具。")
             methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
                        "publish": self.publish, "trial_run": self.trial_run,
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
-                       "preview_crop": self.preview_crop, "remove_asset": self.remove_asset}
+                       "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
+                       "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
+                       "read_manifest_source": self.read_manifest_source}
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -60,6 +67,15 @@ class RepairTools:
                          "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         return self.log.tool_result(filename, result)
+
+    def list_manifests(self, offset=0, limit=50):
+        return self.text(ManifestReference(self.host.manager).list(offset, limit))
+
+    def read_manifest(self, manifest_id, offset=0, limit=50):
+        return self.text(ManifestReference(self.host.manager).structure(manifest_id, offset, limit))
+
+    def read_manifest_source(self, manifest_id, section, logical_name, offset=0, limit=100):
+        return self.text(ManifestReference(self.host.manager).source(manifest_id, section, logical_name, offset, limit))
 
     def add_component(self, filename, logical_name, source):
         """创建普通 Component 并登记；角色由实际源码决定。"""
@@ -293,7 +309,7 @@ class RepairTools:
         identity = uuid.uuid4().hex
         details = {"preview_id": identity, "logical_name": logical_name, "region": area, "tags": tags,
                    "threshold": threshold, "matches": matches, "match_count": len(matches),
-                   "source_screenshot": metadata["path"], "interaction_id": self.log.path.name}
+                   "source_screenshot": metadata["path"], "interaction_id": self.log.identity}
         result = self.image(self.marked_image(session, region=area), {**details, "view": "crop_region"})
         crop = self.image(content, {"view": "crop"}, 2)
         result["content"].extend(crop["content"])
@@ -306,7 +322,7 @@ class RepairTools:
     def crop_asset(self, preview_id):
         """只保存本对话已预览的原始像素，不重新截图或接受外部路径。"""
         if not isinstance(preview_id, str) or preview_id not in self.previews:
-            raise ValueError("未知 preview_id；请先调用 preview_crop，不能引用其他对话的预览。")
+            raise ValueError("未知或已失效的 preview_id；请重新调用 preview_crop，不能引用其他对话或重启前的预览。")
         preview = self.previews[preview_id]
         self.checkpoint()
         result = self.library.save_crop(preview["logical_name"], preview["pixels"], preview["size"],
@@ -315,7 +331,7 @@ class RepairTools:
         # 来源同时指向独立留存的完整截图，不能依赖下次会被替换的 Candidate。
         result["source_screenshot"] = preview["source_screenshot"]
         result["preview_id"] = preview_id
-        result["interaction_id"] = self.log.path.name
+        result["interaction_id"] = self.log.identity
         from .runtime import atomic_write_json
         atomic_write_json(self.library.data_root / "asset-provenance" / f"{result['provenance_id']}.json", result)
         return self.image(self.library.read({"path": result["path"], "sha256": result["sha256"]}), result)

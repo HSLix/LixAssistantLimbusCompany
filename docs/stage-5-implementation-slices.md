@@ -6,6 +6,8 @@
 
 ## 1. [#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335) CLI Repair 使用独立且可恢复的 Developer Session
 
+2026-10-31：已本地实现并经开发者明确确认关闭为 completed；证据及限制见[实施记录](stage-5-335-implementation.md)。下列验收清单保留为原票范围，不将本地检查等同于真实模型 / Windows / 游戏验收。
+
 **Blocked by:** 无，可立即开始
 
 **交付：** 开发者可从指定已发布 Manifest 创建 Repair Session，在 CLI 对话、修改草稿、校验、Publish 和明确版本试运行；退出后按 Session ID 继续，手工 Candidate 始终不变。
@@ -19,20 +21,32 @@
 
 ## 2. [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336) Agent 工作台统一页面、Session 导航与 Construct / Repair 模式
 
+2026-10-31：已本地实施并进入验证，等待开发者验收后关闭；见[实施记录](stage-5-336-implementation.md)。下列清单保留交付范围，不代表开发者或 Windows / 真实模型 / 游戏验收已通过。
+
 **Blocked by:** [#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335)
 
-**交付：** Developer GUI 在统一工作台中创建及恢复 Construct / Repair Session，完成历史续聊、空白或指定来源开发、校验、发布和明确版本试运行；页面布局、模式权限及会话导航作为一个完整增量验收。
+**交付：** Developer GUI 在统一工作台中创建及恢复 Construct / Repair Session，完成历史续聊、空白或指定来源开发、校验、发布和明确版本试运行；页面布局、模式权限及会话导航作为一个完整增量验收；支持 Manifest 参考附件，以及 GUI / CLI 按需只读查看任意已发布 Manifest。
 
-- [ ] 工作台包含历史 Session 侧栏、聊天主体、底部输入区和紧凑新建按钮；新建选择模式，开始对话后固定，历史显示真实模式，不提供 Session 重建或删除。
+- [ ] 工作台包含历史 Session 侧栏、聊天主体、底部输入区和紧凑新建按钮；新建后至首条用户消息提交前可调整模式和来源，首次提交时两者固定，历史显示真实模式，不提供 Session 重建或删除。
 - [ ] Construct 可从空白最小 Python Plan 或已发布 Manifest 开始，Repair 必须选已发布来源；空白不隐式使用 Default，新建不影响其他 Session 或手工 Candidate。
 - [ ] 恢复 GUI / CLI Repair Session，Diff / Validate / Publish / 事件 / 诊断 / 脱敏及请求计数准确归属；重启可继续，旧日志不自动变成 Session。
 - [ ] Construct / Repair 各有初始 Prompt 和工具白名单，实际能力取模式与入口交集；模型声明和分发均拒绝越权，覆盖 read / edit、validate 和宿主工具。
 - [ ] 两种模式复用 Agent 核心，保留自身 Candidate 编辑及专用新增、完整校验、Asset / Trusted Action 边界、不可变 Publish 后显式试运行；CLI 拒绝 Construct，不因历史记录扩权。
 - [ ] Agent 执行、人工等待或试运行期间禁切换 / 新建 Session，取消实际收尾后恢复；不提供后台多 Session 执行。
-- [ ] 移除各页顶部 Manifest 区域，仅工作台右上折叠区选择全局 Developer Selected Manifest 并试运行所选 Plan；不新增 Runner 页面。
-- [ ] 选择列表展开前自动刷新并保留有效选择，失败或缺失报错，不静默替换；Session 切换 / Publish 不自动改选，不修改 Default 或 Candidate 来源。
+- [ ] 删除 Developer GUI 各页顶部 Manifest 选择、刷新及人工运行入口，不移入工作台、不新增 Runner 页或“应用到 User GUI”；User GUI 普通启动保持。
+- [ ] Agent 保留完整校验、Publish、显式已发布版本 trial_run、Run 日志及互斥 / 取消 / 试运行日志窗口；旧 Developer Selected Manifest 停止读写，不迁移或删除旧文件，不修改 Default 或 Candidate 来源。
 - [ ] Capture / Agent Settings 原职责保持，双语一致；完成两种来源到发布 / 试运行以及 CLI-GUI 续聊、权限拒绝的针对性验证，Windows 成品操作另记。
 - [ ] 后续知识库、人工反馈、页面构建工具分别按对应票接入白名单，尚未实现时不可调用；本票不把替身证据计为真实模型或游戏验收。
+
+2026-10-31 参考附件增量（已 grill、专项审查及本地文档同步，纳入本票）：
+
+- [ ] GUI 附件可选择一个或多个已发布 Manifest，参考全部 / 部分内容由聊天消息说明，不做逐 Component 树形选择；Manifest ID 和提示作为消息信息持久保存及恢复，不自动注入全部源码。
+- [ ] GUI Construct / Repair 与 CLI Repair 均提供任意已发布 Manifest 的只读查看，无须先附加；附件不构成访问白名单，不增加逐附件授权或撤销机制。
+- [ ] 工具可按需列出已发布版本、查看结构及其登记源码，返回 Manifest ID、分区 / 逻辑名、Component ID 和所读位置；截断明确且可继续读取，缺失 / 损坏 / 身份校验失败不静默替换版本。
+- [ ] 查看不导入 / 执行参考 Python，验证成员关系、内容哈希、真实路径及符号链接边界；不得提供任意文件读取、编辑 / 删除 / 写出或执行能力，不扩大 Candidate edit 范围。
+- [ ] 附加和查看不改变 Candidate、来源 / 固定基线、Default 或 Working Manifest，不启动试运行或切换执行版本；参考后修改仍走当前模式既有草稿工具。
+- [ ] 新增验收覆盖多 Manifest 提示与会话恢复、未附加版本可查看、同名 Component 不同版本定位、越界 / 哈希异常及纯读取不执行源码 / 不改选择状态；保留图片附件行为。
+- [ ] Runtime Repair 工具白名单已确定包含同一只读能力，不受值守状态限制；本票交付可复用核心及 GUI / CLI 接入，Stage 6 再接运行时，不提前实现恢复流程或其他权限。
 
 ## 3. [#337](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337) GUI 两种模式读取知识库并检查受控 Git 更新
 

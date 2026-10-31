@@ -1081,5 +1081,69 @@ Original pixel region: {2}</source>
       <source>{0}; actual requests: {1}</source>
       <translation>{0}；实际请求 {1} 次</translation>
     </message>
+    <message>
+      <source>New Session</source>
+      <translation>新建会话</translation>
+    </message>
+    <message>
+      <source>Refresh Sessions</source>
+      <translation>刷新会话</translation>
+    </message>
+    <message>
+      <source>Mode</source>
+      <translation>模式</translation>
+    </message>
+    <message>
+      <source>Source Manifest</source>
+      <translation>来源 Manifest</translation>
+    </message>
+    <message>
+      <source>Send the first message to start and fix mode and source.</source>
+      <translation>发送首条消息后开始会话并固定模式和来源。</translation>
+    </message>
+    <message>
+      <source>Attach Manifests</source>
+      <translation>附加 Manifest</translation>
+    </message>
+    <message>
+      <source>Manifest references: {0}</source>
+      <translation>参考 Manifest：{0}</translation>
+    </message>
+    <message>
+      <source>Blank (Construct only)</source>
+      <translation>空白（仅 Construct）</translation>
+    </message>
+    <message>
+      <source>Select a published Manifest</source>
+      <translation>选择已发布 Manifest</translation>
+    </message>
+    <message>
+      <source>Invalid Session directory</source>
+      <translation>会话目录无效</translation>
+    </message>
+    <message>
+      <source>Unavailable Session</source>
+      <translation>无法读取的会话</translation>
+    </message>
+    <message>
+      <source>Interrupted; results may be unknown. No operations replayed.</source>
+      <translation>会话已中断，结果可能未知；没有重放操作。</translation>
+    </message>
+    <message>
+      <source>Repair requires a published source Manifest.</source>
+      <translation>Repair 必须选择已发布来源 Manifest。</translation>
+    </message>
+    <message>
+      <source>Agent Workbench</source>
+      <translation>Agent 工作台</translation>
+    </message>
+    <message>
+      <source>Sessions</source>
+      <translation>历史会话</translation>
+    </message>
+    <message>
+      <source>Viewing Diff</source>
+      <translation>查看差异</translation>
+    </message>
   </context>
 </TS>

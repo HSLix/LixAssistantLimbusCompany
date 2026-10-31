@@ -25,11 +25,11 @@ def test_workspace_opens_actual_candidate_without_creating_missing_draft(gui, mo
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or True)
     monkeypatch.setattr(window, "_interact", lambda operation: operation())
     page.open_workspace()
-    assert opened == [str(window.host.candidate)]
-    shutil.rmtree(window.host.candidate)
+    assert opened == [str(window.repair_page.host.candidate)]
+    shutil.rmtree(window.repair_page.host.candidate)
     with pytest.raises(ValueError, match="初始化 Candidate"):
         page.open_workspace()
-    assert not window.host.candidate.exists() and len(opened) == 1
+    assert not window.repair_page.host.candidate.exists() and len(opened) == 1
 
 
 def test_removed_panels_return_space_and_answer_does_not_open_diff(gui, monkeypatch):
@@ -39,6 +39,10 @@ def test_removed_panels_return_space_and_answer_does_not_open_diff(gui, monkeypa
     assert not hasattr(page, "refresh_files")
     calls = []
     monkeypatch.setattr(page, "show_diff", lambda: calls.append(True))
+    page.host.conversation.log.group = 1
+    page.host.conversation.log.record({'type': 'message_end', 'message': {'role': 'assistant', 'content': [
+        {'type': 'text', 'text': '{"revise_success": true, "message": "完成"}'}]}})
+    page.host.conversation.log.group = 1
     page.answered({"reason": "answered", "requests": 2, "round": 1, "answer": {"message": "完成"}})
     assert not calls
     assert "Agent · 第 1 轮" in page.chat.toPlainText()
@@ -67,9 +71,9 @@ def test_diff_button_reads_current_fixed_baseline(gui):
     from PySide6.QtWidgets import QPlainTextEdit
     app, window = gui
     page = window.repair_page
-    file = window.host.candidate / "steps.total.py"
+    file = window.repair_page.host.candidate / "steps.total.py"
     file.write_text(file.read_text().replace("if value > 0", "if value >= 0"))
-    expected = window.host.diff()
+    expected = window.repair_page.host.diff()
     page.show_diff()
     wait_jobs(app, window)
     assert page.diff_dialog.findChild(QPlainTextEdit).toPlainText() == expected

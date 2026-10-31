@@ -51,7 +51,7 @@ def test_shared_windows_and_independent_idle_close(windows):
     assert user.service is developer.service and user.host is developer.host
     assert owner.open_window(True) is developer
     assert user.pages.widget(0).objectName() == 'dashboard'
-    assert [developer.pages.widget(i).objectName() for i in range(developer.pages.count())] == ['developer-capture', 'developer-settings', 'developer-repair']
+    assert [developer.pages.widget(i).objectName() for i in range(developer.pages.count())] == ['developer-capture', 'developer-settings', 'developer-workbench']
     assert developer.close()
     assert owner.developer is None and owner.user is user
     assert owner.open_window(True) is not developer

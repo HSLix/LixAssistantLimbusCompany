@@ -1,5 +1,7 @@
 # Stage 5 — 工作台与 Session 设计修订
 
+本轮 #336 补充决定见[实施前记录](stage-5-336-decisions.md)：首条用户消息提交前可调整模式 / 来源，首次提交时固定两者；Developer GUI 的 Manifest 选择及人工运行入口删除，Agent 试运行完整保留。下文折叠选择区与右上布局是已被替代的历史决定。
+
 状态：2026-10-31 逐项 grill 已确认，开发者以“开始 review”授权进入影响审查与正式文档统一。本记录保留决定来源；当前契约集中在 [Stage 5 规格](stage-5-agent-workbench.md)及 [ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)。开发者已确认合并原第 2 / 3 票并批准其余拆分，六票已发布为 #335–#340；不表示产品实现完成。
 
 ## 已明确的变更
@@ -8,9 +10,9 @@
 - 删除 Developer GUI 各页上方共用的 Manifest 选择、刷新与试运行区域，将 Developer Selected Manifest 选择及所选 Plan 试运行放入工作台右上角可展开 / 收起的区域。每次打开 Manifest 选择列表前自动刷新，不另设刷新按钮。选择仍不修改 Default 或 Candidate 来源。
 - 工作台布局参考开发者提供的第二张图：历史会话侧栏、聊天主体、底部输入区；New Conversation 使用小按钮，不采用示意图中占据大面积的圆形入口。右上角展开区域参考第三张图，但以本轮明确要求的选择前自动刷新替代图中的独立刷新按钮。图片仅提供布局参考，不自动引入图片文字所暗示的行为契约。
 - 每个 Session 维护各自 Candidate，替代 Agent 全局共享 Candidate。项目根目录现有 Candidate 仅供开发者使用，不能被 GUI Agent 隐式接管、迁移或清空。
-- Construct / Repair 保留为同一工作台内的两种模式；新建 Session 时选择，开始对话后固定。每种模式有自己的工具白名单和初始 Prompt；工具声明与宿主分发均按该 Session 模式执行白名单，不能只靠 Prompt 限权，也不能因共用页面而合并权限。历史 Session 的模式不可通过界面模式切换被隐式改变。
+- Construct / Repair 保留为同一工作台内的两种模式；首条用户消息提交前可调整模式和来源，首次提交时两者固定。每种模式有自己的工具白名单和初始 Prompt；工具声明与宿主分发均按该 Session 模式执行白名单，不能只靠 Prompt 限权，也不能因共用页面而合并权限。历史 Session 的模式不可通过界面模式切换被隐式改变。
 - 一个 Session 对应一段连续对话；聊天、Candidate、固定 Diff 基线和模式一起持久保留。切换会话或重启应用后可恢复并继续，新建 Session 不清空旧 Session。历史日志不能单独冒充可恢复 Session；旧数据原样保留，不自动迁移。
-- 新建 Construct Session 可选择空白草稿（含最小 Python Plan），或选择已发布 Manifest 作为扩展基线；Repair Session 必须选择已发布 Manifest 作为修复基线。来源在创建时确定，Developer Selected Manifest 后续切换仅影响试运行，不重建草稿、不改变其来源或固定 Diff 基线。空白初始化必须与现有隐式选用 Default 的路径明确区分。
+- 新建 Construct Session 可选择空白草稿（含最小 Python Plan），或选择已发布 Manifest 作为扩展基线；Repair Session 必须选择已发布 Manifest 作为修复基线。来源在首条用户消息提交时确定，开始对话后不重建草稿、不改变其来源或固定 Diff 基线；原 Developer Selected Manifest 设计已由本轮删除入口决定替代。空白初始化必须与现有隐式选用 Default 的路径明确区分。
 - Session 内取消“重建 Candidate”：更换基线或从头开始必须新建 Session，旧 Session 的聊天、Candidate 与固定基线保留。该决定取代早先关于重建时重置两边对话的待讨论方案；不自动改变开发者手工 Candidate 的现有初始化命令。
 - Agent 执行、等待人工答复或试运行期间禁止切换 / 新建 Session；完成或取消并收尾后恢复。当前会话的聊天显示和取消入口保持可用，不提供多个 Session 后台并行运行。答复、工具结果及试运行证据归属发起它们的会话，不能随界面选择改变。
 - CLI Agent Repair 同样使用独立 Session Candidate，不再直接修改开发者手工 Candidate。手工初始化、编辑、校验和发布等开发者命令继续使用原 Candidate。历史 Session 保存在 LALC 数据目录；现有草稿与旧日志原样保留，不自动迁移为 Session。
@@ -46,3 +48,5 @@
 后续顺序：完成设计影响审查与正式文档同步 → 提出垂直 tickets 及阻塞关系 → 用户确认拆分 → 发布 GitHub Issues。六票已发布并核验，实施与运行验收仍未完成。
 
 2026-10-31 发布结果：原工作台页面票与 Construct 模式票按开发者要求合并统一验收；六票正文、标签及五条原生阻塞边已核验，详见[实施拆分](stage-5-implementation-slices.md)。
+
+2026-10-31 Manifest 参考补充：附件仅作为消息提示，GUI / CLI 可查看任意已发布 Manifest；Runtime Repair 同一只读工具已明确纳入白名单、不受值守状态限制，实际 Stage 6 接入。见[专项决定](stage-5-manifest-reference-decisions.md)及[影响审查](stage-5-manifest-reference-impact-review.md)。

@@ -81,21 +81,14 @@ def test_capture_preview_saves_exact_original_without_recapture(tmp_path):
     assert saved["observation"] == 8
 
 
-def test_runner_selection_independent_and_invalid_not_fallback(tmp_path):
-    host, loaded = host_for(tmp_path)
-    host.select_runner(loaded.manifest_id)
-    assert host.runner_selection() == loaded.manifest_id
-    original = host.metadata.read_bytes()
-    (host.manager.manifests_dir / "default.json").unlink()
-    assert host.runner_selection() == loaded.manifest_id
-    with pytest.raises(ValueError):
-        host.select_runner("missing")
-    assert host.runner_selection() == loaded.manifest_id
-    assert host.metadata.read_bytes() == original
-    (host.manager.manifests_dir / f"{loaded.manifest_id}.json").unlink()
-    with pytest.raises(StartError):
-        host.service.start("steps.total", {"values": []}, manifest_id=host.runner_selection())
-    assert host.service.state["phase"] == "idle"
+def test_removed_runner_preferences_are_ignored(gui):
+    app, window = gui
+    preferences = window.service.data_root / 'developer-settings.json'
+    preferences.write_text('old invalid settings')
+    window.repair_page.new()
+    assert not hasattr(window, 'runner_manifest')
+    assert not hasattr(window, 'trial_button')
+    assert preferences.read_text() == 'old invalid settings'
 
 
 def test_gui_blank_secret_preserves_and_explicit_clear_removes_reference(tmp_path, monkeypatch):
@@ -120,6 +113,11 @@ def gui(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     app = QApplication.instance() or QApplication([])
     window = MainWindow(host.service)
+    from lalc.developer_session import DeveloperSession
+    session = DeveloperSession.create(host.service, host.manager.default_manifest_id(), entry='gui')
+    session.host.secrets = window.host.secrets
+    session.conversation()
+    window.repair_page.activate_session(session)
     yield app, window
     window.close()
     app.processEvents()
@@ -137,19 +135,18 @@ def wait_jobs(app, window):
 def test_three_pages_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
-    assert [window.pages.widget(i).objectName() for i in range(3)] == ["developer-capture", "developer-settings", "developer-repair"]
+    assert [window.pages.widget(i).objectName() for i in range(3)] == ["developer-capture", "developer-settings", "developer-workbench"]
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
     view.resize(400, 200)
     view.set_image(bytes(200 * 100 * 4), (200, 100))
     assert view.pixel(QPointF(100, 50)) == (50, 25)
-    window.host.new_conversation()
-    conversation = window.host.conversation
-    (window.host.candidate / "manifest.json").write_text("invalid")
+    session = window.repair_page.session
+    (session.host.candidate / "manifest.json").write_text("invalid")
     window.repair_page.new()
-    assert window.host.conversation is not conversation
-    assert (window.host.candidate / "manifest.json").read_text() == "invalid"
+    assert window.repair_page.session is None
+    assert (session.host.candidate / "manifest.json").read_text() == "invalid"
 
 
 def test_async_operation_and_host_busy_state(gui):
@@ -164,13 +161,13 @@ def test_async_operation_and_host_busy_state(gui):
     results = []
     window.launch(operation, results.append)
     assert entered.wait(1)
-    assert not window.trial_button.isEnabled()
+    assert not window.repair_page.new_button.isEnabled()
     assert not window.capture_page.capture_button.isEnabled()
     assert not window.repair_page.baseline.isEnabled()
     release.set()
     wait_jobs(app, window)
     assert results == ["done"]
-    assert window.trial_button.isEnabled()
+    assert window.repair_page.new_button.isEnabled()
 
 
 def test_coordinate_monitor_does_not_focus_and_stops_until_refresh(tmp_path):
@@ -199,16 +196,15 @@ def test_coordinate_monitor_does_not_focus_and_stops_until_refresh(tmp_path):
     assert host.refresh_coordinates()["x"] == -1
 
 
-def test_selected_plan_trial_uses_shared_service_without_changing_default(gui, monkeypatch):
+def test_no_manual_run_entry_but_agent_trial_modal_is_retained(gui):
     app, window = gui
-    identity = window.host.manager.default_manifest_id()
-    window.host.select_runner(identity)
-    calls = []
-    monkeypatch.setattr(window.service, "start_plan", lambda **kwargs: calls.append(kwargs))
-    window.start_selected_plan()
-    assert calls == [{"manifest_id": identity}]
-    assert window.host.manager.default_manifest_id() == identity
-    assert not hasattr(window, "plan_path")
+    assert not hasattr(window, 'start_selected_plan')
+    assert not hasattr(window, 'runner_manifest')
+    window.render_state({**window.service.state, 'phase': 'running', 'run_id': 1,
+                         'entry': {'developer_trial': True}, 'trace': []})
+    assert window.trial_dialog is not None
+    window.render_state({**window.service.state, 'phase': 'finished'})
+    assert window.trial_dialog is None
 
 
 def test_closing_cancels_then_waits_for_actual_cleanup(gui, monkeypatch):
@@ -437,19 +433,20 @@ def test_interaction_error_uses_redacted_details_and_keeps_log_entry(gui, caplog
     assert "gui-secret" not in app.clipboard().text()
 
 
-@pytest.mark.parametrize("phase", ["before_send", "after_send", "new_conversation"])
+@pytest.mark.parametrize("phase", ["before_send", "after_send", "restored"])
 @pytest.mark.parametrize("valid", [True, False])
 def test_manual_validate_displays_once_and_persists_context(gui, monkeypatch, phase, valid):
     app, window = gui
     page = window.repair_page
-    chat = window.host.new_conversation()
-    if phase in {"after_send", "new_conversation"}:
+    chat = page.host.conversation
+    if phase in {"after_send", "restored"}:
         chat.log.on_event = window.operation_event.emit
-    if phase == "new_conversation":
-        page.new()
-        chat = window.host.conversation
+    if phase == "restored":
+        page.session.conversation()
+        page.activate_session(page.session)
+        chat = page.host.conversation
     if not valid:
-        (window.host.candidate / "manifest.json").write_text("broken json")
+        (page.host.candidate / "manifest.json").write_text("broken json")
     opened = []
     monkeypatch.setattr(page.diagnostics, "show_error", lambda: opened.append(True))
     page.validate()
@@ -469,12 +466,12 @@ def test_manual_validate_displays_once_and_persists_context(gui, monkeypatch, ph
 
 def test_manual_validate_without_conversation_does_not_create_one(gui):
     app, window = gui
+    window.repair_page.new()
     assert window.host.conversation is None
     window.repair_page.validate()
     wait_jobs(app, window)
     assert window.host.conversation is None
-    assert len(window.repair_page.chat.entries) == 1
-    assert window.repair_page.chat.entries[0]["name"] == "validate"
+    assert not window.repair_page.chat.entries
 
 
 def test_request_progress_keeps_round_and_limit_through_tool_events_and_resets(gui):
@@ -544,9 +541,9 @@ def test_repair_opens_external_pages_folder_next_to_workspace(gui, monkeypatch, 
     page = window.repair_page
     directory = window.service.data_root / "pages"
     assert not directory.exists()
-    row = next(page.layout().itemAt(i).layout() for i in range(page.layout().count())
-               if page.layout().itemAt(i).layout() and
-               page.layout().itemAt(i).layout().indexOf(page.workspace_button) >= 0)
+    body = page.layout().itemAt(1).layout()
+    row = next(body.itemAt(i).layout() for i in range(body.count())
+               if body.itemAt(i).layout() and body.itemAt(i).layout().indexOf(page.workspace_button) >= 0)
     assert row.indexOf(page.pages_button) == row.indexOf(page.workspace_button) + 1
     opened, errors = [], []
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or can_open)

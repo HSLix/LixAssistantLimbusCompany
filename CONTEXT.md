@@ -77,12 +77,16 @@ The temporary editable staging workspace for a complete Manifest draft, used to 
 _Avoid_: Formal source repository, released Manifest, active Working Manifest, global candidate registry
 
 **Agent Workbench**:
-The unified developer-directed workspace for constructing, extending and repairing Workflows and their business settings pages using explicitly authorized LALC Agent tools. Each development Session owns its Candidate and a Construct or Repair mode fixed once conversation begins, with mode-specific tool permissions and initial instructions; the workspace remains distinct from Runtime Policy.
+The unified developer-directed workspace for constructing, extending and repairing Workflows and their business settings pages using explicitly authorized LALC Agent tools. Each development Session owns its Candidate and a Construct or Repair mode fixed when its first user message is submitted, with mode-specific tool permissions and initial instructions; the workspace remains distinct from Runtime Policy.
 _Avoid_: Unrestricted coding agent, Runtime Agent Session, shared global Agent Candidate
 
 **Developer Session**:
-A persistent, resumable developer conversation with its own Candidate, fixed comparison baseline, page drafts, and a Construct or Repair mode fixed once conversation begins. It is distinct from a model request, a runtime recovery session, and the shared installed environment.
+A persistent, resumable developer conversation with its own Candidate, fixed comparison baseline, page drafts, and a Construct or Repair mode fixed when its first user message is submitted. It is distinct from a model request, a runtime recovery session, and the shared installed environment.
 _Avoid_: Runtime Agent Session, model request, global Candidate
+
+**Manifest Reference Attachment**:
+A message-level pointer to one or more published Manifests suggested as reference material, with optional focus described in the message. It is contextual information rather than a read-access grant, a Candidate source selection, or an execution request.
+_Avoid_: Manifest access whitelist, Candidate initialization, trial selection
 
 **External Knowledge Library**:
 The collection of reference repositories, documents and images readable by both developer Agent interfaces without permission to edit the reference content. Repository synchronization can obtain newer committed versions without making them the checked-out or working copy.
@@ -297,7 +301,7 @@ The user-facing application interface for configuring and running the Default Ma
 _Avoid_: Developer Runner, independent runtime
 
 **Developer GUI**:
-The developer-facing interface for observation, Agent settings and Candidate repair/trial, sharing execution ownership with the User GUI while retaining its own selected Manifest.
+The developer-facing interface for observation, Agent settings and Session-based development, including Agent-requested trials. It shares execution ownership with the User GUI and provides no separate manual Manifest run entry.
 _Avoid_: User GUI, concurrent executor
 
 **Workflow Settings Page**:

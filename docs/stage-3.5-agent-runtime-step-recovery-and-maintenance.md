@@ -152,6 +152,8 @@ flowchart TD
 
 ## Stage 6 TODO：Repair 修改与接入
 
+2026-10-31 Manifest 只读参考已确认：Runtime Repair 的工具白名单包含任意已发布 Manifest 内容查看，不要求先附加版本，不受有人 / 无人值守限制。复用 Stage 5 #336 的只读核心，Runtime 实际接入留本阶段；读取结构及登记源码须核验身份与路径且不导入 / 执行源码，不修改 / 切换 Working Manifest、Default、草稿或执行版本，不授权其他开发工具。人工请求是否开放仍取决于值守状态，与本条只读权限分别判断。设计及证据见[专项审查](stage-5-manifest-reference-impact-review.md)。
+
 2026-10-31 已确认的人工交互权限：Developer GUI 中的 Construct / Repair 均开放“请求人工答复或操作并等待反馈”；User GUI 执行期间的 Runtime Repair 由 Stage 6 实现，仅有人监督 / 值守时开放，无人值守时不开放。不能因共用开发工具自动继承该权限。值守状态如何确定、何时允许变更，以及已有等待如何在转为无人值守时结束，留 Stage 6 讨论与验证；本次不实现运行时接入。
 
 2026-10-30：以下只记录下一阶段讨论范围，不作为 Stage 5 实施项或运行时能力已接受 / 已实现的证明。**已确定的排除项是 Runtime 不提供删除工具及权限**，包括 remove_asset、通用文件删除及经其他工具绕行的删除；开发 Repair 可追溯归档删除不改变此边界。图片覆盖也未纳入需求。

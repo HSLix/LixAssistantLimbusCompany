@@ -67,7 +67,7 @@ def test_gui_accumulates_selection_displays_paths_and_clears_all(gui, monkeypatc
 def test_cli_accepts_repeated_image_options():
     from pathlib import Path
     from lalc.__main__ import _parser
-    args = _parser().parse_args(["repair", "--problem", "test", "--image", "a.jpg", "--image", "b.webp"])
+    args = _parser().parse_args(["repair", "--from", "explicit-id", "--problem", "test", "--image", "a.jpg", "--image", "b.webp"])
     assert args.image == [Path("a.jpg"), Path("b.webp")]
 
 

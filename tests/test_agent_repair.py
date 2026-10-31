@@ -64,6 +64,7 @@ def test_manual_validation_immediately_persists_in_current_conversation(tmp_path
         assert read_json(chat.log.path / "context.json") == chat.history
         assert json.dumps(result, ensure_ascii=False) in chat.history[-1]["content"][0]["text"]
         event = list(read_events(chat.log.path / "events.jsonl"))[-1]["event"]
+        assert event.pop("toolCallId").startswith("manual-")
         assert event == {"type": "validation", "source": "manual", **result}
 
 
@@ -112,7 +113,6 @@ def test_cumulative_diff_and_new_conversation_keep_baseline(tmp_path):
     second = host.new_conversation()
     assert second.history == [] and first.history
     assert host.diff() == diff and "if value >= 0" in diff
-    host.select_runner(None)
     assert host.diff() == diff
     assert host.manager.default_manifest_id() == loaded.manifest_id
 

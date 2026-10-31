@@ -1,5 +1,7 @@
 # LALC
 
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](docs/stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](docs/fluent-gui-migration.md)。
 
 
@@ -14,7 +16,7 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
 - Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; tracking issues #329, #323 and #312 are closed by developer decision after trial use, without completing the full acceptance matrix; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
 - Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 is closed by developer decision after trial use; full Windows acceptance was not completed ([closure record](docs/stage-3-4-closure-2026-10-30.md)); see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
-- Stage 5 Agent Workbench: design revised and accepted on 2026-10-31, not implemented. One GUI workspace provides Construct / Repair modes with separate prompts and tool permissions, persistent per-session Candidates, and shared GUI / CLI Repair sessions. Developer trials move into the workspace; GUI human feedback is available in both modes. Construct pages use an application-modal, in-process before/after preview and human version approval. Bounded reference-library Git fetch preserves checked-out files. Manual Candidates and old logs remain untouched. See [specification](docs/stage-5-agent-workbench.md) and [impact review](docs/stage-5-design-impact-review.md).
+- Stage 5 Agent Workbench: design accepted on 2026-10-31. Independent, resumable CLI Repair Sessions are implemented locally under #335 and closed by explicit developer acceptance of the regression evidence; see [implementation](docs/stage-5-335-implementation.md). GUI Session Workbench and Manifest references are implemented locally under #336 and await developer acceptance; see [implementation](docs/stage-5-336-implementation.md). Knowledge, human feedback and page tools remain pending. The accepted target includes Construct / Repair modes, human feedback, Construct page drafts with modal comparison and human installation approval, and bounded read-only reference access. See [specification](docs/stage-5-agent-workbench.md) and [impact review](docs/stage-5-design-impact-review.md).
 - Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: Runtime has no deletion tools or authority and inherits no Workbench permissions; other repair changes and integration remain Stage 6 discussion TODOs. Additional proposals remain [pending discussion](docs/reconstruction-plan.md).
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
 - Developer-directed Workflow construction is accepted for Stage 5; autonomous Capability Expansion remains deferred.
@@ -50,7 +52,7 @@ UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv r
 ```
 
 Running `lalc` without arguments opens User Dashboard; `lalc --developer` opens Developer GUI. Both windows share one application service. Repeated GUI launches activate the existing application, and game activities also exclude independent CLI runs. The developer workflow uses a
-single Git-ignored `candidate/` directory in the current project:
+Git-ignored `candidate/` directory for manual development in the current project:
 
 ```bash
 uv run lalc init
@@ -65,6 +67,15 @@ uv run lalc list-manifests
 uv run lalc clear
 uv run lalc data-dir
 ```
+
+CLI Agent Repair uses a separate persistent Session, leaving the manual Candidate unchanged:
+
+```bash
+uv run lalc repair --from <saved-manifest-uuid> --problem 'Inspect and repair this workflow' --chat
+uv run lalc repair --session <printed-session-uuid> --problem 'Check the current state and continue'
+```
+
+Creation requires an explicit saved Manifest. Each round reloads the Session under a cross-process lock; idle input holds no lock. Restarting preserves saved evidence and marks unfinished rounds interrupted without automatically replaying actions. GUI integration follows in #336.
 
 On Windows, `uv run lalc connect` finds the unique running Limbus Company
 window, brings it to the foreground once, captures its client area, and writes

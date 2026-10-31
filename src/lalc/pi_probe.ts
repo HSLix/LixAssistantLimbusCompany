@@ -96,9 +96,10 @@ export default async function (pi) {
       + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；历史通知原位保留，以最后一条为准。每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。" };
   });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
-  const repairTools = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                       "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-                       "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset"];
+  const repairTools: string[] = JSON.parse(process.env.LALC_PI_ALLOWED_TOOLS || '[]');
+  const authorize = (name: string) => {
+    if (repairMode && !repairTools.includes(name)) throw new Error("Tool is not permitted by mode and entry");
+  };
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = Number(process.env.LALC_PI_REQUESTS_USED || 0);
   const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
@@ -175,6 +176,7 @@ export default async function (pi) {
     ...read,
     async execute(id, params, signal, onUpdate) {
       // pi 的会话 cwd 会覆盖工厂 cwd，先固定为已检查的绝对路径。
+      authorize("read");
       const path = await checkedPath(root, params.path);
       return read.execute(id, { ...params, path }, signal, onUpdate);
     },
@@ -196,6 +198,7 @@ export default async function (pi) {
     pi.registerTool({
       ...edit,
       async execute(id, params, signal, onUpdate) {
+        authorize("edit");
         const path = await checkedEdit(params.path);
         return edit.execute(id, { ...params, path }, signal, onUpdate);
       },
@@ -206,6 +209,7 @@ export default async function (pi) {
       parameters: Type.Object({}),
       async execute(_id, _params, _signal, _update, ctx) {
         // 复用 RPC 已有请求/响应通道，由 Python 宿主校验；不会向用户交互提问。
+        authorize("validate");
         const value = await ctx.ui.input("lalc.validate:" + _id);
         if (value === undefined) throw new Error("Validation cancelled");
         return { content: [{ type: "text", text: value }], details: JSON.parse(value) };
@@ -213,7 +217,11 @@ export default async function (pi) {
     });
     const logicalName = Type.String({ description: "Complete Asset logical name, e.g. ui/claim" });
     const sourceParameters = Type.Object({ filename: Type.String(), logical_name: Type.String(), source: Type.String() });
+    const paging = { offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) };
     const tools = [
+      { name: "list_manifests", description: "List published Manifest IDs with paging. Read only; does not load Python or change selections.", parameters: Type.Object(paging) },
+      { name: "read_manifest", description: "Read registered members of an explicit published Manifest. No attachment required. Returns identity and continuation offset; does not execute source.", parameters: Type.Object({ manifest_id: Type.String(), ...paging }) },
+      { name: "read_manifest_source", description: "Read verified source of a registered member in an explicit published Manifest, paged by lines (zero-based offset). No import, execution or copying to Candidate. Does not change selection.", parameters: Type.Object({ manifest_id: Type.String(), section: Type.Union([Type.Literal("components"), Type.Literal("recovery_rules")]), logical_name: Type.String(), ...paging }) },
       { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default or grant runtime permanent approval. Publish after edits before trial_run.", parameters: Type.Object({}) },
       { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Omit logical_name to run the saved Manifest unique Python Plan; inputs then contains task_repetitions and settings. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
         parameters: Type.Object({ manifest_id: Type.String(), logical_name: Type.Optional(Type.String()),
@@ -250,6 +258,7 @@ export default async function (pi) {
       pi.registerTool({ ...tool, label: tool.name,
         async execute(_id, params, _signal, _update, ctx) {
           // 图片走独立返回文件，避免大载荷与 RPC 事件竞争 stdout/stdin。
+          authorize(tool.name);
           const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name: tool.name, arguments: params, tool_call_id: _id }));
           if (path === undefined) throw new Error("Repair tool cancelled");
           const result = JSON.parse(await readFile(path, "utf8"));

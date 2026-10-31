@@ -37,7 +37,10 @@ def _parser() -> argparse.ArgumentParser:
     probe.add_argument("--max-requests", type=int, default=20)
     probe.add_argument("--pi", default="pi", help="Path to the fixed-version pi executable")
     probe.add_argument("--ask-api-key", action="store_true", help="Read an optional key without echo")
-    repair = commands.add_parser("repair", help="Analyze or repair existing Candidate files")
+    repair = commands.add_parser("repair", help="Create or resume an independent Repair Session")
+    source = repair.add_mutually_exclusive_group(required=True)
+    source.add_argument("--from", dest="manifest_id", help="Create a Session from an explicit saved Manifest ID")
+    source.add_argument("--session", help="Resume a Repair Session by ID")
     repair.add_argument("--chat", action="store_true", help="Continue the conversation with further messages")
     repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
     repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
@@ -242,7 +245,7 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "repair":
         from .agent_repair import run_repair
 
-        return run_repair(args, manager, candidate)
+        return run_repair(args, manager)
 
     if args.command in {"crop-asset", "tag-asset"}:
         service = ApplicationService(data_root, manifest_manager=manager)

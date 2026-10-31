@@ -9,13 +9,13 @@ supersedes: 0029 (Agent shared Candidate and conversation reset lifecycle), 0032
 
 ## 决定与取舍
 
-Developer GUI 使用一个 Agent 工作台，保留 Construct / Repair 模式。Session 创建时选定，开始对话后固定；分别提供初始 Prompt 和工具白名单，模型工具声明与宿主实际调用同时强制执行。复用 Agent Loop / 工具 / 日志核心，避免复制实现；单一界面不代表统一权限。GUI 两种模式均可请求人工答复 / 操作反馈，仅 Construct 可构建页面草稿并进入预览安装流程。
+Developer GUI 使用一个 Agent 工作台，保留 Construct / Repair 模式。新建并选择模式与来源后，首条用户消息提交前仍可调整两者，首次提交时才固定模式和来源；分别提供初始 Prompt 和工具白名单，模型工具声明与宿主实际调用同时强制执行。复用 Agent Loop / 工具 / 日志核心，避免复制实现；单一界面不代表统一权限。GUI 两种模式均可请求人工答复 / 操作反馈，仅 Construct 可构建页面草稿并进入预览安装流程。
 
-每个 Developer Session 拥有独立 Candidate、固定 Diff 基线、连续聊天及页面草稿，持久保存并可恢复。Construct 可从空白最小 Plan 或已发布 Manifest 开始，Repair 必须从已发布 Manifest 开始。取消 Session 内重建，换基线就新建；首版不删除或自动清理。相较共享草稿，代价是磁盘占用增加，收益是历史会话与其草稿来源保持一致。
+每个 Developer Session 拥有独立 Candidate、固定 Diff 基线、连续聊天及页面草稿，持久保存并可恢复。Construct 可从空白最小 Plan 或已发布 Manifest 开始，Repair 必须从已发布 Manifest 开始。开始对话后取消 Session 内重建，换基线就新建；首版不删除或自动清理。相较共享草稿，代价是磁盘占用增加，收益是历史会话与其草稿来源保持一致。
 
 CLI Repair 使用同一 Session 存储，支持按 Session ID 继续且可由 GUI 打开；同一 Session 执行互斥，入口权限与模式权限取交集，CLI 不运行 Construct 或 GUI 弹窗工具。手工 Candidate 留给开发者命令，Agent 不再接管；现有草稿与旧日志不自动迁移。意外退出保留已保存内容、标记中断，不自动重放操作或恢复未完成人工确认。
 
-Asset Library、正式页面 / 配置、已发布版本和外部知识库仍全局共享，切换 Session 不回滚。Developer Selected Manifest 保持全局选择，只在工作台折叠区显示，选择前刷新，切会话和 Publish 均不自动改变，不修改 Default 或 Session 来源；Agent 试运行仍须明确的已发布 Manifest ID。
+Asset Library、正式页面 / 配置、已发布版本和外部知识库仍全局共享，切换 Session 不回滚。#336 实施前进一步确认删除 Developer GUI 的 Manifest 选择及人工运行入口，不移入工作台，也不新增“应用到 User GUI”快捷设置；普通启动使用 User GUI。Agent 仍保留完整 Validate / Publish / 显式已发布版本 trial_run / Run 日志能力，以及原有互斥、取消与试运行日志窗口。旧 Developer Selected Manifest 设置停止读写，不迁移或删除旧文件；Session 来源及参考附件的选择职责保留。相较新增手动运行配置界面，此取舍减少重复入口，接受 Developer GUI 不再直接人工启动任意版本的限制。
 
 页面草稿不进入 Manifest。采用同进程应用级模态对比窗口，分别运行当前正式页与拟安装页，配置各自为内存副本，锁住其他 LALC 窗口，关闭后解除。人工对照并确认实际预览版本，安装失败保留原页，正式接入由人主动整应用重载。取消独立进程的启动 / 通信 / 清理成本，接受页面卡死或崩溃可能影响主应用，以及无法完全卸载导入模块的限制；内存配置不是安全沙箱。
 
@@ -24,6 +24,8 @@ Asset Library、正式页面 / 配置、已发布版本和外部知识库仍全�
 外部知识库供 GUI 两种模式只读查阅，Git 为限定同步例外：每轮首次访问仓库自动尝试 fetch 一次，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交比较更新，无 upstream / detached HEAD 则报告不确定，不猜分支或宣称最新。只开放受控 diff / show / fetch / log，不改工作区，版本来源明确；无通用终端、任意文件操作或设置 Default 权限。
 
 Runtime Repair 保留 Stage 6 范围，不继承开发工具集，无删除工具和权限；人工交互仅有人监督 / 值守时开放，无人值守时不开放。值守状态及运行时接入细节留 Stage 6，不在本阶段修改 Working Manifest / Recheck 或运行时替换检查。
+
+2026-10-31 Manifest 参考补充：GUI 附件可多选已发布 Manifest，参考部分直接在消息说明，不做 Component 树形选择。附件作为上下文信息保存 / 恢复，不充当访问白名单；GUI 两种模式和 CLI Repair 可按需只读查看任意已发布 Manifest 的结构及登记源码。选择本地已发布版本集合作为只读能力范围，避免维护逐附件授权状态；仍校验成员、哈希及路径，查看不导入 / 执行源码，不扩大 edit 或切换 Candidate / Default。Runtime Repair 也已明确获准使用该只读能力，不受值守状态限制，实际接入留 Stage 6；不因此继承其他开发能力。详见[专项审查](../stage-5-manifest-reference-impact-review.md)。
 
 ## 后果与验证
 

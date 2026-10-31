@@ -160,15 +160,17 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 ## Stage 5：Agent 工作台与外部知识迁移
 
-**状态：2026-10-31 grill 已确认，设计影响审查及文档同步；待实现。** [完整规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)、[影响审查](stage-5-design-impact-review.md)。
+**状态：2026-10-31 grill 与影响审查已确认，#335 CLI Repair Session 本地实现并经开发者确认关闭；GUI 工作台 / Session 与 Manifest 参考已在 #336 本地实现并等待开发者验收，见[实施记录](stage-5-336-implementation.md)；其余工具增量待实现。** [实施记录](stage-5-335-implementation.md)、[完整规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)、[影响审查](stage-5-design-impact-review.md)。
 
-- 单一工作台保留 Construct / Repair，Session 开始对话后固定模式，每种模式有初始 Prompt 和工具白名单，模型声明和宿主分发都执行权限。GUI 两种模式均可请求人工反馈，仅 Construct 可构建页面。
+- 单一工作台保留 Construct / Repair，Session 首条用户消息提交前可调整模式和来源，首次提交时固定两者，每种模式有初始 Prompt 和工具白名单，模型声明和宿主分发都执行权限。GUI 两种模式均可请求人工反馈，仅 Construct 可构建页面。
 - 每 Session 独立保存 Candidate、固定基线、聊天和页面草稿，可跨重启继续；不重建、不自动删除。Construct 可空白 / 已发布来源，Repair 从已发布来源开始；CLI Repair / GUI 共用存储与互斥，Agent 不再接管手工 Candidate，旧草稿和日志不自动迁移。
-- Developer Selected Manifest 移至工作台折叠区，列表展开前刷新，全局选择不随 Session / Publish 自动切换，不修改 Default 或草稿来源。试运行只执行明确的已发布版本。
+- 删除 Developer GUI 的 Manifest 选择和人工运行入口，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持。Agent 保留完整校验、Publish、显式已发布版本试运行及日志能力，不修改 Default 或草稿来源。
 - 知识库供 GUI 两种模式只读查阅，每轮首次访问仓库自动尝试 fetch 一次，可显式 fetch，每次后 status；以 upstream 前后提交比较，无参考分支时报告不确定。受控 diff / show / fetch / log 不修改工作区，不开放通用终端。
 - 页面采用同进程应用级模态双栏对比，当前正式页 / 拟安装页分别运行及内存试填，锁住其他 LALC 窗口，人工确认实际预览版本后安装。由人判断覆盖，不做自动版本冲突检测 / 合并；失败保留原页，正式接入由人主动整应用重载。
 - 活动和预览期间不切换 / 新建 Session；意外退出标记中断，不自动重放操作或确认。全局 Asset / 正式页面 / 配置不随 Session 切换回滚。
 - 业务选择、搭建和验收由开发者承担，不以特定业务交付作为工具增量前置。Runtime 无删除工具，其人工交互仅有人值守开放，其余接入仍留 Stage 6。模型、Windows 成品、实际游戏证据分别记录。
+
+2026-10-31 #336 追加 Manifest 参考：GUI 附件提示一个或多个已发布版本，GUI 两种模式与 CLI Repair 可按需只读查看任意已发布 Manifest，不导入执行、不改变草稿或运行选择；Runtime 同一只读工具已获准列入 Stage 6 白名单，不受值守限制。[专项审查](stage-5-manifest-reference-impact-review.md)。
 
 Stage 5 六票已发布：[#335](https://github.com/HSLix/LixAssistantLimbusCompany/issues/335) → [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)，其后可分别推进 [#337 知识库](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337)、[#338 人工反馈](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338)、[#339 页面预览](https://github.com/HSLix/LixAssistantLimbusCompany/issues/339)，[#340 安装](https://github.com/HSLix/LixAssistantLimbusCompany/issues/340) 由 #339 阻塞。使用原生阻塞关系，详见[实施拆分](stage-5-implementation-slices.md)。
 
