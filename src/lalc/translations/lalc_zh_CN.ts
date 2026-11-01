@@ -644,6 +644,10 @@ Log: {1}</source>
       <translation>打开扩展配置页面文件夹</translation>
     </message>
     <message>
+      <source>Open external knowledge directory</source>
+      <translation>打开外部知识库文件夹</translation>
+    </message>
+    <message>
       <location filename="../developer_gui.py" line="420" />
       <source>Open log directory</source>
       <translation>打开日志目录</translation>
@@ -1216,6 +1220,22 @@ Original pixel region: {2}</source>
     <message>
       <source>Response format did not match JSON; automatic retries: {0}.</source>
       <translation>回复格式未符合 JSON，已自动重试 {0} 次。</translation>
+    </message>
+    <message>
+      <source>Steam client directory</source>
+      <translation>Steam 客户端目录</translation>
+    </message>
+    <message>
+      <source>Directory containing steam.exe; leave unset for automatic discovery</source>
+      <translation>包含 steam.exe 的目录；未设置时自动查找</translation>
+    </message>
+    <message>
+      <source>Choose Steam directory</source>
+      <translation>选择 Steam 目录</translation>
+    </message>
+    <message>
+      <source>Save Steam directory</source>
+      <translation>保存 Steam 目录</translation>
     </message>
   </context>
 </TS>

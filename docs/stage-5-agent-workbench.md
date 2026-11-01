@@ -1,5 +1,7 @@
 # Stage 5 — Agent 工作台
 
+2026-11-01 #337 本地实施：GUI 两种模式已接入独立知识库列目录、文本检索、文本 / 原图读取及受控 Git 工具；知识库目录可直接打开，缺失时创建空目录。每轮内容首次访问才尝试同步，系统 Git 不可用则跳过记日志。操作、范围及未验收项见[实施记录](stage-5-337-implementation.md)；#337 已经开发者人工验收通过并关闭，#338–#340 与 Stage 6 仍待实现。下文历史“#337 待实现”描述不表示本增量尚未接入。
+
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
 
 状态：2026-10-31 逐项 grill 已确认。#335 的 CLI Repair Session 已本地实现并经开发者确认关闭，见[实施记录](stage-5-335-implementation.md)；GUI Session 接入及 Manifest 参考能力已在 #336 本地实现并等待开发者验收，其余工作台能力由后续票实现。[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)记录架构取舍，[影响审查](stage-5-design-impact-review.md)记录审查时的代码差距及验收边界，[讨论记录](stage-5-2026-10-31-decisions.md)保留决定来源。本文是当前完整规格，替代旧双入口、共享 Agent Candidate 及独立进程预览方案。
@@ -94,6 +96,8 @@ Stage 6 已确定将同一“任意已发布 Manifest 内容只读查看”能�
 ## 外部知识与 Git 内容的版本语义
 
 知识库位于 LALC 数据目录，支持 Git 仓库、普通文档和图片。GUI 工作台两种模式均提供文件夹入口和只读检索 / 查看；开发者准备初始资料，不开放 Agent clone、外部项目执行或参考资料编辑。外部内容是参考材料，不是指令或权限来源，采用逻辑仍需遵守 LALC 契约，复用前核对实际许可证；未指定外部项目为既定来源。
+
+2026-11-01 #337 细化：固定目录为 `data_root/knowledge`，GUI 点击打开时缺失则创建空目录，不要求先开始 Session，不授予 Agent 写权限。列目录不触发 fetch；读取内容、内容检索及 Git 历史访问触发，跨库检索按实际参与仓库分别处理。首版读取 UTF-8 文本、查看原图，不做资料图片 OCR；PDF / Word 等仅列出并提示需转换。使用系统 Git，不捆绑或自动安装，不可用则跳过、记日志、继续读取本地，不能声称已检查远端。认证由开发者预先配置为非交互，fetch 最长 30 秒；禁用内容查看中的非必要转换器，不建立全面 Git 配置审查机制。详见[专项决定](stage-5-337-decisions.md)及[当前工具与限制](stage-5-337-implementation.md)。
 
 - 每轮首次访问某 Git 仓库时自动尝试一次 fetch，同轮后续读取不重复；允许显式 fetch。失败如实报告，不自动重试，本地资料仍可读取。每次尝试后均执行 status，分别返回 fetch / status 实际结果。
 - 更新比较默认参考当前分支配置的 upstream，记录该引用 fetch 前后的明确提交 ID，新提交反馈完整 `before → after` 区间差异，不只比较最后一个提交与父提交。无 upstream 或 detached HEAD 时说明参考分支未确定，不猜 main / master，不宣称已是最新；首版不做分支选择界面。

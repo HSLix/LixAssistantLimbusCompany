@@ -1,13 +1,10 @@
-"""通过独立 pi 二进制验证图片和受限源码读取，不持久化会话或交互日志。"""
+"""正式 Agent 共用的 pi 进程启动、隔离配置和 RPC；保留模块名以稳定调用方。"""
 
 from __future__ import annotations
 
 import asyncio
-import base64
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from collections import deque
-import getpass
-import hashlib
 import json
 import logging
 import os
@@ -20,7 +17,7 @@ import threading
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
-from .agent_diagnostics import AgentDiagnosticError, redact, error_details
+from .agent_diagnostics import AgentDiagnosticError, redact
 
 
 PI_VERSION = "1.4.0"
@@ -273,83 +270,6 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *
             raise failure
 
 
-async def _interact(command: list[str], env: dict[str, str], cwd: str, prompt: dict, key: str, *, startup=None) -> int:
-    """验证受限读取并展示事件；完整修复复用 RPC 传输而非此成功判据。"""
-    requests = 0
-    read_ok = False
-    last_message = {}
-    def show(value) -> None:
-        def clean(item):
-            if isinstance(item, dict):
-                return {name: ("[image base64 omitted]" if name == "data" and item.get("type") == "image"
-                               else clean(content)) for name, content in item.items()}
-            if isinstance(item, list):
-                return [clean(content) for content in item]
-            if isinstance(item, str) and key != "lalc-no-key":
-                return item.replace(key, "[REDACTED]")
-            return item
-
-        shown = redact(clean(value), [key])
-        print(shown if isinstance(shown, str) else json.dumps(shown, ensure_ascii=False), flush=True)
-
-    async with rpc_session(command, env, cwd, show, startup=startup) as (send, event):
-        async def configure(kind: str) -> None:
-            await send({"id": kind, "type": kind, "enabled": False})
-            while True:
-                item = await rpc_event(event, f"配置响应 {kind}")
-                show(item)
-                if item.get("id") == kind:
-                    if not item.get("success"):
-                        raise RuntimeError(f"pi rejected {kind}")
-                    return
-
-        try:
-            while True:
-                item = await rpc_event(event, "就绪事件 lalc_ready")
-                show(item)
-                if item.get("type") == "lalc_ready":
-                    if item.get("tools") != ["read"]:
-                        raise RuntimeError("Unexpected active tools")
-                    break
-                if item.get("type") == "extension_error":
-                    raise RuntimeError("pi extension failed")
-            await configure("set_auto_retry")
-            await configure("set_auto_compaction")
-            await send(prompt)
-            while True:
-                item = await event()
-                kind = item.get("type")
-                # 图片以文件、哈希和请求中的图片标记展示，不在终端倾倒 base64。
-                if kind == "message_update":
-                    # 完整响应由 message_end 展示，避免逐 token 重复和刷屏。
-                    continue
-                elif kind in {"message_start", "message_end"} and item.get("message", {}).get("role") == "user":
-                    show({"type": kind, "role": "user", "image": "supplied PNG"})
-                else:
-                    show(item)
-                if kind == "response" and not item.get("success"):
-                    raise RuntimeError("pi rejected RPC command")
-                if kind == "lalc_request":
-                    requests = item["requests"]
-                if kind == "tool_execution_end" and item.get("toolName") == "read" and not item.get("isError"):
-                    read_ok = True
-                if kind == "message_end" and item.get("message", {}).get("role") == "assistant":
-                    last_message = item["message"]
-                if kind == "extension_error":
-                    raise RuntimeError("pi extension failed")
-                if kind == "agent_settled":
-                    success = (requests > 0 and read_ok and last_message.get("stopReason") == "stop"
-                               and any(part.get("type") == "text" and part.get("text", "").strip()
-                                       for part in last_message.get("content", [])))
-                    show({"result": "completed" if success else "incomplete", "requests": requests,
-                          "source_read": read_ok, "stop_reason": last_message.get("stopReason"),
-                          "error": last_message.get("errorMessage")})
-                    return 0 if success else 1
-        except asyncio.CancelledError:
-            show({"result": "cancelled", "requests": requests})
-            raise
-
-
 @contextmanager
 def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None, startup=None):
     """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
@@ -403,43 +323,3 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
                    (getattr(args, "reasoning_effort", None) or "high") if env["LALC_PI_THINKING"] == "1" else "off",
                    "--system-prompt", system_prompt]
         yield command, env, temporary, model
-
-
-def run_probe(args) -> int:
-    """测试模型理解 Prompt、通过受限 read 读取文字源码及理解图片的能力；会实际调用模型。"""
-    key = "lalc-no-key"
-    try:
-        if args.ask_api_key:
-            key = getpass.getpass("API key（无需认证时留空）: ") or key
-        if args.max_requests < 2:
-            raise ValueError("max-requests must be at least 2; reset the request limit")
-        root = args.source_root.resolve(strict=True)
-        source = (root / args.source).resolve(strict=True)
-        if not root.is_dir() or not source.is_file() or not source.is_relative_to(root):
-            raise ValueError("source must be a file inside source-root")
-        image = args.image.resolve(strict=True)
-        data = image.read_bytes()
-        if not data.startswith(b"\x89PNG\r\n\x1a\n"):
-            raise ValueError("image must be a PNG")
-        prompt = {
-            "type": "prompt", "id": "probe",
-            "message": (f"先调用 read 工具读取 {source.relative_to(root).as_posix()}，简述该源码的职责；"
-                        f"然后根据随附图片回答：{args.prompt}\n必须实际读取源码，不能只提出读取计划。"),
-            "images": [{"type": "image", "mimeType": "image/png", "data": base64.b64encode(data).decode()}],
-        }
-        startup = PiStartup()
-        with configured_pi(args, root, key, "你是只读图片与源码分析助手。使用提供的 read 工具，不执行命令或游戏操作。", startup=startup,
-                           on_warning=lambda event: print(json.dumps(redact(event, [key]), ensure_ascii=False), flush=True)) as (command, env, temporary, model):
-            print(json.dumps({"pi": env["LALC_PI_VERSION"], "tested_pi_version": PI_VERSION,
-                              "base_url": env["LALC_PI_BASE_URL"], "model": model["id"],
-                              "model_status": model.get("status", {}).get("value"),
-                              "image": str(image), "sha256": hashlib.sha256(data).hexdigest(),
-                              "prompt": prompt["message"], "max_requests": args.max_requests}, ensure_ascii=False), flush=True)
-            return asyncio.run(_interact(command, env, temporary, prompt, key, startup=startup))
-    except KeyboardInterrupt:
-        return 130
-    except Exception as error:
-        details = error_details(error, "pi_probe", keys=[key])
-        logging.getLogger(__name__).error("pi probe failed: %s", details)
-        print(json.dumps({"error": details["message"], "diagnostics": details}, ensure_ascii=False), flush=True)
-        return 1

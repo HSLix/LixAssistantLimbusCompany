@@ -1,5 +1,9 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 和正式预检保留。
+
+2026-11-01 #337 已本地实现：GUI Construct / Repair 可在 More → Workspace and pages 打开外部知识库文件夹，缺失时创建空目录，无须先开始聊天。将文本、图片或自行准备的普通 Git 仓库放入数据目录 `knowledge/`，Agent 按需只读检索 / 查看。首次内容访问按轮同步，系统 Git 不可用则跳过记日志；CLI / Runtime 不获得该权限。格式、分页、Git 版本及验收限制见[知识库实施记录](stage-5-337-implementation.md)。下文“#337 待实现”为旧阶段记录。
+
 #336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
 
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
@@ -65,7 +69,7 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 同 Session 每轮加跨进程锁并读取最新状态，空闲等输入释放锁，游戏活动仍全局互斥。意外退出的轮次恢复时标为中断；已保存的实际工具结果继续可用，缺少结果者只报告未知，由 Agent 检查现状后决定如何继续，不自动请求模型、重放工具或回滚共享 Asset / 已发布版本。旧裁剪预览 ID 重启后失效。损坏的完整日志或内容引用明确报错；未写完的事件尾部另存原字节后隔离，不丢弃完整历史。
 
-旧 `repair <Component逻辑名>`、自动 Default 重建及必填图片不再是当前契约。`pi-probe` 仍是独立的图片/受限读取检查，不使用连续修复宿主，不作为普通回归附带运行。
+旧 `repair <Component逻辑名>`、自动 Default 重建及必填图片不再是当前契约。独立 `pi-probe` 已移除，早期验证证据保留为历史。
 
 ## 新增源码与多图片
 
@@ -95,7 +99,7 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 
 ## 连接错误诊断
 
-LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检、正式请求及 pi-probe 共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
+LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检及正式请求共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
 
 pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。预检与正式请求均覆盖；原有预检日志仍在 round-N/events.jsonl，正式交互日志位于对话根 events.jsonl。
 
@@ -161,7 +165,7 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 本节替代下文历史记录中的“额度注入 system、计数不加入长期历史”。请求按固定规则、按时间追加的历史消息/工具调用及结果、本次额度提醒组织。system 不包含动态额度或 pi 自动添加的真实工作目录；文件路径相对于 Candidate 根目录，已有文件列表继续随用户消息提供。实际工作目录、路径解析及访问边界仍由宿主管理，不扩展为所有工具反馈的路径脱敏。
 
-额度提醒作为宿主状态消息进入实际请求和对话历史，旧提醒原位保留，最新提醒有效；不触发新轮、不替换旧消息、不拆开一组工具调用与结果。每条用户消息重新计数，预检和格式纠正继续计入；预检消息不混入修复历史，格式纠正继续禁用工具，发送前的硬性上限保持有效。GUI/CLI 共用此行为，不新增设置。连接预检及 pi-probe 同样移除 system 中的工作目录，但保留各自原有的文件访问与计数规则。
+额度提醒作为宿主状态消息进入实际请求和对话历史，旧提醒原位保留，最新提醒有效；不触发新轮、不替换旧消息、不拆开一组工具调用与结果。每条用户消息重新计数，预检和格式纠正继续计入；预检消息不混入修复历史，格式纠正继续禁用工具，发送前的硬性上限保持有效。GUI/CLI 共用此行为，不新增设置。连接预检同样移除 system 中的工作目录，但保留各自原有的文件访问与计数规则。
 
 实施验证：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **43 passed, 4 skipped**。真实 pi 1.4.0 与本机 HTTP 替身验证固定 system 不含工作目录、末尾额度、预检隔离、同轮及跨轮消息前缀一致、DeepSeek reasoning/连续工具、原图、格式纠正与硬性上限。首次检查因沙箱禁止本机监听而未能建立替身服务，授权监听后重新运行得到上述结果。相关普通检查 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_agent_repair.py tests/test_agent_settings.py tests/test_developer_gui.py` 为 **86 passed, 1 skipped**。未调用真实模型、测量 DeepSeek 实际缓存收益或执行 Windows 实机验收，跳过项不计通过。
 
@@ -274,7 +278,7 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 
 ## Prompt 与 SOP
 
-2026-11-01：开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。预检和格式纠正禁用工具，概览明确为空；预检使用独立连接 / 图片检查指令，不要求开发结果 JSON。`lalc pi-probe` 继续使用独立只读诊断角色。
+2026-11-01：开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。预检和格式纠正禁用工具，概览明确为空；预检使用独立连接 / 图片检查指令，不要求开发结果 JSON。独立 `lalc pi-probe` 已移除。
 
 开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset 对应 XML 标签内写 Markdown 流程；三段正文当前留空，说明文字不会注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset，Repair 选 Repair + Asset；轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
 

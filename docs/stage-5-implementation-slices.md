@@ -50,16 +50,18 @@
 
 ## 3. [#337](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337) GUI 两种模式读取知识库并检查受控 Git 更新
 
+2026-11-01 本地实施已接入，见[实施记录](stage-5-337-implementation.md)；开发者人工验收总体通过，#337 已按 completed 关闭；以下勾选表示本地交付完成，不补造 Windows、真实远端或真实模型专项通过证据。目录缺失时创建空目录、文本 / 图片格式、非交互认证、系统 Git 降级及辅助程序边界见[补充决定](stage-5-337-decisions.md)。
+
 **Blocked by:** [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)
 
 **交付：** 开发者打开数据目录中的知识库文件夹准备资料，两种 GUI 模式可检索、查看文件或提交内容，获得准确的远端更新反馈。
 
-- [ ] 仅授权数据目录知识库只读资料访问，包含文档和图片；不编辑参考资料、clone、执行项目或把新增 read 根目录变成 edit 权限。
-- [ ] 每轮首次访问每仓库自动尝试 fetch 一次，可显式 fetch，不自动重试；每次后 status，失败本地仍可读取。
-- [ ] 以当前分支 upstream 的 before / after 反馈区间差异；缺失 upstream / detached HEAD 报不确定，不猜分支或宣称最新。
-- [ ] 区分 HEAD、参考提交和未提交工作区；无更新仍可 show / log / diff，不自动更新工作区或 push。
-- [ ] Git 操作及真实路径 / 符号链接 / 引用 / 参数受控，无命令或写出路径绕过，失败 / 取消不遗留等待。
-- [ ] 检索和 diff 输出可定位来源 / 版本，截断明确且能继续查看；不自动授予 CLI / Runtime，也不前置复杂索引或指定外部业务。
+- [x] 仅授权数据目录知识库只读资料访问，包含文档和图片；不编辑参考资料、clone、执行项目或把新增 read 根目录变成 edit 权限。
+- [x] 每轮首次访问每仓库自动尝试 fetch 一次，可显式 fetch，不自动重试；每次后 status，失败本地仍可读取。
+- [x] 以当前分支 upstream 的 before / after 反馈区间差异；缺失 upstream / detached HEAD 报不确定，不猜分支或宣称最新。
+- [x] 区分 HEAD、参考提交和未提交工作区；无更新仍可 show / log / diff，不自动更新工作区或 push。
+- [x] Git 操作及真实路径 / 符号链接 / 引用 / 参数受控，无命令或写出路径绕过，失败 / 取消不遗留等待。
+- [x] 检索和 diff 输出可定位来源 / 版本，截断明确且能继续查看；不自动授予 CLI / Runtime，也不前置复杂索引或指定外部业务。
 
 ## 4. [#338](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338) GUI Construct 与 Repair 同轮请求人工反馈
 

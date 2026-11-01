@@ -57,6 +57,23 @@ def test_shared_windows_and_independent_idle_close(windows):
     assert owner.open_window(True) is not developer
 
 
+def test_steam_directory_validates_before_save_and_uses_shared_config(windows, tmp_path, monkeypatch):
+    """User GUI 设置与自动缓存共用文件，坏目录不能覆盖已保存地址。"""
+    from test_game_version import steam_install
+    from lalc import game_version
+    _, _, user, _ = windows
+    root = tmp_path / 'Steam'
+    steam_install(root)
+    monkeypatch.setattr(game_version, 'read_game_version', lambda _: '1.118.0')
+    user.steam_directory.setText(str(root))
+    user.save_steam_directory()
+    assert game_version.load_steam_root(user.service.data_root) == str(root)
+    user.steam_directory.setText(str(tmp_path / 'missing'))
+    with pytest.raises((OSError, ValueError)):
+        user.save_steam_directory()
+    assert game_version.load_steam_root(user.service.data_root) == str(root)
+
+
 @pytest.mark.parametrize("frozen", [False, True])
 def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, frozen):
     from PySide6.QtGui import QIcon

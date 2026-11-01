@@ -89,3 +89,12 @@ def user_message_text(text):
         text = text.split("\n用户消息：", 1)[-1]
         text = text.split("\n\nManifest reference attachments (context only):", 1)[0]
     return text
+
+
+def chat_title(text):
+    """从首条实际用户文字提取标题；GUI 和历史索引共用，不依赖 Qt。"""
+    text = user_message_text(text).strip()
+    if not text or text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', '宿主中断了第', 'LALC_FINAL_FORMAT_CORRECTION\n')):
+        return '', ''
+    first = re.split(r'(?<=[。！？!?])|(?<=\.)\s+|\n', text, maxsplit=1)[0].strip()
+    return (first[:39] + '…' if len(first) > 40 else first), text

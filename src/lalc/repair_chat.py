@@ -2,22 +2,12 @@
 
 from html import escape
 import json
-import re
 
 from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import QTextBrowser
 
 from .i18n import tr
-from .agent_prompts import user_message_text
-
-
-def chat_title(text):
-    """仅从实际用户文本提取本地标题；宿主提示与参考附件标记不参与命名。"""
-    text = user_message_text(text).strip()
-    if not text or text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', '宿主中断了第', 'LALC_FINAL_FORMAT_CORRECTION\n')):
-        return '', ''
-    first = re.split(r'(?<=[。！？!?])|(?<=\.)\s+|\n', text, maxsplit=1)[0].strip()
-    return (first[:39] + '…' if len(first) > 40 else first), text
+from .agent_prompts import user_message_text, chat_title
 
 
 class RepairChat(QTextBrowser):

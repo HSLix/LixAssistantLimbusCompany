@@ -18,6 +18,7 @@ from .runtime import UserInterruption
 
 from .agent_policy import BASE_TOOLS
 from .manifest_reference import ManifestReference
+from .knowledge import KnowledgeLibrary
 
 REPAIR_TOOLS = list(BASE_TOOLS)
 
@@ -33,6 +34,7 @@ class RepairTools:
         self.log = log
         self.platform = platform
         self.cancelled = threading.Event()
+        self.knowledge = KnowledgeLibrary(data_root, self.checkpoint)
         self.sequence = 0
         self.previews = {}
         self.ocr_service = host.service.ocr_service if host is not None else ocr_service
@@ -57,7 +59,11 @@ class RepairTools:
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
                        "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
-                       "read_manifest_source": self.read_manifest_source}
+                       "read_manifest_source": self.read_manifest_source,
+                       "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
+                       "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git}
+            methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
+                           read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -73,6 +79,57 @@ class RepairTools:
 
     def list_manifests(self, offset=0, limit=50):
         return self.text(ManifestReference(self.host.manager).list(offset, limit))
+
+    def list_game_versions(self, **arguments):
+        """只查版本索引，不遍历历史日志目录。"""
+        from .agent_history import AgentHistory
+        return self.text(AgentHistory(self.library.data_root).versions(**arguments))
+
+    def search_agent_sessions(self, **arguments):
+        """按观测字段筛选已索引对话；版本筛选不扩张文件读取权限。"""
+        from .agent_history import AgentHistory
+        return self.text(AgentHistory(self.library.data_root).search(**arguments))
+
+    def read_agent_session(self, **arguments):
+        """有界读取历史文字或显式图片，不恢复历史 Session 或执行工具。"""
+        from .agent_history import AgentHistory
+        metadata, content = AgentHistory(self.library.data_root).read(**arguments)
+        result = self.text(metadata)
+        if content is not None:
+            extension = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}[metadata["mime_type"]]
+            path = self.log.path / f"tool-{self.sequence}-history.{extension}"
+            path.write_bytes(content)
+            self.log.store.register_image(path)
+            result["content"].append({"type": "image", "mimeType": metadata["mime_type"],
+                                      "data": base64.b64encode(content).decode()})
+        return result
+
+    def knowledge_list(self, **arguments):
+        return self.text(self.knowledge.list(**arguments))
+
+    def knowledge_search(self, **arguments):
+        return self.text(self.knowledge.search(**arguments))
+
+    def knowledge_git(self, **arguments):
+        metadata = self.knowledge.git_operation(**arguments)
+        return self.knowledge_result(metadata, metadata.pop("_image", None))
+
+    def knowledge_read(self, **arguments):
+        """保留资料原图与 MIME，不调用游戏截图 OCR 或 Asset PNG 专用路径。"""
+        metadata, content = self.knowledge.read(**arguments)
+        return self.knowledge_result(metadata, content)
+
+    def knowledge_result(self, metadata, content):
+        """知识库原图沿用同轮结果文件和自包含日志，不改变 Asset 专用行为。"""
+        result = self.text(metadata)
+        if content is not None:
+            filename = f"tool-{self.sequence}-knowledge.{metadata['extension']}"
+            path = self.log.path / filename
+            path.write_bytes(content)
+            self.log.store.register_image(path)
+            result["content"].append({"type": "image", "mimeType": metadata["mime_type"],
+                                      "data": base64.b64encode(content).decode()})
+        return result
 
     def read_manifest(self, manifest_id, offset=0, limit=50):
         return self.text(ManifestReference(self.host.manager).structure(manifest_id, offset, limit))

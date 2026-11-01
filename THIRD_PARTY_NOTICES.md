@@ -26,6 +26,11 @@ The recognition dictionary is embedded in the model; no separate font is bundled
 for OCR rendering. Sources: https://github.com/RapidAI/RapidOCR and
 https://github.com/microsoft/onnxruntime.
 
+Game-version inspection includes UnityPy 1.25.4 (MIT) and its offline type-tree
+resource. UnityPy and its dependencies retain their original licenses; their
+distribution metadata and license files are collected with the packaged application.
+Source: https://github.com/K0lb3/UnityPy.
+
 The optional with-pi ZIP also contains the complete official Windows x64 pi 1.4.0
 release under `pi/`, including its runtime resources, documentation and metadata.
 Pi is Copyright (c) 2025 Mario Zechner, under the MIT license reproduced in

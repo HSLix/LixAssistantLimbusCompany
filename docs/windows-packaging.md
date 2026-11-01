@@ -1,5 +1,9 @@
 # Windows x64 本地构建和 #334 验收
 
+2026-11-01 游戏版本读取：automation 固定 UnityPy 1.25.4，冻结配置收集 UnityPy/resources/lzma.tpk，组包检查其存在；不再提供独立 pi-probe 命令。真实 Windows 冻结运行未在 macOS 验收，见[游戏版本历史](game-version-history.md)。
+
+2026-11-01 #337 知识库增量：成品使用系统已安装的 Git，不额外捆绑或自动安装。Git 不可用时跳过同步与提交查看、记录日志，本地资料仍可读取；不弹安装窗口。私有仓库须由开发者预先准备非交互认证，首次内容访问才会尝试 fetch。目录与操作见[知识库实施记录](stage-5-337-implementation.md)；Windows 上的 Git / 凭据辅助程序 / 取消清理尚待原生验收。
+
 2026-11-01 OCR 增量：两个 ZIP 均包含 RapidOCR 3.10.0、ONNX Runtime 1.31.1 CPU 及 PP-OCRv6 Small 的 det/rec ONNX 模型。字典内嵌于识别模型，不需要额外下载。构建与归档前校验固定模型摘要，启动不自动下载；必须另行验收断网后的首次识别、工具 OCR 故障降级和 Run 中断。此增量尚不代表 Windows 冻结包或真实游戏验收通过。接口见 [OCR 用法](ocr.md)。
 
 2026-10-30：以下为已实现的构建和验收流程；尚无本票 Windows 成品现场通过记录。真实模型验证不属于本票，回归不调用真实模型。GitHub Actions 在 Stage 6 完成后再考虑。

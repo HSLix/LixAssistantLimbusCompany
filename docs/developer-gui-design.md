@@ -1,5 +1,9 @@
 # Developer GUI — Accepted Design
 
+2026-11-01 游戏版本历史：GUI 两种模式与 CLI Repair 均可通过 list_game_versions / search_agent_sessions / read_agent_session 查阅已索引历史，版本筛选为定位上下文，每轮显示版本组；Steam 客户端路径仅 User GUI 通用设置编辑。见[用法](game-version-history.md)。
+
+2026-11-01 #337 本地实施：Agent 工作台 More 菜单增加外部知识库文件夹入口，缺失时创建空目录，未开始 Session 也可使用。GUI Construct / Repair 已接入只读资料与受控 Git 工具；CLI / Runtime 不继承。目录、工具、格式与验收限制见[实施记录](stage-5-337-implementation.md)。下文“知识库待实现”是历史状态。
+
 #336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
 
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。

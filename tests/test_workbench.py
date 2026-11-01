@@ -55,6 +55,34 @@ def test_mode_entry_policy_and_host_reject_before_dispatch(tmp_path, monkeypatch
         allowed_tools('Construct', 'cli')
 
 
+@pytest.mark.parametrize('mode', ['Construct', 'Repair'])
+def test_knowledge_directory_creates_without_session_and_preserves_content(gui, monkeypatch, mode):
+    from PySide6.QtGui import QDesktopServices
+    app, window = gui
+    page = window.repair_page
+    page.new()
+    page.mode.setCurrentItem(mode)
+    assert page.session is None
+    opened = []
+    monkeypatch.setattr(QDesktopServices, 'openUrl', lambda url: opened.append(url.toLocalFile()) or True)
+    root = window.service.data_root / 'knowledge'
+    assert not root.exists()
+    page.knowledge_action.trigger()
+    assert root.is_dir() and opened == [str(root)]
+    (root / 'keep.md').write_text('keep')
+    page.knowledge_action.trigger()
+    assert (root / 'keep.md').read_text() == 'keep' and len(opened) == 2
+    assert page.session is None
+
+
+def test_knowledge_directory_file_collision_preserves_original(gui, caplog):
+    app, window = gui
+    root = window.service.data_root / 'knowledge'
+    root.write_text('original')
+    window.repair_page.open_knowledge()
+    assert root.read_text() == 'original' and '普通文件' in caplog.text
+
+
 def test_manifest_reference_is_versioned_paged_and_never_imports(tmp_path, monkeypatch):
     host, first = host_for(tmp_path)
     reader = ManifestReference(host.manager)

@@ -62,7 +62,11 @@ def check_settings(data_root: Path, values: dict, *, key=None, check_model=False
     from .agent_repair import RepairLog
     from .pi_probe import _models
     log = RepairLog(data_root, key or "lalc-no-key", category="agent-diagnostics")
+    from .agent_history import record_observation
+    observation = record_observation(log, data_root, "diagnostic:model_status" if check_model else "diagnostic:connection",
+                                     "Model status" if check_model else "Agent connection")
     context = {"operation": "model_status" if check_model else "connection",
+               "game_version_observation": observation,
                "settings": values, "log_path": str(log.path)}
     try:
         settings = validate_settings(values) if snapshot else load_settings(data_root, values)

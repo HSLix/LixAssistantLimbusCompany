@@ -36,6 +36,7 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                  "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
+                 "_internal/UnityPy/resources/lzma.tpk",
                  *["_internal/rapidocr/models/" + name for name in build.MODEL_HASHES]):
         target = app / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +66,8 @@ def test_tampered_ocr_model_prevents_replacing_archives(tmp_path, archive, monke
     resources = ["LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico",
                  "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
-                 "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml"]
+                 "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
+                 "_internal/UnityPy/resources/lzma.tpk"]
     for name in resources:
         path = app / name
         path.parent.mkdir(parents=True, exist_ok=True)

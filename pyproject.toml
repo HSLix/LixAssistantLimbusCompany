@@ -12,6 +12,7 @@ dependencies = []
 [project.optional-dependencies]
 gui = ["PySide6==6.11.2", "PySide6-Fluent-Widgets==1.11.3"]
 automation = [
+    "UnityPy==1.25.4",
     "numpy>=2.0,<3",
     "opencv-python-headless>=4.10,<5",
     "pillow>=13.0.0",

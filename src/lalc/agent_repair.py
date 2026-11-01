@@ -278,6 +278,16 @@ class RepairConversation:
             prefix = f"round-{self.log.group}"
             round_path = self.log.path / prefix
             round_path.mkdir()
+            from .agent_history import record_observation
+            from .agent_prompts import chat_title
+            title = ''
+            for prior in self.history:
+                if prior.get('role') == 'user':
+                    title = chat_title('\n'.join(part.get('text', '') for part in prior.get('content', []) if part.get('type') == 'text'))[0]
+                    if title:
+                        break
+            observation = record_observation(self.log, self.host.service.data_root,
+                                             f'{self.entry}:{self.mode}', title or chat_title(message)[0])
             if self.session:
                 self.log.record({"type": "round_opened"})
             before = candidate_files(self.host.candidate)
@@ -289,10 +299,12 @@ class RepairConversation:
             tools = self.tools
             tools.cancelled.clear()
             tools.created_files.clear()
+            tools.knowledge.begin_round()
             prior_history = list(self.history)
             stage = "attachments"
             submitted = False
             runtime_context = {"mode": self.mode, "entry": self.entry,
+                               "game_version_observation": observation,
                                "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
                                "editable_files": names, "manifest_references": references}
             prompt = {"type": "prompt", "message": "<runtime_context>\n"
@@ -330,6 +342,7 @@ class RepairConversation:
                     "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 submitted = True
                 input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
+                                    "game_version_observation": observation,
                                     "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "sop": sop, "mode": self.mode, "entry": self.entry,
                                     "manifest_references": references}

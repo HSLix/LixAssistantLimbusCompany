@@ -1,5 +1,9 @@
 # Domain Docs
 
+2026-11-01 游戏版本历史：每轮不可变观测、按游戏版本 / Steam Build ID 组合检索、跨入口只读历史工具已接入；旧历史不导入，Unknown 不代表可推断版本。独立 pi-probe 已删除；本地验证及限制见[实施记录](../game-version-session-implementation.md)，用法见[用法](../game-version-history.md)及 [ADR 0035](../adr/0035-associate-agent-history-with-per-round-game-observations.md)。
+
+2026-11-01 #337 本地实施：GUI 两种模式已可只读检索 / 查看数据目录知识库及受控 Git 内容，目录入口在缺失时创建空目录。列目录不 fetch，首次内容访问才尝试；系统 Git 不可用跳过记日志，CLI / Runtime 不继承。当前用法及验证边界见[实施记录](../stage-5-337-implementation.md)；#337 已经开发者人工验收通过并关闭。下文“#337 待实现”保留为历史状态。
+
 2026-11-01 OCR：observe.ocr 使用已有有效截图；game_screenshot 在原图/网格之外附同图完整 OCR JSON，OCR 故障可保留截图并返回 ocr_error，取消/窗口失效不降级。暂不支持韩文。接口与验证边界见 [OCR 用法](../ocr.md)及[影响审查](../ocr-integration-impact-review.md)。
 
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](../stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。

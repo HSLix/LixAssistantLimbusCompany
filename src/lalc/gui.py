@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
-    QMessageBox, QScrollArea,
+    QMessageBox, QScrollArea, QFileDialog,
     QGraphicsOpacityEffect,
 )
 
@@ -24,7 +24,7 @@ from qfluentwidgets import (
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton,
     TransparentToolButton, IconWidget, MessageBox,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
-    ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox,
+    ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
 
 from .i18n import tr
@@ -224,6 +224,8 @@ class MainWindow(FluentWindow):
             if (panel or page is settings_page) and log is None:
                 log = RepairLog(self.service.data_root, category="agent-diagnostics")
                 log.keys.update(keys)
+                from .agent_history import record_observation
+                record_observation(log, self.service.data_root, "diagnostic:gui_error", "Agent settings error")
             context = {"log_path": str(log.path)} if log else {}
             value = error_details(error, "interaction", context, keys)
             if isinstance(error, StartError):
@@ -448,6 +450,23 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
+        from .game_version import load_steam_root
+        application_layout.addWidget(QLabel(tr('Steam client directory')))
+        self.steam_directory = QLineEdit()
+        self.steam_directory.setPlaceholderText(tr('Directory containing steam.exe; leave unset for automatic discovery'))
+        try:
+            self.steam_directory.setText(load_steam_root(service.data_root) or '')
+        except Exception as error:
+            service.logger.error('Cannot read Steam directory settings: %s', error)
+        application_layout.addWidget(self.steam_directory)
+        steam_buttons = QHBoxLayout()
+        browse_steam = QPushButton(tr('Choose Steam directory'))
+        browse_steam.clicked.connect(lambda: self.choose_steam_directory())
+        steam_buttons.addWidget(browse_steam)
+        save_steam = QPushButton(tr('Save Steam directory'))
+        save_steam.clicked.connect(lambda: self._interact(self.save_steam_directory))
+        steam_buttons.addWidget(save_steam)
+        application_layout.addLayout(steam_buttons)
         from .i18n import load_language
         application_layout.addWidget(QLabel(tr("Interface language")))
         self.language_choice = QComboBox()
@@ -507,6 +526,18 @@ class UserWindow(MainWindow):
             self.language_choice.setCurrentIndex(self.language_choice.findData(previous))
             self.language_choice.blockSignals(False)
             raise
+
+    def choose_steam_directory(self):
+        """只选择客户端目录，保存前不更改版本观测配置。"""
+        directory = QFileDialog.getExistingDirectory(self, tr('Choose Steam directory'), self.steam_directory.text())
+        if directory:
+            self.steam_directory.setText(directory)
+
+    def save_steam_directory(self):
+        """验证可读 ID 后保存，失败由现有交互错误入口显示且保留旧配置。"""
+        from .game_version import save_steam_root
+        directory = save_steam_root(self.service.data_root, self.steam_directory.text().strip())
+        self.steam_directory.setText(directory)
 
     def open_developer(self):
         QMessageBox.information(self, tr('Developer GUI'), tr('This interface is for developer observation, Candidate editing and trials.'))

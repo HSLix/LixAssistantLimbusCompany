@@ -1,6 +1,6 @@
 # #337 — 实施前决策确认
 
-2026-11-01。关键决策已逐项确认，进入专项设计影响审查；评审经开发者确认后实施，开发者验收确认后再关闭 issue。以下确认不表示产品已实现。
+2026-11-01。开发者已确认评审并明确“开始实施337”；本地实施与验证见[实施记录](stage-5-337-implementation.md)。开发者随后明确“人工验收没有大问题，通过并关闭”，#337 已按 completed 关闭。以下保留实施前确认过程。
 
 既有范围与版本语义见 [Stage 5 规格](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)及 [#337](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337)。
 

@@ -903,7 +903,9 @@ class RepairPage(QWidget):
         self.workspace_action.triggered.connect(self.open_workspace)
         self.pages_action = Action(tr('Open external settings page directory'), self)
         self.pages_action.triggered.connect(self.open_pages)
-        workspace.addActions([self.workspace_action, self.pages_action])
+        self.knowledge_action = Action(tr('Open external knowledge directory'), self)
+        self.knowledge_action.triggered.connect(self.open_knowledge)
+        workspace.addActions([self.workspace_action, self.pages_action, self.knowledge_action])
         self.logs_action = Action(tr('Open log directory'), self)
         self.logs_action.triggered.connect(self.diagnostics.open_logs)
         self.app_logs_action = Action(tr('Open application log directory'), self)
@@ -957,6 +959,7 @@ class RepairPage(QWidget):
         for action in (self.workspace_action, self.diff_action, self.validate_action, self.publish_action):
             action.setEnabled(has_candidate and not busy)
         self.pages_action.setEnabled(not busy)
+        self.knowledge_action.setEnabled(not busy)
         self.logs_action.setEnabled(self.diagnostics.path.is_dir())
         self.app_logs_action.setEnabled((self.window.service.data_root / 'logs').is_dir())
         self.copy_action.setEnabled(self.diagnostics.errors.currentData() is not None)
@@ -1191,6 +1194,14 @@ class RepairPage(QWidget):
         def operation():
             path = self.host.service.data_root / 'pages'
             path.mkdir(parents=True, exist_ok=True)
+            open_directory(self.window, path)
+        self.window._interact(operation)
+
+    def open_knowledge(self):
+        """固定资料目录缺失时创建空目录，不要求先初始化开发会话。"""
+        from .knowledge import knowledge_root
+        def operation():
+            path = knowledge_root(self.window.service.data_root, create=True)
             open_directory(self.window, path)
         self.window._interact(operation)
 

@@ -71,7 +71,8 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict) ->
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
                      "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
-                     "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml"):
+                     "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
+                     "_internal/UnityPy/resources/lzma.tpk"):
         if not (application / relative).is_file():
             raise ValueError(f"Missing packaged resource: {relative}")
     for name, expected in MODEL_HASHES.items():

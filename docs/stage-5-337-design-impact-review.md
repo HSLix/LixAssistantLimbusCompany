@@ -1,5 +1,7 @@
 # #337 — 外部知识库与受控 Git 设计影响审查
 
+2026-11-01 更新：开发者已授权开始实施，见[本地实施记录](stage-5-337-implementation.md)。开发者随后人工验收通过，#337 已关闭。下文为实施前审查证据，非当前代码差距清单。
+
 2026-11-01。依据 [#337](https://github.com/HSLix/LixAssistantLimbusCompany/issues/337)、[Stage 5 规格](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[本轮已确认决定](stage-5-337-decisions.md)。当前为评审结果，等待开发者确认后实施；不表示 #337 已完成。
 
 ## 设计变化与保留边界

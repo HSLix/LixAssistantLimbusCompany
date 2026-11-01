@@ -18,10 +18,94 @@ from lalc.developer_session import DeveloperSession
 from test_agent_repair_agent import conversation, script, tool, answer
 from test_agent_repair_agent import test_developer_publish_trial_and_logs_continue_same_round as check_publish_trial
 from test_image_attachments import make_images
-from test_pi_probe import probe
+from agent_test_server import agent_server
 from test_developer_gui import gui
 
 pytestmark = pytest.mark.agent
+
+
+@pytest.mark.parametrize('mode,entry,build', [('Construct', 'gui', '26156805'), ('Repair', 'gui', None), ('Repair', 'cli', '26156805')])
+def test_version_history_tools_text_images_and_persistent_context(conversation, monkeypatch, mode, entry, build):
+    """三个工具经真实 pi 与替代服务往返；轮次标版本、图片按需取，入口权限一致。"""
+    from lalc import agent_history
+    from lalc.agent_repair import RepairLog
+    chat, options, state = conversation
+    root = chat.host.service.data_root
+    value = {'game_version': '1.118.0', 'steam_build_id': build,
+             'observed_at': '2026-11-01T06:53:31Z', 'errors': []}
+    monkeypatch.setattr(agent_history, 'observe_game_version', lambda _: value)
+    previous = RepairLog(root)
+    previous.group = 1
+    agent_history.record_observation(previous, root, 'cli:Repair', 'Historical repair')
+    # 传输真实可解码的小 PNG，避免测试依赖服务端容忍无效图片。
+    from PIL import Image
+    import io
+    stream = io.BytesIO()
+    Image.new('RGB', (2, 2), 'red').save(stream, format='PNG')
+    image = stream.getvalue()
+    previous.record({'type': 'historical_answer', 'text': 'Historical version evidence',
+                     'image': {'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(image).decode()}})
+    page, _ = agent_history.AgentHistory(root).read(previous.identity)
+    image_id = page['events'][-1]['images'][0]
+    source = chat.host.manager.default_manifest_id()
+    session = DeveloperSession.create(chat.host.service, source, mode=mode, entry=entry)
+    current = session.conversation()
+    script(state, [tool('list_game_versions', {}),
+                   tool('search_agent_sessions', {'version_group': {'game_version': '1.118.0', 'steam_build_id': build}}),
+                   tool('read_agent_session', {'session_id': previous.identity, 'version_group': {'game_version': '1.118.0', 'steam_build_id': build}}),
+                   tool('read_agent_session', {'session_id': previous.identity, 'image_id': image_id}), answer('history checked')])
+    result = asyncio.run(current.run('Use versioned historical evidence', options))
+    assert result['status'] == 'completed', result
+    declared = {item['function']['name'] for item in state['calls'][-1]['tools']}
+    assert {'list_game_versions', 'search_agent_sessions', 'read_agent_session'} <= declared
+    assert 'Historical version evidence' in json.dumps(state['calls'][-1])
+    results = [message for message in current.history if message.get('role') == 'toolResult']
+    assert len(results) == 4 and not any(message.get('isError') for message in results)
+    assert not any(part.get('type') == 'image' for part in results[2]['content'])
+    assert any(part.get('type') == 'image' and base64.b64decode(part['data']) == image for part in results[3]['content'])
+    saved = read_json(current.log.root / 'round-1/input.json')
+    assert saved['game_version_observation'] == value
+    restored = DeveloperSession(chat.host.service, session.identity, entry=entry).conversation()
+    assert restored.history == current.history
+
+
+@pytest.mark.parametrize('mode', ['Construct', 'Repair'])
+def test_gui_knowledge_tools_images_and_cli_permissions(conversation, tmp_path, monkeypatch, mode):
+    """知识库经实际 pi 注册、宿主返回及历史恢复；GUI 权限不流入 CLI。"""
+    from PIL import Image
+    from lalc.agent_policy import KNOWLEDGE_TOOLS
+    chat, options, state = conversation
+    source = chat.host.manager.default_manifest_id()
+    session = DeveloperSession.create(chat.host.service, source, mode=mode, entry='gui')
+    gui_chat = session.conversation()
+    root = chat.host.service.data_root / 'knowledge'
+    root.mkdir()
+    (root / 'guide.md').write_text('Knowledge evidence needle\n')
+    Image.new('RGB', (3, 2), 'red').save(root / 'reference.jpg')
+    before = {p: p.read_bytes() for p in session.host.candidate.rglob('*') if p.is_file()}
+    script(state, [tool('knowledge_list', {}), tool('knowledge_read', {'path': 'guide.md'}),
+                   tool('knowledge_search', {'query': 'needle'}),
+                   tool('knowledge_read', {'path': 'reference.jpg'}), answer('knowledge read')])
+    result = asyncio.run(gui_chat.run('read external references', options))
+    assert result['status'] == 'completed', result
+    declared = {item['function']['name'] for item in state['calls'][-1]['tools']}
+    assert set(KNOWLEDGE_TOOLS) <= declared
+    payload = json.dumps(state['calls'][-1])
+    assert 'Knowledge evidence needle' in payload and 'image/jpeg' in payload
+    assert all(path.read_bytes() == value for path, value in before.items())
+    assert any(path.suffix == '.jpeg' and path.read_bytes() == (root / 'reference.jpg').read_bytes()
+               for path in gui_chat.log.path.iterdir())
+    restored = DeveloperSession(chat.host.service, session.identity, entry='gui').conversation()
+    script(state, [answer('restored reference evidence')])
+    assert asyncio.run(restored.run('continue', options))['status'] == 'completed'
+    assert 'Knowledge evidence needle' in json.dumps(state['calls'][-1])
+    if mode == 'Repair':
+        cli_chat = DeveloperSession(chat.host.service, session.identity, entry='cli').conversation()
+        monkeypatch.setattr(cli_chat.tools, 'knowledge_read', lambda **kwargs: pytest.fail('CLI 禁止读取资料'))
+        script(state, [tool('knowledge_read', {'path': 'guide.md'}), answer('CLI has no knowledge access')])
+        assert asyncio.run(cli_chat.run('continue in CLI', options))['status'] == 'completed'
+        assert not set(KNOWLEDGE_TOOLS) & {item['function']['name'] for item in state['calls'][-1]['tools']}
+        assert any(message.get('role') == 'toolResult' and message.get('isError') for message in cli_chat.history)
 
 
 def persistent(conversation):

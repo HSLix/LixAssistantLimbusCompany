@@ -19,13 +19,15 @@ a = Analysis(
            (str(Path(QLibraryInfo.path(QLibraryInfo.TranslationsPath)) / "qtbase_zh_CN.qm"),
             "PySide6/translations" if sys.platform == "win32" else "PySide6/Qt/translations")]
     + collect_data_files("rapidocr", includes=["config.yaml", "default_models.yaml"])
+    + collect_data_files("UnityPy", includes=["resources/*.tpk"])
+    + copy_metadata("UnityPy", recursive=True)
     + [(str(path), "rapidocr/models") for path in model_files().values()]
     + sum((copy_metadata(name) for name in (
         "PySide6", "PySide6-Essentials", "PySide6-Addons", "PySide6-Fluent-Widgets",
         "PySideSix-Frameless-Window", "darkdetect",
         "rapidocr", "onnxruntime",
     )), []),
-    hiddenimports=["onnxruntime", "rapidocr.inference_engine.onnxruntime"],
+    hiddenimports=["onnxruntime", "rapidocr.inference_engine.onnxruntime", "UnityPy.resources"],
     hookspath=[str(root / "packaging_hooks")],
     hooksconfig={},
     runtime_hooks=[],

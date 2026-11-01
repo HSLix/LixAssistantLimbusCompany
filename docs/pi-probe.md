@@ -1,3 +1,7 @@
+# pi 最小接入验证：历史记录（命令已移除）
+
+2026-11-01：开发者确认不再需要此冒烟入口，已删除独立 `lalc pi-probe` 命令及专用循环。下文为原阶段用法与验收记录，不是当前可执行命令。共享 pi 启动 / RPC / 工具扩展、正式 Agent 预检继续保留。当前按需集成测试选择 `tests/test_agent_repair_agent.py`、`tests/test_developer_session_agent.py` 并显式添加 `--run-agent-tests`；仅使用本机 HTTP 替身的通过不等于真实模型、Windows 成品或游戏验收。普通回归不启用 Agent 测试，跳过不得报告为通过。游戏版本历史见[当前用法](game-version-history.md)。
+
 # pi 最小接入验证（#324）
 
 2026-10-30 #334：成品默认优先同级 `pi/pi.exe`，请求前的限定故障最多回退一次到环境 pi；显式 `--pi` 保持指定。版本差异仍只警告，超时／协议错误／清理失败及任何模型 prompt 发送后的错误不回退；见[Windows 构建说明](windows-packaging.md)。本命令会请求模型，不能作为普通回归或仅检查路径的附带步骤。

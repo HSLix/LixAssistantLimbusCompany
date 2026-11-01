@@ -148,6 +148,18 @@ _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 The complete reconstructable record of information supplied to an Agent, its tool operations and results, and its outputs. Each continuous developer conversation is an independent, self-contained retention unit with per-round outcomes; compact content references preserve the evidence rather than summarize or alter the model context, while runtime Agent Turns are referenced by Execution Trace when the executor acts on a response.
 _Avoid_: Execution Trace, Agent memory
 
+**Game Version Observation**:
+A point-in-time observation of the local game's version identifiers associated with one Agent conversation round or independent diagnostic operation. Historical observations remain distinct, so a continuing Session can be associated with multiple observed versions.
+_Avoid_: Session version, memory validity verdict, latest game version
+
+**Game Version Group**:
+The distinct pair of observed in-game version and Steam Build ID used to locate Agent history. Missing identifiers remain missing; a group with neither identifier is Unknown, and a group's latest observation does not update other groups associated with the same Session.
+_Avoid_: Game version alone, Steam build alone, history validity
+
+**Agent History Index**:
+A rebuildable directory of Agent conversations and rounds associated with recorded Game Version Observations. It locates retained evidence without replacing the self-contained Agent Interaction Log or creating version observations for unobserved history.
+_Avoid_: Agent memory, authoritative interaction log, automatic history migration
+
 **Agent Adapter**:
 The provider boundary that sends one self-contained Context Snapshot to a local or remote model and parses exactly one of the three allowed Agent Turn results. It owns transport and provider-error normalization but never performs actions, writes files, validates or switches a Working Manifest, invokes formal code, or decides recovery and termination.
 _Avoid_: Runtime Agent Session, executor

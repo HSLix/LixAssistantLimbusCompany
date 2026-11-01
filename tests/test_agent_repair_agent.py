@@ -14,7 +14,7 @@ import pytest
 
 from lalc.agent_log import read_json, read_events
 
-from test_pi_probe import probe
+from agent_test_server import agent_server
 from test_agent_repair import host_for
 
 pytestmark = pytest.mark.agent
@@ -75,11 +75,11 @@ def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, mon
 
 
 @pytest.fixture
-def conversation(probe, tmp_path):
-    command, state, _ = probe
+def conversation(agent_server, tmp_path):
+    address, state, _ = agent_server
     host, _ = host_for(tmp_path / "project")
     options = SimpleNamespace(pi="pi", ask_api_key=False,
-                             base_url=command[command.index("--base-url") + 1], model="gemma4-test", max_requests=20)
+                             base_url=address, model="gemma4-test", max_requests=20)
     state["repair_check"] = True
     state["respond"] = lambda body: answer()
     return host.new_conversation(), options, state
