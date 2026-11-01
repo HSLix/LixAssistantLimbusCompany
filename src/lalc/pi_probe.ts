@@ -90,10 +90,19 @@ export default async function (pi) {
     if (repairMode && event.messageType === "user" && event.prompt.startsWith("LALC_FINAL_FORMAT_CORRECTION\n")) {
       pi.setActiveTools([]);
     }
-    // 使用宿主原始提示词覆盖 pi 的自动工作目录段，工具声明仍由 pi 管理。
-    return { systemPrompt: event.systemPromptOptions.customPrompt
-      + "\n" + (repairMode ? "文件路径相对于 Candidate 根目录；已有文件列表由宿主提供。" : "文件路径相对于宿主指定的源码根目录。")
-      + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；历史通知原位保留，以最后一条为准。每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。" };
+    // 使用宿主原始提示词覆盖 pi 自动工作目录段，工具定义仍由实际注册信息提供。
+    const active = new Set(pi.getActiveTools());
+    const guidance = pi.getAllTools().filter(tool => active.has(tool.name))
+      .map(tool => `- ${tool.name}: ${tool.description.replace(/\s+/g, " ").trim()}`).join("\n");
+    return { systemPrompt: (preflight
+      ? "你正在检查模型连接和图片输入。按本次检查要求简短回答，不调用工具。"
+      : event.systemPromptOptions.customPrompt)
+      + "\n# Runtime Rules\n" + (preflight ? "当前仅检查连接和图片输入，不执行开发任务。" : repairMode
+        ? "文件路径相对于 Candidate 根目录；已有文件列表由宿主提供。"
+        : "文件路径相对于宿主指定的源码根目录。")
+      + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；历史通知原位保留，以最后一条为准。每条用户消息独立计数，连接预检和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。"
+      + (conversationRound ? "\n# Tool Guidance\n以下仅列本次启用的工具；参数以工具 Schema 为准。\n" + (guidance || "当前没有启用工具。") : "") };
+
   });
   const preflight = process.env.LALC_PI_PREFLIGHT === "1";
   const repairTools: string[] = JSON.parse(process.env.LALC_PI_ALLOWED_TOOLS || '[]');

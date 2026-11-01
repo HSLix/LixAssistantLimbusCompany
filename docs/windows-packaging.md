@@ -103,3 +103,8 @@ Copy-Item -Recurse "$repo\example\pages" "$data\pages"
 GUI Agent 对话会请求配置中的模型，不能为了“检查路径”随意发消息到真实服务；无真实模型验收要求，可使用受控替身。两包选择／回退的自动化边界检查参见 `tests/test_pi_startup.py`，冻结资源／双包内容检查参见 `tests/test_windows_packaging.py`。
 
 2026-10-30：开发者试用反馈“没明显问题”，明确决定不等待完整验收并关闭 #334；见[关闭记录](stage-3-4-closure-2026-10-30.md)。上表保留可执行的验收方法，未执行项仍未验证，不因关闭变成通过。
+
+
+## 开发 Agent SOP 资源
+
+程序包包含 `_internal/lalc/sop.md`，wheel 包含 `lalc/sop.md`；组装 Windows ZIP 时检查该资源存在。开发者按文件内说明编辑三个正文区，保留标题和 XML 标签，UTF-8 保存。源码运行对应 `src/lalc/sop.md`；每条用户消息执行时读取，轮内固定，无需重启。不存在用户数据目录覆盖文件或 GUI 编辑器。更新程序可能替换 SOP，请自行备份填写内容。标签损坏或缺少文件时 Agent 在调用模型前报告错误；普通确定性执行不依赖该文件。

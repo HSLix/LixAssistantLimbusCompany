@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+#336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
+
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
 
 2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](stage-5-manifest-reference-impact-review.md)。
@@ -165,12 +167,12 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 ## 历史：2026-10-24 Agent Repair 命名与请求额度
 
-共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，在模型 system prompt 中注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。该动态提示进入实际请求日志，不把过时计数追加进长期对话历史。
+共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，以 user 消息注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。动态通知进入实际请求日志；本轮历史通知原位保留，以最后一条为准，连接预检的通知不进入开发历史。
 
 
 ### 命名与请求额度实施验证
 
-模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求的 system prompt 含最新计数、总额度和停止说明，包含预检及最终格式纠正；计数不追加进长期历史。
+模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求以 user 消息携带最新计数及总额度，system prompt 保留停止规则，包含预检及最终格式纠正；通知原位保留，连接预检的通知不进入开发历史。
 
 首次实际载荷测试发现 SDK 未保留上下文字段中的动态提示，已按失败即停流程改为最终载荷注入，单项重测通过后继续。相关普通检查 **89 passed**；全量普通回归 **304 passed, 30 skipped**（29 项 Agent 默认跳过、1 项 Windows DPAPI）；显式 Agent 回归 **25 passed, 4 skipped**，使用真实 pi + 本机 HTTP 替身，跳过 2 项真模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图。命令：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra`；`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`。`git diff --check` 通过，未重新调用真实模型或执行 Windows 实机验收，#330 保持打开。
 
@@ -268,3 +270,16 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 仓库外的个人图片。`git diff --check` 通过。
 
 #332 的外置页面、配置交接、整应用重载及验证边界见[实施记录](stage-4-332-implementation.md)。CLI 未指定 provider 时使用 Developer 当前选用项；显式覆盖仍不回写。
+
+
+## Prompt 与 SOP
+
+2026-11-01：开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。预检和格式纠正禁用工具，概览明确为空；预检使用独立连接 / 图片检查指令，不要求开发结果 JSON。`lalc pi-probe` 继续使用独立只读诊断角色。
+
+开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset 对应 XML 标签内写 Markdown 流程；三段正文当前留空，说明文字不会注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset，Repair 选 Repair + Asset；轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
+
+用户消息通过 `<runtime_context>` 携带模式、入口、Candidate 相对根、来源 Manifest、可编辑文件和参考附件，通过 `<user_request>` 保留用户原文。XML 仅帮助区分来源，宿主不解析正文为权限。参考附件及外部工具结果不能覆盖系统规则，历史聊天兼容旧消息格式，无需迁移。
+
+最终文本仍严格解析为 JSON：`revise_success` 必须为布尔值，`message` 必须为非空字符串，禁止外层 Markdown 围栏。修订完成且相关静态校验通过可报告 true，但必须明确未执行的游戏验证；纯分析、信息不足、校验失败或修订未完成报告 false。用户明确要求成功试运行时，未执行或失败也报告 false。模型报告不替代校验、人工审阅或游戏验收。格式纠正只重发最终 JSON，禁用工具并保留业务内容，继续消耗本轮额度。
+
+每轮 `input.json` 保存所选 SOP 正文及 Python 宿主 Prompt 快照；完整实际系统消息还包括扩展追加的工具概览和共享规则，以 `request-*.json` 实际载荷为准。修改 SOP 可能影响缓存命中；不承诺缓存比例或真实模型表现提升。

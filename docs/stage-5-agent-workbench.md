@@ -12,7 +12,9 @@ Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保
 
 ## 工作台与运行入口
 
-- 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建 Session 使用小按钮。保留图片 / Manifest 参考附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
+#336 聊天交互重构已本地实施，当前界面使用分段模式选择、底部集成输入 / 取消 / 附件及 More 工具菜单；来源仅在新聊天上下文中显示，已开始会话使用只读模式标识。历史标题从首条实际用户消息本地提取，不调用模型。当前操作和验证见[实施记录](stage-5-336-chat-ui-implementation.md)，决定及边界见[对齐记录](stage-5-336-chat-ui-decisions.md)。
+
+- 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建入口使用 New Chat，历史侧栏可折叠。保留图片 / Manifest 参考附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
 - 新建并选好 Construct / Repair 模式和来源后，首条用户消息提交前仍可调整两者；首次提交时固定模式、来源及其对应 Candidate / Diff 基线。开始对话后，更换模式或来源须新建 Session。打开历史 Session 显示其真实模式。
 - 删除 Developer GUI 各页上方共用的 Manifest 选择、刷新和手动试运行区域，不移入工作台，不新增 Runner 页或“应用到 User GUI”快捷设置。普通启动继续使用 User GUI。
 - 保留 Agent 的完整开发试运行闭环：修改、完整 Validate、Publish 后以明确已发布 Manifest ID 和输入调用 trial_run，再读取 Run 结果和日志。保留活动互斥、取消收尾及试运行日志窗口；删除人工入口不撤销 Agent 工具权限。
@@ -53,6 +55,9 @@ CLI Agent Repair 使用同一 Session 存储，可创建 Repair Session 或按 S
 Asset Library、已发布 Manifest、正式页面、业务配置及外部知识库仍全局共享。某 Session 新增 / 归档移除 Asset 会影响之后的匹配，安装页面会修改正式页面；切换 Session 不撤销这些变更。独立 Candidate 不代表整套环境隔离。页面预览的试填配置独立于正式配置。
 
 ## Prompt 与工具权限
+
+2026-11-01 Prompt 重构：Core / Mode / 模式 SOP 及实际启用工具概览分开组织，宿主上下文与用户需求通过用户消息中的独立标签区分。每条消息执行时读取随程序发布的单一 `sop.md`，按固定模式选择 Construct + Asset 或 Repair + Asset，轮内固定，下一轮及历史续聊读取新内容。SOP 是默认指导，不改变程序权限；空正文合法，缺失或损坏在发出模型请求前报错。填写方式及输出语义见 [Agent 指南](agent-repair.md#prompt-与-sop)，决定及影响见 [审查报告](agent-prompt-impact-review.md)，验证见 [实施记录](agent-prompt-implementation.md)。
+
 
 每种模式有自己的初始 Prompt 和工具白名单：Construct 遵循开发者指示开发 Workflow 和页面，Repair 聚焦修复。实际权限取模式白名单与当前入口能力的交集；pi 工具声明和宿主实际分发都必须执行，不只在 Prompt 中限制。共享核心不意味着任意目录读写或共享全部工具。
 

@@ -131,8 +131,8 @@ def test_first_send_uses_final_choices_and_preserves_manual_candidate(gui, monke
     page.new()
     root = window.service.data_root / 'developer-sessions'
     existing = set(root.iterdir())
-    page.mode.setCurrentText('Repair')
-    page.mode.setCurrentText('Construct')
+    page.mode.setCurrentItem('Repair')
+    page.mode.setCurrentItem('Construct')
     page.baseline.setCurrentIndex(0)
     assert set(root.iterdir()) == existing and page.session is None
     calls = []
@@ -162,7 +162,7 @@ def test_new_session_initialization_failure_keeps_preparation(gui, monkeypatch):
     app, window = gui
     page = window.repair_page
     page.new()
-    page.mode.setCurrentText('Construct')
+    page.mode.setCurrentItem('Construct')
     page.baseline.setCurrentIndex(0)
     page.message.setPlainText('keep input')
     monkeypatch.setattr(DeveloperSession, 'create', lambda *a, **k: (_ for _ in ()).throw(ValueError('failed create')))
@@ -193,7 +193,7 @@ def test_gui_opens_cli_history_and_manual_validation_uses_session(gui):
                 if session.identity == page.history.item(i).data(Qt.ItemDataRole.UserRole))
     page.open_session(item)
     wait_jobs(app, window)
-    assert 'CLI message' in page.chat.toPlainText() and page.mode.currentText() == 'Repair'
+    assert 'CLI message' in page.chat.toPlainText() and page.mode.currentRouteKey() == 'Repair'
     page.validate()
     wait_jobs(app, window)
     restored = DeveloperSession(window.service, session.identity).conversation()

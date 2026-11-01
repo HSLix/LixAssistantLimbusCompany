@@ -89,7 +89,7 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
     assert owner.service.game_language == game_language
     developer.close()
     new_developer = owner.open_window(True)
-    assert new_developer.repair_page.new_button.text() == "新建会话"
+    assert new_developer.repair_page.new_button.text() == "新建聊天"
     assert reopened.business_pages[0].context.language == "zh_CN"
 
 
@@ -124,7 +124,7 @@ developer.close()
                             text=True, timeout=20, check=True)
     values = json.loads(result.stdout.splitlines()[-1])
     assert values == [language, "开始运行 Plan" if language == "zh_CN" else "Start Plan",
-                      "新建会话" if language == "zh_CN" else "New Session",
+                      "新建聊天" if language == "zh_CN" else "New Chat",
                       [language] * 3, "en"]
 
 
@@ -235,8 +235,10 @@ def test_dynamic_controls_chat_and_notifications_keep_original_details(owner, ap
     state = owner.service.state
     state["activity"] = "Candidate 初始化"
     developer.render_state(state)
-    assert developer.status.text() == ("当前活动：初始化 Candidate" if language == "zh_CN"
-                                       else "Current activity: Initializing Candidate")
+    assert not hasattr(developer, 'status')
+    developer.repair_page.show_event({'round': 1, 'event': {'type': 'lalc_request', 'requests': 1}})
+    assert developer.repair_page.status.text() == ('Agent 正在处理…' if language == 'zh_CN'
+                                                 else 'Agent is responding…')
     from lalc.developer_gui import TrialDialog
     dialog = TrialDialog(owner.service, developer)
     state.update(paused=True, trace=[], pause_info=None)

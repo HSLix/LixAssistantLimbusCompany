@@ -406,7 +406,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
 
 
 def run_probe(args) -> int:
-    """使用临时配置及受限读取；不同于已验证版本时提示但不阻止启动。"""
+    """测试模型理解 Prompt、通过受限 read 读取文字源码及理解图片的能力；会实际调用模型。"""
     key = "lalc-no-key"
     try:
         if args.ask_api_key:

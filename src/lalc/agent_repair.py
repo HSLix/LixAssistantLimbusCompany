@@ -11,48 +11,14 @@ from types import SimpleNamespace
 import uuid
 
 from .pi_probe import PI_VERSION, PiStartup, configured_pi, rpc_event, rpc_session
-from .repair_tools import REPAIR_TOOLS, RepairTools
+from .repair_tools import RepairTools
 from .agent_policy import allowed_tools
 from .manifest_reference import ManifestReference
 from .agent_settings import settings_snapshot
 from .developer import candidate_files, editable_files, file_diff
 from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 from .agent_log import LogStore
-
-
-SYSTEM_PROMPT = """你是 LALC Developer Policy 开发助手。根据开发者 prompt 和当前游戏状态持续开发、调试工作流，需要修改时实际 read、edit，并 validate 完整候选。
-通用 read 只能读取 Candidate 内已有文件；list_manifests / read_manifest / read_manifest_source 可按需只读查看任意已发布版本及登记源码，不需要先附加，不导入源码，不改变来源、Default 或执行版本。Manifest 参考附件只是用户消息提示，不是授权白名单。
-可按需修改多个已有文件，包括 manifest.json、Recovery Rule 和未被 Manifest 引用的文件。
-可编辑已有 Candidate Python Plan；不得执行可变 Candidate 路径，Plan 必须先 Publish。不通用新建、删除或重命名文件，不通过通用文件工具访问目录外文件。
-新增源码仅用 add_component / add_recovery_rule，提供 filename、logical_name、source 完整源码，工具同时创建并登记 Manifest。
-新增成功后同轮可 read/edit/validate；不自动登记已有未引用文件，不把工具成功当作完整校验通过。
-校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
-asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
-game_screenshot 返回现场原图和每隔40px的网格辅助图；辅助覆盖层不能进入模板或原始截图证据。
-先 preview_crop(logical_name, region, threshold, tags) 取得区域标线图、干净裁剪图及同图匹配结果，再 crop_asset(preview_id) 保存完全相同的像素和参数，不重新截图。
-预览不进入活跃素材库；同图匹配不证明跨状态可靠性，也不自动决定是否保存。同名同哈希保留原图和原标签。
-remove_asset(logical_name, sha, reason) 可归档任意既有图片及原Tags、理由和移除时新截的原始游戏画面，再同步移除活跃图片及该逻辑名的标签关系；截图失败不移除。移除影响所有后续使用该素材的匹配。
-非 Windows 现场工具不可用。截图会恢复并置前唯一游戏窗口。除专用移除归档外，不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
-trial_run 不提供 logical_name 时运行已保存 Manifest 的唯一 Python Plan，inputs 为 task_repetitions/settings；可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
-试运行支持已发布版本的唯一 Python Plan 或 Task Workflow/Subworkflow/Step。运行期间等待工具结果，不并行修改或操作游戏。
-启动拒绝无 Run ID，修正原因后可再次调用；已启动的结果带 Run ID，使用 list_runs 查看可用 ID、read_run_log 分段查看日志及引用截图。
-试运行结果返回后可继续修改、发布、试运行直到完成开发要求；用户停止本次运行后建议总结并等待下个指示。
-不运行命令、不直接点击或按键、不执行可变 Candidate、不设置 Default。Publish 不表示运行时永久批准。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
-Validator 会导入 Python，不是安全沙箱，校验通过也不证明真实游戏行为修复。
-遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；ctx.log(message, screenshot=False) 可记录语义日志并可选附上已有截图，不重新截图。Python 模块和关键函数用简洁中文 docstring。
-最终回答必须只输出一个合法 JSON 对象，格式为 {"revise_success": false, "message": "分析、修改结果或缺少的信息"}。
-revise_success 必须是 JSON 布尔值 true 或 false，message 必须是非空字符串；不要输出 Markdown 代码块、前后说明或 JSON 之外的文字。
-所有给用户的说明均放入 message 字段，包括纯分析和信息不足的情况。
-revise_success 仅是本轮修订判断，不能代替校验或游戏验收。宿主反馈格式错误时，只重新生成最终 JSON，不调用工具、不重复修改。
-合法最终回答后结束本轮，等待开发者下一条消息。
-"""
-
-MODE_PROMPTS = {
-    "Construct": "当前模式：Construct。根据开发者目标构建、扩展或修复 Workflow；仅使用当前实际工具，页面、知识库及人工交互工具未接入时不可使用。\n",
-    "Repair": "当前模式：Repair。聚焦 Workflow / Asset 修复；可通过专用新增工具创建修复所需组件。\n",
-}
-
-FORMAT_RETRY_PREFIX = "LALC_FINAL_FORMAT_CORRECTION\n"
+from .agent_prompts import load_sop, system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
 
 
 class RepairLog:
@@ -147,7 +113,7 @@ def final_answer(message):
             f"模型最终回答不是可解析的 JSON：{error.msg}（第 {error.lineno} 行，第 {error.colno} 列）；请查看实际回复。",
             "final_answer", raw_text=text, json_text=candidate, parse_line=error.lineno,
             parse_column=error.colno, parse_offset=error.pos,
-            hint="最终回答只能是一个 JSON 对象，禁止代码块和前后说明；格式纠正计入本轮请求上限。") from error
+            hint="回复外层禁止三个反引号 ``` 或 ```json；正文直接以 { 开始、以 } 结束，message 字符串内部可以有 Markdown；格式纠正计入本轮请求上限。") from error
     if (not isinstance(value, dict) or type(value.get("revise_success")) is not bool
             or not isinstance(value.get("message"), str) or not value["message"].strip()):
         raise AgentDiagnosticError("Final answer must be JSON with boolean revise_success and non-empty message："
@@ -271,7 +237,7 @@ class RepairConversation:
         self.entry = entry
         self.mode = session.mode if session else "Repair"
         self.allowed = allowed_tools(self.mode, entry)
-        self.system_prompt = MODE_PROMPTS[self.mode] + SYSTEM_PROMPT
+        self.system_prompt = system_prompt(self.mode, {})
         self.log = RepairLog(host.service.data_root, path=session.path / "log" if session else None,
                              identity=session.identity if session else None)
         self.history = []
@@ -303,8 +269,6 @@ class RepairConversation:
             references = list(dict.fromkeys(manifest_references))
             for identity in references:
                 ManifestReference(self.host.manager).read(identity)
-            if references:
-                message += "\n\nManifest reference attachments (context only): " + json.dumps(references)
             names = editable_files(self.host.candidate)
             if not message.strip():
                 raise ValueError("消息不能为空。")
@@ -328,8 +292,12 @@ class RepairConversation:
             prior_history = list(self.history)
             stage = "attachments"
             submitted = False
-            prompt = {"type": "prompt", "message": "本轮允许编辑的已有文件：" + json.dumps(names, ensure_ascii=False)
-                      + "\n用户消息：" + message}
+            runtime_context = {"mode": self.mode, "entry": self.entry,
+                               "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
+                               "editable_files": names, "manifest_references": references}
+            prompt = {"type": "prompt", "message": "<runtime_context>\n"
+                      + json.dumps(runtime_context, ensure_ascii=False)
+                      + "\n</runtime_context>\n<user_request>\n" + message + "\n</user_request>"}
             self.log.keys.update(value for value in self.host.secrets.values() if value)
             context = {"conversation": self.log.identity, "round": self.log.group,
                        "log_path": str(round_path), "tested_pi_version": PI_VERSION}
@@ -341,6 +309,10 @@ class RepairConversation:
                 self.host.service.logger.error("Agent Repair 错误：%s", details)
                 return details
             try:
+                stage = "prompt"
+                sop = load_sop(self.mode)
+                self.system_prompt = system_prompt(self.mode, sop)
+                stage = "attachments"
                 attachments, attachment_records = image_attachments(images, round_path)
                 for attachment in attachment_records:
                     self.log.store.register_image(round_path / attachment["filename"])
@@ -358,8 +330,8 @@ class RepairConversation:
                     "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 submitted = True
                 input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
-                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
-                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "mode": self.mode, "entry": self.entry,
+                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
+                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "sop": sop, "mode": self.mode, "entry": self.entry,
                                     "manifest_references": references}
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
@@ -472,11 +444,7 @@ class RepairConversation:
                                                       "error": details["message"] + " 本轮请求额度已耗尽。",
                                                       "diagnostics": {**details, "budget_exhausted": True}}
                                             break
-                                        feedback = (FORMAT_RETRY_PREFIX + "你的最终回答未通过严格 JSON 校验：\n"
-                                                    + details["message"] + "\n只纠正最终输出格式，不调用工具，不重新执行或修改。"
-                                                    '\n仅输出一个 JSON 对象：{"revise_success": false, "message": "说明"}。'
-                                                    "revise_success 必须为 true 或 false，message 为非空字符串。"
-                                                    "所有说明放入 message；禁止代码块、前后说明和 JSON 之外的文字。")
+                                        feedback = FORMAT_RETRY_PREFIX + details["message"] + "\n" + FORMAT_RETRY
                                         correction = {"type": "prompt", "message": feedback}
                                         self.log.record({"type": "final_answer_retry", "diagnostics": details,
                                                          "requests_remaining": remaining, "prompt": correction})

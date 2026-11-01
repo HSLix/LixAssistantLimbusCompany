@@ -195,6 +195,8 @@ def test_mode_white_list_hides_and_rejects_disallowed_native_tools(conversation,
     result = asyncio.run(chat.run('do not allow native edit through a restricted mode', options))
     assert result['status'] == 'completed', result
     assert [item['function']['name'] for item in state['calls'][-1]['tools']] == ['read_manifest']
+    guidance = state['calls'][-1]['messages'][0]['content'].split('# Tool Guidance\n', 1)[1]
+    assert [line[2:].split(':', 1)[0] for line in guidance.splitlines() if line.startswith('- ')] == ['read_manifest']
     assert (chat.host.candidate / 'steps.total.py').read_bytes() == before
     assert any(row['event'].get('type') == 'tool_execution_end' and row['event'].get('isError')
                for row in read_events(chat.log.root / 'events.jsonl'))
@@ -209,7 +211,7 @@ def test_gui_send_uses_actual_pi_events_and_cli_can_continue(conversation, gui):
     page = window.repair_page
     source = window.host.manager.default_manifest_id()
     page.new()
-    page.mode.setCurrentText('Repair')
+    page.mode.setCurrentItem('Repair')
     page.baseline.setCurrentIndex(page.baseline.findData(source))
     page.manifest_references = [source]
     page.message.setPlainText('actual GUI message')

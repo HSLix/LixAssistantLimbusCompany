@@ -13,6 +13,7 @@ a = Analysis(
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
            (str(root / "MagicAndWonder.ico"), "lalc"),
            (str(root / "src/lalc/pi_probe.ts"), "lalc"),
+           (str(root / "src/lalc/sop.md"), "lalc"),
            (str(root / "src/lalc/translations/lalc_zh_CN.qm"), "lalc/translations"),
            (str(Path(QLibraryInfo.path(QLibraryInfo.TranslationsPath)) / "qtbase_zh_CN.qm"),
             "PySide6/translations" if sys.platform == "win32" else "PySide6/Qt/translations")]

@@ -2,11 +2,22 @@
 
 from html import escape
 import json
+import re
 
 from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import QTextBrowser
 
 from .i18n import tr
+from .agent_prompts import user_message_text
+
+
+def chat_title(text):
+    """仅从实际用户文本提取本地标题；宿主提示与参考附件标记不参与命名。"""
+    text = user_message_text(text).strip()
+    if not text or text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', '宿主中断了第', 'LALC_FINAL_FORMAT_CORRECTION\n')):
+        return '', ''
+    first = re.split(r'(?<=[。！？!?])|(?<=\.)\s+|\n', text, maxsplit=1)[0].strip()
+    return (first[:39] + '…' if len(first) > 40 else first), text
 
 
 class RepairChat(QTextBrowser):
@@ -49,6 +60,16 @@ class RepairChat(QTextBrowser):
             entry["status"] = "执行中"
         self.render()
         return entry
+
+    def format_retry(self, round_number):
+        """同轮格式纠正只占一条系统摘要；每次实际重试仍准确计数。"""
+        entry = next((entry for entry in self.entries if 'format_retry' in entry and entry['round'] == round_number), None)
+        if entry is None:
+            entry = {'role': '系统', 'round': round_number, 'format_retry': 0}
+            self.entries.append(entry)
+        entry['format_retry'] += 1
+        entry['text'] = tr('Response format did not match JSON; automatic retries: {0}.').format(entry['format_retry'])
+        self.render()
 
     def open_link(self, url):
         if url.scheme() == "tool":

@@ -1145,5 +1145,77 @@ Original pixel region: {2}</source>
       <source>Viewing Diff</source>
       <translation>查看差异</translation>
     </message>
+    <message>
+      <source>New Chat</source>
+      <translation>新建聊天</translation>
+    </message>
+    <message>
+      <source>Chat in use</source>
+      <translation>会话使用中</translation>
+    </message>
+    <message>
+      <source>Toggle chat history</source>
+      <translation>展开或收起聊天历史</translation>
+    </message>
+    <message>
+      <source>Chat context</source>
+      <translation>聊天上下文</translation>
+    </message>
+    <message>
+      <source>Message the Agent…</source>
+      <translation>给 Agent 发送消息…</translation>
+    </message>
+    <message>
+      <source>Attachments</source>
+      <translation>附件</translation>
+    </message>
+    <message>
+      <source>More developer tools</source>
+      <translation>更多开发工具</translation>
+    </message>
+    <message>
+      <source>Workspace and pages</source>
+      <translation>工作区与页面</translation>
+    </message>
+    <message>
+      <source>Logs and diagnostics</source>
+      <translation>日志与诊断</translation>
+    </message>
+    <message>
+      <source>Development and validation</source>
+      <translation>开发与验证</translation>
+    </message>
+    <message>
+      <source>Cancelling…</source>
+      <translation>正在取消…</translation>
+    </message>
+    <message>
+      <source>Start a new chat. Choose a mode and set the source in Chat context.</source>
+      <translation>开始新的聊天。选择模式，并在聊天上下文中设置来源。</translation>
+    </message>
+    <message>
+      <source>{0} images · {1} Manifest references</source>
+      <translation>{0} 张图片 · {1} 个 Manifest 参考</translation>
+    </message>
+    <message>
+      <source>Round complete</source>
+      <translation>本轮已完成</translation>
+    </message>
+    <message>
+      <source>Round cancelled</source>
+      <translation>本轮已取消</translation>
+    </message>
+    <message>
+      <source>Round incomplete</source>
+      <translation>本轮未完成</translation>
+    </message>
+    <message>
+      <source>Agent is responding…</source>
+      <translation>Agent 正在处理…</translation>
+    </message>
+    <message>
+      <source>Response format did not match JSON; automatic retries: {0}.</source>
+      <translation>回复格式未符合 JSON，已自动重试 {0} 次。</translation>
+    </message>
   </context>
 </TS>

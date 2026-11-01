@@ -27,7 +27,7 @@ from qfluentwidgets import (
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox,
 )
 
-from .i18n import activity_text, tr
+from .i18n import tr
 
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
@@ -115,6 +115,9 @@ class MainWindow(FluentWindow):
         self.settings_view = QScrollArea()
         self.settings_view.setWidgetResizable(True)
         self.settings_view.setWidget(self.settings_page)
+        self.settings_view.setStyleSheet('QScrollArea {border: none; background: transparent;}')
+        self.settings_view.viewport().setAutoFillBackground(False)
+        self.settings_page.setAutoFillBackground(False)
         self.operation_event.connect(self.repair_page.show_event)
         for page, identity, name, icon in (
             (self.capture_page, "developer-capture", tr('Capture'), FluentIcon.CAMERA),
@@ -125,9 +128,6 @@ class MainWindow(FluentWindow):
             self.addSubInterface(page, icon, name)
         self.widgetLayout.removeWidget(self.stackedWidget)
         layout.addWidget(self.stackedWidget, 1)
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
         self.notifications = NotificationList()
         layout.addWidget(self.notifications)
         self.widgetLayout.addWidget(root)
@@ -145,10 +145,11 @@ class MainWindow(FluentWindow):
         def finished():
             self.jobs.remove(job)
             self.render_state(self.service.state)
-            if "error" in outcome and not (self.closing and isinstance(outcome["error"], asyncio.CancelledError)):
-                def fail():
-                    raise outcome["error"]
-                self._interact(fail)
+            if "error" in outcome:
+                if not isinstance(outcome["error"], asyncio.CancelledError):
+                    def fail():
+                        raise outcome["error"]
+                    self._interact(fail)
             elif done and not self.closing:
                 self._interact(lambda: done(outcome.get("value")))
             job.deleteLater()
@@ -160,6 +161,7 @@ class MainWindow(FluentWindow):
     def cancel_operation(self):
         for job in self.jobs:
             job.cancel()
+        self.render_state(self.service.state)
 
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
@@ -174,8 +176,8 @@ class MainWindow(FluentWindow):
                 self.service.stop()
                 self.cancel_operation()
                 self.render_state(self.service.state)
-                if hasattr(self, "status"):
-                    self.status.setText(tr('Stopping; waiting for input release, log saving and pi cleanup…'))
+                if hasattr(self, 'repair_page'):
+                    self.repair_page.status.setText(tr('Stopping; waiting for input release, log saving and pi cleanup…'))
                 self.close_timer.start()
             return
         self.close_timer.stop()
@@ -269,7 +271,6 @@ class MainWindow(FluentWindow):
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
-        self.status.setText(tr('Current activity: ') + (activity_text(state["activity"]) if state.get("activity") else (tr('Running') if state["phase"] == "running" else tr('Idle'))))
         for page in (self.capture_page, self.settings_page, self.repair_page):
             page.render(busy)
 

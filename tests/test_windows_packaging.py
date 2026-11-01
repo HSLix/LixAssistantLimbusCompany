@@ -33,7 +33,7 @@ def archive(tmp_path, monkeypatch):
 
 def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive):
     app = tmp_path / "application"
-    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts",
+    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm"):
         target = app / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +49,11 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
     assert all(build.digest(path) in sums for path in outputs)
+    before = {path: build.digest(path) for path in outputs}
+    (app / "_internal/lalc/sop.md").unlink()
+    with pytest.raises(ValueError, match="sop.md"):
+        build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
+    assert {path: build.digest(path) for path in outputs} == before
 
 
 def test_tampered_pi_and_missing_frozen_resource_are_rejected(tmp_path, archive):

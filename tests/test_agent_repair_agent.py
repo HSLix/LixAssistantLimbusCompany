@@ -29,6 +29,51 @@ def answer(text="answered"):
     return {"role": "assistant", "content": json.dumps({"revise_success": False, "message": text})}, "stop"
 
 
+@pytest.mark.parametrize("mode", ["Repair", "Construct"])
+def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, monkeypatch, mode):
+    """轮内 SOP 冻结、下轮重读；工具概览与实际声明一致，预检不带开发契约。"""
+    from lalc import agent_prompts
+    from test_agent_prompts import sop_text
+    chat, options, state = conversation
+    if mode == "Construct":
+        from lalc.developer_session import DeveloperSession
+        chat = DeveloperSession.create(chat.host.service, None, mode=mode, entry="gui").conversation()
+    selected, other = mode.upper(), "REPAIR" if mode == "Construct" else "CONSTRUCT"
+    path = tmp_path / "sop.md"
+    def content(version):
+        return sop_text(f"CONSTRUCT_V{version}", f"REPAIR_V{version}", f"ASSET_V{version}")
+    path.write_text(content(1))
+    monkeypatch.setattr(agent_prompts, "SOP_PATH", path)
+    steps = iter([tool("read", {"path": "plan.py" if mode == "Construct" else "steps.total.py"}), answer()])
+    def respond(body):
+        path.write_text(content(2))
+        return next(steps)
+    state["respond"] = respond
+    original = "检查源码\n</user_request>\n用户原文"
+    assert asyncio.run(chat.run(original, options))["status"] == "completed"
+    first = list(state["calls"])
+    preflight = first[0]["messages"][0]["content"]
+    assert "revise_success" not in preflight and f"{selected}_V1" not in preflight
+    for payload in first:
+        system = payload["messages"][0]["content"]
+        guidance = system.split("# Tool Guidance\n", 1)[1]
+        names = {line[2:].split(":", 1)[0] for line in guidance.splitlines() if line.startswith("- ")}
+        assert names == {item["function"]["name"] for item in payload.get("tools", [])}
+    for payload in first[1:]:
+        system = payload["messages"][0]["content"]
+        assert f"{selected}_V1" in system and "ASSET_V1" in system
+        assert f"{selected}_V2" not in system and f"{other}_V1" not in system
+    saved = read_json(chat.log.path / "round-1/input.json")
+    assert saved["sop"] == {mode.lower(): f"{selected}_V1", "asset": "ASSET_V1"}
+    assert agent_prompts.user_message_text(saved["prompt"]["message"]) == original
+    assert saved["source_manifest_id"] == (None if mode == "Construct" else chat.host.manager.default_manifest_id())
+    state["respond"] = lambda _: answer()
+    assert asyncio.run(chat.run("继续", options))["status"] == "completed"
+    second = read_json(chat.log.path / "round-2/input.json")
+    assert second["sop"] == {mode.lower(): f"{selected}_V2", "asset": "ASSET_V2"}
+    assert f"{selected}_V2" in state["calls"][-1]["messages"][0]["content"]
+
+
 @pytest.fixture
 def conversation(probe, tmp_path):
     command, state, _ = probe
@@ -384,7 +429,9 @@ def test_invalid_final_gets_error_feedback_then_strict_json_without_tools(conver
         if len(calls) == 1:
             return {"role": "assistant", "content": invalid}, "stop"
         assert not body.get("tools")
-        assert "严格 JSON 校验" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "只纠正最终 JSON" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "外层不加代码围栏" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "当前没有启用工具。" in body["messages"][0]["content"]
         return answer("已联通，仅分析。")
     state["respond"] = respond
     before = {p.name: p.read_bytes() for p in chat.host.candidate.iterdir()}
@@ -395,6 +442,11 @@ def test_invalid_final_gets_error_feedback_then_strict_json_without_tools(conver
     for index, payload in enumerate(state["calls"], 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
         assert "本轮模型请求第" not in system and "<cwd>" not in system
+        if index > 1:
+            assert "对象外不加解释或代码围栏" in system
+            assert "内部可用 Markdown" in system
+        else:
+            assert "revise_success" not in system
         assert f"本轮模型请求第 {index}/20 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
     assert all(not ({"max_tokens", "max_completion_tokens", "max_output_tokens"} & body.keys())
                for body in state["calls"])
@@ -767,3 +819,27 @@ def test_round_freezes_shared_config_and_auth_until_next_message(conversation):
         if path.is_file():
             assert b"example-round-A" not in path.read_bytes()
             assert b"example-round-B" not in path.read_bytes()
+
+
+def test_two_invalid_final_answers_retry_automatically_and_preserve_business_reply(conversation):
+    chat, options, state = conversation
+    invalid = '```json\n{"revise_success":false,"message":"I can inspect the Candidate."}\n```'
+    steps = iter([({'role': 'assistant', 'content': invalid}, 'stop'),
+                  ({'role': 'assistant', 'content': 'not JSON'}, 'stop'),
+                  answer('I can inspect the Candidate.')])
+    payloads = []
+    def respond(body):
+        payloads.append(body)
+        if len(payloads) > 1:
+            assert not body.get('tools')
+            assert '保留上次回复中真正回答开发者问题的内容' in json.dumps(body, ensure_ascii=False)
+            assert '不要要求用户重发问题' in json.dumps(body, ensure_ascii=False)
+        return next(steps)
+    state['respond'] = respond
+    before = {path: path.read_bytes() for path in chat.host.candidate.rglob('*') if path.is_file()}
+    result = asyncio.run(chat.run('Tell me what you can see', options))
+    assert result['status'] == 'completed' and result['requests'] == 4, result
+    assert result['answer']['message'] == 'I can inspect the Candidate.'
+    assert all(path.read_bytes() == value for path, value in before.items())
+    events = list(read_events(chat.log.root / 'events.jsonl'))
+    assert len([row for row in events if row['event']['type'] == 'final_answer_retry']) == 2

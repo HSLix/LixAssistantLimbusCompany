@@ -149,6 +149,7 @@ def test_final_parse_errors_include_actual_text_and_position(text):
     details = error_details(caught.value, "agent")
     assert details["stage"] == "final_answer" and details["raw_text"] == text
     assert details["parse_line"] >= 1 and details["parse_column"] >= 1
+    assert "三个反引号 ```" in details["hint"]
     assert "JSONDecodeError" in details["traceback"]
     assert text in details_text(details)
 
@@ -191,3 +192,8 @@ def test_rpc_wait_timeout_identifies_stage_and_preserves_cause(stage):
         asyncio.run(rpc_event(event, stage))
     assert caught.value.__cause__ is original
     assert "30 秒" in str(caught.value) and "stderr" in str(caught.value)
+
+
+def test_final_json_message_allows_markdown_inside_the_string():
+    value = {"revise_success": False, "message": "说明：\n```python\nprint(1)\n```"}
+    assert final_answer({"content": [{"type": "text", "text": json.dumps(value)}]}) == value
