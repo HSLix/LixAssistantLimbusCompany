@@ -7,6 +7,7 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_example_workf
 import json
 import shutil
 from pathlib import Path
+from types import SimpleNamespace
 
 from lalc.actions import application_actions
 from lalc.application import ApplicationService
@@ -15,7 +16,7 @@ from test_assets import Window
 
 
 def test_three_level_example_and_all_production_actions(tmp_path):
-    """使用生产注册动作，只替换 Windows 平台，证明样例走统一应用入口。"""
+    """使用生产注册动作，替换 Windows 平台和 OCR 模型，证明样例走统一应用入口。"""
     candidate = tmp_path / "candidate"
     shutil.copytree(Path(__file__).resolve().parents[1] / "example" / "workflow", candidate)
     manager = ManifestManager(tmp_path / "data", actions=application_actions())
@@ -26,6 +27,10 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     traces = []
     def run(entry, inputs, manifest=original.manifest_id):
         service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=Window(), game_language="zh")
+        service.ocr_service = SimpleNamespace(recognize=lambda image, **kwargs: {
+            "region": {"x": 0, "y": 0, "width": image.shape[1], "height": image.shape[0]},
+            "items": [{"text": "战斗开始", "score": 0.97, "box": {"x": 2, "y": 1, "width": 2, "height": 2},
+                       "polygon": [[2, 1], [3, 1], [3, 2], [2, 2]], "centerxy": [2, 1]}]})
         run_id = service.start(entry, inputs, manifest_id=manifest)
         state = service.wait_for(lambda current: current["phase"] == "finished")
         assert state["result"]["status"] == "success", state["result"]
@@ -54,6 +59,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     assert service.tag_asset("ui/claim", Path(crop["image_path"]), ["zh"])["tags"] == ["zh"]
     detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
+    assert run("steps.ocr", {"min_score": 0.9})["result"]["output"]["items"][0]["text"] == "战斗开始"
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())
 
 

@@ -1,6 +1,6 @@
-# GUI third-party notices
+# Third-party notices
 
-The LALC project license remains in LICENSE. This file identifies the GUI libraries;
+The LALC project license remains in LICENSE. This file identifies bundled libraries;
 it does not replace their original license texts or grant a separate commercial license.
 The packaged application includes the following distributions' metadata and license files.
 
@@ -17,6 +17,14 @@ The packaged application includes the following distributions' metadata and lice
 
 Platform libraries, Python, and other runtime dependencies retain their original
 licenses and notices. Refer to the corresponding distributions and packaged metadata.
+
+Local OCR includes RapidOCR 3.10.0 (Apache-2.0), its converted PP-OCRv6 Small
+detection and recognition models (upstream Baidu/PaddleOCR rights holders,
+Apache-2.0), and ONNX Runtime 1.31.1 (Microsoft, MIT). Their distribution metadata,
+license texts and RapidOCR MODEL_LICENSES.md are included in the packaged application.
+The recognition dictionary is embedded in the model; no separate font is bundled
+for OCR rendering. Sources: https://github.com/RapidAI/RapidOCR and
+https://github.com/microsoft/onnxruntime.
 
 The optional with-pi ZIP also contains the complete official Windows x64 pi 1.4.0
 release under `pi/`, including its runtime resources, documentation and metadata.

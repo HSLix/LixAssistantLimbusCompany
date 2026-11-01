@@ -40,6 +40,7 @@ Run Result 的 `output` 含观察标识及证据路径；详细记录保存在�
 | Step | Trusted Action | 输入 |
 | --- | --- | --- |
 | `steps.capture` | `observe.capture_screen` | `save`，默认 true |
+| `steps.ocr` | `observe.capture_screen` + `observe.ocr` | 可选 `region`、`min_score`（默认 0.0），返回完整 OCR 结果；暂不支持韩文 |
 | `steps.wait` | `control.wait` | `seconds`，默认 0 |
 | `steps.click` | `control.click` | 必填 `x`, `y` |
 | `steps.key_press` | `control.key_press` | 必填 `key`：esc / p / enter |

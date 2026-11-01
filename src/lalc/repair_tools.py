@@ -12,6 +12,8 @@ from .actions import application_actions
 from .assets import AssetLibrary, asset_name
 from .focused import FocusedAutomationSession, WindowsWindowPlatform
 from .agent_diagnostics import error_details
+from .ocr import ocr_service
+from .runtime import UserInterruption
 
 
 from .agent_policy import BASE_TOOLS
@@ -33,6 +35,7 @@ class RepairTools:
         self.cancelled = threading.Event()
         self.sequence = 0
         self.previews = {}
+        self.ocr_service = host.service.ocr_service if host is not None else ocr_service
 
     def checkpoint(self):
         if self.cancelled.is_set():
@@ -264,11 +267,31 @@ class RepairTools:
         return session, metadata, path
 
     def game_screenshot(self):
+        """返回同次原图、网格图及完整 OCR；识别失败保留图片并说明错误，不支持韩文。"""
+        from .recognition import client_image
+
         session, metadata, path = self.capture()
         result = self.image(path.read_bytes(), {**metadata, "view": "original"})
         overlay = self.image(self.marked_image(session, grid=True), {"view": "grid", "spacing": 40}, 2)
         result["content"].extend(overlay["content"])
         result["details"]["grid"] = overlay["details"]
+        def checkpoint():
+            self.checkpoint()
+            session.check(record=False)
+
+        try:
+            recognized = self.ocr_service.recognize(client_image(session.image, session.size), checkpoint=checkpoint)
+            ocr = {"ocr": {"observation": session.observation, **recognized}}
+        except UserInterruption:
+            raise
+        except Exception as error:
+            # 窗口失效或取消不能被 OCR 降级掩盖。
+            checkpoint()
+            details = error_details(error, "tool:game_screenshot:ocr", keys=self.log.keys)
+            ocr = {"ocr_error": details}
+        checkpoint()
+        result["content"].extend(self.text(ocr)["content"])
+        result["details"].update(ocr)
         return result
 
     @staticmethod

@@ -178,6 +178,7 @@ class WorkflowExecutor:
         select_manifest: Callable[[LoadedManifest], None] | None = None,
         game_language: str = "en",
         match_asset: Callable[..., list[dict[str, Any]]] | None = None,
+        ocr: Callable[..., dict[str, Any]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
@@ -202,6 +203,7 @@ class WorkflowExecutor:
         self.select_manifest = select_manifest
         self.game_language = game_language
         self._match_asset = match_asset
+        self._ocr = ocr
         self._crop_asset = crop_asset
         self.attempted_manifest_ids = [manifest.manifest_id]
 
@@ -703,6 +705,12 @@ class WorkflowExecutor:
         if self._active_action != "observe" or self._match_asset is None:
             raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
         return self._match_asset(logical_name, **options)
+
+    def ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
+        """保持 OCR 的 observe 权限边界，原始失败交由现有执行路径处理。"""
+        if self._active_action != "observe" or self._ocr is None:
+            raise ExecutionFailure("execution_failed", "OCR requires an observe Trusted Action.")
+        return self._ocr(region=region, min_score=min_score)
 
     def crop_asset(self, logical_name: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
         if self._active_action != "observe" or self._crop_asset is None:

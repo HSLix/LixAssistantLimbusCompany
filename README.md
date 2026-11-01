@@ -43,7 +43,9 @@ template cropping are available through observe Trusted Actions; Assets update i
 [the developer tutorial](docs/developer-workflow-tutorial.md).
 Input takeover has automated coverage and prior standalone Windows acceptance;
 current Workflow integration and Windows package acceptance remain deferred.
-OCR and model calls are not implemented yet.
+Local PP-OCRv6 Small OCR is available through `observe.ocr` and the Agent's
+`game_screenshot` tool; see [OCR usage and validation limits](docs/ocr.md).
+Korean and custom-model recognition are unsupported.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras

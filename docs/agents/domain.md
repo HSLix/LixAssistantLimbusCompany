@@ -1,5 +1,7 @@
 # Domain Docs
 
+2026-11-01 OCR：observe.ocr 使用已有有效截图；game_screenshot 在原图/网格之外附同图完整 OCR JSON，OCR 故障可保留截图并返回 ocr_error，取消/窗口失效不降级。暂不支持韩文。接口与验证边界见 [OCR 用法](../ocr.md)及[影响审查](../ocr-integration-impact-review.md)。
+
 2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](../stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
 
 2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](../stage-5-manifest-reference-impact-review.md)。

@@ -35,6 +35,10 @@ class RunContext:
     def game_language(self) -> str:
         return self._executor.game_language
 
+    def ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
+        """仅供 observe Action 识别当前内存截图，不隐式刷新。"""
+        return self._executor.ocr(region=region, min_score=min_score)
+
     def match_asset(
         self, logical_name: str, *, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,

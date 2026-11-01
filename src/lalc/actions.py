@@ -23,6 +23,11 @@ def capture_screen(ctx, *, save: bool = False) -> dict[str, int | str]:
     return ctx.capture_screen(save=save)
 
 
+def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, int | dict[str, int] | list[dict[str, str | float | dict[str, int] | list[int] | list[list[int]]]]]:
+    """识别当前有效截图的文字，返回 observation、region 和完整 items；不刷新或保存截图，不支持韩文。"""
+    return ctx.ocr(region=region, min_score=min_score)
+
+
 def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
                 threshold: float = 0.9, nms: bool = True,
                 nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]]:
@@ -74,6 +79,7 @@ def application_actions() -> dict[str, TrustedAction]:
     """构建应用唯一动作表；测试可由应用层提供替身表。"""
     return {
         "observe.capture_screen": TrustedAction(capture_screen, "observe"),
+        "observe.ocr": TrustedAction(ocr, "observe"),
         "observe.match_asset": TrustedAction(match_asset, "observe"),
         "observe.crop_asset": TrustedAction(crop_asset, "observe"),
         "control.click": TrustedAction(click, "control"),

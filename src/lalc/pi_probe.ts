@@ -251,7 +251,7 @@ export default async function (pi) {
           sha256: Type.String({ pattern: "^[0-9a-f]{64}$" }) }), { minItems: 1 }) }) },
       { name: "action_contracts", description: "Read all registered Trusted Action classifications, signatures, return types and docstrings. Does not execute actions or expose implementation source.",
         parameters: Type.Object({}) },
-      { name: "game_screenshot", description: "Return a fresh original game screenshot and a separate 40px coordinate grid image. Overlays are viewing aids only, never template or evidence pixels. Restores and focuses the unique game window.",
+      { name: "game_screenshot", description: "Return a fresh original game screenshot, a separate 40px coordinate grid image, and full OCR JSON (observation, region, items with text, score, box, polygon and centerxy) from the SAME original pixels. OCR coordinates are client-area pixels; no summarization or correction. Korean is unsupported. OCR failure preserves both images and returns ocr_error, never an empty success. Cancellation or window invalidation still fails the tool. Overlays are viewing aids only, never OCR, template or evidence pixels. Restores and focuses the unique game window.",
         parameters: Type.Object({}) },
       { name: "preview_crop", description: "Capture the game anew; preview a crop without adding an active Asset. Return full image with crop boundary lines, the clean crop, and same-image template matching at threshold. A match is diagnostic, not proof of cross-state reliability. Returns preview_id for crop_asset to save the identical pixels and parameters.",
         parameters: Type.Object({ logical_name: logicalName,

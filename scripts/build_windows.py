@@ -1,4 +1,4 @@
-"""在 Windows x64 本地构建同源双包；不收集用户数据，不调用 pi 或模型。"""
+"""在 Windows x64 本地构建同源双包；校验 OCR 资源，不收集用户数据或调用模型。"""
 
 from __future__ import annotations
 
@@ -15,8 +15,10 @@ import tempfile
 import tomllib
 import zipfile
 
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+from lalc.ocr import MODEL_HASHES
+
 PI_VERSION = "1.4.0"
 PI_SHA256 = "0f7256ea8bdac3af20012b94fdc1252a31cc6dc0d2f9b9eb539555d22e3e321b"
 PI_URL = "https://github.com/earendil-works/pi/releases/download/v1.4.0/pi-windows-x64.zip"
@@ -68,9 +70,13 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict) ->
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
-                     "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm"):
+                     "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
+                     "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml"):
         if not (application / relative).is_file():
             raise ValueError(f"Missing packaged resource: {relative}")
+    for name, expected in MODEL_HASHES.items():
+        if digest(application / "_internal/rapidocr/models" / name) != expected:
+            raise ValueError(f"Packaged OCR model hash mismatch: {name}")
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="lalc-release-", dir=destination) as directory:
         stage = Path(directory)

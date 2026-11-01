@@ -31,13 +31,17 @@ def archive(tmp_path, monkeypatch):
     return path
 
 
-def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive):
+def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
     for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
-                 "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm"):
+                 "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
+                 "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
+                 *["_internal/rapidocr/models/" + name for name in build.MODEL_HASHES]):
         target = app / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(name.encode())
+    monkeypatch.setattr(build, "MODEL_HASHES", {name: build.digest(app / "_internal/rapidocr/models" / name)
+                                              for name in build.MODEL_HASHES})
     (tmp_path / "user-settings.json").write_text('"private"', encoding="utf-8")
     outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
     with zipfile.ZipFile(outputs[0]) as plain, zipfile.ZipFile(outputs[1]) as bundled:
@@ -54,6 +58,26 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     with pytest.raises(ValueError, match="sop.md"):
         build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
     assert {path: build.digest(path) for path in outputs} == before
+
+
+def test_tampered_ocr_model_prevents_replacing_archives(tmp_path, archive, monkeypatch):
+    app = tmp_path / "application"
+    resources = ["LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico",
+                 "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
+                 "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
+                 "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml"]
+    for name in resources:
+        path = app / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"test")
+    model = app / "_internal/rapidocr/models/det.onnx"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"original")
+    monkeypatch.setattr(build, "MODEL_HASHES", {"det.onnx": build.digest(model)})
+    model.write_bytes(b"tampered")
+    with pytest.raises(ValueError, match="OCR model hash"):
+        build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
+    assert not (tmp_path / "dist").exists()
 
 
 def test_tampered_pi_and_missing_frozen_resource_are_rejected(tmp_path, archive):
