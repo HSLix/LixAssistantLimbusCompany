@@ -1,4 +1,4 @@
-"""经真实 pi 与本机 HTTP 替身验证 Session 续聊、图片、中断与 CLI 发布试运行。
+"""经真实 pi 与本机 HTTP 替身验证 Session 续聊、人工反馈、图片、中断与 CLI 发布试运行。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q tests/test_developer_session_agent.py
@@ -22,6 +22,169 @@ from agent_test_server import agent_server
 from test_developer_gui import gui
 
 pytestmark = pytest.mark.agent
+
+
+@pytest.mark.parametrize('mode,continuation', [('Construct', 'memory'), ('Construct', 'gui'),
+                                             ('Repair', 'memory'), ('Repair', 'gui'), ('Repair', 'cli')])
+@pytest.mark.parametrize('corrections', [1, 2])
+def test_tools_restored_after_final_correction(conversation, mode, continuation, corrections):
+    """格式纠正禁用工具不污染下轮或恢复入口；旧日志与实际工具结果保留。"""
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(),
+                                      mode=mode, entry='gui')
+    chat = session.conversation()
+    seen = []
+
+    def feedback(request):
+        seen.append(request)
+        request.finish('confirmed', '已检查')
+
+    script(state, [tool('request_feedback', {'message': '第一次反馈'}),
+                   *[({'role': 'assistant', 'content': 'invalid'}, 'stop')] * corrections,
+                   answer('corrected')])
+    result = asyncio.run(chat.run('先请求反馈再回答', options, on_feedback=feedback))
+    assert result['status'] == 'completed', result
+    assert len(seen) == 1
+    assert all(not body.get('tools') for body in state['calls'][-corrections:])
+    events = list(read_events(chat.log.root / 'events.jsonl'))
+    assert any(row['event']['type'] == 'message_end' and row['event']['message'].get('toolsRemoved')
+               for row in events)
+    retained = {path: path.read_bytes() for path in (chat.log.root / 'round-1').rglob('*') if path.is_file()}
+    if continuation != 'memory':
+        chat = DeveloperSession(original.host.service, session.identity, entry=continuation).conversation()
+    assert any(message.get('role') == 'system' and message.get('toolsRemoved') for message in chat.history)
+    returned = [message for message in chat.history if message.get('toolName') == 'request_feedback']
+    assert returned[-1]['details'] == {'status': 'confirmed', 'text': '已检查'}
+    expected = set(chat.allowed)
+    next_tool = 'action_contracts' if continuation == 'cli' else 'request_feedback'
+    steps = iter([tool(next_tool, {} if continuation == 'cli' else {'message': '第二次反馈'}), answer('continued')])
+
+    def respond(body):
+        assert {item['function']['name'] for item in body.get('tools', [])} == expected
+        guidance = body['messages'][0]['content'].split('# Tool Guidance\n', 1)[1]
+        assert {line[2:].split(':', 1)[0] for line in guidance.splitlines() if line.startswith('- ')} == expected
+        assert any(message.get('role') == 'tool' and '已检查' in str(message) for message in body['messages'])
+        return next(steps)
+
+    state['respond'] = respond
+    result = asyncio.run(chat.run('继续调用工具', options, on_feedback=feedback))
+    assert result['status'] == 'completed' and result['requests'] == 2, result
+    assert len(seen) == (1 if continuation == 'cli' else 2)
+    assert ('request_feedback' in expected) == (continuation != 'cli')
+    assert all(path.read_bytes() == content for path, content in retained.items())
+
+
+@pytest.mark.parametrize('mode', ['Construct', 'Repair'])
+@pytest.mark.parametrize('status,text', [('confirmed', ''), ('confirmed', '操作完成'), ('skipped', '')])
+def test_feedback_returns_in_same_round_and_survives_cli_resume(conversation, mode, status, text):
+    """人工反馈经真实 pi 回到同轮上下文；续聊不重放、不向 CLI 授权。"""
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(), mode=mode, entry='gui')
+    chat = session.conversation()
+    seen = []
+    def feedback(request):
+        seen.append(request)
+        request.finish(status, text)
+    script(state, [tool('request_feedback', {'message': '请检查当前界面'}), answer('received')])
+    result = asyncio.run(chat.run('interact', options, on_feedback=feedback))
+    assert result['status'] == 'completed', result
+    assert len(seen) == 1 and result['requests'] == 2
+    returned = [item for item in chat.history if item.get('toolName') == 'request_feedback']
+    assert returned[-1]['details'] == {'status': status, 'text': text}
+    assert any(message.get('role') == 'tool' and status in str(message) for message in state['calls'][-1]['messages'])
+    before = len(seen)
+    if mode == 'Repair':
+        restored = DeveloperSession(original.host.service, session.identity, entry='cli').conversation()
+        script(state, [tool('request_feedback', {'message': 'forbidden'}), answer('denied')])
+        result = asyncio.run(restored.run('CLI continuation', options, on_feedback=feedback))
+        assert result['status'] == 'completed', result
+        assert len(seen) == before
+        assert 'request_feedback' not in {item['function']['name'] for item in state['calls'][-1]['tools']}
+        assert [item for item in restored.history if item.get('toolName') == 'request_feedback'][-1]['isError']
+    else:
+        restored = DeveloperSession(original.host.service, session.identity, entry='gui').conversation()
+        assert [item for item in restored.history if item.get('toolName') == 'request_feedback'][-1]['details'] == returned[-1]['details']
+
+
+@pytest.mark.parametrize('cancel', [False, True])
+def test_feedback_batch_waits_before_trial_and_cancel_reaps(conversation, monkeypatch, cancel):
+    """同响应内人工等待先于后续工具；取消清理 pi 后不能再执行试运行。"""
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(), entry='gui')
+    chat = session.conversation()
+    batch = []
+    for index, (name, arguments) in enumerate([('request_feedback', {'message': 'wait'}),
+                                              ('trial_run', {'manifest_id': 'saved'})]):
+        call = tool(name, arguments)[0]['tool_calls'][0]
+        call['index'] = index
+        batch.append(call)
+    script(state, [({'role': 'assistant', 'tool_calls': batch}, 'tool_calls'), answer()])
+    requests, trials = [], []
+    def trial(**arguments):
+        trials.append(arguments)
+        assert requests[0].done.is_set()
+        return chat.tools.text({'status': 'completed'})
+    monkeypatch.setattr(chat.tools, 'trial_run', trial)
+    async def run():
+        task = asyncio.create_task(chat.run('batch interaction', options, on_feedback=requests.append))
+        try:
+            async with asyncio.timeout(15):
+                while not requests:
+                    await asyncio.sleep(.01)
+            await asyncio.sleep(.1)
+            assert not trials and not task.done()
+            assert chat.host.service.state['activity'] == 'Agent'
+            from lalc.application import StartError
+            with pytest.raises(StartError, match='当前活动'):
+                chat.host.capture()
+            if cancel:
+                task.cancel()
+            else:
+                requests[0].finish('confirmed', '')
+            return await task
+        finally:
+            if not task.done():
+                task.cancel()
+                await task
+    result = asyncio.run(run())
+    assert result['status'] == ('cancelled' if cancel else 'completed'), result
+    assert bool(trials) is not cancel
+    assert requests[0].done.is_set() and not requests[0].finish('confirmed', 'late')
+    assert chat.tools.on_feedback is None and chat.host.service.state['activity'] is None
+    restored = session.conversation()
+    results = [item for item in restored.history if item.get('toolName') == 'request_feedback']
+    assert results and (results[-1]['isError'] if cancel else results[-1]['details']['status'] == 'confirmed')
+
+
+def test_actual_gui_feedback_signal_and_empty_confirmation(conversation, gui):
+    """真实 GUI 发送链路经 pi 请求反馈，点击空确认后完成同轮。"""
+    from PySide6.QtCore import QTimer
+    from lalc.agent_settings import save_settings
+    from test_developer_gui import wait_jobs
+    _, options, state = conversation
+    app, window = gui
+    save_settings(window.service.data_root, {'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
+    script(state, [tool('request_feedback', {'message': '请操作后确认'}), answer('feedback received')])
+    seen = []
+    timer = QTimer()
+    def confirm():
+        dialog = getattr(window.repair_page, 'feedback_dialog', None)
+        if dialog is not None and dialog.isVisible():
+            seen.append(dialog.request)
+            dialog.confirm.click()
+            timer.stop()
+    timer.timeout.connect(confirm)
+    timer.start(10)
+    try:
+        window.repair_page.message.setPlainText('request human feedback')
+        window.repair_page.send()
+        wait_jobs(app, window)
+    finally:
+        timer.stop()
+    assert len(seen) == 1 and seen[0].result == {'status': 'confirmed', 'text': ''}
+    chat = window.repair_page.host.conversation
+    assert read_json(chat.log.root / 'result.json')['status'] == 'completed'
+    assert 'feedback received' in window.repair_page.chat.toPlainText()
 
 
 @pytest.mark.parametrize('mode,entry,build', [('Construct', 'gui', '26156805'), ('Repair', 'gui', None), ('Repair', 'cli', '26156805')])

@@ -50,7 +50,7 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - 成品数据统一在 `%LOCALAPPDATA%\LALC`：`candidate/`、`.candidate-baseline.json`、`pages/`、Manifest、Component、Assets、配置、日志与证据。替换程序目录不搬移数据；源码运行仍沿用项目 `candidate/`。不自动寻找、迁移或删除旧草稿。
 - 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出以后另做。
 - 默认 pi 选择：`LALC.exe` 同级 `pi/pi.exe` 优先，其次环境路径；显式 CLI `--pi` 保持调用者指定。
-- 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条模型 prompt 发送前即关闭本轮回退，包括图片／连接预检；预检后的正式修复进程失败也不换 pi。
+- 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条正式模型 prompt 发送前即关闭本轮回退，之后不因进程故障改换 pi；每轮图片／连接推理预检已取消。
 - 没有可用 pi 时只拒绝实际 Agent 启动；User Agent 关闭时仍可执行确定性任务，不自动联网安装 pi。
 
 ## 开发者单独准备验收示例

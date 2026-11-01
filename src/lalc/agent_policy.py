@@ -6,9 +6,10 @@ BASE_TOOLS = ("read", "edit", "validate", "asset_tree", "asset_directory", "asse
               "list_manifests", "read_manifest", "read_manifest_source",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
 KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search", "knowledge_git")
-MODE_TOOLS = {"Construct": frozenset(BASE_TOOLS + KNOWLEDGE_TOOLS),
-              "Repair": frozenset(BASE_TOOLS + KNOWLEDGE_TOOLS)}
-ENTRY_TOOLS = {"gui": frozenset(BASE_TOOLS + KNOWLEDGE_TOOLS), "cli": frozenset(BASE_TOOLS)}
+GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback",)
+MODE_TOOLS = {"Construct": frozenset(BASE_TOOLS + GUI_TOOLS),
+              "Repair": frozenset(BASE_TOOLS + GUI_TOOLS)}
+ENTRY_TOOLS = {"gui": frozenset(BASE_TOOLS + GUI_TOOLS), "cli": frozenset(BASE_TOOLS)}
 
 
 def allowed_tools(mode, entry):
@@ -16,4 +17,4 @@ def allowed_tools(mode, entry):
     if mode not in MODE_TOOLS or entry not in ENTRY_TOOLS or entry == "cli" and mode != "Repair":
         raise ValueError("CLI 仅能使用 Repair；无效的开发模式或入口。")
     allowed = MODE_TOOLS[mode] & ENTRY_TOOLS[entry]
-    return tuple(name for name in BASE_TOOLS + KNOWLEDGE_TOOLS if name in allowed)
+    return tuple(name for name in BASE_TOOLS + GUI_TOOLS if name in allowed)

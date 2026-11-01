@@ -10,6 +10,23 @@ from .i18n import tr
 from .agent_prompts import user_message_text, chat_title
 
 
+def raw_output_text(content):
+    """同一格式呈现实时内容与已落盘的完整模型消息。"""
+    parts = []
+    for part in content:
+        kind = part.get('type')
+        if kind == 'text':
+            parts.append(part.get('text', ''))
+        elif kind == 'thinking':
+            parts.append(part.get('thinking', ''))
+        elif kind == 'toolCall':
+            arguments = part.get('partialArgs')
+            if arguments is None:
+                arguments = json.dumps(part.get('arguments', {}), ensure_ascii=False)
+            parts.append(part.get('name', '') + '\n' + arguments)
+    return '\n\n'.join(part for part in parts if part)
+
+
 class RepairChat(QTextBrowser):
     """用原生富文本区呈现角色与 Markdown，按调用 ID 合并可展开工具记录。"""
 
@@ -17,13 +34,59 @@ class RepairChat(QTextBrowser):
         super().__init__(parent)
         self.entries = []
         self.tools = {}
+        self.activities = {}
+        self.activity_round = 0
         self.setOpenLinks(False)
         self.anchorClicked.connect(self.open_link)
 
     def clear(self):
         self.entries.clear()
         self.tools.clear()
+        self.activities.clear()
+        self.activity_round = 0
         super().clear()
+
+    def activity(self, number=None):
+        """每轮独立保存生成过程和展开选择，避免续聊覆盖上一轮。"""
+        number = self.activity_round if number is None else number
+        return self.activities.setdefault(number, {'status': '', 'tooltip': '', 'messages': [],
+                                                   'pending': '', 'expanded': False})
+
+    def remember_message(self, number, content):
+        """复用完整消息记录保留生成过程，不新增逐片持久化或迁移。"""
+        self.activity_round = number
+        activity = self.activity(number)
+        text = raw_output_text(content)
+        if text:
+            activity['messages'].append(text)
+        activity['pending'] = ''
+        self.render()
+
+    def set_activity(self, status, round_number, tooltip=""):
+        """状态与生成过程位于对应轮次回复顶部。"""
+        self.activity_round = round_number
+        activity = self.activity()
+        unchanged_empty = not status and not activity['status'] and not activity['messages'] and not activity['pending']
+        activity.update(status=status, tooltip=tooltip)
+        if not unchanged_empty:
+            self.render()
+
+    def activity_html(self, number):
+        """真实状态作折叠标题；模型内容按纯文字转义。"""
+        activity = self.activity(number)
+        raw = '\n\n'.join([*activity['messages'], *([activity['pending']] if activity['pending'] else [])])
+        title = escape(activity['status'] or tr('Raw output'))
+        tooltip = escape(activity['tooltip'], quote=True)
+        if raw:
+            tooltip = escape(tr('Expand or collapse raw output'), quote=True) + (' · ' + tooltip if tooltip else '')
+            arrow = '▾' if activity['expanded'] else '▸'
+            title = f'<a href="raw:{number}" title="{tooltip}" style="color:#737980;text-decoration:none">{title} {arrow}</a>'
+        elif not activity['status']:
+            return ''
+        body = f'<p style="color:#737980" title="{tooltip}">{title}</p>'
+        if raw and activity['expanded']:
+            body += '<pre>' + escape(raw) + '</pre>'
+        return body
 
     def add_message(self, role, text, round_number=0):
         self.entries.append({"role": role, "text": text, "round": round_number})
@@ -62,7 +125,13 @@ class RepairChat(QTextBrowser):
         self.render()
 
     def open_link(self, url):
-        if url.scheme() == "tool":
+        if url.scheme() == "raw":
+            if not url.path().isdigit() or int(url.path()) not in self.activities:
+                return
+            activity = self.activities[int(url.path())]
+            activity['expanded'] = not activity['expanded']
+            self.render(follow=False)
+        elif url.scheme() == "tool":
             index = int(url.path())
             self.entries[index]["expanded"] = not self.entries[index]["expanded"]
             self.render(follow=False)
@@ -75,7 +144,17 @@ class RepairChat(QTextBrowser):
         position = bar.value()
         at_bottom = position >= bar.maximum() - 2
         parts, previous_round = [], None
+        # 每轮折叠区跟随该轮用户消息，续聊仍保留旧轮次内容。
+        activity_indices = {}
         for index, entry in enumerate(self.entries):
+            if entry['role'] == '你':
+                activity_indices[entry['round']] = index + 1
+        activity_at = {}
+        for number in self.activities:
+            activity_at.setdefault(activity_indices.get(number, len(self.entries)), []).append(number)
+        for index, entry in enumerate(self.entries):
+            for number in activity_at.get(index, []):
+                parts.append(self.activity_html(number))
             number, role = entry["round"], entry["role"]
             if number and number != previous_round:
                 parts.append(tr('<hr><p><b>Round {0}</b></p>').format(number))
@@ -115,5 +194,7 @@ class RepairChat(QTextBrowser):
                 body = "<p>" + escape(entry["text"]).replace("\n", "<br>") + "</p>"
             parts.append(f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" '
                          f'style="color:#172b4d"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
+        for number in activity_at.get(len(self.entries), []):
+            parts.append(self.activity_html(number))
         self.setHtml("".join(parts))
         bar.setValue(bar.maximum() if follow and at_bottom else position)

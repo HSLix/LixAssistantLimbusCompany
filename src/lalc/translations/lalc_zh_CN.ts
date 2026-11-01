@@ -3,6 +3,38 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Raw output</source>
+      <translation>原始输出</translation>
+    </message>
+    <message>
+      <source>Expand or collapse raw output</source>
+      <translation>展开或收起原始输出</translation>
+    </message>
+    <message>
+      <source>Agent request</source>
+      <translation>Agent 请求</translation>
+    </message>
+    <message>
+      <source>Your feedback (optional)</source>
+      <translation>你的反馈（可留空）</translation>
+    </message>
+    <message>
+      <source>Waiting for feedback</source>
+      <translation>等待人工反馈</translation>
+    </message>
+    <message>
+      <source>Feedback does not verify game state or approve installation. Empty confirmation is allowed.</source>
+      <translation>反馈不证明游戏状态，也不批准安装；可直接空答复确认。</translation>
+    </message>
+    <message>
+      <source>Confirm</source>
+      <translation>确认</translation>
+    </message>
+    <message>
+      <source>Skip</source>
+      <translation>跳过</translation>
+    </message>
+    <message>
       <location filename="../repair_chat.py" line="96" />
       <source> · Round {0}</source>
       <translation> · 第 {0} 轮</translation>

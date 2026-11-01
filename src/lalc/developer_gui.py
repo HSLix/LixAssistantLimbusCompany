@@ -25,7 +25,7 @@ from qfluentwidgets import (
 
 from .i18n import tr
 
-from .repair_chat import RepairChat, chat_title
+from .repair_chat import RepairChat, chat_title, raw_output_text
 from .chat_input import ChatInput
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
 from .agent_diagnostics import check_settings, details_text
@@ -66,6 +66,62 @@ class Operation(QThread):
         finally:
             self.loop = None
             self.task = None
+
+
+class FeedbackDialog(QDialog):
+    """非模态人工反馈；窗口关闭只跳过，取消按钮结束发起轮次。"""
+
+    def __init__(self, request, window):
+        super().__init__(window)
+        self.request = request
+        self.setWindowTitle(tr('Waiting for feedback'))
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.resize(640, 420)
+        layout = QVBoxLayout(self)
+        content = QPlainTextEdit()
+        content.setAccessibleName(tr('Agent request'))
+        content.setReadOnly(True)
+        content.setPlainText(request.message)
+        layout.addWidget(content)
+        notice = QLabel(tr('Feedback does not verify game state or approve installation. Empty confirmation is allowed.'))
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+        self.reply = QPlainTextEdit()
+        self.reply.setAccessibleName(tr('Your feedback (optional)'))
+        self.reply.setPlaceholderText(tr('Your feedback (optional)'))
+        layout.addWidget(self.reply)
+        controls = QHBoxLayout()
+        self.confirm = button(tr('Confirm'), lambda: self.respond('confirmed'), controls)
+        self.skip = button(tr('Skip'), self.reject, controls)
+        self.cancel = button(tr('Cancel round'), self.cancel_round, controls)
+        layout.addLayout(controls)
+        self.window = window
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.expire)
+        self.timer.start(50)
+
+    def respond(self, status):
+        self.request.finish(status, self.reply.toPlainText())
+        self.close()
+
+    def reject(self):
+        self.request.finish('skipped')
+        super().reject()
+
+    def closeEvent(self, event):
+        self.request.finish('skipped')
+        super().closeEvent(event)
+
+    def cancel_round(self):
+        """先请求轮次取消再作废反馈，不把取消记成 Skip。"""
+        if not self.request.done.is_set():
+            self.window.cancel_operation()
+            self.request.close()
+        self.close()
+
+    def expire(self):
+        if self.request.done.is_set():
+            self.close()
 
 
 class TrialDialog(QDialog):
@@ -829,11 +885,17 @@ class RepairPage(QWidget):
         self.chat.setMinimumSize(0, 80)
         self.chat.setStyleSheet('QTextBrowser { border: none; background: transparent; }')
         body.addWidget(self.chat, 1)
-        self.status = QLabel()
+        self.raw_timer = QTimer(self)
+        self.raw_timer.setSingleShot(True)
+        self.raw_timer.setInterval(50)
+        self.raw_timer.timeout.connect(self.flush_raw_output)
+        self.raw_pending = ''
+        self.clear_raw_output()
+        self.status = QLabel(self)
         self.status.setMinimumWidth(0)
         self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
-        body.addWidget(self.status)
+        self.status.hide()
         self.composer = QWidget()
         self.composer.setObjectName('chatComposer')
         self.composer.setStyleSheet('#chatComposer { background: rgba(128,128,128,0.07); border: 1px solid rgba(128,128,128,0.25); border-radius: 18px; }')
@@ -876,6 +938,46 @@ class RepairPage(QWidget):
         self.refresh_sessions()
         self.set_manifests(self.host.manager.list_manifests())
         self.show_empty_chat()
+
+    def set_status(self, text, tooltip=None):
+        """保留状态读取接口，将可见状态统一呈现在当前轮回复顶部。"""
+        self.status.setText(text)
+        self.status.setToolTip(text if tooltip is None else tooltip)
+        number = self.host.conversation.log.group if self.host.conversation else 0
+        self.chat.set_activity(text, number, self.status.toolTip())
+
+    def clear_raw_output(self):
+        """只丢弃尚未完成的流式缓冲，完整生成过程随回复保留。"""
+        self.raw_timer.stop()
+        self.raw_pending = ''
+        activity = self.chat.activity()
+        changed = bool(activity['pending'])
+        activity['pending'] = ''
+        if not activity['messages']:
+            activity['expanded'] = False
+        if changed:
+            self.chat.render()
+
+    def flush_raw_output(self):
+        """展开时合并绘制，滚动规则沿用聊天记录。"""
+        if self.chat.activity()['expanded']:
+            self.chat.render()
+
+    def update_raw_output(self, content, number=None):
+        """流式内容属于当前轮折叠区，完整消息到达时替换为保留记录。"""
+        if number is not None:
+            self.chat.activity_round = number
+        text = raw_output_text(content)
+        if not text or text == self.raw_pending:
+            return
+        first = not self.raw_pending
+        self.raw_pending = text
+        activity = self.chat.activity()
+        activity['pending'] = text
+        if first:
+            self.chat.render()
+        elif activity['expanded'] and not self.raw_timer.isActive():
+            self.raw_timer.start()
 
     def is_busy(self):
         state = self.window.service.state
@@ -970,7 +1072,9 @@ class RepairPage(QWidget):
         running = self._round_running and bool(self.window.jobs)
         cancelling = running and any(job.cancel_requested for job in self.window.jobs)
         if cancelling:
-            self.status.setText(tr('Cancelling…'))
+            self.clear_raw_output()
+            self.set_status(tr('Cancelling…'))
+            self.status.setToolTip(self.status.text())
         if running:
             self.send_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
             title = tr('Cancelling…') if cancelling else tr('Cancel round')
@@ -1064,7 +1168,7 @@ class RepairPage(QWidget):
         root = self.window.service.data_root / 'developer-sessions'
         self.history.clear()
         if root.is_symlink():
-            self.status.setText(tr('Invalid Session directory'))
+            self.set_status(tr('Invalid Session directory'))
             return
         if root.exists():
             paths = (path for path in root.iterdir() if not path.name.startswith('.'))
@@ -1101,6 +1205,7 @@ class RepairPage(QWidget):
     def new(self):
         if self.window.jobs or self.window.service.state.get('activity') or self.window.service.state['phase'] == 'running':
             return
+        self.clear_raw_output()
         self.session = None
         self.host = self.window.host
         self.chat.clear()
@@ -1113,7 +1218,8 @@ class RepairPage(QWidget):
         self.source_panel.hide()
         self.show_empty_chat()
         self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
-        self.status.clear()
+        self.set_status('')
+        self.status.setToolTip('')
         self.refresh_sessions()
         self.baseline.setCurrentIndex(0)
         self.render(False)
@@ -1131,6 +1237,7 @@ class RepairPage(QWidget):
         self.window.launch(operation, self.activate_session)
 
     def activate_session(self, session, *, restore_history=True):
+        self.clear_raw_output()
         self.session, self.host = session, session.host
         self.mode.setCurrentItem(session.mode)
         metadata = json.loads((session.path / 'session.json').read_text())
@@ -1148,13 +1255,18 @@ class RepairPage(QWidget):
         """从原始持久事件重建视图，保留工具关联，不触发模型或工具。"""
         if self.session is None:
             return
-        from .agent_log import read_events
+        self.clear_raw_output()
+        from .agent_log import read_events, read_json
         from .agent_repair import final_answer, FORMAT_RETRY_PREFIX
         from .agent_prompts import user_message_text
         with self.host.candidate_lock():
             self.session.restore(self.host.conversation)
             events_path = self.host.conversation.log.root / 'events.jsonl'
             rows = list(read_events(events_path)) if events_path.exists() else []
+            number = self.host.conversation.log.group
+            result = read_json(events_path.parent / f'round-{number}/result.json') if number else None
+            if result is not None:
+                result.setdefault('requests', self.host.conversation.log.requests)
         self.chat.clear()
         self.tool_errors.clear()
         self.diagnostics.errors.clear()
@@ -1168,6 +1280,7 @@ class RepairPage(QWidget):
                     if not text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', FORMAT_RETRY_PREFIX)):
                         self.chat.add_message('你', user_message_text(text), number)
                 elif kind == 'message_end' and value.get('message', {}).get('role') == 'assistant':
+                    self.chat.remember_message(number, value['message'].get('content', []))
                     try:
                         text = final_answer(value['message'])['message']
                     except ValueError:
@@ -1187,6 +1300,12 @@ class RepairPage(QWidget):
         self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
             self.host.conversation.log.group, self.host.conversation.log.requests,
             load_settings(self.host.service.data_root)['max_requests']))
+        if not self.window.jobs and not self.window.closing:
+            if result is not None:
+                self.show_result_status(result)
+            else:
+                self.set_status('')
+                self.status.setToolTip('')
         self.refresh_sessions()
 
     def open_pages(self):
@@ -1278,13 +1397,18 @@ class RepairPage(QWidget):
                 self.window.operation_event.emit({'event': {'type': 'workbench_session', 'session': current,
                     'message': message, 'round': conversation.log.group + 1}})
                 return conversation.run(message, SimpleNamespace(pi='pi', ask_api_key=False), images=images,
-                                        manifest_references=references, on_event=self.window.operation_event.emit)
+                                        manifest_references=references, on_event=self.window.operation_event.emit,
+                                        on_feedback=self.window.feedback_requested.emit)
             self._round_running = True
             self.window.launch(operation, self.answered)
         self.window._interact(action)
 
     def answered(self, result):
+        expanded = {number: activity['expanded'] for number, activity in self.chat.activities.items()}
         self.reload_history()
+        for number, activity in self.chat.activities.items():
+            activity['expanded'] = expanded.get(number, False)
+        self.chat.render()
         answer = result.get("answer", {})
         if result.get("diagnostics"):
             details = result['diagnostics']
@@ -1307,16 +1431,44 @@ class RepairPage(QWidget):
             if not any(row.get('role') == 'Agent' and row.get('text') == text and row.get('round') == number
                        for row in self.chat.entries):
                 self.chat.add_message('Agent', text, number)
-        summary = tr('Error: ') + result['error'] if result.get('error') else {
-            'answered': tr('Round complete'), 'user_cancelled': tr('Round cancelled')
-        }.get(result.get('reason'), tr('Round incomplete'))
-        self.status.setText(summary)
-        self.status.setToolTip(tr('{0}; actual requests: {1}').format(summary, result['requests']))
+        self.show_result_status(result)
         self.update_actions(self.is_busy())
+
+    def show_result_status(self, result):
+        """实时收尾和历史恢复共用结果摘要，不弹窗或修改聊天及运行状态。"""
+        summary = tr('Error: ') + result['error'] if result.get('error') else {
+            'answered': tr('Round complete'), 'user_cancelled': tr('Round cancelled'),
+            'host_interrupted': tr('Interrupted; results may be unknown. No operations replayed.'),
+        }.get(result.get('reason'), tr('Round incomplete'))
+        self.set_status(summary, tr('{0}; actual requests: {1}').format(summary, result.get('requests', 0)))
+
+    def show_feedback(self, request):
+        """只展示当前活动轮次；取消后排队到达的旧请求直接作废。"""
+        chat = self.host.conversation
+        if (request.done.is_set() or self.window.closing or not self.window.jobs or chat is None
+                or any(job.cancel_requested for job in self.window.jobs)
+                or request.identity[:2] != (chat.log.identity, chat.log.group)):
+            request.close()
+            return
+        self.feedback_dialog = FeedbackDialog(request, self.window)
+        self.feedback_dialog.show()
+        self.set_status(tr('Waiting for feedback'))
 
     def show_event(self, event):
         value = event["event"]
         kind, number = value.get("type"), event.get("round", 0)
+        live = (not getattr(self, '_replaying', False) and not self.window.closing
+                and not any(job.cancel_requested for job in self.window.jobs))
+        if kind == 'raw_output':
+            if live and self._round_running:
+                self.update_raw_output(value.get('content', []), number)
+            return
+        if kind == 'message_end' and value.get('message', {}).get('role') == 'assistant':
+            self.chat.remember_message(number, value['message'].get('content', []))
+        if kind in {'message_end', 'tool_execution_start', 'repair_error', 'round_finished',
+                    'round_interrupted', 'final_answer_retry', 'agent_settled'}:
+            self.clear_raw_output()
+        status = None
         if kind == 'workbench_session':
             self.titles[value['session'].identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
             self.activate_session(value['session'], restore_history=False)
@@ -1326,12 +1478,12 @@ class RepairPage(QWidget):
             return
         if kind == "lalc_request":
             self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(number, value['requests'], value.get('request_limit', '—')))
-            self.status.setText(tr('Agent is responding…'))
+            status = tr('Agent is responding…')
         elif kind == "repair_error":
             self.diagnostics.add_error(value)
         elif kind == "final_answer_retry":
             self.chat.format_retry(number)
-            self.status.setText(tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining']))
+            status = tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining'])
         elif kind == "pi_version_warning":
             self.chat.add_message("系统", "WARNING: " + value["message"], number)
         elif kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation"}:
@@ -1341,7 +1493,7 @@ class RepairPage(QWidget):
             name = value.get("toolName") or value.get("name") or "validate"
             entry = self.chat.upsert_tool(number, identity, name, kind, value)
             if kind == "tool_execution_start":
-                self.status.setText(tr('Calling tool: ') + name)
+                status = tr('Calling tool: ') + name
             if entry["failed"]:
                 host = entry["events"].get("repair_tool", {}).get("result", {}).get("details", {})
                 validation = entry["events"].get("validation", {})
@@ -1359,8 +1511,10 @@ class RepairPage(QWidget):
                 else:
                     self.diagnostics.errors.setItemData(self.tool_errors[key], details)
                     self.diagnostics.select_error()
-                self.status.setText(tr('Error: ') + details["message"] + tr('; details are available, processing continues this round.'))
-        self.status.setToolTip(self.status.text())
+                status = tr('Error: ') + details["message"] + tr('; details are available, processing continues this round.')
+        if live and status is not None:
+            self.set_status(status)
+            self.status.setToolTip(status)
         self.update_actions(self.is_busy())
 
     def show_diff(self):
@@ -1404,8 +1558,10 @@ class RepairPage(QWidget):
 
     def render(self, busy):
         if not self.window.jobs:
+            self.clear_raw_output()
             if self._round_running and self.status.text() == tr('Cancelling…'):
-                self.status.setText(tr('Round cancelled'))
+                self.set_status(tr('Round cancelled'))
+                self.status.setToolTip(self.status.text())
             self._round_running = False
         for control in (self.new_button, self.refresh_button, self.history, self.message, self.attach):
             control.setEnabled(not busy)

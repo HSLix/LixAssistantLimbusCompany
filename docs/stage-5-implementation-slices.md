@@ -65,16 +65,18 @@
 
 ## 4. [#338](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338) GUI Construct 与 Repair 同轮请求人工反馈
 
+2026-11-01 已本地实施，见[决定](stage-5-338-decisions.md)和[实施记录](stage-5-338-implementation.md)。以下勾选表示本地交付及自动检查范围，#338 尚待开发者人工验收，不代表 Windows、真实模型或游戏通过。
+
 **Blocked by:** [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)
 
 **交付：** 两种 GUI 模式可在当前开发轮次提问或请求人工操作，等待反馈后继续；人可跳过、关闭或取消，游戏仍可操作。
 
-- [ ] 显示请求、输入及 Confirm / Skip，实际答复返回同 Session 上下文并按现有规则脱敏记录，不重置本轮请求额度。
-- [ ] Confirm 仅代表答复 / 操作反馈，不证明游戏目标达成、不隐式恢复人工暂停、不替代安装或其他明确授权。
-- [ ] Skip / 关闭 / Esc 明确跳过，不推断操作完成或取得授权；空答复具有明确结果。
-- [ ] 等待不并行自动输入或试运行，不妨碍切换游戏；GUI 响应且有可用取消出口。
-- [ ] 取消 / 窗口退出解除等待并按既有流程清理，重复 / 迟到回调不能写入其他请求或 Session。
-- [ ] CLI / Runtime 不暴露该 GUI 工具；Stage 6 值守权限只作契约，不在本票实现 Runtime 接入。
+- [x] 显示统一内容 / 意图与文字输入及 Confirm / Skip，实际答复返回同 Session 上下文并按现有规则脱敏记录，不重置本轮请求额度。
+- [x] Confirm 仅代表答复 / 操作反馈，不证明游戏目标达成、不隐式恢复人工暂停、不替代安装或其他明确授权。
+- [x] Skip / 关闭 / Esc 明确跳过，不推断操作完成或取得授权；空答复明确返回 confirmed 与空文字。
+- [x] 不设自动超时；等待不并行自动输入或试运行，不妨碍切换游戏；普通非模态 GUI 响应且有可用取消出口。
+- [x] 取消 / 窗口退出解除等待并按既有流程清理，重复 / 迟到回调不能写入其他请求或 Session。
+- [x] CLI / Runtime 不暴露该 GUI 工具；Stage 6 值守权限只作契约，不在本票实现 Runtime 接入。
 
 ## 5. [#339](https://github.com/HSLix/LixAssistantLimbusCompany/issues/339) Construct 创建页面草稿并模态对比预览
 

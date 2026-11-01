@@ -40,6 +40,7 @@ class RepairLog:
         self.requests = 0
         self.transport_error = None
         self.on_event = on_event
+        self.raw_content = {}
 
     @property
     def key(self):
@@ -55,6 +56,8 @@ class RepairLog:
         return redact(value, self.keys)
 
     def record(self, value):
+        if isinstance(value, dict) and value.get("type") in {"message_start", "message_end", "repair_error", "round_finished"}:
+            self.raw_content.clear()
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
         if value.get("type") == "lalc_request":
@@ -80,6 +83,36 @@ class RepairLog:
             logging.getLogger(__name__).error("Agent 操作错误：%s", event)
         if self.on_event:
             self.on_event(event)
+
+    def stream(self, value):
+        """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
+        if not self.on_event:
+            return
+        event = value.get("assistantMessageEvent", {})
+        kind, index = event.get("type", ""), event.get("contentIndex")
+        if index is None:
+            return
+        block, _, phase = kind.partition("_")
+        if block in {"text", "thinking"}:
+            part = self.raw_content.setdefault(index, {"type": block, block: ""})
+            if phase == "delta":
+                part[block] += event.get("delta", "")
+            elif phase == "end":
+                part[block] = event.get("content", part[block])
+        elif block == "toolcall":
+            part = self.raw_content.setdefault(index, {"type": "toolCall", "name": "", "partialArgs": ""})
+            if phase == "start":
+                part["name"] = event.get("toolName", "")
+            elif phase == "delta":
+                part["partialArgs"] += event.get("delta", "")
+            elif phase == "end":
+                tool = event.get("toolCall", {})
+                part.update(name=tool.get("name", part["name"]),
+                            partialArgs=json.dumps(tool.get("arguments", {}), ensure_ascii=False))
+        else:
+            return
+        self.on_event(self.clean({"round": self.group, "event": {
+            "type": "raw_output", "content": [self.raw_content[key] for key in sorted(self.raw_content)]}}))
 
     def save_json(self, name, value):
         self.store.write_json(self.path / name, self.clean(value))
@@ -147,7 +180,7 @@ def model_error(message, stage, requests, request_limit, transport=None):
 
 
 async def configure_session(send, event, log, expected_tools):
-    """确认实际工具集并关闭自动重试和压缩，供预检与修复共用。"""
+    """正式请求前确认实际工具集，并关闭自动重试和压缩。"""
     while True:
         item = await rpc_event(event, "就绪事件 lalc_ready")
         log.record(item)
@@ -192,41 +225,6 @@ def image_attachments(paths, directory):
     return result, records
 
 
-async def check_model_image(command, env, temporary, images, log, *, startup=None):
-    """整组图片只预检一次；成功前不修改候选，计数沿用到修复。"""
-    checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
-                "LALC_PI_MAX_REQUESTS": "1"}
-    prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
-    if images:
-        prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
-                  "images": images}
-    checking["LALC_PI_INPUT_MESSAGE"] = prompt["message"]
-    last = {}
-    async with rpc_session(command, checking, temporary, log.record, startup=startup) as (send, event):
-        await configure_session(send, event, log, [])
-        log.record({"type": "model_check_started", "prompt": prompt})
-        await send({key: value for key, value in prompt.items() if key != "images"})
-        while True:
-            item = await event()
-            kind = item.get("type")
-            if kind == "message_update":
-                continue
-            log.record(item)
-            if kind == "lalc_request":
-                log.requests = item["requests"]
-            elif kind == "message_end" and item.get("message", {}).get("role") == "assistant":
-                last = item["message"]
-            elif kind == "extension_error" or (kind == "response" and not item.get("success")):
-                raise RuntimeError("Model image check failed: " + str(item))
-            elif kind == "agent_settled":
-                if last.get("stopReason") != "stop":
-                    raise model_error(last, "model_preflight", log.requests, 1, log.transport_error)
-                if (log.requests != 1 or not any(part.get("type") == "text" and part.get("text", "").strip()
-                                   for part in last.get("content", []))):
-                    raise RuntimeError("Model image check failed: " + str(last.get("errorMessage") or last))
-                log.record({"type": "model_check_passed", "requests": log.requests})
-                return
-
 
 class RepairConversation:
     """消息主动触发一轮；实际消息/图片/工具结果留在上下文，候选不随对话清空。"""
@@ -257,7 +255,7 @@ class RepairConversation:
             "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
         self.log.save_json("context.json", self.history)
 
-    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=()):
+    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
         with self.host.candidate_lock(), self.host.service.activity("Agent"):
             if self.session:
@@ -297,6 +295,7 @@ class RepairConversation:
             self.log.snapshot(f"{prefix}/original", before)
             result = {"status": "incomplete", "reason": "setup_error"}
             tools = self.tools
+            tools.on_feedback = on_feedback
             tools.cancelled.clear()
             tools.created_files.clear()
             tools.knowledge.begin_round()
@@ -355,8 +354,8 @@ class RepairConversation:
                     self.log.transport_dir = Path(temporary)
                     payloads = Path(temporary) / "payloads"
                     payloads.mkdir()
-                    input_record["pi"] = env["LALC_PI_VERSION"]
-                    context["pi_version"] = env["LALC_PI_VERSION"]
+                    input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
+                    context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
                     self.log.save_json(f"{prefix}/input.json", input_record)
                     image_path = Path(temporary) / "input-images.json"
                     image_path.write_text(json.dumps(attachments), encoding="utf-8")
@@ -365,18 +364,6 @@ class RepairConversation:
                     env["LALC_PI_PAYLOAD_DIR"] = str(payloads)
                     env["LALC_PI_CONVERSATION_ROUND"] = str(self.log.group)
                     env["LALC_PI_ROUND_REQUEST_LIMIT"] = str(settings["max_requests"])
-                    # 预检实际请求计入本轮，历史消息不进入连接检查。
-                    old_path = self.log.path
-                    self.log.path = round_path
-                    try:
-                        stage = "model_preflight"
-                        await check_model_image(command, env, temporary, attachments, self.log, startup=startup)
-                    finally:
-                        self.log.path = old_path
-                        input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
-                        context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
-                        self.log.save_json(f"{prefix}/input.json", input_record)
-                    env["LALC_PI_REQUESTS_USED"] = str(self.log.requests)
                     env["LALC_PI_REPAIR_FILES"] = json.dumps([str((self.host.candidate / name).resolve()) for name in names])
                     history_path = Path(temporary) / "history.json"
                     history_path.write_text(json.dumps(self.log.clean(prior_history)), encoding="utf-8")
@@ -386,6 +373,9 @@ class RepairConversation:
                     command[command.index("--tools") + 1] = ",".join(expected)
                     stage = "pi_start"
                     async with rpc_session(command, env, temporary, self.log.record, startup=startup) as (send, event):
+                        input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
+                        context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
+                        self.log.save_json(f"{prefix}/input.json", input_record)
                         await configure_session(send, event, self.log, expected)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
@@ -396,6 +386,7 @@ class RepairConversation:
                             item = await event()
                             kind = item.get("type")
                             if kind == "message_update":
+                                self.log.stream(item)
                                 continue
                             self.log.record(item)
                             if kind == "lalc_request":
@@ -477,6 +468,7 @@ class RepairConversation:
                 result = {"status": "incomplete", "reason": details.get("failure_code", "error"),
                           "error": details["message"], "diagnostics": details}
             finally:
+                tools.on_feedback = None
                 if not submitted:
                     self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                         "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})

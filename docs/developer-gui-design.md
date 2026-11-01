@@ -1,5 +1,9 @@
 # Developer GUI — Accepted Design
 
+2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
+
+2026-11-01 #338 本地实施：GUI 两种模式共用普通非模态人工反馈窗口，展示 Agent 内容 / 意图与文字输入框，无请求类型分类、不置顶、不设自动超时；Confirm 可空回复，Skip / 关闭 / Esc 只跳过，取消本轮结束轮次。等待保留 Session 与活动互斥，结果绑定发起请求；CLI / Runtime 不继承。当前用法及验收限制见[实施记录](stage-5-338-implementation.md)，#338 等待开发者验收。下文人工反馈待实现的描述为历史状态。
+
 2026-11-01 游戏版本历史：GUI 两种模式与 CLI Repair 均可通过 list_game_versions / search_agent_sessions / read_agent_session 查阅已索引历史，版本筛选为定位上下文，每轮显示版本组；Steam 客户端路径仅 User GUI 通用设置编辑。见[用法](game-version-history.md)。
 
 2026-11-01 #337 本地实施：Agent 工作台 More 菜单增加外部知识库文件夹入口，缺失时创建空目录，未开始 Session 也可使用。GUI Construct / Repair 已接入只读资料与受控 Git 工具；CLI / Runtime 不继承。目录、工具、格式与验收限制见[实施记录](stage-5-337-implementation.md)。下文“知识库待实现”是历史状态。
@@ -56,7 +60,7 @@
 - 复用已有 PySide6 GUI 与共享应用服务，不通过执行 CLI 命令实现 GUI，不在界面实现另一套 Agent Loop。耗时操作不阻塞 GUI，普通 Workflow 不依赖 pi 启动。
 - Runner 支持 Automation Plan、Task Workflow、Subworkflow、Step；Plan 选择现有配置文件，其他入口按所选 Manifest/角色展示并接收 JSON 参数，复用现有参数契约。保留暂停、接管、恢复、取消、执行结果及 Trace/Ledger 定位，不新增 Plan/代码编辑器或参数表单生成器。
 - Agent Settings 提供 Base URL、Model、API Key 和模型请求上限。密钥仅能设置、覆盖或显式清除，界面不读取/显示已有明文，只显示是否设置；普通保存时空输入保留原密钥，认证值不进入日志或配置导出。复用 Windows DPAPI 与 Mac 临时内存密钥边界，不读取或修改其他 pi 实例的个人配置。
-- GUI 状态由真实 Host/工具/校验事件驱动，不依靠模型自然语言猜测分析阶段；展示当前工具和实际结果，不做 token 级可视化、虚假审批状态或假操作按钮。
+- GUI 状态由真实 Host/工具/校验事件驱动，不依靠模型自然语言猜测分析阶段；展示当前工具和实际结果，临时原始输出区按本页现行规则流式展示真实内容，不提供虚假审批状态或假操作按钮。
 - Open Asset Directory 由既有数据目录与 Asset Library 路径提供，使用系统文件管理器打开；不存在或失败明确提示，不实现文件管理器。
 
 ## Implementation scope

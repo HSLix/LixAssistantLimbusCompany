@@ -1,6 +1,10 @@
 # Agent Repair — Developer Candidate 开发与修复
 
-2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 和正式预检保留。
+2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
+
+2026-11-01 #338 本地实施：GUI Construct / Repair 的 Agent 可用 `request_feedback(message)` 展示交互内容 / 意图并等待同轮文字反馈。普通非模态窗口不置顶，可切换游戏；Confirm 可空答复，Skip / 关闭 / Esc 表示跳过，取消本轮则终止并收尾。等待无自动超时，期间不能切换 / 新建 Session、启动试运行或自动输入；反馈不证明状态、不解除暂停、不批准安装。CLI / Runtime 不开放，重启不恢复未完成等待。用法、验证与未验收项见[实施记录](stage-5-338-implementation.md)。下文“#338 待实现”为历史状态。
+
+2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 保留，强制推理预检按本页现行规则取消。
 
 2026-11-01 #337 已本地实现：GUI Construct / Repair 可在 More → Workspace and pages 打开外部知识库文件夹，缺失时创建空目录，无须先开始聊天。将文本、图片或自行准备的普通 Git 仓库放入数据目录 `knowledge/`，Agent 按需只读检索 / 查看。首次内容访问按轮同步，系统 Git 不可用则跳过记日志；CLI / Runtime 不获得该权限。格式、分页、Git 版本及验收限制见[知识库实施记录](stage-5-337-implementation.md)。下文“#337 待实现”为旧阶段记录。
 
@@ -78,7 +82,7 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 工具拒绝已有文件/逻辑名覆盖和越界，先按既有源码结构契约检查，不导入执行新源码；创建和登记在提交前失败或取消会回退。其他已有文件校验失败不一概禁止新增。新文件可在同一轮继续编辑，进入快照和累计 Diff；完整校验、Publish 和 Default 仍分别操作。取消工具请求时先等待工具线程回退/完成，再生成最终快照。
 
-图片按实际内容由 Pillow 识别和校验，原始 MIME、字节和顺序独立留存，不转码、不设应用附件数量上限。预检携带整组图片，仅消耗一次模型请求；原图通过 context hook 进入 pi 上下文，绕开 RPC 图片转码及静默丢弃。下一轮沿用原始历史图片；格式纠正不重复添加附件。服务拒绝格式/载荷走正常诊断，不自动删图或重发。Asset Library 的 PNG 规则独立保留。
+图片按实际内容由 Pillow 识别和校验，原始 MIME、字节和顺序独立留存，不转码、不设应用附件数量上限。正式请求携带整组图片；原图通过 context hook 进入 pi 上下文，绕开 RPC 图片转码及静默丢弃。下一轮沿用原始历史图片；格式纠正不重复添加附件。服务拒绝格式/载荷走正常诊断，不自动删图或重发。Asset Library 的 PNG 规则独立保留。
 
 ## 权限、上下文和日志
 
@@ -101,7 +105,7 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 
 LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检及正式请求共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
 
-pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。预检与正式请求均覆盖；原有预检日志仍在 round-N/events.jsonl，正式交互日志位于对话根 events.jsonl。
+pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。正式请求覆盖；旧预检日志仍在 round-N/events.jsonl，新轮次不再生成预检日志；正式交互日志位于对话根 events.jsonl。
 
 旧记录中的 `Connection error.` 本身不能证明代理、TLS、服务端或工具定义是根因。更新后需在实际出错的 Windows 环境复现，根据新增错误码确定修复；本机 HTTP 替身检查只验证诊断链路。
 
@@ -119,10 +123,10 @@ GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停
 
 每个对话在数据目录 `agent-interactions/<UTC日期>/<UUID4>/` 下独立留存：
 
-- `events.jsonl`：实际模型/工具/校验和逐轮结束事件；预检事件也在相应轮目录保留。
+- `events.jsonl`：实际模型/工具/校验和逐轮结束事件；旧预检事件保留原样。
 - `baseline/`：该对话首次处理时固定的候选物化基线。
 - `round-N/input.json`、可选 `input-序号.实际格式`：用户消息、附件、已有可编辑文件清单、基础 Manifest UUID、实际 pi 版本、已验证版本、非密钥配置与提示词。
-- `round-N/request-K.json`：实际模型请求；连接预检消耗计入同一轮额度。
+- `round-N/request-K.json`：实际模型请求；直接从正式请求 1 开始，格式纠正计入同轮额度。
 - `round-N/original/`、`final/`、`cumulative.diff`、`result.json`：真实候选快照、相对固定基线的累计 Diff、请求次数及结束原因。
 - `context.json`、`tool-N.json` 和图片：保留消息、图片及工具结果；工具序号跨轮递增，不覆盖旧产物。
 
@@ -253,8 +257,8 @@ uv run lalc repair --from <saved-manifest-uuid> --problem "检查候选流程" -
 
 CLI repair overrides `--provider`, `--thinking/--no-thinking` and `--reasoning-effort` affect only the
 current invocation. Full API base paths remain unchanged (no automatic `/v1`). Standard DeepSeek model
-list metadata is sufficient for availability checks; actual image preflight remains a real request and
-counts toward the round's budget. pi explicitly uses DeepSeek's thinking format and preserves streamed
+list metadata is sufficient for availability checks; images go directly into the formal request,
+without a separate inference preflight. pi explicitly uses DeepSeek's thinking format and preserves streamed
 `reasoning_content` across tool calls and subsequent conversation rounds. Original tool permissions,
 request caps, cancellation, disabled automatic retry and candidate review/Publish boundaries remain.
 
@@ -285,5 +289,7 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 用户消息通过 `<runtime_context>` 携带模式、入口、Candidate 相对根、来源 Manifest、可编辑文件和参考附件，通过 `<user_request>` 保留用户原文。XML 仅帮助区分来源，宿主不解析正文为权限。参考附件及外部工具结果不能覆盖系统规则，历史聊天兼容旧消息格式，无需迁移。
 
 最终文本仍严格解析为 JSON：`revise_success` 必须为布尔值，`message` 必须为非空字符串，禁止外层 Markdown 围栏。修订完成且相关静态校验通过可报告 true，但必须明确未执行的游戏验证；纯分析、信息不足、校验失败或修订未完成报告 false。用户明确要求成功试运行时，未执行或失败也报告 false。模型报告不替代校验、人工审阅或游戏验收。格式纠正只重发最终 JSON，禁用工具并保留业务内容，继续消耗本轮额度。
+
+跨轮及 Session 恢复时，原始日志保留历史系统消息；发给模型的历史仅重放对话，不重放旧系统 Prompt 或 `toolsAdded` / `toolsRemoved`。本轮系统 Prompt 与工具声明由当前入口、模式及格式纠正状态生成，上一轮纠正不会禁用下一轮工具。发送前核对工具声明与当前启用集合，不一致时拒绝请求并报告接入错误；不把回复正文中的工具标记转换为执行指令。相关回归使用真实 pi 与本机 HTTP 替身，不代表真实模型验收。
 
 每轮 `input.json` 保存所选 SOP 正文及 Python 宿主 Prompt 快照；完整实际系统消息还包括扩展追加的工具概览和共享规则，以 `request-*.json` 实际载荷为准。修改 SOP 可能影响缓存命中；不承诺缓存比例或真实模型表现提升。

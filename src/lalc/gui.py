@@ -81,6 +81,7 @@ class MainWindow(FluentWindow):
     """通过正式 ApplicationService 启动和观察任意逻辑入口。"""
 
     operation_event = Signal(dict)
+    feedback_requested = Signal(object)
 
     def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None,
                  *, host=None, coordinator=None) -> None:
@@ -119,6 +120,7 @@ class MainWindow(FluentWindow):
         self.settings_view.viewport().setAutoFillBackground(False)
         self.settings_page.setAutoFillBackground(False)
         self.operation_event.connect(self.repair_page.show_event)
+        self.feedback_requested.connect(self.repair_page.show_feedback)
         for page, identity, name, icon in (
             (self.capture_page, "developer-capture", tr('Capture'), FluentIcon.CAMERA),
             (self.settings_view, "developer-settings", tr('Agent Settings'), FluentIcon.SETTING),

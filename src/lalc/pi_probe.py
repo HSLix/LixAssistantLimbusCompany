@@ -68,7 +68,7 @@ class PiVersionError(RuntimeError):
 
 
 class PiStartup:
-    """同一轮共享 pi 选择及请求边界；模型预检之后也不重新开放回退。"""
+    """同一轮共享 pi 选择及请求边界；首条 prompt 发送后不重新开放回退。"""
 
     def __init__(self):
         self.fallback = None
@@ -309,8 +309,6 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
         env.setdefault("NODE_USE_SYSTEM_CA", "1")
         env.pop("LALC_PI_REPAIR_TARGET", None)
         env.pop("LALC_PI_PAYLOAD_DIR", None)
-        env.pop("LALC_PI_PREFLIGHT", None)
-        env.pop("LALC_PI_REQUESTS_USED", None)
         env.pop("LALC_PI_REPAIR_FILES", None)
         env.pop("LALC_PI_HISTORY", None)
         startup = startup or PiStartup()

@@ -107,7 +107,7 @@ def test_gui_blank_secret_preserves_and_explicit_clear_removes_reference(tmp_pat
 def gui(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QDialog
     from lalc.gui import MainWindow
     host, _ = host_for(tmp_path)
     monkeypatch.chdir(tmp_path)
@@ -119,6 +119,9 @@ def gui(tmp_path, monkeypatch):
     session.conversation()
     window.repair_page.activate_session(session)
     yield app, window
+    # 隐藏主窗口不会关闭独立错误弹窗，避免模态状态污染后续反馈测试。
+    for dialog in window.findChildren(QDialog):
+        dialog.close()
     window.close()
     app.processEvents()
 

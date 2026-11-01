@@ -34,6 +34,7 @@ class RepairTools:
         self.log = log
         self.platform = platform
         self.cancelled = threading.Event()
+        self.on_feedback = None
         self.knowledge = KnowledgeLibrary(data_root, self.checkpoint)
         self.sequence = 0
         self.previews = {}
@@ -61,7 +62,8 @@ class RepairTools:
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
                        "read_manifest_source": self.read_manifest_source,
                        "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
-                       "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git}
+                       "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git,
+                       "request_feedback": self.request_feedback}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
@@ -76,6 +78,25 @@ class RepairTools:
                          "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         return self.log.tool_result(filename, result)
+
+    def request_feedback(self, message):
+        """等待 GUI 的真实答复；线程取消先作废请求再完成工具收尾。"""
+        from .human_feedback import FeedbackRequest
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError("人工反馈请求内容不能为空。")
+        if self.on_feedback is None:
+            raise ValueError("当前入口未连接人工反馈界面。")
+        request = FeedbackRequest(message, (self.log.identity, self.log.group, self.sequence))
+        try:
+            self.on_feedback(request)
+            while not request.done.wait(.05):
+                self.checkpoint()
+            self.checkpoint()
+            if request.result is None:
+                raise RuntimeError("人工反馈请求已取消。")
+            return self.text(request.result)
+        finally:
+            request.close()
 
     def list_manifests(self, offset=0, limit=50):
         return self.text(ManifestReference(self.host.manager).list(offset, limit))

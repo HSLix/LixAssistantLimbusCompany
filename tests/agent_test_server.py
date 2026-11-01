@@ -54,14 +54,7 @@ def agent_server(tmp_path):
                 if state["status"] != 200:
                     self.wfile.write(json.dumps({"error": {"message": state.get("error_message", "test provider unavailable")}}).encode())
                     return
-                message = next(message for message in reversed(body["messages"])
-                               if "LALC_REQUEST_BUDGET\\n" not in json.dumps(message, ensure_ascii=False))
-                content = message.get("content", "")
-                text = content if isinstance(content, str) else "".join(p.get("text", "") for p in content)
-                if (state.get("repair_check") and not body.get("tools")
-                        and text.startswith(("连接检查：", "简短描述随附图片"))):
-                    delta, finish = {"role": "assistant", "content": "Image received."}, "stop"
-                elif "respond" in state:
+                if "respond" in state:
                     delta, finish = state["respond"](body)
                 elif len(state["calls"]) == 1:
                     delta = {"role": "assistant", "tool_calls": [{"index": 0, "id": "read-1", "type": "function",
