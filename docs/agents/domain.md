@@ -1,8 +1,14 @@
 # Domain Docs
 
+2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](../page-review-tabs-implementation.md)。
+
+2026-11-02 页面审批试用修订：拟安装页加载 / 接口 / 注册失败不显示审批，直接把错误返回同轮 Agent 修正；成功才显示默认 Proposed 的 Current / Proposed / Review 三 Tab，切换保留页面实例与独立试填。Review 集中呈现 Agent 总结、ID 与版本，三操作和人工快照安装保持。见[决定](../stage-5-339-340-decisions.md#2026-11-02-试用反馈后的修订讨论)及[修订记录](../page-review-tabs-implementation.md)。此前双栏 / 失败留窗规则为历史。
+
+2026-11-02 #339 / #340 合并本地实施：Construct 专属 Session 单文件页面草稿、双页应用级模态预览及人工固定版本安装已接入。配置及 Plan 影响由 Agent 总结，宿主不固定检验配置兼容、不自动 submit；两侧配置仅内存，安装不导入试填、不改 Default、不自动重载。两票待开发者验收，见[决定](../stage-5-339-340-decisions.md)及[实施记录](../stage-5-339-340-implementation.md)。下文页面待实现描述为历史状态。
+
 2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
 
-2026-11-01 #338 本地实施：GUI Construct / Repair 已有统一文字人工反馈工具与非模态窗口，空确认与跳过区分，无自动超时；取消唤醒等待，旧回调失效，同轮额度 / Session 日志保持。CLI / Runtime 不继承；待开发者验收后关闭，见[实施记录](../stage-5-338-implementation.md)。下文“#338 待实现”保留为历史状态。
+2026-11-01 #338 本地实施：GUI Construct / Repair 已有统一文字人工反馈工具与非模态窗口，空确认与跳过区分，无自动超时；取消唤醒等待，旧回调失效，同轮额度 / Session 日志保持。CLI / Runtime 不继承；开发者简单验证通过，#338 已按 completed 关闭，见[实施记录](../stage-5-338-implementation.md)。下文“#338 待实现”保留为历史状态。
 
 2026-11-01 游戏版本历史：每轮不可变观测、按游戏版本 / Steam Build ID 组合检索、跨入口只读历史工具已接入；旧历史不导入，Unknown 不代表可推断版本。独立 pi-probe 已删除；本地验证及限制见[实施记录](../game-version-session-implementation.md)，用法见[用法](../game-version-history.md)及 [ADR 0035](../adr/0035-associate-agent-history-with-per-round-game-observations.md)。
 

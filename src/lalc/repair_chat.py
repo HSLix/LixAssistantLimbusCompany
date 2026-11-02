@@ -85,7 +85,7 @@ class RepairChat(QTextBrowser):
             return ''
         body = f'<p style="color:#737980" title="{tooltip}">{title}</p>'
         if raw and activity['expanded']:
-            body += '<pre>' + escape(raw) + '</pre>'
+            body += '<pre style="white-space: pre-wrap">' + escape(raw) + '</pre>'
         return body
 
     def add_message(self, role, text, round_number=0):
@@ -179,7 +179,7 @@ class RepairChat(QTextBrowser):
                              "result": result}
                     if host and end.get("isError") and not host.get("result", {}).get("isError"):
                         shown["pi_error"] = end.get("result")
-                    body += "<pre>" + escape(json.dumps(shown, ensure_ascii=False, indent=2)) + "</pre>"
+                    body += '<pre style="white-space: pre-wrap">' + escape(json.dumps(shown, ensure_ascii=False, indent=2)) + '</pre>'
                 parts.append(body)
                 continue
             shown_role = {"你": tr("You"), "系统": tr("System")}.get(role, role)

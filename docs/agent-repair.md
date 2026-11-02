@@ -1,8 +1,12 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-02 页面审查修订：拟安装页失败直接返回 preview_failed / isError，Agent 在同轮内按错误修正再请求，不需要人先关闭错误页。成功审批为默认 Proposed 的三 Tab，Review 展示总结与版本详情。保持同轮额度、固定预览字节和独立安装授权，见[修订记录](page-review-tabs-implementation.md)。
+
+2026-11-02 页面开发仅 GUI Construct 通过 page_* 工具操作当前 Session 的 page-drafts，不扩大原生 read/edit 或 CLI / Repair 权限。正式源码只读，安装只由应用级模态对比窗口批准固定预览字节；普通人工反馈不能批准安装。旧配置及 Plan 影响由 Agent 审查总结，无固定配置兼容检测，安装不清空旧配置 / 不自动重载。见[实施记录](stage-5-339-340-implementation.md)；两票待开发者验收。
+
 2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
 
-2026-11-01 #338 本地实施：GUI Construct / Repair 的 Agent 可用 `request_feedback(message)` 展示交互内容 / 意图并等待同轮文字反馈。普通非模态窗口不置顶，可切换游戏；Confirm 可空答复，Skip / 关闭 / Esc 表示跳过，取消本轮则终止并收尾。等待无自动超时，期间不能切换 / 新建 Session、启动试运行或自动输入；反馈不证明状态、不解除暂停、不批准安装。CLI / Runtime 不开放，重启不恢复未完成等待。用法、验证与未验收项见[实施记录](stage-5-338-implementation.md)。下文“#338 待实现”为历史状态。
+2026-11-01 #338 本地实施：GUI Construct / Repair 的 Agent 可用 `request_feedback(message)` 展示交互内容 / 意图并等待同轮文字反馈。普通非模态窗口不置顶，可切换游戏；Confirm 可空答复，Skip / 关闭 / Esc 表示跳过，取消本轮则终止并收尾。等待无自动超时，期间不能切换 / 新建 Session、启动试运行或自动输入；反馈不证明状态、不解除暂停、不批准安装。CLI / Runtime 不开放，重启不恢复未完成等待。用法、验证与未验收项见[实施记录](stage-5-338-implementation.md)。#338 已经开发者简单验证通过并按 completed 关闭；下文“#338 待实现”为历史状态。
 
 2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 保留，强制推理预检按本页现行规则取消。
 

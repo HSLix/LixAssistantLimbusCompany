@@ -79,6 +79,43 @@ class BusinessPage:
     icon: Any = None
 
 
+def load_page_module(path: Path, source: bytes):
+    """加载指定字节并检查声明；每次独立模块身份，不使用 pyc。"""
+    spec = importlib.util.spec_from_file_location("lalc_page_" + uuid.uuid4().hex, path)
+    assert spec is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module.__name__] = module
+    # 直接编译当前字节，避免同秒改页后旧 pyc 被误复用。
+    exec(compile(source, str(path), "exec"), module.__dict__)
+    page_id, name, task_id = module.PAGE_ID, module.PAGE_NAME, getattr(module, "TASK_ID", None)
+    if (type(page_id) is not str or not page_id.strip() or page_id in {"dashboard", "general-settings"} or
+            type(name) is not str or not name.strip() or
+            task_id is not None and (type(task_id) is not str or not task_id.strip()) or
+            not callable(module.create_page)):
+        raise ValueError("无效页面声明或保留页面 ID。")
+    return module, page_id, name, task_id
+
+
+def create_business_page(path, module, page_id, name, task_id, store):
+    """按共享契约创建页面；检查 submit 存在但不主动调用。"""
+    from PySide6.QtWidgets import QWidget
+    from qfluentwidgets import FluentIcon
+    context = PageContext(store, page_id)
+    names = getattr(module, "PAGE_NAMES", {})
+    if (type(names) is not dict or any(key not in {"zh_CN", "en_US"} or
+            type(value) is not str or not value.strip() for key, value in names.items())):
+        raise ValueError("PAGE_NAMES must map zh_CN/en_US to non-empty display names.")
+    name = names.get(context.language, name)
+    widget = module.create_page(context)
+    if not isinstance(widget, QWidget) or not callable(getattr(widget, "submit", None)):
+        raise ValueError("create_page 必须返回提供 submit() -> dict 的 QWidget。")
+    icon = getattr(module, "PAGE_ICON", None)
+    if icon is not None and not isinstance(icon, FluentIcon):
+        logging.getLogger(__name__).warning("%s（%s）：PAGE_ICON 无效，使用默认导航图标。", path.name, page_id)
+        icon = None
+    return BusinessPage(page_id, name, task_id, widget, context, icon or FluentIcon.APPLICATION)
+
+
 def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessPage], list[str]]:
     """普通导入/创建异常只隔离单页，所有冲突注册均不进入可执行列表。"""
     modules, errors, pages = [], [], []
@@ -88,18 +125,7 @@ def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessP
         if path.name.startswith("_"):
             continue
         try:
-            spec = importlib.util.spec_from_file_location("lalc_page_" + uuid.uuid4().hex, path)
-            assert spec is not None
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[module.__name__] = module
-            # 直接编译当前字节，避免同秒改页后旧 pyc 被误复用。
-            exec(compile(path.read_bytes(), str(path), "exec"), module.__dict__)
-            page_id, name, task_id = module.PAGE_ID, module.PAGE_NAME, getattr(module, "TASK_ID", None)
-            if (type(page_id) is not str or not page_id.strip() or page_id in {"dashboard", "general-settings"} or
-                    type(name) is not str or not name.strip() or
-                    task_id is not None and (type(task_id) is not str or not task_id.strip()) or
-                    not callable(module.create_page)):
-                raise ValueError("无效页面声明或保留页面 ID。")
+            module, page_id, name, task_id = load_page_module(path, path.read_bytes())
             modules.append((path, module, page_id, name, task_id))
         except Exception as error:
             errors.append(f"{path.name}：{type(error).__name__}: {error}")
@@ -109,22 +135,7 @@ def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessP
         try:
             if ids[page_id] > 1 or task_id is not None and tasks[task_id] > 1:
                 raise ValueError(f"页面或任务 ID 冲突：{page_id} / {task_id}")
-            from PySide6.QtWidgets import QWidget
-            from qfluentwidgets import FluentIcon
-            context = PageContext(store, page_id)
-            names = getattr(module, "PAGE_NAMES", {})
-            if (type(names) is not dict or any(key not in {"zh_CN", "en_US"} or
-                    type(value) is not str or not value.strip() for key, value in names.items())):
-                raise ValueError("PAGE_NAMES must map zh_CN/en_US to non-empty display names.")
-            name = names.get(context.language, name)
-            widget = module.create_page(context)
-            if not isinstance(widget, QWidget) or not callable(getattr(widget, "submit", None)):
-                raise ValueError("create_page 必须返回提供 submit() -> dict 的 QWidget。")
-            icon = getattr(module, "PAGE_ICON", None)
-            if icon is not None and not isinstance(icon, FluentIcon):
-                logging.getLogger(__name__).warning("%s（%s）：PAGE_ICON 无效，使用默认导航图标。", path.name, page_id)
-                icon = None
-            pages.append(BusinessPage(page_id, name, task_id, widget, context, icon or FluentIcon.APPLICATION))
+            pages.append(create_business_page(path, module, page_id, name, task_id, store))
         except Exception as error:
             errors.append(f"{path.name}：{type(error).__name__}: {error}")
     return pages, errors

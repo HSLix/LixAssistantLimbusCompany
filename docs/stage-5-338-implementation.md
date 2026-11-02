@@ -1,6 +1,6 @@
 # #338 — GUI 同轮人工反馈实施记录
 
-2026-11-01。开发者确认[关键决定](stage-5-338-decisions.md)和[影响审查](stage-5-338-design-impact-review.md)后明确“开始实现”。已本地交付，尚待开发者人工验收；#338 保持打开，不将自动检查计为开发者验收。
+2026-11-01。开发者确认[关键决定](stage-5-338-decisions.md)和[影响审查](stage-5-338-design-impact-review.md)后明确“开始实现”。已本地交付；开发者随后明确“简单验证通过，关闭338”，#338 已按 completed 关闭，不将自动检查计为开发者验收。
 
 ## 使用与边界
 
@@ -47,10 +47,13 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q tests/
 
 中文窗口已用 offscreen 渲染并人工检查内容、输入、按钮与换行；翻译资源已编译，`git diff --check` 检查通过。
 
-## 待开发者人工验收
+## 人工验收建议与实际反馈
 
 1. 在 Construct / Repair 分别让 Agent 请求人工反馈，输入文字或完成游戏操作后空确认，观察同轮继续。
 2. 分别用 Skip、Esc、关闭反馈窗跳过；等待时切换游戏，检查无并行自动输入，且不能切换 / 新建 Session。
 3. 分别从反馈窗口和工作台取消，再测试主窗口拒绝退出 / 确认退出；重启后检查中断历史且无自动弹窗或重放。
 
-本地服务替身不代表真实模型行为；offscreen 不代表 Windows 原生 / 成品窗口焦点或真实游戏验收。本票尚未调用真实模型、操作真实游戏或验证 Windows 成品，4 项缺失 fixture 的既有 DeepSeek 测试仍是维护缺口。开发者确认后再记录反馈并关闭 #338。
+本地服务替身不代表真实模型行为；offscreen 不代表 Windows 原生 / 成品窗口焦点或真实游戏验收。本票尚未调用真实模型、操作真实游戏或验证 Windows 成品，4 项缺失 fixture 的既有 DeepSeek 测试仍是维护缺口。开发者此次简单验证确认不补造上述专项通过证据。
+
+
+2026-11-01 开发者反馈：“简单验证通过，关闭338”。已将反馈、实现及验证限制记录至 [issue 评论](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338#issuecomment-6559256620)，并核验 #338 为 CLOSED / COMPLETED。反馈未说明测试平台与专项检查明细；上述三项仍是推荐检查路径，不据此声称已逐项完成。

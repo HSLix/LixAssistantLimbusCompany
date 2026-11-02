@@ -255,7 +255,7 @@ class RepairConversation:
             "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
         self.log.save_json("context.json", self.history)
 
-    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None):
+    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None, on_page_preview=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
         with self.host.candidate_lock(), self.host.service.activity("Agent"):
             if self.session:
@@ -296,6 +296,7 @@ class RepairConversation:
             result = {"status": "incomplete", "reason": "setup_error"}
             tools = self.tools
             tools.on_feedback = on_feedback
+            tools.on_page_preview = on_page_preview
             tools.cancelled.clear()
             tools.created_files.clear()
             tools.knowledge.begin_round()
@@ -469,6 +470,7 @@ class RepairConversation:
                           "error": details["message"], "diagnostics": details}
             finally:
                 tools.on_feedback = None
+                tools.on_page_preview = None
                 if not submitted:
                     self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                         "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})

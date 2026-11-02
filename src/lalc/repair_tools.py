@@ -35,6 +35,7 @@ class RepairTools:
         self.platform = platform
         self.cancelled = threading.Event()
         self.on_feedback = None
+        self.on_page_preview = None
         self.knowledge = KnowledgeLibrary(data_root, self.checkpoint)
         self.sequence = 0
         self.previews = {}
@@ -63,7 +64,10 @@ class RepairTools:
                        "read_manifest_source": self.read_manifest_source,
                        "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
                        "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git,
-                       "request_feedback": self.request_feedback}
+                       "request_feedback": self.request_feedback,
+                       "page_list": self.page_list, "page_read": self.page_read,
+                       "page_create": self.page_create, "page_update": self.page_update,
+                       "page_preview": self.page_preview}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
@@ -78,6 +82,52 @@ class RepairTools:
                          "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         return self.log.tool_result(filename, result)
+
+    def page_drafts(self):
+        from .page_drafts import PageDrafts
+        if self.host is None or not getattr(self.host, "session", None):
+            raise ValueError("页面工具需要 GUI Construct Session。")
+        return PageDrafts(self.host.session)
+
+    def page_list(self, **arguments):
+        return self.text(self.page_drafts().list(**arguments))
+
+    def page_read(self, **arguments):
+        return self.text(self.page_drafts().read(**arguments))
+
+    def page_create(self, **arguments):
+        return self.text(self.page_drafts().create(**arguments))
+
+    def page_update(self, **arguments):
+        return self.text(self.page_drafts().update(**arguments))
+
+    def page_preview(self, filename, summary):
+        """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""
+        from .page_preview import PreviewRequest
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError("请总结字段变化、旧配置和 Plan 影响及兼容授权情况。")
+        if self.on_page_preview is None:
+            raise ValueError("当前入口未连接页面预览界面。")
+        drafts = self.page_drafts()
+        request = PreviewRequest(drafts, drafts.snapshot(filename), summary,
+                                 (self.log.identity, self.log.group, self.sequence))
+        self.log.save_json(f"tool-{self.sequence}-page-preview.json", {
+            "filename": filename, "sha256": request.snapshot["sha256"],
+            "source": request.snapshot["source"].decode("utf-8"), "summary": summary,
+            "replace": request.snapshot["replace"]})
+        try:
+            self.on_page_preview(request)
+            while not request.done.wait(.05):
+                self.checkpoint()
+            self.checkpoint()
+            if request.result is None:
+                raise RuntimeError("页面审查已取消。")
+            result = self.text(request.result)
+            if request.result.get("status") == "preview_failed":
+                result["isError"] = True
+            return result
+        finally:
+            request.close()
 
     def request_feedback(self, message):
         """等待 GUI 的真实答复；线程取消先作废请求再完成工具收尾。"""

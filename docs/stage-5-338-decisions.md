@@ -1,6 +1,6 @@
 # #338 — 实施前决策确认
 
-2026-11-01。下列关键决定已逐项确认，开发者确认[影响审查](stage-5-338-design-impact-review.md)后明确“开始实现”。本地实施及验证见[实施记录](stage-5-338-implementation.md)；开发者验收确认后才关闭 issue。既有范围见 [#338](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338) 与 [Stage 5 规格](stage-5-agent-workbench.md#请求人工答复或操作并等待反馈)。
+2026-11-01。下列关键决定已逐项确认，开发者确认[影响审查](stage-5-338-design-impact-review.md)后明确“开始实现”。本地实施及验证见[实施记录](stage-5-338-implementation.md)；开发者随后明确“简单验证通过，关闭338”，已按 completed 关闭 issue。既有范围见 [#338](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338) 与 [Stage 5 规格](stage-5-agent-workbench.md#请求人工答复或操作并等待反馈)。
 
 ## 1. 空答复确认（已确认）
 

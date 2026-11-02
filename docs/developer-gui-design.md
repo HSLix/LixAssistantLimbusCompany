@@ -1,8 +1,14 @@
 # Developer GUI — Accepted Design
 
+2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](page-review-tabs-implementation.md)。
+
+2026-11-02 试用修订：页面审批改为 Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页加载 / 契约 / ID 注册失败直接返回同轮 Agent，不显示失败审批。Review 集中显示 Agent 总结与身份 / 版本，切换不重建页面或配置；三按钮和人审快照批准保持。见[影响审查](page-review-tabs-design-impact-review.md)及[实施记录](page-review-tabs-implementation.md)。下文历史左右双栏 / 失败留窗描述被替代。
+
+2026-11-02 #339 / #340 合并本地实施：Construct 专属单文件页面草稿和双实例应用级模态对比、人工版本安装已接入；Repair / CLI / Runtime 不继承。宿主只检查加载 / 页面契约 / 路径及 ID，配置与 Plan 影响由 Agent 总结，无固定配置兼容检验或自动 submit。窗口提供安装、关闭不安装、取消本轮，安装后由人主动重载。见[实施记录](stage-5-339-340-implementation.md)，两票待开发者验收；下文旧待实现状态为历史。
+
 2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
 
-2026-11-01 #338 本地实施：GUI 两种模式共用普通非模态人工反馈窗口，展示 Agent 内容 / 意图与文字输入框，无请求类型分类、不置顶、不设自动超时；Confirm 可空回复，Skip / 关闭 / Esc 只跳过，取消本轮结束轮次。等待保留 Session 与活动互斥，结果绑定发起请求；CLI / Runtime 不继承。当前用法及验收限制见[实施记录](stage-5-338-implementation.md)，#338 等待开发者验收。下文人工反馈待实现的描述为历史状态。
+2026-11-01 #338 本地实施：GUI 两种模式共用普通非模态人工反馈窗口，展示 Agent 内容 / 意图与文字输入框，无请求类型分类、不置顶、不设自动超时；Confirm 可空回复，Skip / 关闭 / Esc 只跳过，取消本轮结束轮次。等待保留 Session 与活动互斥，结果绑定发起请求；CLI / Runtime 不继承。当前用法及验收限制见[实施记录](stage-5-338-implementation.md)，#338 已经开发者简单验证通过并按 completed 关闭。下文人工反馈待实现的描述为历史状态。
 
 2026-11-01 游戏版本历史：GUI 两种模式与 CLI Repair 均可通过 list_game_versions / search_agent_sessions / read_agent_session 查阅已索引历史，版本筛选为定位上下文，每轮显示版本组；Steam 客户端路径仅 User GUI 通用设置编辑。见[用法](game-version-history.md)。
 

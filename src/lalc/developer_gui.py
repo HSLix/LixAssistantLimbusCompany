@@ -1003,11 +1003,13 @@ class RepairPage(QWidget):
         self.more_menu.addMenu(development)
         self.workspace_action = Action(tr('Open Agent workspace'), self)
         self.workspace_action.triggered.connect(self.open_workspace)
+        self.page_drafts_action = Action(tr('Open Session page drafts'), self)
+        self.page_drafts_action.triggered.connect(self.open_page_drafts)
         self.pages_action = Action(tr('Open external settings page directory'), self)
         self.pages_action.triggered.connect(self.open_pages)
         self.knowledge_action = Action(tr('Open external knowledge directory'), self)
         self.knowledge_action.triggered.connect(self.open_knowledge)
-        workspace.addActions([self.workspace_action, self.pages_action, self.knowledge_action])
+        workspace.addActions([self.workspace_action, self.page_drafts_action, self.pages_action, self.knowledge_action])
         self.logs_action = Action(tr('Open log directory'), self)
         self.logs_action.triggered.connect(self.diagnostics.open_logs)
         self.app_logs_action = Action(tr('Open application log directory'), self)
@@ -1058,6 +1060,7 @@ class RepairPage(QWidget):
 
     def update_actions(self, busy):
         has_candidate = self.session is not None and self.host.candidate.is_dir()
+        self.page_drafts_action.setEnabled(has_candidate and self.session.mode == 'Construct' and not busy)
         for action in (self.workspace_action, self.diff_action, self.validate_action, self.publish_action):
             action.setEnabled(has_candidate and not busy)
         self.pages_action.setEnabled(not busy)
@@ -1398,7 +1401,8 @@ class RepairPage(QWidget):
                     'message': message, 'round': conversation.log.group + 1}})
                 return conversation.run(message, SimpleNamespace(pi='pi', ask_api_key=False), images=images,
                                         manifest_references=references, on_event=self.window.operation_event.emit,
-                                        on_feedback=self.window.feedback_requested.emit)
+                                        on_feedback=self.window.feedback_requested.emit,
+                                        on_page_preview=self.window.page_preview_requested.emit)
             self._round_running = True
             self.window.launch(operation, self.answered)
         self.window._interact(action)
@@ -1441,6 +1445,38 @@ class RepairPage(QWidget):
             'host_interrupted': tr('Interrupted; results may be unknown. No operations replayed.'),
         }.get(result.get('reason'), tr('Round incomplete'))
         self.set_status(summary, tr('{0}; actual requests: {1}').format(summary, result.get('requests', 0)))
+
+    def open_page_drafts(self):
+        def action():
+            from .page_drafts import PageDrafts
+            drafts = PageDrafts(self.session)
+            drafts.root.mkdir(parents=True, exist_ok=True)
+            self.diagnostics.open_directory(drafts.root)
+        self.window._interact(action)
+
+    def show_page_preview(self, request):
+        """只接当前 Construct 活动；迟到请求不能重新取得安装许可。"""
+        chat = self.host.conversation
+        if (request.done.is_set() or self.window.closing or not self.window.jobs or chat is None
+                or self.session is None or self.session.mode != 'Construct'
+                or 'page_preview' not in chat.allowed
+                or any(job.cancel_requested for job in self.window.jobs)
+                or request.identity[:2] != (chat.log.identity, chat.log.group)):
+            request.close()
+            return
+        from .page_preview import PagePreviewDialog
+        try:
+            dialog = PagePreviewDialog(request, self.window)
+            if (dialog.ready and not request.done.is_set() and not self.window.closing
+                    and not any(job.cancel_requested for job in self.window.jobs)):
+                self.page_preview_dialog = dialog
+                dialog.show()
+            else:
+                request.close()
+                dialog.deleteLater()
+        except BaseException:
+            request.close()
+            raise
 
     def show_feedback(self, request):
         """只展示当前活动轮次；取消后排队到达的旧请求直接作废。"""

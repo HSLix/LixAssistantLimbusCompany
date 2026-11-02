@@ -44,7 +44,14 @@ revise_success=true 表示本轮请求的修订已完成且相关静态校验通
 
 MODE_PROMPTS = {
     "Construct": """# Mode: Construct
-根据开发者目标构建、扩展或修复 Workflow。页面、知识库或人工交互能力仅在实际工具启用时可用，不能因模式名称推断权限。
+
+根据开发者需求构建、扩展或修复 Workflow，并在工具允许时开发 User GUI 扩展页面。按任务需要参考下方 SOP。
+
+## 页面特殊约束
+- 页面仅通过 page_* 专用工具管理，独立于 Workflow Candidate 和 Manifest。
+- 破坏现有页面或配置兼容性前，必须获得开发者明确授权。
+- 安装页面必须经过 page_preview 的专用人工审批，其他反馈不构成安装授权。
+- 预览或安装成功不代表实际业务验证通过。
 """,
     "Repair": """# Mode: Repair
 聚焦 Workflow / Asset 的故障定位和修复；可通过实际启用的专用新增工具补充修复所需 Component / Recovery Rule。
@@ -62,14 +69,14 @@ def load_sop(mode):
     """每轮读取并校验三个独立正文区；仅返回当前模式及共用 Asset SOP。"""
     text = SOP_PATH.read_text(encoding="utf-8")
     sections = {}
-    for name in ("construct", "repair", "asset"):
+    for name in ("construct", "repair", "asset", "page"):
         tag = f"{name}_sop"
         match = re.search(fr"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
         if (text.count(f"<{tag}>") != 1 or text.count(f"</{tag}>") != 1 or match is None
                 or re.search(r"</?(?:construct|repair|asset)_sop>", match[1])):
             raise ValueError(f"SOP 文件 {SOP_PATH} 的 {tag} 标签缺失、重复或嵌套错误。")
         sections[name] = match[1].strip()
-    return {name: sections[name] for name in (mode.lower(), "asset")}
+    return {name: sections[name] for name in (mode.lower(), "asset", "page")}
 
 
 def system_prompt(mode, sop):

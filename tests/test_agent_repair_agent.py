@@ -58,6 +58,13 @@ def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, mon
         guidance = system.split("# Tool Guidance\n", 1)[1]
         names = {line[2:].split(":", 1)[0] for line in guidance.splitlines() if line.startswith("- ")}
         assert names == {item["function"]["name"] for item in payload.get("tools", [])}
+        if mode == "Construct":
+            descriptions = {item['function']['name']: item['function']['description'] for item in payload['tools']}
+            sample = descriptions['page_create'].split('```python\n', 1)[1].split('```', 1)[0]
+            documented = (Path(__file__).resolve().parents[1] / 'example/pages/README.md').read_text()
+            expected = documented.split('```python\n', 1)[1].split('```', 1)[0]
+            assert sample.strip() == expected.strip()
+            compile(sample, '<page-create-tool-example>', 'exec')
     for payload in first:
         system = payload["messages"][0]["content"]
         assert f"{selected}_V1" in system and "ASSET_V1" in system

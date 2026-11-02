@@ -65,7 +65,7 @@
 
 ## 4. [#338](https://github.com/HSLix/LixAssistantLimbusCompany/issues/338) GUI Construct 与 Repair 同轮请求人工反馈
 
-2026-11-01 已本地实施，见[决定](stage-5-338-decisions.md)和[实施记录](stage-5-338-implementation.md)。以下勾选表示本地交付及自动检查范围，#338 尚待开发者人工验收，不代表 Windows、真实模型或游戏通过。
+2026-11-01 已本地实施，见[决定](stage-5-338-decisions.md)和[实施记录](stage-5-338-implementation.md)。以下勾选表示本地交付及自动检查范围，#338 已经开发者简单验证通过并按 completed 关闭，不代表 Windows、真实模型或游戏通过。
 
 **Blocked by:** [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)
 
@@ -80,18 +80,24 @@
 
 ## 5. [#339](https://github.com/HSLix/LixAssistantLimbusCompany/issues/339) Construct 创建页面草稿并模态对比预览
 
+2026-11-02 最新验收：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待其 Windows 实验验证。此前“两票一起验收关闭”的安排由此决定细化，历史清单中的 Windows 未验证项不因此计为通过。见[验收记录](page-review-tabs-implementation.md)。
+
+2026-11-02：开发者确认与 #340 合并设计、实现和验收。本地已接入，等待开发者验收后才关闭两票；见[决定](stage-5-339-340-decisions.md)、[影响审查](stage-5-339-340-design-impact-review.md)及[实施记录](stage-5-339-340-implementation.md)。程序只检查加载 / 契约 / 路径和 ID，不固定检验配置兼容、不自动 submit，字段与 Plan 影响由 Agent 总结；下列旧“兼容检查”按本条解释。
+
 **Blocked by:** [#336](https://github.com/HSLix/LixAssistantLimbusCompany/issues/336)
 
-**交付：** Construct 可从空白或当前正式页面创建本 Session 草稿，修改后在一个模态窗口左右操作当前正式页和拟安装页，试填不影响正式配置。
+**交付：** Construct 可从空白或当前正式页面创建本 Session 草稿，修改后在应用级模态窗口的 Current / Proposed / Review 三 Tab 审查，默认 Proposed，试填不影响正式配置。拟安装页检查失败自动返回同轮 Agent，不出现失败审批；详见[试用修订](page-review-tabs-implementation.md)。
 
 - [ ] 页面草稿按 Session 保留，当前正式页通过受控只读入口访问；Repair / CLI 无构建与预览工具权限。
 - [ ] 页面接口 / ID / 旧配置 / Plan 参数兼容检查结果反馈 Agent，破坏兼容先获授权，不自动丢弃旧配置。
-- [ ] 同进程窗口左右各加载一个独立实例及内存配置；同名页不存在标明新增，修改后重开加载当前草稿字节。
+- [ ] 同进程 Current / Proposed 各有独立实例及内存配置，切换 Tab 不重复加载或丢失试填；无旧页标明新增，旧页失败仍可审批有效修复版，拟安装页失败直接返回 Agent。修改后重开加载当前草稿字节，默认 Proposed；Review 集中显示 Agent 总结、ID 和版本。
 - [ ] 应用级模态锁住 User / Developer 其他窗口，点击时提示并强调预览；两页可操作，游戏和其他应用不被锁住。
 - [ ] 预览期间不能切换 / 新建 Session 或启动新 Agent 修改；关闭 / 失败 / 取消能解除锁定与等待，不依赖被锁主窗按钮。
 - [ ] 宿主配置保存零正式落盘、两侧试填互不影响、关闭丢弃；记录同进程故障和模块卸载限制，Windows 成品模态与布局单独验证。
 
 ## 6. [#340](https://github.com/HSLix/LixAssistantLimbusCompany/issues/340) 人工确认对比版本后安装并重载业务页面
+
+2026-11-02：已与 #339 合并本地实施，保留本票全部安装 / 重载验收项。#339 已按开发者确认关闭；本票保持 OPEN，等待开发者 Windows 实验验证及另行关闭确认。见[实施记录](stage-5-339-340-implementation.md)。
 
 **Blocked by:** [#339](https://github.com/HSLix/LixAssistantLimbusCompany/issues/339)
 

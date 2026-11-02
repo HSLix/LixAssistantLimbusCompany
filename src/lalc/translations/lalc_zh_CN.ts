@@ -1269,5 +1269,105 @@ Original pixel region: {2}</source>
       <source>Save Steam directory</source>
       <translation>保存 Steam 目录</translation>
     </message>
+    <message>
+      <source>Open Session page drafts</source>
+      <translation>打开当前会话页面草稿目录</translation>
+    </message>
+    <message>
+      <source>Review settings page</source>
+      <translation>审查业务设置页面</translation>
+    </message>
+    <message>
+      <source>Review both pages here. Other LALC windows are locked until this review closes.</source>
+      <translation>请在此对比两侧页面。关闭审查前，其他 LALC 窗口暂时锁定。</translation>
+    </message>
+    <message>
+      <source>Current installed page</source>
+      <translation>当前正式页</translation>
+    </message>
+    <message>
+      <source>Proposed page</source>
+      <translation>拟安装页</translation>
+    </message>
+    <message>
+      <source>Trial configuration is discarded. Installation keeps existing settings; reload the application afterwards.</source>
+      <translation>试填配置将丢弃。安装保留已有配置，完成后请主动重载应用。</translation>
+    </message>
+    <message>
+      <source>Install this version</source>
+      <translation>安装此版本</translation>
+    </message>
+    <message>
+      <source>Close without installing</source>
+      <translation>关闭不安装</translation>
+    </message>
+    <message>
+      <source>New page; no installed page exists.</source>
+      <translation>新增页面；当前没有对应正式页。</translation>
+    </message>
+    <message>
+      <source>Finish or close the page review before using other LALC windows.</source>
+      <translation>请先完成或关闭页面审查，再使用其他 LALC 窗口。</translation>
+    </message>
+    <message>
+      <source>Page installed</source>
+      <translation>页面已安装</translation>
+    </message>
+    <message>
+      <source>Reload the application to use the installed page.</source>
+      <translation>请重载应用以使用已安装页面。</translation>
+    </message>
+    <message>
+      <source>Current</source>
+      <translation>原页面</translation>
+    </message>
+    <message>
+      <source>Proposed</source>
+      <translation>拟安装页</translation>
+    </message>
+    <message>
+      <source>Review</source>
+      <translation>Agent 审查</translation>
+    </message>
+    <message>
+      <source>Review the proposed page. Use Current and Review for comparison and details.</source>
+      <translation>请审查拟安装页，可切换原页面及 Agent 审查查看对比与详情。</translation>
+    </message>
+    <message>
+      <source>File: {0}</source>
+      <translation>文件：{0}</translation>
+    </message>
+    <message>
+      <source>Session: {0}</source>
+      <translation>会话：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed page ID: {0}</source>
+      <translation>拟安装页 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed task ID: {0}</source>
+      <translation>拟安装任务 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed SHA-256: {0}</source>
+      <translation>拟安装版本 SHA-256：{0}</translation>
+    </message>
+    <message>
+      <source>Current page ID: {0}</source>
+      <translation>原页面 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Current task ID: {0}</source>
+      <translation>原任务 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Current SHA-256: {0}</source>
+      <translation>原版本 SHA-256：{0}</translation>
+    </message>
+    <message>
+      <source>Page loading was checked. Configuration and Plan compatibility are reviewed by the Agent.</source>
+      <translation>已检查拟安装页加载。配置及 Plan 兼容影响由 Agent 审查说明。</translation>
+    </message>
   </context>
 </TS>

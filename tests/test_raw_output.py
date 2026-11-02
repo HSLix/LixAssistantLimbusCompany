@@ -14,6 +14,36 @@ from lalc.agent_repair import RepairLog
 from test_developer_gui import gui
 
 
+@pytest.mark.parametrize('completed', [False, True])
+@pytest.mark.parametrize('line', ['long sentence ' * 100, 'x' * 1500])
+def test_raw_output_wraps_with_viewport_without_changing_text(gui, completed, line):
+    """实时与完整消息的长行随视口重排，保留缩进、换行和字面文本。"""
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    text = '  <literal>\n    ' + line + '\n\nlast line'
+    if completed:
+        chat.remember_message(1, [{'type': 'text', 'text': text}])
+    else:
+        chat.activity(1)['pending'] = text
+    chat.open_link(QUrl('raw:1'))
+    chat.show()
+    heights = []
+    try:
+        for width in (800, 360, 800):
+            chat.resize(width, 400)
+            app.processEvents()
+            assert chat.horizontalScrollBar().maximum() == 0
+            assert chat.document().size().width() <= chat.viewport().width()
+            assert text in chat.toPlainText()
+            heights.append(chat.document().size().height())
+        assert heights[1] > heights[0]
+        assert heights[2] == heights[0]
+    finally:
+        chat.close()
+
+
 def raw(page, content):
     if not page.host.conversation.log.group:
         page.host.conversation.log.group = 1

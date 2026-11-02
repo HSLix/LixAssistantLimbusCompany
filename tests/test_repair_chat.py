@@ -11,6 +11,35 @@ import pytest
 from test_developer_gui import gui, wait_jobs
 
 
+def test_tool_details_wrap_with_viewport_and_preserve_json(gui):
+    """工具详情中的长参数与返回值不撑宽聊天区，缩放后仍完整可读。"""
+    import json
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    arguments = {'path': 'x' * 1500}
+    result = {'text': 'long sentence ' * 100}
+    chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_start', {'args': arguments})
+    chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_end', {'result': result})
+    chat.open_link(QUrl('tool:0'))
+    chat.show()
+    heights = []
+    try:
+        for width in (800, 360, 800):
+            chat.resize(width, 400)
+            app.processEvents()
+            assert chat.horizontalScrollBar().maximum() == 0
+            assert chat.document().size().width() <= chat.viewport().width()
+            assert json.dumps({'arguments': arguments, 'result': result}, ensure_ascii=False, indent=2) in chat.toPlainText()
+            heights.append(chat.document().size().height())
+        assert heights[1] > heights[0]
+        assert heights[2] == heights[0]
+    finally:
+        chat.close()
+
+
 def emit(page, kind, identity="call-1", name="action_contracts", number=1, **fields):
     value = {"type": kind, "toolCallId": identity, **fields}
     value["name" if kind == "repair_tool" else "toolName"] = name

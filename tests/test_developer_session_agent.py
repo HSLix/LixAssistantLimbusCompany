@@ -24,6 +24,97 @@ from test_developer_gui import gui
 pytestmark = pytest.mark.agent
 
 
+@pytest.mark.parametrize('mode', ['Construct', 'Repair'])
+def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mode):
+    """页面工具仅 Construct 声明；源码保存和预览结果经真实 pi 回到同轮。"""
+    from lalc.agent_policy import PAGE_TOOLS
+    from lalc.page_drafts import PageDrafts
+    from test_page_drafts import SOURCE
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(), mode=mode, entry='gui')
+    chat = session.conversation()
+    seen = []
+    def preview(request):
+        seen.append(request)
+        request.finish({'status': 'not_installed', 'sha256': request.snapshot['sha256']})
+    if mode == 'Construct':
+        script(state, [tool('page_create', {'filename': 'sample.py', 'source': SOURCE}),
+                       tool('page_list', {'scope': 'drafts'}),
+                       tool('page_read', {'scope': 'settings'}),
+                       tool('page_update', {'filename': 'sample.py', 'source': SOURCE.replace('"Sample"', '"Updated"')}),
+                       tool('page_preview', {'filename': 'sample.py', 'summary': '保留字段和 ID，未改变 Plan 参数。'}),
+                       answer('review closed')])
+    else:
+        script(state, [tool('page_list', {}), answer('not permitted')])
+    result = asyncio.run(chat.run('review page', options, on_page_preview=preview))
+    assert result['status'] == 'completed', result
+    declared = {item['function']['name'] for item in state['calls'][-1]['tools']}
+    assert (set(PAGE_TOOLS) <= declared) if mode == 'Construct' else not (set(PAGE_TOOLS) & declared)
+    assert chat.tools.on_page_preview is None
+    if mode == 'Construct':
+        assert len(seen) == 1 and seen[0].done.is_set()
+        assert not seen[0].finish({'status': 'installed'})
+        assert any(message.get('role') == 'tool' and 'not_installed' in str(message) for message in state['calls'][-1]['messages'])
+        restored = DeveloperSession(chat.host.service, session.identity, entry='gui').conversation()
+        assert PageDrafts(restored.session).snapshot('sample.py')['source'] == SOURCE.replace('"Sample"', '"Updated"').encode()
+        assert [message for message in restored.history if message.get('toolName') == 'page_preview'][-1]['details']['status'] == 'not_installed'
+        assert not (chat.host.service.data_root / 'pages').exists()
+    else:
+        assert not seen and not (session.path / 'page-drafts').exists()
+
+
+@pytest.mark.parametrize('invalid_first', [False, True])
+def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_first):
+    """真实 GUI → pi → 双页审查 → 人工点击安装 → 同轮继续，不自动重载。"""
+    from PySide6.QtCore import QTimer
+    from lalc.agent_settings import save_settings
+    from test_page_drafts import SOURCE
+    from test_developer_gui import wait_jobs
+    _, options, state = conversation
+    app, window = gui
+    save_settings(window.service.data_root, {'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
+    session = DeveloperSession.create(window.service, None, mode='Construct', entry='gui')
+    session.conversation()
+    window.repair_page.activate_session(session)
+    initial = SOURCE.replace('PAGE_ID = "sample.page"', '') if invalid_first else SOURCE
+    steps = [tool('page_create', {'filename': 'sample.py', 'source': initial}),
+             tool('page_preview', {'filename': 'sample.py', 'summary': '新增页面；不改现有字段。'})]
+    if invalid_first:
+        steps.extend([tool('page_update', {'filename': 'sample.py', 'source': SOURCE}),
+                      tool('page_preview', {'filename': 'sample.py', 'summary': '已补齐 PAGE_ID，字段不变。'})])
+    script(state, [*steps, answer('installed; reload manually')])
+    seen = []
+    timer = QTimer()
+    def install():
+        dialog = getattr(window.repair_page, 'page_preview_dialog', None)
+        if dialog is not None and dialog.isVisible() and dialog.install_button.isEnabled():
+            seen.append(dialog.request)
+            dialog.install_button.click()
+            timer.stop()
+    timer.timeout.connect(install)
+    timer.start(10)
+    try:
+        window.repair_page.message.setPlainText('创建并审查页面')
+        window.repair_page.send()
+        wait_jobs(app, window)
+    finally:
+        timer.stop()
+        window.cancel_operation()
+        wait_jobs(app, window)
+    assert len(seen) == 1 and seen[0].result['status'] == 'installed'
+    assert (window.service.data_root / 'pages/sample.py').read_text() == SOURCE
+    assert read_json(session.path / 'log/result.json')['status'] == 'completed'
+    assert any(message.get('role') == 'tool' and 'reload_required' in str(message) for message in state['calls'][-1]['messages'])
+    assert app.activeModalWidget() is None and window.service.state['activity'] is None
+    results = [item for item in session.host.conversation.history if item.get('toolName') == 'page_preview']
+    if invalid_first:
+        assert len(results) == 2
+        assert results[0]['isError'] and results[0]['details']['status'] == 'preview_failed'
+        assert 'PAGE_ID' in results[0]['details']['error']
+        assert any(message.get('role') == 'tool' and 'preview_failed' in str(message) for message in state['calls'][2]['messages'])
+    assert results[-1]['details']['status'] == 'installed'
+
+
 @pytest.mark.parametrize('mode,continuation', [('Construct', 'memory'), ('Construct', 'gui'),
                                              ('Repair', 'memory'), ('Repair', 'gui'), ('Repair', 'cli')])
 @pytest.mark.parametrize('corrections', [1, 2])
