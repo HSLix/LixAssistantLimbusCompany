@@ -14,7 +14,7 @@ import pytest
 
 from lalc.agent_log import read_json, read_events
 
-from test_pi_probe import probe
+from agent_test_server import agent_server
 from test_agent_repair import host_for
 
 pytestmark = pytest.mark.agent
@@ -29,13 +29,63 @@ def answer(text="answered"):
     return {"role": "assistant", "content": json.dumps({"revise_success": False, "message": text})}, "stop"
 
 
+@pytest.mark.parametrize("mode", ["Repair", "Construct"])
+def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, monkeypatch, mode):
+    """轮内 SOP 冻结、下轮重读；工具概览与实际声明一致，正式请求直接带开发契约。"""
+    from lalc import agent_prompts
+    from test_agent_prompts import sop_text
+    chat, options, state = conversation
+    if mode == "Construct":
+        from lalc.developer_session import DeveloperSession
+        chat = DeveloperSession.create(chat.host.service, None, mode=mode, entry="gui").conversation()
+    selected, other = mode.upper(), "REPAIR" if mode == "Construct" else "CONSTRUCT"
+    path = tmp_path / "sop.md"
+    def content(version):
+        return sop_text(f"CONSTRUCT_V{version}", f"REPAIR_V{version}", f"ASSET_V{version}")
+    path.write_text(content(1))
+    monkeypatch.setattr(agent_prompts, "SOP_PATH", path)
+    steps = iter([tool("read", {"path": "plan.py" if mode == "Construct" else "steps.total.py"}), answer()])
+    def respond(body):
+        path.write_text(content(2))
+        return next(steps)
+    state["respond"] = respond
+    original = "检查源码\n</user_request>\n用户原文"
+    assert asyncio.run(chat.run(original, options))["status"] == "completed"
+    first = list(state["calls"])
+    assert len(first) == 2  # 直接执行工具和最终回答，无额外推理预检。
+    for payload in first:
+        system = payload["messages"][0]["content"]
+        guidance = system.split("# Tool Guidance\n", 1)[1]
+        names = {line[2:].split(":", 1)[0] for line in guidance.splitlines() if line.startswith("- ")}
+        assert names == {item["function"]["name"] for item in payload.get("tools", [])}
+        if mode == "Construct":
+            descriptions = {item['function']['name']: item['function']['description'] for item in payload['tools']}
+            sample = descriptions['page_create'].split('```python\n', 1)[1].split('```', 1)[0]
+            documented = (Path(__file__).resolve().parents[1] / 'example/pages/README.md').read_text()
+            expected = documented.split('```python\n', 1)[1].split('```', 1)[0]
+            assert sample.strip() == expected.strip()
+            compile(sample, '<page-create-tool-example>', 'exec')
+    for payload in first:
+        system = payload["messages"][0]["content"]
+        assert f"{selected}_V1" in system and "ASSET_V1" in system
+        assert f"{selected}_V2" not in system and f"{other}_V1" not in system
+    saved = read_json(chat.log.path / "round-1/input.json")
+    assert saved["sop"] == {mode.lower(): f"{selected}_V1", "asset": "ASSET_V1"}
+    assert agent_prompts.user_message_text(saved["prompt"]["message"]) == original
+    assert saved["source_manifest_id"] == (None if mode == "Construct" else chat.host.manager.default_manifest_id())
+    state["respond"] = lambda _: answer()
+    assert asyncio.run(chat.run("继续", options))["status"] == "completed"
+    second = read_json(chat.log.path / "round-2/input.json")
+    assert second["sop"] == {mode.lower(): f"{selected}_V2", "asset": "ASSET_V2"}
+    assert f"{selected}_V2" in state["calls"][-1]["messages"][0]["content"]
+
+
 @pytest.fixture
-def conversation(probe, tmp_path):
-    command, state, _ = probe
+def conversation(agent_server, tmp_path):
+    address, state, _ = agent_server
     host, _ = host_for(tmp_path / "project")
     options = SimpleNamespace(pi="pi", ask_api_key=False,
-                             base_url=command[command.index("--base-url") + 1], model="gemma4-test", max_requests=20)
-    state["repair_check"] = True
+                             base_url=address, model="gemma4-test", max_requests=20)
     state["respond"] = lambda body: answer()
     return host.new_conversation(), options, state
 
@@ -43,6 +93,60 @@ def conversation(probe, tmp_path):
 def script(state, steps):
     iterator = iter(steps)
     state["respond"] = lambda body: next(iterator)
+
+
+@pytest.mark.parametrize('declarations', ['missing', 'partial'])
+def test_incomplete_tool_declarations_rejected_before_request(conversation, tmp_path, monkeypatch, declarations):
+    """模拟适配器漏发全部或部分工具声明；宿主在发送正式请求前明确失败。"""
+    from contextlib import contextmanager
+    from lalc import agent_repair
+
+    chat, options, state = conversation
+    configured = agent_repair.configured_pi
+
+    @contextmanager
+    def incomplete_payload(*args, **kwargs):
+        with configured(*args, **kwargs) as (command, env, temporary, model):
+            command = list(command)
+            index = command.index('--extension') + 1
+            extension = tmp_path / 'incomplete-tools.ts'
+            source = Path(command[index]).read_text()
+            mutation = 'delete payload.tools;' if declarations == 'missing' else 'payload.tools?.pop();'
+            source = source.replace('const active = new Set(pi.getActiveTools());\n          if (payload.tools)',
+                                    mutation + '\n          const active = new Set(pi.getActiveTools());\n          if (payload.tools)')
+            extension.write_text(source)
+            command[index] = str(extension)
+            yield command, env, temporary, model
+
+    monkeypatch.setattr(agent_repair, 'configured_pi', incomplete_payload)
+    result = asyncio.run(chat.run('检查工具声明', options))
+    assert result['status'] == 'incomplete', result
+    assert 'tool declarations do not match active tools' in result['error']
+    assert len(state['calls']) == result['requests'] == 0
+
+
+def test_single_model_response_can_call_multiple_host_tools(conversation):
+    """同一响应可调用多个宿主工具；下一次请求必须携带全部工具结果。"""
+    chat, options, state = conversation
+    batch = []
+    for index, name in enumerate(("action_contracts", "asset_tree")):
+        call = tool(name, {})[0]["tool_calls"][0]
+        call["index"] = index
+        batch.append(call)
+    script(state, [({"role": "assistant", "tool_calls": batch}, "tool_calls"), answer()])
+    result = asyncio.run(chat.run("inspect contracts and assets together", options))
+    assert result["status"] == "completed", result
+    # 一次双工具响应、一次携带双结果的最终回答请求。
+    assert len(state["calls"]) == result["requests"] == 2
+    messages = state["calls"][-1]["messages"]
+    requested = next(message for message in reversed(messages) if message.get("tool_calls"))
+    assert len(requested["tool_calls"]) == 2
+    returned = {message["tool_call_id"] for message in messages if message["role"] == "tool"}
+    assert returned == {call["id"] for call in batch}
+    hosted = [row["event"] for row in read_events(chat.log.path / "events.jsonl")
+              if row["event"]["type"] == "repair_tool"]
+    assert {event["name"] for event in hosted} == {"action_contracts", "asset_tree"}
+    assert all(not event["result"].get("isError") for event in hosted)
 
 
 def test_multifile_edit_manifest_and_plan_enforced(conversation):
@@ -86,11 +190,11 @@ def test_text_only_and_context_retained(conversation):
     script(state, [tool("read", {"path": "steps.total.py"}), answer("first result")])
     first = asyncio.run(chat.run("remember first user message", options, key="test-private-key"))
     assert first["status"] == "completed", first
-    assert first["requests"] == 3
+    assert first["requests"] == 2
     state["respond"] = lambda body: answer("second result")
     second = asyncio.run(chat.run("second user message", options, key="test-private-key"))
     assert second["status"] == "completed", second
-    assert second["requests"] == 2
+    assert second["requests"] == 1
     payload = state["calls"][-1]
     text = json.dumps(payload)
     assert "remember first user message" in text and "first result" in text and "second user message" in text
@@ -108,6 +212,7 @@ def test_text_only_and_context_retained(conversation):
 def test_transport_error_preserves_cause_and_request_without_retry(conversation, fault, phase, request_number):
     chat, options, state = conversation
     state[fault] = request_number
+    script(state, [tool("read", {"path": "steps.total.py"}), answer()])
     result = asyncio.run(chat.run("只分析连接", options, key="test-private-key"))
     assert result["status"] == "incomplete", result
     assert result["requests"] == len(state["calls"]) == request_number
@@ -173,7 +278,7 @@ def test_developer_publish_trial_and_logs_continue_same_round(conversation, monk
     state["respond"] = respond
     result = asyncio.run(chat.run("develop and trial", options))
     assert result["status"] == "completed", result
-    assert result["round"] == 1 and result["requests"] == 7
+    assert result["round"] == 1 and result["requests"] == 6
     assert chat.host.manager.default_manifest_id() == original_default
     assert {"publish", "trial_run", "list_runs", "read_run_log"} <= {
         item["function"]["name"] for item in state["calls"][-1]["tools"]}
@@ -228,7 +333,7 @@ def test_request_limit_ends_round_and_next_round_resets(conversation):
     state["respond"] = lambda body: answer("continue")
     continued = asyncio.run(chat.run("now answer", options))
     assert continued["status"] == "completed", continued
-    assert continued["requests"] == 2
+    assert continued["requests"] == 1
 
 
 def test_cancel_reaps_process_and_keeps_candidate_and_log(conversation):
@@ -345,7 +450,7 @@ def test_unloaded_model_reaches_inference_without_management_load_request(conver
     state["models"] = [{"id": "gemma4-test", "status": {"value": "unloaded"}}]
     result = asyncio.run(chat.run("只分析，不修改。", options))
     assert result["status"] == "completed", result
-    assert len(state["calls"]) == result["requests"] == 2
+    assert len(state["calls"]) == result["requests"] == 1
     assert state["get_paths"] == ["/v1/models"]
     assert all(path == "/v1/chat/completions" for path in state["post_paths"])
 
@@ -360,17 +465,21 @@ def test_invalid_final_gets_error_feedback_then_strict_json_without_tools(conver
         if len(calls) == 1:
             return {"role": "assistant", "content": invalid}, "stop"
         assert not body.get("tools")
-        assert "严格 JSON 校验" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "只纠正最终 JSON" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "外层不加代码围栏" in json.dumps(body["messages"], ensure_ascii=False)
+        assert "当前没有启用工具。" in body["messages"][0]["content"]
         return answer("已联通，仅分析。")
     state["respond"] = respond
     before = {p.name: p.read_bytes() for p in chat.host.candidate.iterdir()}
     result = asyncio.run(chat.run("测试联通", options))
     assert result["status"] == "completed", result
     assert result["answer"] == {"revise_success": False, "message": "已联通，仅分析。"}
-    assert len(state["calls"]) == result["requests"] == 3
+    assert len(state["calls"]) == result["requests"] == 2
     for index, payload in enumerate(state["calls"], 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
         assert "本轮模型请求第" not in system and "<cwd>" not in system
+        assert "对象外不加解释或代码围栏" in system
+        assert "内部可用 Markdown" in system
         assert f"本轮模型请求第 {index}/20 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
     assert all(not ({"max_tokens", "max_completion_tokens", "max_output_tokens"} & body.keys())
                for body in state["calls"])
@@ -393,19 +502,16 @@ def test_invalid_final_retries_never_exceed_round_budget(conversation, limit):
     assert len(state["calls"]) == result["requests"] == limit
 
 
-@pytest.mark.parametrize("preflight", [False, True])
-def test_output_truncation_records_reason_and_does_not_format_retry(conversation, preflight):
+def test_output_truncation_records_reason_and_does_not_format_retry(conversation):
     chat, options, state = conversation
-    if preflight:
-        state["repair_check"] = False
     state["respond"] = lambda body: ({"role": "assistant", "reasoning_content": "unfinished reasoning"}, "length")
     result = asyncio.run(chat.run("测试截断", options))
     assert result["reason"] == "output_limit", result
-    assert len(state["calls"]) == result["requests"] == (1 if preflight else 2)
+    assert len(state["calls"]) == result["requests"] == 1
     details = result["diagnostics"]
     assert details["stop_reason"] == "length" and details["text_chars"] == 0
     assert details["thinking_chars"] == len("unfinished reasoning")
-    assert details["stage"] == ("model_preflight" if preflight else "provider_request")
+    assert details["stage"] == "provider_request"
     events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     assert not any(event.get("type") == "final_answer_retry" for event in events)
 
@@ -470,7 +576,7 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
     script(state, [tool("read", {"path": "steps.total.py"}), answer("done")])
     events = []
     result = asyncio.run(chat.run("inspect then answer", options, on_event=events.append))
-    assert result["status"] == "completed" and result["requests"] == 3
+    assert result["status"] == "completed" and result["requests"] == 2
     first_calls = list(state["calls"])
     for index, payload in enumerate(first_calls, 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
@@ -481,21 +587,21 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
         assert "当前对话第" not in system
         assert "<cwd>" not in system and "lalc-pi-" not in system
         assert "达到上限后必须停止" in system
-    assert first_calls[2]["messages"][:len(first_calls[1]["messages"])] == first_calls[1]["messages"]
-    assert first_calls[1]["messages"][0] == first_calls[2]["messages"][0]
+    assert first_calls[1]["messages"][:len(first_calls[0]["messages"])] == first_calls[0]["messages"]
+    assert first_calls[0]["messages"][0] == first_calls[1]["messages"][0]
     requests = [event["event"] for event in events if event["event"]["type"] == "lalc_request"]
-    assert [(value["requests"], value["request_limit"]) for value in requests] == [(1, 3), (2, 3), (3, 3)]
+    assert [(value["requests"], value["request_limit"]) for value in requests] == [(1, 3), (2, 3)]
     options.max_requests = 2
     state["respond"] = lambda _: answer("next")
     result = asyncio.run(chat.run("next message", options))
-    assert result["status"] == "completed" and result["requests"] == 2
-    for index, payload in enumerate(state["calls"][3:], 1):
+    assert result["status"] == "completed" and result["requests"] == 1
+    for index, payload in enumerate(state["calls"][2:], 1):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
         assert f"当前对话第 2 轮；本轮模型请求第 {index}/2 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
         assert "当前对话第" not in system
     assert state["calls"][-1]["messages"][:len(first_calls[-1]["messages"])] == first_calls[-1]["messages"]
     budgets = [message for message in chat.history if "LALC_REQUEST_BUDGET" in json.dumps(message)]
-    assert len(budgets) == 3  # 两轮预检的通知不进入修复历史。
+    assert len(budgets) == 3  # 所有正式请求的通知均进入修复历史。
     assert read_json(chat.log.path / "context.json") == chat.history
 
 
@@ -526,7 +632,7 @@ def test_multiple_image_formats_are_forwarded_without_conversion_and_retained(co
     expected = ["image/png", "image/jpeg", "image/webp", "image/gif", "image/bmp", "image/tiff", "image/avif"]
     result = asyncio.run(chat.run("inspect all images", options, images=paths))
     assert result["status"] == "completed", result
-    assert result["requests"] == 2
+    assert result["requests"] == 1
     for payload in state["calls"]:
         urls = [part["image_url"]["url"] for message in payload["messages"] if isinstance(message.get("content"), list)
                 for part in message["content"] if part["type"] == "image_url"]
@@ -565,7 +671,7 @@ def test_images_stay_original_during_format_correction(conversation, tmp_path):
     paths = make_images(tmp_path, ("JPEG", "BMP"))
     script(state, [({"role": "assistant", "content": "not json"}, "stop"), answer()])
     result = asyncio.run(chat.run("inspect then answer as JSON", options, images=paths))
-    assert result["status"] == "completed" and result["requests"] == 3, result
+    assert result["status"] == "completed" and result["requests"] == 2, result
     for payload in state["calls"]:
         urls = [part["image_url"]["url"] for message in payload["messages"] if isinstance(message.get("content"), list)
                 for part in message["content"] if part["type"] == "image_url"]
@@ -642,7 +748,9 @@ def test_host_and_pi_events_share_call_ids_without_removing_raw_logs(conversatio
 
 
 @pytest.mark.parametrize('thinking,effort', [(True, 'high'), (True, 'low'), (True, 'max'), (False, 'high')])
-def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, thinking, effort):
+def test_deepseek_thinking_survives_tools_and_next_round(conversation, tmp_path, thinking, effort):
+    from test_image_attachments import make_images
+
     chat, options, state = conversation
     options.provider, options.model = 'deepseek', 'deepseek-flash'
     options.thinking, options.reasoning_effort = thinking, effort
@@ -655,9 +763,9 @@ def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, th
     third['reasoning_content'] = 'Check available actions too.'
     script(state, [(first, finish_reason), (third, third_reason), (second, stop)])
     result = asyncio.run(chat.run('inspect with deepseek', options, key='deepseek-test-key',
-                                 images=[probe[2] / 'image.png']))
+                                 images=make_images(tmp_path, ('PNG',))))
     assert result['status'] == 'completed', result
-    assert result['requests'] == 4
+    assert result['requests'] == 3
     state['respond'] = lambda body: answer('second deepseek result')
     result = asyncio.run(chat.run('continue deepseek discussion', options, key='deepseek-test-key'))
     assert result['status'] == 'completed', result
@@ -666,7 +774,7 @@ def test_deepseek_thinking_survives_tools_and_next_round(conversation, probe, th
     assert [m['reasoning_content'] for m in assistant] == [
         'Inspect source before answering.', 'Check available actions too.', 'Source inspection completed.']
     # 连续工具调用及新一轮均完整保留先前实际请求的消息前缀。
-    for previous, current in ((1, 2), (2, 3), (3, 5)):
+    for previous, current in ((0, 1), (1, 2), (2, 3)):
         before = state['calls'][previous]['messages']
         assert state['calls'][current]['messages'][:len(before)] == before
     for payload in state['calls']:
@@ -743,3 +851,58 @@ def test_round_freezes_shared_config_and_auth_until_next_message(conversation):
         if path.is_file():
             assert b"example-round-A" not in path.read_bytes()
             assert b"example-round-B" not in path.read_bytes()
+
+
+def test_two_invalid_final_answers_retry_automatically_and_preserve_business_reply(conversation):
+    chat, options, state = conversation
+    invalid = '```json\n{"revise_success":false,"message":"I can inspect the Candidate."}\n```'
+    steps = iter([({'role': 'assistant', 'content': invalid}, 'stop'),
+                  ({'role': 'assistant', 'content': 'not JSON'}, 'stop'),
+                  answer('I can inspect the Candidate.')])
+    payloads = []
+    def respond(body):
+        payloads.append(body)
+        if len(payloads) > 1:
+            assert not body.get('tools')
+            assert '保留上次回复中真正回答开发者问题的内容' in json.dumps(body, ensure_ascii=False)
+            assert '不要要求用户重发问题' in json.dumps(body, ensure_ascii=False)
+        return next(steps)
+    state['respond'] = respond
+    before = {path: path.read_bytes() for path in chat.host.candidate.rglob('*') if path.is_file()}
+    result = asyncio.run(chat.run('Tell me what you can see', options))
+    assert result['status'] == 'completed' and result['requests'] == 3, result
+    assert result['answer']['message'] == 'I can inspect the Candidate.'
+    assert all(path.read_bytes() == value for path, value in before.items())
+    events = list(read_events(chat.log.root / 'events.jsonl'))
+    assert len([row for row in events if row['event']['type'] == 'final_answer_retry']) == 2
+
+
+def test_live_raw_output_is_forwarded_without_preflight_or_history_storage(conversation):
+    """真实 pi 的 thinking / 工具参数 / 文字在 message_end 前通知，日志只留完整消息。"""
+    chat, options, state = conversation
+    options.provider = 'deepseek'
+    options.model = 'deepseek-flash'
+    state['models'] = [{'id': 'deepseek-flash'}]
+    script(state, [tool('read', {'path': 'steps.total.py'}),
+                   ({'role': 'assistant', 'reasoning_content': 'Inspect raw-stream-secret',
+                     'content': json.dumps({'revise_success': False, 'message': 'finished'})}, 'stop')])
+    events = []
+    result = asyncio.run(chat.run('inspect source', options, key='raw-stream-secret', on_event=events.append))
+    assert result['status'] == 'completed' and result['requests'] == 2, result
+    assert len(state['calls']) == 2
+    live = [row['event'] for row in events if row['event']['type'] == 'raw_output']
+    assert live
+    parts = [part for event in live for part in event['content']]
+    assert any(part.get('name') == 'read' for part in parts)
+    assert any('steps.total.py' in json.dumps(part) for part in parts)
+    assert any(part.get('thinking') == 'Inspect [REDACTED]' for part in parts)
+    assert any('finished' in part.get('text', '') for part in parts)
+    first_stream = next(i for i, row in enumerate(events) if row['event']['type'] == 'raw_output')
+    first_end = next(i for i, row in enumerate(events) if row['event']['type'] == 'message_end'
+                     and row['event'].get('message', {}).get('role') == 'assistant')
+    assert first_stream < first_end
+    assert 'raw-stream-secret' not in json.dumps(events)
+    saved = list(read_events(chat.log.root / 'events.jsonl'))
+    assert not any(row['event']['type'] in {'raw_output', 'message_update', 'model_check_started'} for row in saved)
+    assert not (chat.log.root / 'round-1/events.jsonl').exists()
+    assert (chat.log.root / 'round-1/request-1.json').exists()

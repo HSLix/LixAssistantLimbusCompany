@@ -16,6 +16,7 @@ from .process_lock import ProcessLock
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
 from .control import InputSession
+from .ocr import ocr_service
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
 from .manifest import LoadedManifest, ManifestManager, ValidationError
 from .runtime import (
@@ -64,6 +65,7 @@ class ApplicationService:
         self.window_platform = window_platform
         self.game_language = checked_game_language(game_language)
         self.asset_library = AssetLibrary(self.data_root)
+        self.ocr_service = ocr_service
         self._focused_session: FocusedAutomationSession | None = None
         self._input_session: InputSession | None = None
         self._fatal = False
@@ -298,6 +300,26 @@ class ApplicationService:
         self._emit("asset_created", result)
         return result
 
+    def _ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
+        """读取已有截图；推理前后核验输入所有权及窗口，不刷新或保存。"""
+        from .recognition import client_image
+
+        session = self._focused_session
+        if session is None or session.image is None or session.size is None:
+            raise WindowError("No current screenshot for OCR; capture explicitly first.")
+
+        def checkpoint():
+            self._check_input()
+            if self._gate is not None:
+                self._gate.checkpoint()
+            session.check(record=False)
+
+        checkpoint()
+        result = self.ocr_service.recognize(client_image(session.image, session.size), region=region,
+                                            min_score=min_score, checkpoint=checkpoint)
+        checkpoint()
+        return {"observation": session.observation, **result}
+
     def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
         """按需建立本次 Run 的输入监测，与观察共用唯一的前台窗口。"""
 
@@ -520,6 +542,7 @@ class ApplicationService:
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
             game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
+            ocr=self._ocr,
             task_finished=self._finish_plan_task,
         )
         started = time.monotonic()

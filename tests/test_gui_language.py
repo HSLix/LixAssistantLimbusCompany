@@ -89,7 +89,7 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
     assert owner.service.game_language == game_language
     developer.close()
     new_developer = owner.open_window(True)
-    assert new_developer.trial_button.text() == "试运行所选 Plan"
+    assert new_developer.repair_page.new_button.text() == "新建聊天"
     assert reopened.business_pages[0].context.language == "zh_CN"
 
 
@@ -114,7 +114,7 @@ from lalc.i18n import current_language
 owner = GuiCoordinator(ApplicationService(Path(sys.argv[1])), ApplicationLifecycle())
 developer = owner.open_window(True)
 user = owner.open_window()
-print(json.dumps([current_language(), user.start_button.text(), developer.trial_button.text(),
+print(json.dumps([current_language(), user.start_button.text(), developer.repair_page.new_button.text(),
                   [page.context.language for page in user.business_pages], owner.service.game_language]))
 user.close()
 developer.close()
@@ -124,7 +124,7 @@ developer.close()
                             text=True, timeout=20, check=True)
     values = json.loads(result.stdout.splitlines()[-1])
     assert values == [language, "开始运行 Plan" if language == "zh_CN" else "Start Plan",
-                      "试运行所选 Plan" if language == "zh_CN" else "Trial selected Plan",
+                      "新建聊天" if language == "zh_CN" else "New Chat",
                       [language] * 3, "en"]
 
 
@@ -191,7 +191,7 @@ def test_catalog_covers_literal_gui_messages_and_preserves_format_fields(app):
     messages = {item.findtext("source"): item.findtext("translation") for item in catalog.findall("context/message")}
     fields = lambda value: sorted(field for _, field, _, _ in Formatter().parse(value) if field is not None)
     install_translations(app, "zh_CN")
-    for filename in ("gui.py", "developer_gui.py", "repair_chat.py", "lifecycle.py", "i18n.py"):
+    for filename in ("gui.py", "developer_gui.py", "repair_chat.py", "page_preview.py", "lifecycle.py", "i18n.py"):
         for node in ast.walk(ast.parse((root / filename).read_text())):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr":
                 assert isinstance(node.args[0], ast.Constant), (filename, node.lineno)
@@ -235,8 +235,10 @@ def test_dynamic_controls_chat_and_notifications_keep_original_details(owner, ap
     state = owner.service.state
     state["activity"] = "Candidate 初始化"
     developer.render_state(state)
-    assert developer.status.text() == ("当前活动：初始化 Candidate" if language == "zh_CN"
-                                       else "Current activity: Initializing Candidate")
+    assert not hasattr(developer, 'status')
+    developer.repair_page.show_event({'round': 1, 'event': {'type': 'lalc_request', 'requests': 1}})
+    assert developer.repair_page.status.text() == ('Agent 正在处理…' if language == 'zh_CN'
+                                                 else 'Agent is responding…')
     from lalc.developer_gui import TrialDialog
     dialog = TrialDialog(owner.service, developer)
     state.update(paused=True, trace=[], pause_info=None)

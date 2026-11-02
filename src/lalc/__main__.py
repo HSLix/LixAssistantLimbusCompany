@@ -27,17 +27,10 @@ class _Parser(argparse.ArgumentParser):
 def _parser() -> argparse.ArgumentParser:
     parser = _Parser(prog="lalc")
     commands = parser.add_subparsers(dest="command", required=True)
-    probe = commands.add_parser("pi-probe", help="Verify pi image input and restricted source reading")
-    probe.add_argument("--base-url", default="http://localhost:12138/v1")
-    probe.add_argument("--model")
-    probe.add_argument("--image", type=Path, required=True)
-    probe.add_argument("--source-root", type=Path, required=True)
-    probe.add_argument("--source", required=True)
-    probe.add_argument("--prompt", default="识别图片中的游戏界面，并分析要进入关卡，下一个步骤应点击哪里。说明按钮文字和大致位置，不执行点击。")
-    probe.add_argument("--max-requests", type=int, default=20)
-    probe.add_argument("--pi", default="pi", help="Path to the fixed-version pi executable")
-    probe.add_argument("--ask-api-key", action="store_true", help="Read an optional key without echo")
-    repair = commands.add_parser("repair", help="Analyze or repair existing Candidate files")
+    repair = commands.add_parser("repair", help="Create or resume an independent Repair Session")
+    source = repair.add_mutually_exclusive_group(required=True)
+    source.add_argument("--from", dest="manifest_id", help="Create a Session from an explicit saved Manifest ID")
+    source.add_argument("--session", help="Resume a Repair Session by ID")
     repair.add_argument("--chat", action="store_true", help="Continue the conversation with further messages")
     repair.add_argument("--problem", required=True, help="Problem, reproduction steps and expected behavior")
     repair.add_argument("--exception", help="Exception/traceback or additional reproduction details")
@@ -52,9 +45,9 @@ def _parser() -> argparse.ArgumentParser:
     settings.add_argument("--base-url", help="Complete API base URL; no path is appended")
     settings.add_argument("--model")
     settings.add_argument("--max-requests", type=int)
-    for command in (probe, repair, settings):
+    for command in (repair, settings):
         command.add_argument("--provider", choices=("llama.cpp", "deepseek"),
-                             default="llama.cpp" if command is probe else None)
+                             default=None)
         command.add_argument("--thinking", action=argparse.BooleanOptionalAction, default=None)
         command.add_argument("--reasoning-effort", choices=("low", "high", "max"))
     secret = settings.add_mutually_exclusive_group()
@@ -79,6 +72,7 @@ def _parser() -> argparse.ArgumentParser:
     tag.add_argument("--image", type=Path, required=True, help="Existing local crop image path")
     commands.add_parser("generate-stubs", help="Generate RunContext types from registered Trusted Actions")
     commands.add_parser("data-dir")
+    commands.add_parser("history-rebuild", help="Rebuild the Agent history index from recorded version observations")
     run = commands.add_parser("run")
     run.add_argument("logical_name")
     run.add_argument("--manifest")
@@ -214,10 +208,6 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
 
 
 def _dispatch(args: argparse.Namespace) -> int:
-    if args.command == "pi-probe":
-        from .pi_probe import run_probe
-
-        return run_probe(args)
     if args.command == "generate-stubs":
         from .stubgen import generate_stubs
 
@@ -231,6 +221,10 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "data-dir":
         print(data_root)
         return 0
+    if args.command == "history-rebuild":
+        from .agent_history import AgentHistory
+        print(json.dumps(AgentHistory(data_root).rebuild(), ensure_ascii=False))
+        return 0
     if args.command in {"agent-config", "secret-set"}:
         from .agent_settings import settings_command
 
@@ -242,7 +236,7 @@ def _dispatch(args: argparse.Namespace) -> int:
     if args.command == "repair":
         from .agent_repair import run_repair
 
-        return run_repair(args, manager, candidate)
+        return run_repair(args, manager)
 
     if args.command in {"crop-asset", "tag-asset"}:
         service = ApplicationService(data_root, manifest_manager=manager)
@@ -338,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
             return run_application(lambda owner: run_gui(owner, developer=True))
         return run_application()
     try:
-        if args[0] not in {"data-dir", "pi-probe", "generate-stubs"}:
+        if args[0] not in {"data-dir", "generate-stubs"}:
             configure_logging(default_data_root())
         parsed = _parser().parse_args(args)
         if parsed.command in {"validate", "publish", "clear"}:

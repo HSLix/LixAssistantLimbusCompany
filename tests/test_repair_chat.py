@@ -11,6 +11,35 @@ import pytest
 from test_developer_gui import gui, wait_jobs
 
 
+def test_tool_details_wrap_with_viewport_and_preserve_json(gui):
+    """工具详情中的长参数与返回值不撑宽聊天区，缩放后仍完整可读。"""
+    import json
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    arguments = {'path': 'x' * 1500}
+    result = {'text': 'long sentence ' * 100}
+    chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_start', {'args': arguments})
+    chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_end', {'result': result})
+    chat.open_link(QUrl('tool:0'))
+    chat.show()
+    heights = []
+    try:
+        for width in (800, 360, 800):
+            chat.resize(width, 400)
+            app.processEvents()
+            assert chat.horizontalScrollBar().maximum() == 0
+            assert chat.document().size().width() <= chat.viewport().width()
+            assert json.dumps({'arguments': arguments, 'result': result}, ensure_ascii=False, indent=2) in chat.toPlainText()
+            heights.append(chat.document().size().height())
+        assert heights[1] > heights[0]
+        assert heights[2] == heights[0]
+    finally:
+        chat.close()
+
+
 def emit(page, kind, identity="call-1", name="action_contracts", number=1, **fields):
     value = {"type": kind, "toolCallId": identity, **fields}
     value["name" if kind == "repair_tool" else "toolName"] = name
@@ -25,11 +54,11 @@ def test_workspace_opens_actual_candidate_without_creating_missing_draft(gui, mo
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or True)
     monkeypatch.setattr(window, "_interact", lambda operation: operation())
     page.open_workspace()
-    assert opened == [str(window.host.candidate)]
-    shutil.rmtree(window.host.candidate)
+    assert opened == [str(window.repair_page.host.candidate)]
+    shutil.rmtree(window.repair_page.host.candidate)
     with pytest.raises(ValueError, match="初始化 Candidate"):
         page.open_workspace()
-    assert not window.host.candidate.exists() and len(opened) == 1
+    assert not window.repair_page.host.candidate.exists() and len(opened) == 1
 
 
 def test_removed_panels_return_space_and_answer_does_not_open_diff(gui, monkeypatch):
@@ -39,6 +68,10 @@ def test_removed_panels_return_space_and_answer_does_not_open_diff(gui, monkeypa
     assert not hasattr(page, "refresh_files")
     calls = []
     monkeypatch.setattr(page, "show_diff", lambda: calls.append(True))
+    page.host.conversation.log.group = 1
+    page.host.conversation.log.record({'type': 'message_end', 'message': {'role': 'assistant', 'content': [
+        {'type': 'text', 'text': '{"revise_success": true, "message": "完成"}'}]}})
+    page.host.conversation.log.group = 1
     page.answered({"reason": "answered", "requests": 2, "round": 1, "answer": {"message": "完成"}})
     assert not calls
     assert "Agent · 第 1 轮" in page.chat.toPlainText()
@@ -67,9 +100,9 @@ def test_diff_button_reads_current_fixed_baseline(gui):
     from PySide6.QtWidgets import QPlainTextEdit
     app, window = gui
     page = window.repair_page
-    file = window.host.candidate / "steps.total.py"
+    file = window.repair_page.host.candidate / "steps.total.py"
     file.write_text(file.read_text().replace("if value > 0", "if value >= 0"))
-    expected = window.host.diff()
+    expected = window.repair_page.host.diff()
     page.show_diff()
     wait_jobs(app, window)
     assert page.diff_dialog.findChild(QPlainTextEdit).toPlainText() == expected

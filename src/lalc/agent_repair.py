@@ -11,51 +11,28 @@ from types import SimpleNamespace
 import uuid
 
 from .pi_probe import PI_VERSION, PiStartup, configured_pi, rpc_event, rpc_session
-from .repair_tools import REPAIR_TOOLS, RepairTools
+from .repair_tools import RepairTools
+from .agent_policy import allowed_tools
+from .manifest_reference import ManifestReference
 from .agent_settings import settings_snapshot
 from .developer import candidate_files, editable_files, file_diff
 from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 from .agent_log import LogStore
-
-
-SYSTEM_PROMPT = """你是 LALC Developer Policy 开发助手。根据开发者 prompt 和当前游戏状态持续开发、调试工作流，需要修改时实际 read、edit，并 validate 完整候选。
-只能读取 Candidate 内已有文件；可按需修改多个已有文件，包括 manifest.json、Recovery Rule 和未被 Manifest 引用的文件。
-可编辑已有 Candidate Python Plan；不得执行可变 Candidate 路径，Plan 必须先 Publish。不通用新建、删除或重命名文件，不访问目录外文件。
-新增源码仅用 add_component / add_recovery_rule，提供 filename、logical_name、source 完整源码，工具同时创建并登记 Manifest。
-新增成功后同轮可 read/edit/validate；不自动登记已有未引用文件，不把工具成功当作完整校验通过。
-校验失败不影响继续读取和修改；先前校验结果可从上下文查阅。信息不足时说明缺少什么并结束本轮，等待用户主动补充。
-asset_tree/asset_directory/asset_images 只读共享素材；action_contracts 只读应用实际动作契约。
-game_screenshot 返回现场原图和每隔40px的网格辅助图；辅助覆盖层不能进入模板或原始截图证据。
-先 preview_crop(logical_name, region, threshold, tags) 取得区域标线图、干净裁剪图及同图匹配结果，再 crop_asset(preview_id) 保存完全相同的像素和参数，不重新截图。
-预览不进入活跃素材库；同图匹配不证明跨状态可靠性，也不自动决定是否保存。同名同哈希保留原图和原标签。
-remove_asset(logical_name, sha, reason) 可归档任意既有图片及原Tags、理由和移除时新截的原始游戏画面，再同步移除活跃图片及该逻辑名的标签关系；截图失败不移除。移除影响所有后续使用该素材的匹配。
-非 Windows 现场工具不可用。截图会恢复并置前唯一游戏窗口。除专用移除归档外，不修改既有图片/标签、正式 Manifest/源码或 Trusted Actions。
-trial_run 不提供 logical_name 时运行已保存 Manifest 的唯一 Python Plan，inputs 为 task_repetitions/settings；可自主使用 publish 保存完整不可变版本，再用 trial_run 指定 Manifest ID 及入口/输入试运行；修改 Candidate 后必须重新 Publish 才能运行新代码。
-试运行支持 Candidate 内已有 JSON Plan 或 Task Workflow/Subworkflow/Step。运行期间等待工具结果，不并行修改或操作游戏。
-启动拒绝无 Run ID，修正原因后可再次调用；已启动的结果带 Run ID，使用 list_runs 查看可用 ID、read_run_log 分段查看日志及引用截图。
-试运行结果返回后可继续修改、发布、试运行直到完成开发要求；用户停止本次运行后建议总结并等待下个指示。
-不运行命令、不直接点击或按键、不执行可变 Candidate、不设置 Default。Publish 不表示运行时永久批准。不要生成文件操作、网络、子进程、顶层副作用或绕过 ctx 的后台调用。
-Validator 会导入 Python，不是安全沙箱，校验通过也不证明真实游戏行为修复。
-遵守现有 Component、Recovery Rule 与 ctx.call/ctx.action 契约；ctx.log(message, screenshot=False) 可记录语义日志并可选附上已有截图，不重新截图。Python 模块和关键函数用简洁中文 docstring。
-最终回答必须只输出一个合法 JSON 对象，格式为 {"revise_success": false, "message": "分析、修改结果或缺少的信息"}。
-revise_success 必须是 JSON 布尔值 true 或 false，message 必须是非空字符串；不要输出 Markdown 代码块、前后说明或 JSON 之外的文字。
-所有给用户的说明均放入 message 字段，包括纯分析和信息不足的情况。
-revise_success 仅是本轮修订判断，不能代替校验或游戏验收。宿主反馈格式错误时，只重新生成最终 JSON，不调用工具、不重复修改。
-合法最终回答后结束本轮，等待开发者下一条消息。
-"""
-
-FORMAT_RETRY_PREFIX = "LALC_FINAL_FORMAT_CORRECTION\n"
+from .agent_prompts import load_sop, system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
 
 
 class RepairLog:
     """每对话一个交互目录；逐轮保留原始事件，认证值统一脱敏。"""
 
-    def __init__(self, data_root: Path, key: str = "lalc-no-key", on_event=None, *, category="agent-interactions"):
-        self.path = data_root / category / datetime.now(timezone.utc).strftime("%Y-%m-%d") / str(uuid.uuid4())
-        self.path.mkdir(parents=True)
+    def __init__(self, data_root: Path, key: str = "lalc-no-key", on_event=None, *, category="agent-interactions", path=None, identity=None):
+        self.path = Path(path) if path is not None else data_root / category / datetime.now(timezone.utc).strftime("%Y-%m-%d") / str(uuid.uuid4())
+        existing = self.path.exists()
+        self.path.mkdir(parents=True, exist_ok=path is not None)
         self.root = self.path
+        self.identity = identity or self.root.name
         self.store = LogStore(self.root)
-        self.store.initialize()
+        if not existing:
+            self.store.initialize()
         self.transport_dir = None
         self.keys = set()
         self.key = key
@@ -63,6 +40,7 @@ class RepairLog:
         self.requests = 0
         self.transport_error = None
         self.on_event = on_event
+        self.raw_content = {}
 
     @property
     def key(self):
@@ -78,6 +56,8 @@ class RepairLog:
         return redact(value, self.keys)
 
     def record(self, value):
+        if isinstance(value, dict) and value.get("type") in {"message_start", "message_end", "repair_error", "round_finished"}:
+            self.raw_content.clear()
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
         if value.get("type") == "lalc_request":
@@ -103,6 +83,36 @@ class RepairLog:
             logging.getLogger(__name__).error("Agent 操作错误：%s", event)
         if self.on_event:
             self.on_event(event)
+
+    def stream(self, value):
+        """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
+        if not self.on_event:
+            return
+        event = value.get("assistantMessageEvent", {})
+        kind, index = event.get("type", ""), event.get("contentIndex")
+        if index is None:
+            return
+        block, _, phase = kind.partition("_")
+        if block in {"text", "thinking"}:
+            part = self.raw_content.setdefault(index, {"type": block, block: ""})
+            if phase == "delta":
+                part[block] += event.get("delta", "")
+            elif phase == "end":
+                part[block] = event.get("content", part[block])
+        elif block == "toolcall":
+            part = self.raw_content.setdefault(index, {"type": "toolCall", "name": "", "partialArgs": ""})
+            if phase == "start":
+                part["name"] = event.get("toolName", "")
+            elif phase == "delta":
+                part["partialArgs"] += event.get("delta", "")
+            elif phase == "end":
+                tool = event.get("toolCall", {})
+                part.update(name=tool.get("name", part["name"]),
+                            partialArgs=json.dumps(tool.get("arguments", {}), ensure_ascii=False))
+        else:
+            return
+        self.on_event(self.clean({"round": self.group, "event": {
+            "type": "raw_output", "content": [self.raw_content[key] for key in sorted(self.raw_content)]}}))
 
     def save_json(self, name, value):
         self.store.write_json(self.path / name, self.clean(value))
@@ -136,7 +146,7 @@ def final_answer(message):
             f"模型最终回答不是可解析的 JSON：{error.msg}（第 {error.lineno} 行，第 {error.colno} 列）；请查看实际回复。",
             "final_answer", raw_text=text, json_text=candidate, parse_line=error.lineno,
             parse_column=error.colno, parse_offset=error.pos,
-            hint="最终回答只能是一个 JSON 对象，禁止代码块和前后说明；格式纠正计入本轮请求上限。") from error
+            hint="回复外层禁止三个反引号 ``` 或 ```json；正文直接以 { 开始、以 } 结束，message 字符串内部可以有 Markdown；格式纠正计入本轮请求上限。") from error
     if (not isinstance(value, dict) or type(value.get("revise_success")) is not bool
             or not isinstance(value.get("message"), str) or not value["message"].strip()):
         raise AgentDiagnosticError("Final answer must be JSON with boolean revise_success and non-empty message："
@@ -170,7 +180,7 @@ def model_error(message, stage, requests, request_limit, transport=None):
 
 
 async def configure_session(send, event, log, expected_tools):
-    """确认实际工具集并关闭自动重试和压缩，供预检与修复共用。"""
+    """正式请求前确认实际工具集，并关闭自动重试和压缩。"""
     while True:
         item = await rpc_event(event, "就绪事件 lalc_ready")
         log.record(item)
@@ -215,61 +225,48 @@ def image_attachments(paths, directory):
     return result, records
 
 
-async def check_model_image(command, env, temporary, images, log, *, startup=None):
-    """整组图片只预检一次；成功前不修改候选，计数沿用到修复。"""
-    checking = {**env, "LALC_PI_PREFLIGHT": "1", "LALC_PI_SOURCE_ROOT": temporary,
-                "LALC_PI_MAX_REQUESTS": "1"}
-    prompt = {"type": "prompt", "message": "连接检查：请简短回答已收到，不调用工具。"}
-    if images:
-        prompt = {"type": "prompt", "message": "简短描述随附图片中的可见内容。这是连接和图片输入检查，不调用工具。",
-                  "images": images}
-    checking["LALC_PI_INPUT_MESSAGE"] = prompt["message"]
-    last = {}
-    async with rpc_session(command, checking, temporary, log.record, startup=startup) as (send, event):
-        await configure_session(send, event, log, [])
-        log.record({"type": "model_check_started", "prompt": prompt})
-        await send({key: value for key, value in prompt.items() if key != "images"})
-        while True:
-            item = await event()
-            kind = item.get("type")
-            if kind == "message_update":
-                continue
-            log.record(item)
-            if kind == "lalc_request":
-                log.requests = item["requests"]
-            elif kind == "message_end" and item.get("message", {}).get("role") == "assistant":
-                last = item["message"]
-            elif kind == "extension_error" or (kind == "response" and not item.get("success")):
-                raise RuntimeError("Model image check failed: " + str(item))
-            elif kind == "agent_settled":
-                if last.get("stopReason") != "stop":
-                    raise model_error(last, "model_preflight", log.requests, 1, log.transport_error)
-                if (log.requests != 1 or not any(part.get("type") == "text" and part.get("text", "").strip()
-                                   for part in last.get("content", []))):
-                    raise RuntimeError("Model image check failed: " + str(last.get("errorMessage") or last))
-                log.record({"type": "model_check_passed", "requests": log.requests})
-                return
-
 
 class RepairConversation:
     """消息主动触发一轮；实际消息/图片/工具结果留在上下文，候选不随对话清空。"""
 
-    def __init__(self, host):
+    def __init__(self, host, *, session=None, entry="cli"):
         self.host = host
-        self.log = RepairLog(host.service.data_root)
+        self.session = session
+        self.entry = entry
+        self.mode = session.mode if session else "Repair"
+        self.allowed = allowed_tools(self.mode, entry)
+        self.system_prompt = system_prompt(self.mode, {})
+        self.log = RepairLog(host.service.data_root, path=session.path / "log" if session else None,
+                             identity=session.identity if session else None)
         self.history = []
-        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform, host=host)
+        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform, host=host, allowed=self.allowed)
+
+    def append_user(self, message):
+        """Session 的主动输入先记入持久事件，恢复不依赖轮末快照。"""
+        message = self.log.clean(message)
+        if self.session:
+            self.log.record({"type": "session_message", "message": message})
+        self.history.append(message)
 
     def add_validation(self, result):
         """手动校验立即落盘；来源标记避免 GUI 同时显示日志事件与完成回调。"""
-        self.log.record({"type": "validation", "source": "manual", **result})
-        self.history.append({"role": "user", "content": [{"type": "text", "text":
+        self.log.record({"type": "validation", "source": "manual", "toolCallId": "manual-" + str(uuid.uuid4()), **result})
+        self.append_user({"role": "user", "content": [{"type": "text", "text":
             "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
         self.log.save_json("context.json", self.history)
 
-    async def run(self, message, args, *, images=(), key=None, on_event=None):
+    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None, on_page_preview=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
-        with self.host.service.activity("Agent"), self.host.candidate_lock():
+        with self.host.candidate_lock(), self.host.service.activity("Agent"):
+            if self.session:
+                self.session.restore(self)
+            if self.session and self.mode != self.session.mode:
+                raise ValueError("Session 模式不能改变。")
+            self.allowed = allowed_tools(self.mode, self.entry)
+            self.tools.allowed = frozenset(self.allowed)
+            references = list(dict.fromkeys(manifest_references))
+            for identity in references:
+                ManifestReference(self.host.manager).read(identity)
             names = editable_files(self.host.candidate)
             if not message.strip():
                 raise ValueError("消息不能为空。")
@@ -279,6 +276,18 @@ class RepairConversation:
             prefix = f"round-{self.log.group}"
             round_path = self.log.path / prefix
             round_path.mkdir()
+            from .agent_history import record_observation
+            from .agent_prompts import chat_title
+            title = ''
+            for prior in self.history:
+                if prior.get('role') == 'user':
+                    title = chat_title('\n'.join(part.get('text', '') for part in prior.get('content', []) if part.get('type') == 'text'))[0]
+                    if title:
+                        break
+            observation = record_observation(self.log, self.host.service.data_root,
+                                             f'{self.entry}:{self.mode}', title or chat_title(message)[0])
+            if self.session:
+                self.log.record({"type": "round_opened"})
             before = candidate_files(self.host.candidate)
             baseline = self.host.baseline()
             if not (self.log.path / "baseline").exists():
@@ -286,11 +295,23 @@ class RepairConversation:
             self.log.snapshot(f"{prefix}/original", before)
             result = {"status": "incomplete", "reason": "setup_error"}
             tools = self.tools
+            tools.on_feedback = on_feedback
+            tools.on_page_preview = on_page_preview
             tools.cancelled.clear()
             tools.created_files.clear()
+            tools.knowledge.begin_round()
             prior_history = list(self.history)
-            stage = "settings"
-            context = {"conversation": self.log.path.name, "round": self.log.group,
+            stage = "attachments"
+            submitted = False
+            runtime_context = {"mode": self.mode, "entry": self.entry,
+                               "game_version_observation": observation,
+                               "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
+                               "editable_files": names, "manifest_references": references}
+            prompt = {"type": "prompt", "message": "<runtime_context>\n"
+                      + json.dumps(runtime_context, ensure_ascii=False)
+                      + "\n</runtime_context>\n<user_request>\n" + message + "\n</user_request>"}
+            self.log.keys.update(value for value in self.host.secrets.values() if value)
+            context = {"conversation": self.log.identity, "round": self.log.group,
                        "log_path": str(round_path), "tested_pi_version": PI_VERSION}
             if key is not None:
                 self.log.key = key
@@ -300,6 +321,16 @@ class RepairConversation:
                 self.host.service.logger.error("Agent Repair 错误：%s", details)
                 return details
             try:
+                stage = "prompt"
+                sop = load_sop(self.mode)
+                self.system_prompt = system_prompt(self.mode, sop)
+                stage = "attachments"
+                attachments, attachment_records = image_attachments(images, round_path)
+                for attachment in attachment_records:
+                    self.log.store.register_image(round_path / attachment["filename"])
+                if attachments:
+                    prompt["images"] = attachments
+                stage = "settings"
                 settings, actual_key = settings_snapshot(args, self.host.service.data_root,
                                                          temporary_keys=self.host.secrets, key=key)
                 context["settings"] = settings
@@ -307,30 +338,25 @@ class RepairConversation:
                 for field, value in settings.items():
                     setattr(options, field, value)
                 self.log.key = actual_key
-                stage = "attachments"
-                attachments, attachment_records = image_attachments(images, round_path)
-                for attachment in attachment_records:
-                    self.log.store.register_image(round_path / attachment["filename"])
-                prompt = {"type": "prompt", "message": "本轮允许编辑的已有文件：" + json.dumps(names, ensure_ascii=False)
-                          + "\n用户消息：" + message}
-                if attachments:
-                    prompt["images"] = attachments
-                self.history.append(self.log.clean({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
-                    "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]}))
+                self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
+                    "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
+                submitted = True
                 input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
-                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
-                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": SYSTEM_PROMPT}
+                                    "game_version_observation": observation,
+                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
+                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "sop": sop, "mode": self.mode, "entry": self.entry,
+                                    "manifest_references": references}
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
                 startup = PiStartup()
-                with configured_pi(options, self.host.candidate.resolve(), self.log.key, SYSTEM_PROMPT,
+                with configured_pi(options, self.host.candidate.resolve(), self.log.key, self.system_prompt,
                                    require_image=bool(attachments), on_warning=self.log.record,
                                    startup=startup) as (command, env, temporary, model):
                     self.log.transport_dir = Path(temporary)
                     payloads = Path(temporary) / "payloads"
                     payloads.mkdir()
-                    input_record["pi"] = env["LALC_PI_VERSION"]
-                    context["pi_version"] = env["LALC_PI_VERSION"]
+                    input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
+                    context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
                     self.log.save_json(f"{prefix}/input.json", input_record)
                     image_path = Path(temporary) / "input-images.json"
                     image_path.write_text(json.dumps(attachments), encoding="utf-8")
@@ -339,26 +365,18 @@ class RepairConversation:
                     env["LALC_PI_PAYLOAD_DIR"] = str(payloads)
                     env["LALC_PI_CONVERSATION_ROUND"] = str(self.log.group)
                     env["LALC_PI_ROUND_REQUEST_LIMIT"] = str(settings["max_requests"])
-                    # 预检实际请求计入本轮，历史消息不进入连接检查。
-                    old_path = self.log.path
-                    self.log.path = round_path
-                    try:
-                        stage = "model_preflight"
-                        await check_model_image(command, env, temporary, attachments, self.log, startup=startup)
-                    finally:
-                        self.log.path = old_path
-                        input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
-                        context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
-                        self.log.save_json(f"{prefix}/input.json", input_record)
-                    env["LALC_PI_REQUESTS_USED"] = str(self.log.requests)
                     env["LALC_PI_REPAIR_FILES"] = json.dumps([str((self.host.candidate / name).resolve()) for name in names])
                     history_path = Path(temporary) / "history.json"
                     history_path.write_text(json.dumps(self.log.clean(prior_history)), encoding="utf-8")
                     env["LALC_PI_HISTORY"] = str(history_path)
-                    expected = list(REPAIR_TOOLS)
+                    expected = list(self.allowed)
+                    env["LALC_PI_ALLOWED_TOOLS"] = json.dumps(expected)
                     command[command.index("--tools") + 1] = ",".join(expected)
                     stage = "pi_start"
                     async with rpc_session(command, env, temporary, self.log.record, startup=startup) as (send, event):
+                        input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
+                        context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
+                        self.log.save_json(f"{prefix}/input.json", input_record)
                         await configure_session(send, event, self.log, expected)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
@@ -369,6 +387,7 @@ class RepairConversation:
                             item = await event()
                             kind = item.get("type")
                             if kind == "message_update":
+                                self.log.stream(item)
                                 continue
                             self.log.record(item)
                             if kind == "lalc_request":
@@ -388,6 +407,8 @@ class RepairConversation:
                                 if item.get("method") != "input":
                                     raise RuntimeError("Unexpected interactive request")
                                 if title.startswith("lalc.validate:"):
+                                    if "validate" not in self.allowed:
+                                        raise ValueError("当前模式和入口不允许 validate。")
                                     stage = "validation"
                                     errors = self.host.manager.validate(self.host.candidate / "manifest.json")
                                     validation = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
@@ -428,16 +449,12 @@ class RepairConversation:
                                                       "error": details["message"] + " 本轮请求额度已耗尽。",
                                                       "diagnostics": {**details, "budget_exhausted": True}}
                                             break
-                                        feedback = (FORMAT_RETRY_PREFIX + "你的最终回答未通过严格 JSON 校验：\n"
-                                                    + details["message"] + "\n只纠正最终输出格式，不调用工具，不重新执行或修改。"
-                                                    '\n仅输出一个 JSON 对象：{"revise_success": false, "message": "说明"}。'
-                                                    "revise_success 必须为 true 或 false，message 为非空字符串。"
-                                                    "所有说明放入 message；禁止代码块、前后说明和 JSON 之外的文字。")
+                                        feedback = FORMAT_RETRY_PREFIX + details["message"] + "\n" + FORMAT_RETRY
                                         correction = {"type": "prompt", "message": feedback}
                                         self.log.record({"type": "final_answer_retry", "diagnostics": details,
                                                          "requests_remaining": remaining, "prompt": correction})
-                                        self.history.append(self.log.clean({"role": "user", "content": [{"type": "text", "text": feedback}],
-                                                                            "timestamp": int(datetime.now().timestamp() * 1000)}))
+                                        self.append_user({"role": "user", "content": [{"type": "text", "text": feedback}],
+                                                          "timestamp": int(datetime.now().timestamp() * 1000)})
                                         await send(correction)
                                         last = {}
                                         stage = "agent"
@@ -452,6 +469,11 @@ class RepairConversation:
                 result = {"status": "incomplete", "reason": details.get("failure_code", "error"),
                           "error": details["message"], "diagnostics": details}
             finally:
+                tools.on_feedback = None
+                tools.on_page_preview = None
+                if not submitted:
+                    self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
+                        "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 self.log.transport_dir = None
                 tools.cancelled.set()
                 try:
@@ -478,17 +500,22 @@ class RepairConversation:
             return self.log.clean(result)
 
 
-def run_repair(args, manager, candidate):
-    """CLI 同样使用当前 Candidate；可显式交互续聊，默认只处理一条消息。"""
+def run_repair(args, manager):
+    """CLI 创建或恢复独立 Repair Session；输入等待不持锁，不接管手工草稿。"""
     from .application import ApplicationService
-    from .developer import DeveloperHost
-    host = DeveloperHost(ApplicationService(manager.data_root, manifest_manager=manager), candidate)
+    from .developer_session import DeveloperSession
+    service = ApplicationService(manager.data_root, manifest_manager=manager)
+    conversation = None
     try:
-        conversation = host.new_conversation()
+        session = (DeveloperSession.create(service, args.manifest_id) if args.manifest_id
+                   else DeveloperSession(service, args.session))
+        print(json.dumps({"session_id": session.identity}, ensure_ascii=False), flush=True)
+        conversation = session.conversation()
         images = args.image or []
         message = args.problem + ("\n异常信息：" + args.exception if args.exception else "")
         while True:
             result = asyncio.run(conversation.run(message, args, images=images))
+            result["session_id"] = session.identity
             print(json.dumps(result, ensure_ascii=False), flush=True)
             if not args.chat:
                 return 0 if result["status"] == "completed" else 130 if result["status"] == "cancelled" else 1
@@ -499,8 +526,8 @@ def run_repair(args, manager, candidate):
     except (KeyboardInterrupt, EOFError):
         return 130
     except Exception as error:
-        keys = host.conversation.log.keys if host.conversation else ()
+        keys = conversation.log.keys if conversation else ()
         details = error_details(error, "repair_setup", keys=keys)
-        host.service.logger.error("Agent Repair 错误：%s", details)
+        service.logger.error("Agent Repair 错误：%s", details)
         print(json.dumps({"status": "incomplete", "error": details["message"], "diagnostics": details}, ensure_ascii=False))
         return 1

@@ -51,10 +51,61 @@ def test_shared_windows_and_independent_idle_close(windows):
     assert user.service is developer.service and user.host is developer.host
     assert owner.open_window(True) is developer
     assert user.pages.widget(0).objectName() == 'dashboard'
-    assert [developer.pages.widget(i).objectName() for i in range(developer.pages.count())] == ['developer-capture', 'developer-settings', 'developer-repair']
+    assert [developer.pages.widget(i).objectName() for i in range(developer.pages.count())] == ['developer-capture', 'developer-settings', 'developer-workbench']
     assert developer.close()
     assert owner.developer is None and owner.user is user
     assert owner.open_window(True) is not developer
+
+
+def test_steam_directory_validates_before_save_and_uses_shared_config(windows, tmp_path, monkeypatch):
+    """User GUI 设置与自动缓存共用文件，坏目录不能覆盖已保存地址。"""
+    from test_game_version import steam_install
+    from lalc import game_version
+    _, _, user, _ = windows
+    root = tmp_path / 'Steam'
+    steam_install(root)
+    monkeypatch.setattr(game_version, 'read_game_version', lambda _: '1.118.0')
+    user.steam_directory.setText(str(root))
+    user.save_steam_directory()
+    assert game_version.load_steam_root(user.service.data_root) == str(root)
+    user.steam_directory.setText(str(tmp_path / 'missing'))
+    with pytest.raises((OSError, ValueError)):
+        user.save_steam_directory()
+    assert game_version.load_steam_root(user.service.data_root) == str(root)
+
+
+@pytest.mark.parametrize("frozen", [False, True])
+def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, frozen):
+    from PySide6.QtGui import QIcon
+    from PySide6.QtWidgets import QApplication
+    import lalc.gui as gui
+    monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+    previous = app.windowIcon()
+    icon_path = Path(__file__).parents[1] / "MagicAndWonder.ico"
+    expected = QIcon(str(icon_path)).pixmap(32, 32).toImage()
+    assert not expected.isNull()
+    monkeypatch.setattr(sys, "frozen", frozen, raising=False)
+    if frozen:
+        packaged = tmp_path / "_internal/lalc"
+        packaged.mkdir(parents=True)
+        (packaged / "MagicAndWonder.ico").write_bytes(icon_path.read_bytes())
+        monkeypatch.setattr(gui, "__file__", str(packaged / "gui.py"))
+    monkeypatch.chdir(tmp_path)
+    host, _ = host_for(tmp_path)
+    owner = gui.GuiCoordinator(host.service, ApplicationLifecycle())
+    try:
+        for window in (owner.open_window(), owner.open_window(True)):
+            assert window.windowIcon().pixmap(32, 32).toImage() == expected
+            assert not window.titleBar.iconLabel.pixmap().isNull()
+        assert app.windowIcon().pixmap(32, 32).toImage() == expected
+    finally:
+        owner.shutdown()
+        for window in (owner.user, owner.developer):
+            if window:
+                window.close()
+        app.processEvents()
+        app.setWindowIcon(previous)
 
 
 def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(windows):

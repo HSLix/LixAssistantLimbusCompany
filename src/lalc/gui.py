@@ -7,7 +7,7 @@ import asyncio
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
-    QMessageBox, QScrollArea,
+    QMessageBox, QScrollArea, QFileDialog,
     QGraphicsOpacityEffect,
 )
 
@@ -24,10 +24,10 @@ from qfluentwidgets import (
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton,
     TransparentToolButton, IconWidget, MessageBox,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
-    ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox,
+    ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
 
-from .i18n import activity_text, tr
+from .i18n import tr
 
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
@@ -81,6 +81,8 @@ class MainWindow(FluentWindow):
     """通过正式 ApplicationService 启动和观察任意逻辑入口。"""
 
     operation_event = Signal(dict)
+    feedback_requested = Signal(object)
+    page_preview_requested = Signal(object)
 
     def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None,
                  *, host=None, coordinator=None) -> None:
@@ -101,36 +103,12 @@ class MainWindow(FluentWindow):
         self.close_timer = QTimer(self)
         self.close_timer.setInterval(100)
         self.close_timer.timeout.connect(self._finish_close)
+        self.setWindowIcon(QApplication.windowIcon())
         self.setWindowTitle(tr('LALC — Developer'))
         self.resize(1150, 900)
         self.navigationInterface.setExpandWidth(220)
         root = QWidget()
         layout = QVBoxLayout(root)
-        self.runner_manifest = QComboBox()
-        self.runner_manifest.addItem(tr('Use Default'), userData=None)
-        self.runner_selection_error = None
-        try:
-            selected = self.host.runner_selection()
-            if selected is not None:
-                self.runner_manifest.addItem(selected, userData=selected)
-                self.runner_manifest.setCurrentIndex(1)
-        except Exception as error:
-            self.runner_selection_error = str(error)
-        for item in self.host.manager.list_manifests():
-            if self.runner_manifest.findData(item["manifest_id"]) < 0:
-                self.runner_manifest.addItem(item["manifest_id"], userData=item["manifest_id"])
-        self.runner_manifest.currentIndexChanged.connect(self._runner_selected)
-        layout.addWidget(QLabel(tr('Developer Selected Manifest (does not change Default or Candidate source)')))
-        layout.addWidget(self.runner_manifest)
-        self.runner_notice = QLabel(self.runner_selection_error or tr('The selected version is used for subsequent developer trials.'))
-        self.runner_notice.setWordWrap(True)
-        layout.addWidget(self.runner_notice)
-        self.refresh_manifest_button = QPushButton(tr('Refresh Manifests'))
-        self.refresh_manifest_button.clicked.connect(self._refresh_runner)
-        layout.addWidget(self.refresh_manifest_button)
-        self.trial_button = QPushButton(tr('Trial selected Plan'))
-        self.trial_button.clicked.connect(lambda: self._interact(self.start_selected_plan))
-        layout.addWidget(self.trial_button)
         self.pages = self.stackedWidget
         self.pages.setAnimationEnabled(False)
         self.capture_page = CapturePage(self)
@@ -139,20 +117,21 @@ class MainWindow(FluentWindow):
         self.settings_view = QScrollArea()
         self.settings_view.setWidgetResizable(True)
         self.settings_view.setWidget(self.settings_page)
+        self.settings_view.setStyleSheet('QScrollArea {border: none; background: transparent;}')
+        self.settings_view.viewport().setAutoFillBackground(False)
+        self.settings_page.setAutoFillBackground(False)
         self.operation_event.connect(self.repair_page.show_event)
+        self.feedback_requested.connect(self.repair_page.show_feedback)
+        self.page_preview_requested.connect(self.repair_page.show_page_preview)
         for page, identity, name, icon in (
             (self.capture_page, "developer-capture", tr('Capture'), FluentIcon.CAMERA),
             (self.settings_view, "developer-settings", tr('Agent Settings'), FluentIcon.SETTING),
-            (self.repair_page, "developer-repair", tr('Agent Repair'), FluentIcon.CHAT),
+            (self.repair_page, "developer-workbench", tr('Agent Workbench'), FluentIcon.CHAT),
         ):
             page.setObjectName(identity)
             self.addSubInterface(page, icon, name)
-        self.repair_page.set_manifests(self.host.manager.list_manifests())
         self.widgetLayout.removeWidget(self.stackedWidget)
         layout.addWidget(self.stackedWidget, 1)
-        self.status = QLabel()
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
         self.notifications = NotificationList()
         layout.addWidget(self.notifications)
         self.widgetLayout.addWidget(root)
@@ -170,10 +149,11 @@ class MainWindow(FluentWindow):
         def finished():
             self.jobs.remove(job)
             self.render_state(self.service.state)
-            if "error" in outcome and not (self.closing and isinstance(outcome["error"], asyncio.CancelledError)):
-                def fail():
-                    raise outcome["error"]
-                self._interact(fail)
+            if "error" in outcome:
+                if not isinstance(outcome["error"], asyncio.CancelledError):
+                    def fail():
+                        raise outcome["error"]
+                    self._interact(fail)
             elif done and not self.closing:
                 self._interact(lambda: done(outcome.get("value")))
             job.deleteLater()
@@ -185,58 +165,7 @@ class MainWindow(FluentWindow):
     def cancel_operation(self):
         for job in self.jobs:
             job.cancel()
-
-    def _runner_selected(self):
-        self.runner_selection_error = None
-        identity = self.runner_manifest.currentData()
-        def saved(_):
-            self._refresh_runner()
-        def operation():
-            try:
-                self.host.select_runner(identity)
-            except Exception as error:
-                self.runner_selection_error = str(error)
-                raise
-        self.launch(operation, saved)
-
-    def start_selected_plan(self):
-        """显式运行 Developer 所选已发布版本；不改变 Default。"""
-        if self.runner_selection_error:
-            raise ValueError(self.runner_selection_error)
-        identity = self.host.runner_selection() or self.host.manager.default_manifest_id()
-        if identity is None:
-            raise ValueError("请先选择已发布 Manifest。")
-        self.service.start_plan(manifest_id=identity)
-        self.owns_run = True
         self.render_state(self.service.state)
-
-    def _refresh_runner(self):
-        identity = self.runner_manifest.currentData()
-        def operation():
-            manifests = self.host.manager.list_manifests()
-            try:
-                self.service._loaded_manifest(identity)
-                return manifests, None
-            except Exception as error:
-                return manifests, str(error)
-        def done(values):
-            manifests, error = values
-            self.runner_manifest.blockSignals(True)
-            self.runner_manifest.clear()
-            self.runner_manifest.addItem(tr('Use Default'), userData=None)
-            for item in manifests:
-                self.runner_manifest.addItem(item["manifest_id"], userData=item["manifest_id"])
-            index = self.runner_manifest.findData(identity)
-            if index < 0 and identity is not None:
-                self.runner_manifest.addItem(identity, userData=identity)
-                index = self.runner_manifest.count() - 1
-            self.runner_manifest.setCurrentIndex(max(0, index))
-            self.runner_manifest.blockSignals(False)
-            self.runner_selection_error = error
-            self.runner_notice.setText(error or tr('Selected is used for subsequent trials; Default and Candidate remain unchanged.'))
-            self.repair_page.set_manifests(manifests)
-            self.render_state(self.service.state)
-        self.launch(operation, done)
 
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
@@ -251,8 +180,8 @@ class MainWindow(FluentWindow):
                 self.service.stop()
                 self.cancel_operation()
                 self.render_state(self.service.state)
-                if hasattr(self, "status"):
-                    self.status.setText(tr('Stopping; waiting for input release, log saving and pi cleanup…'))
+                if hasattr(self, 'repair_page'):
+                    self.repair_page.status.setText(tr('Stopping; waiting for input release, log saving and pi cleanup…'))
                 self.close_timer.start()
             return
         self.close_timer.stop()
@@ -287,7 +216,8 @@ class MainWindow(FluentWindow):
             from .agent_repair import RepairLog
             settings_page = getattr(self, "settings_page", None)
             keys = {*self.host.secrets.values(), settings_page.pending_key() if settings_page else None} - {None, ""}
-            conversation = self.host.conversation
+            workbench = getattr(self, "repair_page", None)
+            conversation = workbench.host.conversation if workbench and workbench.session else self.host.conversation
             if conversation:
                 keys.update(conversation.log.keys)
             page = self.pages.currentWidget() if hasattr(self, "pages") else None
@@ -298,6 +228,8 @@ class MainWindow(FluentWindow):
             if (panel or page is settings_page) and log is None:
                 log = RepairLog(self.service.data_root, category="agent-diagnostics")
                 log.keys.update(keys)
+                from .agent_history import record_observation
+                record_observation(log, self.service.data_root, "diagnostic:gui_error", "Agent settings error")
             context = {"log_path": str(log.path)} if log else {}
             value = error_details(error, "interaction", context, keys)
             if isinstance(error, StartError):
@@ -345,10 +277,6 @@ class MainWindow(FluentWindow):
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
-        self.status.setText(tr('Current activity: ') + (activity_text(state["activity"]) if state.get("activity") else (tr('Running') if state["phase"] == "running" else tr('Idle'))))
-        self.trial_button.setEnabled(not busy and not self.runner_selection_error)
-        self.runner_manifest.setEnabled(not busy)
-        self.refresh_manifest_button.setEnabled(not busy)
         for page in (self.capture_page, self.settings_page, self.repair_page):
             page.render(busy)
 
@@ -392,6 +320,7 @@ class UserWindow(MainWindow):
         self.close_timer.setInterval(100)
         self.close_timer.timeout.connect(self._finish_close)
         self.setWindowTitle("LALC")
+        self.setWindowIcon(QApplication.windowIcon())
         self.resize(1100, 800)
         self.navigationInterface.setExpandWidth(220)
         self.pages = self.stackedWidget
@@ -525,6 +454,23 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
+        from .game_version import load_steam_root
+        application_layout.addWidget(QLabel(tr('Steam client directory')))
+        self.steam_directory = QLineEdit()
+        self.steam_directory.setPlaceholderText(tr('Directory containing steam.exe; leave unset for automatic discovery'))
+        try:
+            self.steam_directory.setText(load_steam_root(service.data_root) or '')
+        except Exception as error:
+            service.logger.error('Cannot read Steam directory settings: %s', error)
+        application_layout.addWidget(self.steam_directory)
+        steam_buttons = QHBoxLayout()
+        browse_steam = QPushButton(tr('Choose Steam directory'))
+        browse_steam.clicked.connect(lambda: self.choose_steam_directory())
+        steam_buttons.addWidget(browse_steam)
+        save_steam = QPushButton(tr('Save Steam directory'))
+        save_steam.clicked.connect(lambda: self._interact(self.save_steam_directory))
+        steam_buttons.addWidget(save_steam)
+        application_layout.addLayout(steam_buttons)
         from .i18n import load_language
         application_layout.addWidget(QLabel(tr("Interface language")))
         self.language_choice = QComboBox()
@@ -584,6 +530,18 @@ class UserWindow(MainWindow):
             self.language_choice.setCurrentIndex(self.language_choice.findData(previous))
             self.language_choice.blockSignals(False)
             raise
+
+    def choose_steam_directory(self):
+        """只选择客户端目录，保存前不更改版本观测配置。"""
+        directory = QFileDialog.getExistingDirectory(self, tr('Choose Steam directory'), self.steam_directory.text())
+        if directory:
+            self.steam_directory.setText(directory)
+
+    def save_steam_directory(self):
+        """验证可读 ID 后保存，失败由现有交互错误入口显示且保留旧配置。"""
+        from .game_version import save_steam_root
+        directory = save_steam_root(self.service.data_root, self.steam_directory.text().strip())
+        self.steam_directory.setText(directory)
 
     def open_developer(self):
         QMessageBox.information(self, tr('Developer GUI'), tr('This interface is for developer observation, Candidate editing and trials.'))
@@ -794,6 +752,9 @@ class GuiCoordinator:
     def __init__(self, service, lifecycle):
         from .i18n import install_translations, load_language, resolve_language
         app = QApplication.instance()
+        icon_path = (Path(__file__).with_name("MagicAndWonder.ico") if getattr(sys, "frozen", False)
+                     else Path(__file__).resolve().parents[2] / "MagicAndWonder.ico")
+        app.setWindowIcon(QIcon(str(icon_path)))
         if not hasattr(app, "_lalc_language"):
             install_translations(app, resolve_language(load_language(service.data_root)))
         from .developer import DeveloperHost

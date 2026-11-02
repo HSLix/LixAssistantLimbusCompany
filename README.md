@@ -1,5 +1,19 @@
 # LALC
 
+2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](docs/page-review-tabs-implementation.md)。
+
+2026-11-02 页面审批试用修订：Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页缺 PAGE_ID 等加载 / 接口 / 注册错误直接退回同轮 Agent 修正，不再留窗等人关闭。配置隔离和人工快照安装保持。见[修订说明](docs/page-review-tabs-implementation.md)，两票仍待验收。
+
+2026-11-02 #339 / #340 合并本地实施：GUI Construct 可持久创建页面草稿、双页模态对比并由人安装实际预览版本；关闭不安装可继续，取消结束本轮。安装保留正式配置、不改变 Default、不自动重载；当前两票等待开发者验收。工具及验证边界见[实施记录](docs/stage-5-339-340-implementation.md)。此前页面待实现描述为历史状态。
+
+GUI Construct / Repair 已本地接入同轮人工反馈：统一文字输入，允许空确认，可跳过或取消，不设自动超时；CLI / Runtime 不开放。#338 已经开发者简单验证通过并按 completed 关闭，见[用法与验证记录](docs/stage-5-338-implementation.md)。下文历史“人工反馈待实现”不代表当前状态；页面工具仍待后续票实现。
+
+游戏版本与 AI 历史关联、Steam 路径设置及只读检索工具见 [使用说明](docs/game-version-history.md)。独立 `lalc pi-probe` 命令已移除。
+
+2026-11-01 #337 本地实施：GUI 工作台两种模式已支持外部知识库只读检索、文本 / 原图查看和受控 Git；More 菜单可打开知识库文件夹，缺失时创建空目录。系统 Git 不可用则跳过记日志，不影响本地资料。详见[使用与验收边界](docs/stage-5-337-implementation.md)。#336 已关闭，#337 已经开发者人工验收通过并关闭；下文此前的待实现 / 待验收描述保留为历史状态。
+
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](docs/stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](docs/fluent-gui-migration.md)。
 
 
@@ -12,11 +26,12 @@ The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It 
 - Stage 1 product and Agent boundaries: accepted.
 - Stage 2 Workflow and deterministic-execution architecture: accepted.
 - Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
-- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; final Windows/model/game acceptance remains tracked in #329.
-- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 local build implementation is available, with Windows acceptance pending; see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
-- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: deferral confirmed on 2026-10-26; prior runtime architecture retained. Other Stage 5–6 proposals remain [pending discussion](docs/reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案).
+- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; tracking issues #329, #323 and #312 are closed by developer decision after trial use, without completing the full acceptance matrix; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
+- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 is closed by developer decision after trial use; full Windows acceptance was not completed ([closure record](docs/stage-3-4-closure-2026-10-30.md)); see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
+- Stage 5 Agent Workbench: design accepted on 2026-10-31. Independent, resumable CLI Repair Sessions are implemented locally under #335 and closed by explicit developer acceptance of the regression evidence; see [implementation](docs/stage-5-335-implementation.md). GUI Session Workbench and Manifest references are implemented under #336 (now closed); see [implementation](docs/stage-5-336-implementation.md). Read-only external knowledge and controlled Git tools are implemented under #337 and closed after explicit developer manual acceptance; see [implementation](docs/stage-5-337-implementation.md). GUI human feedback is implemented under #338 and closed after explicit developer acceptance of a simple verification; see [implementation](docs/stage-5-338-implementation.md). Page tools remain pending. The accepted target includes Construct / Repair modes, human feedback, Construct page drafts with modal comparison and human installation approval, and bounded read-only reference access. See [specification](docs/stage-5-agent-workbench.md) and [impact review](docs/stage-5-design-impact-review.md).
+- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: Runtime has no deletion tools or authority and inherits no Workbench permissions; other repair changes and integration remain Stage 6 discussion TODOs. Additional proposals remain [pending discussion](docs/reconstruction-plan.md).
 - The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
-- Agent-assisted Workflow Drafting and autonomous Capability Expansion: explicitly deferred.
+- Developer-directed Workflow construction is accepted for Stage 5; autonomous Capability Expansion remains deferred.
 
 Start with:
 
@@ -31,7 +46,7 @@ Start with:
 
 ## Development
 
-The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages and shared Agent profiles are implemented in #332. Bilingual GUI controls and restart-based language changes are implemented locally in #333; Windows packaged acceptance remains in #334.
+The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages and shared Agent profiles are implemented in #332. Bilingual GUI controls and restart-based language changes are implemented locally in #333; #334 has since been closed by developer decision without completing full Windows acceptance; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
 
 The current formal runtime uses Python 3.12.10 and uv. It supports focused
 Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
@@ -40,7 +55,9 @@ template cropping are available through observe Trusted Actions; Assets update i
 [the developer tutorial](docs/developer-workflow-tutorial.md).
 Input takeover has automated coverage and prior standalone Windows acceptance;
 current Workflow integration and Windows package acceptance remain deferred.
-OCR and model calls are not implemented yet.
+Local PP-OCRv6 Small OCR is available through `observe.ocr` and the Agent's
+`game_screenshot` tool; see [OCR usage and validation limits](docs/ocr.md).
+Korean and custom-model recognition are unsupported.
 
 ```bash
 UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
@@ -49,7 +66,7 @@ UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv r
 ```
 
 Running `lalc` without arguments opens User Dashboard; `lalc --developer` opens Developer GUI. Both windows share one application service. Repeated GUI launches activate the existing application, and game activities also exclude independent CLI runs. The developer workflow uses a
-single Git-ignored `candidate/` directory in the current project:
+Git-ignored `candidate/` directory for manual development in the current project:
 
 ```bash
 uv run lalc init
@@ -64,6 +81,15 @@ uv run lalc list-manifests
 uv run lalc clear
 uv run lalc data-dir
 ```
+
+CLI Agent Repair uses a separate persistent Session, leaving the manual Candidate unchanged:
+
+```bash
+uv run lalc repair --from <saved-manifest-uuid> --problem 'Inspect and repair this workflow' --chat
+uv run lalc repair --session <printed-session-uuid> --problem 'Check the current state and continue'
+```
+
+Creation requires an explicit saved Manifest. Each round reloads the Session under a cross-process lock; idle input holds no lock. Restarting preserves saved evidence and marks unfinished rounds interrupted without automatically replaying actions. GUI integration follows in #336.
 
 On Windows, `uv run lalc connect` finds the unique running Limbus Company
 window, brings it to the foreground once, captures its client area, and writes

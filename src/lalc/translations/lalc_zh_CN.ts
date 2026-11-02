@@ -3,6 +3,38 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Raw output</source>
+      <translation>原始输出</translation>
+    </message>
+    <message>
+      <source>Expand or collapse raw output</source>
+      <translation>展开或收起原始输出</translation>
+    </message>
+    <message>
+      <source>Agent request</source>
+      <translation>Agent 请求</translation>
+    </message>
+    <message>
+      <source>Your feedback (optional)</source>
+      <translation>你的反馈（可留空）</translation>
+    </message>
+    <message>
+      <source>Waiting for feedback</source>
+      <translation>等待人工反馈</translation>
+    </message>
+    <message>
+      <source>Feedback does not verify game state or approve installation. Empty confirmation is allowed.</source>
+      <translation>反馈不证明游戏状态，也不批准安装；可直接空答复确认。</translation>
+    </message>
+    <message>
+      <source>Confirm</source>
+      <translation>确认</translation>
+    </message>
+    <message>
+      <source>Skip</source>
+      <translation>跳过</translation>
+    </message>
+    <message>
       <location filename="../repair_chat.py" line="96" />
       <source> · Round {0}</source>
       <translation> · 第 {0} 轮</translation>
@@ -644,6 +676,10 @@ Log: {1}</source>
       <translation>打开扩展配置页面文件夹</translation>
     </message>
     <message>
+      <source>Open external knowledge directory</source>
+      <translation>打开外部知识库文件夹</translation>
+    </message>
+    <message>
       <location filename="../developer_gui.py" line="420" />
       <source>Open log directory</source>
       <translation>打开日志目录</translation>
@@ -1080,6 +1116,258 @@ Original pixel region: {2}</source>
       <location filename="../developer_gui.py" line="895" />
       <source>{0}; actual requests: {1}</source>
       <translation>{0}；实际请求 {1} 次</translation>
+    </message>
+    <message>
+      <source>New Session</source>
+      <translation>新建会话</translation>
+    </message>
+    <message>
+      <source>Refresh Sessions</source>
+      <translation>刷新会话</translation>
+    </message>
+    <message>
+      <source>Mode</source>
+      <translation>模式</translation>
+    </message>
+    <message>
+      <source>Source Manifest</source>
+      <translation>来源 Manifest</translation>
+    </message>
+    <message>
+      <source>Send the first message to start and fix mode and source.</source>
+      <translation>发送首条消息后开始会话并固定模式和来源。</translation>
+    </message>
+    <message>
+      <source>Attach Manifests</source>
+      <translation>附加 Manifest</translation>
+    </message>
+    <message>
+      <source>Manifest references: {0}</source>
+      <translation>参考 Manifest：{0}</translation>
+    </message>
+    <message>
+      <source>Blank (Construct only)</source>
+      <translation>空白（仅 Construct）</translation>
+    </message>
+    <message>
+      <source>Select a published Manifest</source>
+      <translation>选择已发布 Manifest</translation>
+    </message>
+    <message>
+      <source>Invalid Session directory</source>
+      <translation>会话目录无效</translation>
+    </message>
+    <message>
+      <source>Unavailable Session</source>
+      <translation>无法读取的会话</translation>
+    </message>
+    <message>
+      <source>Interrupted; results may be unknown. No operations replayed.</source>
+      <translation>会话已中断，结果可能未知；没有重放操作。</translation>
+    </message>
+    <message>
+      <source>Repair requires a published source Manifest.</source>
+      <translation>Repair 必须选择已发布来源 Manifest。</translation>
+    </message>
+    <message>
+      <source>Agent Workbench</source>
+      <translation>Agent 工作台</translation>
+    </message>
+    <message>
+      <source>Sessions</source>
+      <translation>历史会话</translation>
+    </message>
+    <message>
+      <source>Viewing Diff</source>
+      <translation>查看差异</translation>
+    </message>
+    <message>
+      <source>New Chat</source>
+      <translation>新建聊天</translation>
+    </message>
+    <message>
+      <source>Chat in use</source>
+      <translation>会话使用中</translation>
+    </message>
+    <message>
+      <source>Toggle chat history</source>
+      <translation>展开或收起聊天历史</translation>
+    </message>
+    <message>
+      <source>Chat context</source>
+      <translation>聊天上下文</translation>
+    </message>
+    <message>
+      <source>Message the Agent…</source>
+      <translation>给 Agent 发送消息…</translation>
+    </message>
+    <message>
+      <source>Attachments</source>
+      <translation>附件</translation>
+    </message>
+    <message>
+      <source>More developer tools</source>
+      <translation>更多开发工具</translation>
+    </message>
+    <message>
+      <source>Workspace and pages</source>
+      <translation>工作区与页面</translation>
+    </message>
+    <message>
+      <source>Logs and diagnostics</source>
+      <translation>日志与诊断</translation>
+    </message>
+    <message>
+      <source>Development and validation</source>
+      <translation>开发与验证</translation>
+    </message>
+    <message>
+      <source>Cancelling…</source>
+      <translation>正在取消…</translation>
+    </message>
+    <message>
+      <source>Start a new chat. Choose a mode and set the source in Chat context.</source>
+      <translation>开始新的聊天。选择模式，并在聊天上下文中设置来源。</translation>
+    </message>
+    <message>
+      <source>{0} images · {1} Manifest references</source>
+      <translation>{0} 张图片 · {1} 个 Manifest 参考</translation>
+    </message>
+    <message>
+      <source>Round complete</source>
+      <translation>本轮已完成</translation>
+    </message>
+    <message>
+      <source>Round cancelled</source>
+      <translation>本轮已取消</translation>
+    </message>
+    <message>
+      <source>Round incomplete</source>
+      <translation>本轮未完成</translation>
+    </message>
+    <message>
+      <source>Agent is responding…</source>
+      <translation>Agent 正在处理…</translation>
+    </message>
+    <message>
+      <source>Response format did not match JSON; automatic retries: {0}.</source>
+      <translation>回复格式未符合 JSON，已自动重试 {0} 次。</translation>
+    </message>
+    <message>
+      <source>Steam client directory</source>
+      <translation>Steam 客户端目录</translation>
+    </message>
+    <message>
+      <source>Directory containing steam.exe; leave unset for automatic discovery</source>
+      <translation>包含 steam.exe 的目录；未设置时自动查找</translation>
+    </message>
+    <message>
+      <source>Choose Steam directory</source>
+      <translation>选择 Steam 目录</translation>
+    </message>
+    <message>
+      <source>Save Steam directory</source>
+      <translation>保存 Steam 目录</translation>
+    </message>
+    <message>
+      <source>Open Session page drafts</source>
+      <translation>打开当前会话页面草稿目录</translation>
+    </message>
+    <message>
+      <source>Review settings page</source>
+      <translation>审查业务设置页面</translation>
+    </message>
+    <message>
+      <source>Review both pages here. Other LALC windows are locked until this review closes.</source>
+      <translation>请在此对比两侧页面。关闭审查前，其他 LALC 窗口暂时锁定。</translation>
+    </message>
+    <message>
+      <source>Current installed page</source>
+      <translation>当前正式页</translation>
+    </message>
+    <message>
+      <source>Proposed page</source>
+      <translation>拟安装页</translation>
+    </message>
+    <message>
+      <source>Trial configuration is discarded. Installation keeps existing settings; reload the application afterwards.</source>
+      <translation>试填配置将丢弃。安装保留已有配置，完成后请主动重载应用。</translation>
+    </message>
+    <message>
+      <source>Install this version</source>
+      <translation>安装此版本</translation>
+    </message>
+    <message>
+      <source>Close without installing</source>
+      <translation>关闭不安装</translation>
+    </message>
+    <message>
+      <source>New page; no installed page exists.</source>
+      <translation>新增页面；当前没有对应正式页。</translation>
+    </message>
+    <message>
+      <source>Finish or close the page review before using other LALC windows.</source>
+      <translation>请先完成或关闭页面审查，再使用其他 LALC 窗口。</translation>
+    </message>
+    <message>
+      <source>Page installed</source>
+      <translation>页面已安装</translation>
+    </message>
+    <message>
+      <source>Reload the application to use the installed page.</source>
+      <translation>请重载应用以使用已安装页面。</translation>
+    </message>
+    <message>
+      <source>Current</source>
+      <translation>原页面</translation>
+    </message>
+    <message>
+      <source>Proposed</source>
+      <translation>拟安装页</translation>
+    </message>
+    <message>
+      <source>Review</source>
+      <translation>Agent 审查</translation>
+    </message>
+    <message>
+      <source>Review the proposed page. Use Current and Review for comparison and details.</source>
+      <translation>请审查拟安装页，可切换原页面及 Agent 审查查看对比与详情。</translation>
+    </message>
+    <message>
+      <source>File: {0}</source>
+      <translation>文件：{0}</translation>
+    </message>
+    <message>
+      <source>Session: {0}</source>
+      <translation>会话：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed page ID: {0}</source>
+      <translation>拟安装页 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed task ID: {0}</source>
+      <translation>拟安装任务 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Proposed SHA-256: {0}</source>
+      <translation>拟安装版本 SHA-256：{0}</translation>
+    </message>
+    <message>
+      <source>Current page ID: {0}</source>
+      <translation>原页面 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Current task ID: {0}</source>
+      <translation>原任务 ID：{0}</translation>
+    </message>
+    <message>
+      <source>Current SHA-256: {0}</source>
+      <translation>原版本 SHA-256：{0}</translation>
+    </message>
+    <message>
+      <source>Page loading was checked. Configuration and Plan compatibility are reviewed by the Agent.</source>
+      <translation>已检查拟安装页加载。配置及 Plan 兼容影响由 Agent 审查说明。</translation>
     </message>
   </context>
 </TS>

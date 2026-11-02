@@ -1,5 +1,7 @@
 # Stage 4 — Vertical Implementation Slices
 
+2026-10-30 当前状态：#334 已按开发者试用反馈和明确阶段收尾决定关闭为 completed；完整验收未补跑，原清单未执行项不勾为通过。Stage 3 的 #329、#323、#312 同轮关闭。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)。
+
 状态（2026-10-27）：设计与以下四阶段拆分已由开发者确认（原 1/2 合并、原 3/4 合并）；四票已发布 GitHub；#331 已在本地实现并经开发者确认关闭，真实使用测试留待后续，验证和未验收边界见[实施记录](stage-4-331-implementation.md)；#332 已完成本地实现及定向验证，见[实施证据](stage-4-332-implementation.md)；#333 已完成本地双语及语言重载实现，已获开发者人工验收确认并关闭 #333（[证据](stage-4-333-implementation.md)）；#334 尚未完成。每阶段独立可演示、验证，不按 schema/API/UI/测试横向拆分。依据 [Stage 4 规格](stage-4-extensible-user-gui.md)、[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 及[影响审查](stage-4-design-impact-review.md)。
 
 直接依赖：1 → 2 → 3 → 4。已使用 ready-for-agent 和 GitHub 原生 blocked-by；不修改或关闭既有父议题。

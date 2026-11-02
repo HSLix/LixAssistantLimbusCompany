@@ -77,7 +77,10 @@ def test_full_api_path_and_explicit_loaded_model(monkeypatch, tmp_path):
     models = [{"id": "explicit", "status": {"value": "loaded"}, "architecture": {"input_modalities": ["image"]}}]
     monkeypatch.setattr(probe, "_models", lambda address, key: observed.append(address) or models)
     args = arguments(base_url="http://host:80/full/api/", model="explicit", max_requests=2, pi="pi")
+    monkeypatch.setenv("PI_CODING_AGENT_DIR", str(tmp_path / "private-agent"))
     with configured_pi(args, tmp_path, "memory-secret", "prompt") as (command, env, temporary, model):
+        assert env["PI_CODING_AGENT_DIR"] != str(tmp_path / "private-agent")
+        assert {"--no-extensions", "--no-skills", "--no-context-files", "--no-builtin-tools", "--no-session", "--offline"} <= set(command)
         assert env["LALC_PI_BASE_URL"] == "http://host:80/full/api"
         assert "memory-secret" not in str(command)
         from pathlib import Path

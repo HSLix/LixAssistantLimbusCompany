@@ -58,16 +58,16 @@ def test_gui_accumulates_selection_displays_paths_and_clears_all(gui, monkeypatc
     page.attach_image()
     page.attach_image()
     assert page.images == paths * 2
-    assert "4" in page.attach.text()
+    assert "4" in page.attachment_notice.text()
     assert str(paths[1]) in page.attach.toolTip()
     page.clear_image()
-    assert not page.images and not page.attach.toolTip()
+    assert not page.images and str(paths[1]) not in page.attach.toolTip()
 
 
 def test_cli_accepts_repeated_image_options():
     from pathlib import Path
     from lalc.__main__ import _parser
-    args = _parser().parse_args(["repair", "--problem", "test", "--image", "a.jpg", "--image", "b.webp"])
+    args = _parser().parse_args(["repair", "--from", "explicit-id", "--problem", "test", "--image", "a.jpg", "--image", "b.webp"])
     assert args.image == [Path("a.jpg"), Path("b.webp")]
 
 

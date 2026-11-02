@@ -64,6 +64,7 @@ def test_manual_validation_immediately_persists_in_current_conversation(tmp_path
         assert read_json(chat.log.path / "context.json") == chat.history
         assert json.dumps(result, ensure_ascii=False) in chat.history[-1]["content"][0]["text"]
         event = list(read_events(chat.log.path / "events.jsonl"))[-1]["event"]
+        assert event.pop("toolCallId").startswith("manual-")
         assert event == {"type": "validation", "source": "manual", **result}
 
 
@@ -112,7 +113,6 @@ def test_cumulative_diff_and_new_conversation_keep_baseline(tmp_path):
     second = host.new_conversation()
     assert second.history == [] and first.history
     assert host.diff() == diff and "if value >= 0" in diff
-    host.select_runner(None)
     assert host.diff() == diff
     assert host.manager.default_manifest_id() == loaded.manifest_id
 
@@ -149,6 +149,7 @@ def test_final_parse_errors_include_actual_text_and_position(text):
     details = error_details(caught.value, "agent")
     assert details["stage"] == "final_answer" and details["raw_text"] == text
     assert details["parse_line"] >= 1 and details["parse_column"] >= 1
+    assert "三个反引号 ```" in details["hint"]
     assert "JSONDecodeError" in details["traceback"]
     assert text in details_text(details)
 
@@ -191,3 +192,8 @@ def test_rpc_wait_timeout_identifies_stage_and_preserves_cause(stage):
         asyncio.run(rpc_event(event, stage))
     assert caught.value.__cause__ is original
     assert "30 秒" in str(caught.value) and "stderr" in str(caught.value)
+
+
+def test_final_json_message_allows_markdown_inside_the_string():
+    value = {"revise_success": False, "message": "说明：\n```python\nprint(1)\n```"}
+    assert final_answer({"content": [{"type": "text", "text": json.dumps(value)}]}) == value

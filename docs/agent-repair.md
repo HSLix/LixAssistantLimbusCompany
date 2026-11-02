@@ -1,5 +1,29 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-02 页面审查修订：拟安装页失败直接返回 preview_failed / isError，Agent 在同轮内按错误修正再请求，不需要人先关闭错误页。成功审批为默认 Proposed 的三 Tab，Review 展示总结与版本详情。保持同轮额度、固定预览字节和独立安装授权，见[修订记录](page-review-tabs-implementation.md)。
+
+2026-11-02 页面开发仅 GUI Construct 通过 page_* 工具操作当前 Session 的 page-drafts，不扩大原生 read/edit 或 CLI / Repair 权限。正式源码只读，安装只由应用级模态对比窗口批准固定预览字节；普通人工反馈不能批准安装。旧配置及 Plan 影响由 Agent 审查总结，无固定配置兼容检测，安装不清空旧配置 / 不自动重载。见[实施记录](stage-5-339-340-implementation.md)；两票待开发者验收。
+
+2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
+
+2026-11-01 #338 本地实施：GUI Construct / Repair 的 Agent 可用 `request_feedback(message)` 展示交互内容 / 意图并等待同轮文字反馈。普通非模态窗口不置顶，可切换游戏；Confirm 可空答复，Skip / 关闭 / Esc 表示跳过，取消本轮则终止并收尾。等待无自动超时，期间不能切换 / 新建 Session、启动试运行或自动输入；反馈不证明状态、不解除暂停、不批准安装。CLI / Runtime 不开放，重启不恢复未完成等待。用法、验证与未验收项见[实施记录](stage-5-338-implementation.md)。#338 已经开发者简单验证通过并按 completed 关闭；下文“#338 待实现”为历史状态。
+
+2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 保留，强制推理预检按本页现行规则取消。
+
+2026-11-01 #337 已本地实现：GUI Construct / Repair 可在 More → Workspace and pages 打开外部知识库文件夹，缺失时创建空目录，无须先开始聊天。将文本、图片或自行准备的普通 Git 仓库放入数据目录 `knowledge/`，Agent 按需只读检索 / 查看。首次内容访问按轮同步，系统 Git 不可用则跳过记日志；CLI / Runtime 不获得该权限。格式、分页、Git 版本及验收限制见[知识库实施记录](stage-5-337-implementation.md)。下文“#337 待实现”为旧阶段记录。
+
+#336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
+
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
+2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](stage-5-manifest-reference-impact-review.md)。
+
+2026-10-31 #335 本地实现：CLI Repair 已改用独立持久 Session，创建 / 恢复用法见下文 CLI；不再操作手工 Candidate。GUI 尚沿用旧入口，Session 历史及 CLI / GUI 互通待 #336。实施与验收边界见[记录](stage-5-335-implementation.md)，#335 已由开发者基于回归结果确认关闭，后续重点为 #336 GUI 工作台。
+
+2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer GUI 的 Manifest 选择及人工运行入口删除，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持，Agent 的显式版本试运行和日志能力完整保留。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
+
+2026-10-31 外部知识库目标（待实现）：数据目录中的 Git / 非 Git 资料供 GUI 两种模式只读查阅。每轮首次访问仓库自动尝试一次 fetch，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交报告更新，无 upstream / detached HEAD 报告不确定。受控工具限 diff / show / fetch / log，不更新工作区，不授予通用终端或编辑权限；CLI 不自动继承 GUI 新授权，Runtime 保持 Stage 6 边界。详见[版本语义](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)。
+
 2026-10-30 #334：成品草稿和基线随用户数据保存；默认随包 pi 优先、请求前限定故障回退一次。模型预检也会锁定本轮 pi，后续修复进程启动失败不能重开回退。源码仍保留项目草稿及显式 `--pi`；当前构建与证据见[#334 记录](stage-4-334-implementation.md)。
 
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
@@ -31,21 +55,29 @@ uv run --frozen lalc init --from <saved-manifest-uuid>
 # 明确确认替换现有草稿时才使用：
 uv run --frozen lalc init --from <saved-manifest-uuid> --replace
 
-# Agent 自行读取和修改所需已有文件，包括现有 Python Plan
+# 从明确已发布版本创建独立 Repair Session；不需要先执行手工 init
 uv run --frozen lalc repair \
+  --from <saved-manifest-uuid> \
   --problem '问题、复现步骤和预期行为' \
   --image /absolute/path/to/optional.png --image /absolute/path/to/another.jpg
 
 # 可通过消息要求只分析
-uv run --frozen lalc repair --problem '请分析这个问题'
+uv run --frozen lalc repair --from <saved-manifest-uuid> --problem '请分析这个问题'
 
 # 主动续聊，空行退出
-uv run --frozen lalc repair --chat --problem '请修复所述问题'
+uv run --frozen lalc repair --from <saved-manifest-uuid> --chat --problem '请修复所述问题'
+
+# 退出或重启后，按创建时输出的 Session ID 继续
+uv run --frozen lalc repair --session <session-uuid> --problem '检查当前状态后继续'
 ```
 
 CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用当前对话。模型连接可由 `agent-config` 保存，也可用本次 `--base-url`、`--model`、`--max-requests` 覆盖，覆盖不回写。`--ask-api-key` 从终端临时输入，不接受明文参数。Windows 的 `secret-set <name>` 保存命名 DPAPI 密钥；`agent-config --secret-name <name>` 引用它，`--clear-secret` 解除引用。
 
-旧 `repair <Component逻辑名>`、自动 Default 重建及必填图片不再是当前契约。`pi-probe` 仍是独立的图片/受限读取检查，不使用连续修复宿主，不作为普通回归附带运行。
+`--from` 与 `--session` 必须二选一，不隐式使用 Default。创建成功先输出 `session_id`，即使随后模型请求失败也可按 ID 继续。状态保存在 `lalc data-dir` 下的 `developer-sessions/<session-uuid>/`，Candidate、固定基线和自包含日志分别保留；不迁移旧草稿或旧日志，不提供重建、删除或自动清理。手工 init / validate / publish / clear 仍操作原 Candidate。
+
+同 Session 每轮加跨进程锁并读取最新状态，空闲等输入释放锁，游戏活动仍全局互斥。意外退出的轮次恢复时标为中断；已保存的实际工具结果继续可用，缺少结果者只报告未知，由 Agent 检查现状后决定如何继续，不自动请求模型、重放工具或回滚共享 Asset / 已发布版本。旧裁剪预览 ID 重启后失效。损坏的完整日志或内容引用明确报错；未写完的事件尾部另存原字节后隔离，不丢弃完整历史。
+
+旧 `repair <Component逻辑名>`、自动 Default 重建及必填图片不再是当前契约。独立 `pi-probe` 已移除，早期验证证据保留为历史。
 
 ## 新增源码与多图片
 
@@ -54,7 +86,7 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 
 工具拒绝已有文件/逻辑名覆盖和越界，先按既有源码结构契约检查，不导入执行新源码；创建和登记在提交前失败或取消会回退。其他已有文件校验失败不一概禁止新增。新文件可在同一轮继续编辑，进入快照和累计 Diff；完整校验、Publish 和 Default 仍分别操作。取消工具请求时先等待工具线程回退/完成，再生成最终快照。
 
-图片按实际内容由 Pillow 识别和校验，原始 MIME、字节和顺序独立留存，不转码、不设应用附件数量上限。预检携带整组图片，仅消耗一次模型请求；原图通过 context hook 进入 pi 上下文，绕开 RPC 图片转码及静默丢弃。下一轮沿用原始历史图片；格式纠正不重复添加附件。服务拒绝格式/载荷走正常诊断，不自动删图或重发。Asset Library 的 PNG 规则独立保留。
+图片按实际内容由 Pillow 识别和校验，原始 MIME、字节和顺序独立留存，不转码、不设应用附件数量上限。正式请求携带整组图片；原图通过 context hook 进入 pi 上下文，绕开 RPC 图片转码及静默丢弃。下一轮沿用原始历史图片；格式纠正不重复添加附件。服务拒绝格式/载荷走正常诊断，不自动删图或重发。Asset Library 的 PNG 规则独立保留。
 
 ## 权限、上下文和日志
 
@@ -75,9 +107,9 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 
 ## 连接错误诊断
 
-LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检、正式请求及 pi-probe 共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
+LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检及正式请求共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
 
-pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。预检与正式请求均覆盖；原有预检日志仍在 round-N/events.jsonl，正式交互日志位于对话根 events.jsonl。
+pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。正式请求覆盖；旧预检日志仍在 round-N/events.jsonl，新轮次不再生成预检日志；正式交互日志位于对话根 events.jsonl。
 
 旧记录中的 `Connection error.` 本身不能证明代理、TLS、服务端或工具定义是根因。更新后需在实际出错的 Windows 环境复现，根据新增错误码确定修复；本机 HTTP 替身检查只验证诊断链路。
 
@@ -95,10 +127,10 @@ GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停
 
 每个对话在数据目录 `agent-interactions/<UTC日期>/<UUID4>/` 下独立留存：
 
-- `events.jsonl`：实际模型/工具/校验和逐轮结束事件；预检事件也在相应轮目录保留。
+- `events.jsonl`：实际模型/工具/校验和逐轮结束事件；旧预检事件保留原样。
 - `baseline/`：该对话首次处理时固定的候选物化基线。
 - `round-N/input.json`、可选 `input-序号.实际格式`：用户消息、附件、已有可编辑文件清单、基础 Manifest UUID、实际 pi 版本、已验证版本、非密钥配置与提示词。
-- `round-N/request-K.json`：实际模型请求；连接预检消耗计入同一轮额度。
+- `round-N/request-K.json`：实际模型请求；直接从正式请求 1 开始，格式纠正计入同轮额度。
 - `round-N/original/`、`final/`、`cumulative.diff`、`result.json`：真实候选快照、相对固定基线的累计 Diff、请求次数及结束原因。
 - `context.json`、`tool-N.json` 和图片：保留消息、图片及工具结果；工具序号跨轮递增，不覆盖旧产物。
 
@@ -141,18 +173,18 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 本节替代下文历史记录中的“额度注入 system、计数不加入长期历史”。请求按固定规则、按时间追加的历史消息/工具调用及结果、本次额度提醒组织。system 不包含动态额度或 pi 自动添加的真实工作目录；文件路径相对于 Candidate 根目录，已有文件列表继续随用户消息提供。实际工作目录、路径解析及访问边界仍由宿主管理，不扩展为所有工具反馈的路径脱敏。
 
-额度提醒作为宿主状态消息进入实际请求和对话历史，旧提醒原位保留，最新提醒有效；不触发新轮、不替换旧消息、不拆开一组工具调用与结果。每条用户消息重新计数，预检和格式纠正继续计入；预检消息不混入修复历史，格式纠正继续禁用工具，发送前的硬性上限保持有效。GUI/CLI 共用此行为，不新增设置。连接预检及 pi-probe 同样移除 system 中的工作目录，但保留各自原有的文件访问与计数规则。
+额度提醒作为宿主状态消息进入实际请求和对话历史，旧提醒原位保留，最新提醒有效；不触发新轮、不替换旧消息、不拆开一组工具调用与结果。每条用户消息重新计数，预检和格式纠正继续计入；预检消息不混入修复历史，格式纠正继续禁用工具，发送前的硬性上限保持有效。GUI/CLI 共用此行为，不新增设置。连接预检同样移除 system 中的工作目录，但保留各自原有的文件访问与计数规则。
 
 实施验证：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q -x tests/test_agent_repair_agent.py tests/test_pi_probe.py` 为 **43 passed, 4 skipped**。真实 pi 1.4.0 与本机 HTTP 替身验证固定 system 不含工作目录、末尾额度、预检隔离、同轮及跨轮消息前缀一致、DeepSeek reasoning/连续工具、原图、格式纠正与硬性上限。首次检查因沙箱禁止本机监听而未能建立替身服务，授权监听后重新运行得到上述结果。相关普通检查 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_agent_repair.py tests/test_agent_settings.py tests/test_developer_gui.py` 为 **86 passed, 1 skipped**。未调用真实模型、测量 DeepSeek 实际缓存收益或执行 Windows 实机验收，跳过项不计通过。
 
 ## 历史：2026-10-24 Agent Repair 命名与请求额度
 
-共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，在模型 system prompt 中注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。该动态提示进入实际请求日志，不把过时计数追加进长期对话历史。
+共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，以 user 消息注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。动态通知进入实际请求日志；本轮历史通知原位保留，以最后一条为准，连接预检的通知不进入开发历史。
 
 
 ### 命名与请求额度实施验证
 
-模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求的 system prompt 含最新计数、总额度和停止说明，包含预检及最终格式纠正；计数不追加进长期历史。
+模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求以 user 消息携带最新计数及总额度，system prompt 保留停止规则，包含预检及最终格式纠正；通知原位保留，连接预检的通知不进入开发历史。
 
 首次实际载荷测试发现 SDK 未保留上下文字段中的动态提示，已按失败即停流程改为最终载荷注入，单项重测通过后继续。相关普通检查 **89 passed**；全量普通回归 **304 passed, 30 skipped**（29 项 Agent 默认跳过、1 项 Windows DPAPI）；显式 Agent 回归 **25 passed, 4 skipped**，使用真实 pi + 本机 HTTP 替身，跳过 2 项真模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图。命令：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra`；`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`。`git diff --check` 通过，未重新调用真实模型或执行 Windows 实机验收，#330 保持打开。
 
@@ -224,13 +256,13 @@ uv run lalc agent-config --provider deepseek --thinking --reasoning-effort high
 # Windows: first save a named key using secret-set, then reference it:
 uv run lalc agent-config --secret-name deepseek-service
 # macOS: use the GUI's temporary platform key, or prompt in the CLI:
-uv run lalc repair --problem "检查候选流程" --ask-api-key
+uv run lalc repair --from <saved-manifest-uuid> --problem "检查候选流程" --ask-api-key
 ```
 
 CLI repair overrides `--provider`, `--thinking/--no-thinking` and `--reasoning-effort` affect only the
 current invocation. Full API base paths remain unchanged (no automatic `/v1`). Standard DeepSeek model
-list metadata is sufficient for availability checks; actual image preflight remains a real request and
-counts toward the round's budget. pi explicitly uses DeepSeek's thinking format and preserves streamed
+list metadata is sufficient for availability checks; images go directly into the formal request,
+without a separate inference preflight. pi explicitly uses DeepSeek's thinking format and preserves streamed
 `reasoning_content` across tool calls and subsequent conversation rounds. Original tool permissions,
 request caps, cancellation, disabled automatic retry and candidate review/Publish boundaries remain.
 
@@ -250,3 +282,18 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 仓库外的个人图片。`git diff --check` 通过。
 
 #332 的外置页面、配置交接、整应用重载及验证边界见[实施记录](stage-4-332-implementation.md)。CLI 未指定 provider 时使用 Developer 当前选用项；显式覆盖仍不回写。
+
+
+## Prompt 与 SOP
+
+2026-11-01：开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。预检和格式纠正禁用工具，概览明确为空；预检使用独立连接 / 图片检查指令，不要求开发结果 JSON。独立 `lalc pi-probe` 已移除。
+
+开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset 对应 XML 标签内写 Markdown 流程；三段正文当前留空，说明文字不会注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset，Repair 选 Repair + Asset；轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
+
+用户消息通过 `<runtime_context>` 携带模式、入口、Candidate 相对根、来源 Manifest、可编辑文件和参考附件，通过 `<user_request>` 保留用户原文。XML 仅帮助区分来源，宿主不解析正文为权限。参考附件及外部工具结果不能覆盖系统规则，历史聊天兼容旧消息格式，无需迁移。
+
+最终文本仍严格解析为 JSON：`revise_success` 必须为布尔值，`message` 必须为非空字符串，禁止外层 Markdown 围栏。修订完成且相关静态校验通过可报告 true，但必须明确未执行的游戏验证；纯分析、信息不足、校验失败或修订未完成报告 false。用户明确要求成功试运行时，未执行或失败也报告 false。模型报告不替代校验、人工审阅或游戏验收。格式纠正只重发最终 JSON，禁用工具并保留业务内容，继续消耗本轮额度。
+
+跨轮及 Session 恢复时，原始日志保留历史系统消息；发给模型的历史仅重放对话，不重放旧系统 Prompt 或 `toolsAdded` / `toolsRemoved`。本轮系统 Prompt 与工具声明由当前入口、模式及格式纠正状态生成，上一轮纠正不会禁用下一轮工具。发送前核对工具声明与当前启用集合，不一致时拒绝请求并报告接入错误；不把回复正文中的工具标记转换为执行指令。相关回归使用真实 pi 与本机 HTTP 替身，不代表真实模型验收。
+
+每轮 `input.json` 保存所选 SOP 正文及 Python 宿主 Prompt 快照；完整实际系统消息还包括扩展追加的工具概览和共享规则，以 `request-*.json` 实际载荷为准。修改 SOP 可能影响缓存命中；不承诺缓存比例或真实模型表现提升。

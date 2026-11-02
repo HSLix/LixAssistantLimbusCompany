@@ -36,7 +36,12 @@ class LogStore:
         if (not isinstance(relative, str) or not relative or "\\" in relative or ":" in relative
                 or Path(relative).is_absolute() or ".." in Path(relative).parts):
             raise ValueError("日志引用必须是对话内的相对路径。")
-        path = (self.root / relative).resolve()
+        path = self.root
+        for part in Path(relative).parts:
+            path = path / part
+            if path.is_symlink():
+                raise ValueError("日志引用不能包含符号链接。")
+        path = path.resolve()
         if not path.is_relative_to(self.root):
             raise ValueError("日志引用越出对话目录。")
         return path
@@ -109,11 +114,11 @@ class LogStore:
         content = _json_bytes(packed)
         return self._put(content, "json") if not inline and len(content) >= 1024 else packed
 
-    def unpack(self, value, *, _active=None):
+    def unpack(self, value, *, _active=None, image_handler=None):
         """完整展开并验哈希；缺失、损坏、循环或越界引用一律明确失败。"""
         active = set() if _active is None else _active
         if isinstance(value, list):
-            return [self.unpack(item, _active=active) for item in value]
+            return [self.unpack(item, _active=active, image_handler=image_handler) for item in value]
         if not isinstance(value, dict):
             return value
         if set(value) == {MARKER}:
@@ -126,10 +131,14 @@ class LogStore:
                         or not isinstance(pair[0], str) for pair in pairs)
                         or len({pair[0] for pair in pairs}) != len(pairs)):
                     raise ValueError("日志字面量转义格式错误。")
-                return {key: self.unpack(item, _active=active) for key, item in pairs}
+                return {key: self.unpack(item, _active=active, image_handler=image_handler) for key, item in pairs}
             path = self._path(reference.get("path"))
             if path in active:
                 raise ValueError("日志存在循环引用。")
+            if image_handler is not None and reference.get("kind") == "bin" and reference.get("base64") is True:
+                if not re.fullmatch(r"[0-9a-f]{64}", str(reference.get("sha256", ""))):
+                    raise ValueError("日志图片哈希格式错误。")
+                return image_handler(reference)
             try:
                 content = path.read_bytes()
             except OSError as error:
@@ -145,9 +154,9 @@ class LogStore:
             if kind == "txt":
                 return content.decode("utf-8")
             if kind == "json":
-                return self.unpack(json.loads(content), _active=active | {path})
+                return self.unpack(json.loads(content), _active=active | {path}, image_handler=image_handler)
             raise ValueError("未知日志引用类型。")
-        return {key: self.unpack(item, _active=active) for key, item in value.items()}
+        return {key: self.unpack(item, _active=active, image_handler=image_handler) for key, item in value.items()}
 
     def write_json(self, path, value):
         """原子替换日志文档；内容对象失败时不发布新的引用文档。"""

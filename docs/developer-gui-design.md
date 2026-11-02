@@ -1,5 +1,31 @@
 # Developer GUI — Accepted Design
 
+2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](page-review-tabs-implementation.md)。
+
+2026-11-02 试用修订：页面审批改为 Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页加载 / 契约 / ID 注册失败直接返回同轮 Agent，不显示失败审批。Review 集中显示 Agent 总结与身份 / 版本，切换不重建页面或配置；三按钮和人审快照批准保持。见[影响审查](page-review-tabs-design-impact-review.md)及[实施记录](page-review-tabs-implementation.md)。下文历史左右双栏 / 失败留窗描述被替代。
+
+2026-11-02 #339 / #340 合并本地实施：Construct 专属单文件页面草稿和双实例应用级模态对比、人工版本安装已接入；Repair / CLI / Runtime 不继承。宿主只检查加载 / 页面契约 / 路径及 ID，配置与 Plan 影响由 Agent 总结，无固定配置兼容检验或自动 submit。窗口提供安装、关闭不安装、取消本轮，安装后由人主动重载。见[实施记录](stage-5-339-340-implementation.md)，两票待开发者验收；下文旧待实现状态为历史。
+
+2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
+
+2026-11-01 #338 本地实施：GUI 两种模式共用普通非模态人工反馈窗口，展示 Agent 内容 / 意图与文字输入框，无请求类型分类、不置顶、不设自动超时；Confirm 可空回复，Skip / 关闭 / Esc 只跳过，取消本轮结束轮次。等待保留 Session 与活动互斥，结果绑定发起请求；CLI / Runtime 不继承。当前用法及验收限制见[实施记录](stage-5-338-implementation.md)，#338 已经开发者简单验证通过并按 completed 关闭。下文人工反馈待实现的描述为历史状态。
+
+2026-11-01 游戏版本历史：GUI 两种模式与 CLI Repair 均可通过 list_game_versions / search_agent_sessions / read_agent_session 查阅已索引历史，版本筛选为定位上下文，每轮显示版本组；Steam 客户端路径仅 User GUI 通用设置编辑。见[用法](game-version-history.md)。
+
+2026-11-01 #337 本地实施：Agent 工作台 More 菜单增加外部知识库文件夹入口，缺失时创建空目录，未开始 Session 也可使用。GUI Construct / Repair 已接入只读资料与受控 Git 工具；CLI / Runtime 不继承。目录、工具、格式与验收限制见[实施记录](stage-5-337-implementation.md)。下文“知识库待实现”是历史状态。
+
+#336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
+
+2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+
+2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](stage-5-manifest-reference-impact-review.md)。
+
+2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer GUI 的 Manifest 选择及人工运行入口删除，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持，Agent 的显式版本试运行和日志能力完整保留。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
+
+2026-10-31 外部知识库目标（待实现）：数据目录中的 Git / 非 Git 资料供 GUI 两种模式只读查阅。每轮首次访问仓库自动尝试一次 fetch，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交报告更新，无 upstream / detached HEAD 报告不确定。受控工具限 diff / show / fetch / log，不更新工作区，不授予通用终端或编辑权限；CLI 不自动继承 GUI 新授权，Runtime 保持 Stage 6 边界。详见[版本语义](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)。
+
+2026-10-30：开发者明确关闭 #329、#323、#312 及 #334，阶段跟踪不再等待完整验收；未执行的真实模型／Windows／游戏及 TA 交付检查不计为通过。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)；下文历史“继续由 #329 验收”的当前跟踪要求由本次决定替代。
+
 2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
 
 
@@ -40,7 +66,7 @@
 - 复用已有 PySide6 GUI 与共享应用服务，不通过执行 CLI 命令实现 GUI，不在界面实现另一套 Agent Loop。耗时操作不阻塞 GUI，普通 Workflow 不依赖 pi 启动。
 - Runner 支持 Automation Plan、Task Workflow、Subworkflow、Step；Plan 选择现有配置文件，其他入口按所选 Manifest/角色展示并接收 JSON 参数，复用现有参数契约。保留暂停、接管、恢复、取消、执行结果及 Trace/Ledger 定位，不新增 Plan/代码编辑器或参数表单生成器。
 - Agent Settings 提供 Base URL、Model、API Key 和模型请求上限。密钥仅能设置、覆盖或显式清除，界面不读取/显示已有明文，只显示是否设置；普通保存时空输入保留原密钥，认证值不进入日志或配置导出。复用 Windows DPAPI 与 Mac 临时内存密钥边界，不读取或修改其他 pi 实例的个人配置。
-- GUI 状态由真实 Host/工具/校验事件驱动，不依靠模型自然语言猜测分析阶段；展示当前工具和实际结果，不做 token 级可视化、虚假审批状态或假操作按钮。
+- GUI 状态由真实 Host/工具/校验事件驱动，不依靠模型自然语言猜测分析阶段；展示当前工具和实际结果，临时原始输出区按本页现行规则流式展示真实内容，不提供虚假审批状态或假操作按钮。
 - Open Asset Directory 由既有数据目录与 Asset Library 路径提供，使用系统文件管理器打开；不存在或失败明确提示，不实现文件管理器。
 
 ## Implementation scope
@@ -105,12 +131,12 @@
 
 ## 历史：2026-10-24 Agent Repair 命名与请求额度
 
-共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，在模型 system prompt 中注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。该动态提示进入实际请求日志，不把过时计数追加进长期对话历史。
+共享连续对话、文件编辑、素材工具及日志宿主统一命名为 `agent_repair.py`，使用指南为 `agent-repair.md`；CLI `repair` 命令不变，Component 缺陷种子仍保留原名称。GUI 独立显示对话轮次和本条消息内模型请求次数/上限，不随工具状态提示覆盖；新对话或重建 Candidate 后重置。每次实际请求前，以 user 消息注入当前对话轮次、当前请求序号、总请求上限及剩余次数，提示最后一次请求需给出最终回答，达到上限后停止，不再调用工具或继续请求。额度仍是每条用户消息的请求额度，预检与格式纠正均计入，下一条用户消息重新计数；宿主强制限制不依赖模型遵守提示。动态通知进入实际请求日志；本轮历史通知原位保留，以最后一条为准，连接预检的通知不进入开发历史。
 
 
 ### 命名与请求额度实施验证
 
-模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求的 system prompt 含最新计数、总额度和停止说明，包含预检及最终格式纠正；计数不追加进长期历史。
+模块及导入统一为 `agent_repair.py`，测试为 `test_agent_repair.py` / `test_agent_repair_agent.py`，指南为 `agent-repair.md`；CLI `repair` 和既有用户数据路径不变。GUI 显示独立的对话轮次和请求次数/上限，工具状态不覆盖计数，新对话和 Candidate 重建重置显示。每个实际 HTTP 请求以 user 消息携带最新计数及总额度，system prompt 保留停止规则，包含预检及最终格式纠正；通知原位保留，连接预检的通知不进入开发历史。
 
 首次实际载荷测试发现 SDK 未保留上下文字段中的动态提示，已按失败即停流程改为最终载荷注入，单项重测通过后继续。相关普通检查 **89 passed**；全量普通回归 **304 passed, 30 skipped**（29 项 Agent 默认跳过、1 项 Windows DPAPI）；显式 Agent 回归 **25 passed, 4 skipped**，使用真实 pi + 本机 HTTP 替身，跳过 2 项真模型、1 项 Windows DPAPI 认证、1 项 Windows 现场截图。命令：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra`；`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py`。`git diff --check` 通过，未重新调用真实模型或执行 Windows 实机验收，#330 保持打开。
 
@@ -269,3 +295,8 @@ DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/archit
 - 普通回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra` → **407 passed, 48 skipped**；跳过 47 项须显式启用的 Agent 测试及 1 项 Windows 原生 DPAPI。
 - 专项接入：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x -ra --run-agent-tests tests/test_agent_repair_agent.py tests/test_pi_probe.py` → **43 passed, 4 skipped**；通过项使用真实 pi + 本机 HTTP 替身。2 项真模型因未提供显式测试连接配置跳过，Windows DPAPI 认证及现场游戏窗口各 1 项因平台跳过。本次未调用真实模型，不以替身/offscreen 计为实机或游戏通过。
 - #329 原生依赖已核实包含 #326、#327、#328、#330；#329 保留真实缺陷修复前后对照、Windows/DPI/焦点/认证及最终交付责任。#328 的准备完成由开发者本次确认，本轮没有重新执行该游戏案例。
+
+
+## 2026-11-01 开发 Prompt 与历史显示
+
+Construct / Repair 共享 Core，分别选择模式 SOP，并共用 Asset SOP；每条消息执行开始读取、轮内固定。工具概览来自实际注册定义与当前启用集合，预检和格式纠正时没有开发工具。详情及填写说明见 [Agent 指南](agent-repair.md#prompt-与-sop)。聊天标题和历史显示兼容旧包装与新的 Runtime Context / User Request 分区，只呈现原始用户需求，不把宿主上下文显示为需求；完整原始消息和实际请求仍留在日志。无需修改 Session 存储格式、权限或 GUI 配置页。

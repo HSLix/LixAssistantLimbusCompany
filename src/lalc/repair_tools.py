@@ -12,25 +12,34 @@ from .actions import application_actions
 from .assets import AssetLibrary, asset_name
 from .focused import FocusedAutomationSession, WindowsWindowPlatform
 from .agent_diagnostics import error_details
+from .ocr import ocr_service
+from .runtime import UserInterruption
 
 
-REPAIR_TOOLS = ["read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
-                "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-                "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset"]
+from .agent_policy import BASE_TOOLS
+from .manifest_reference import ManifestReference
+from .knowledge import KnowledgeLibrary
+
+REPAIR_TOOLS = list(BASE_TOOLS)
 
 
 class RepairTools:
     """通过宿主实现固定工具集；图片与返回值独立留存在本次交互目录。"""
 
-    def __init__(self, data_root, log, *, platform=None, host=None):
+    def __init__(self, data_root, log, *, platform=None, host=None, allowed=None):
+        self.allowed = frozenset(REPAIR_TOOLS if allowed is None else allowed)
         self.host = host
         self.created_files = set()
         self.library = AssetLibrary(data_root)
         self.log = log
         self.platform = platform
         self.cancelled = threading.Event()
+        self.on_feedback = None
+        self.on_page_preview = None
+        self.knowledge = KnowledgeLibrary(data_root, self.checkpoint)
         self.sequence = 0
         self.previews = {}
+        self.ocr_service = host.service.ocr_service if host is not None else ocr_service
 
     def checkpoint(self):
         if self.cancelled.is_set():
@@ -39,15 +48,28 @@ class RepairTools:
     def call(self, name, arguments, *, tool_call_id=None):
         """工具错误原样反馈模型；不把工具失败当作整个修复进程失败。"""
         self.sequence += 1
+        self.log.record({"type": "tool_reserved", "sequence": self.sequence})
         self.checkpoint()
         try:
+            if name not in self.allowed:
+                raise ValueError("当前模式和入口不允许此工具。")
             methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
                        "publish": self.publish, "trial_run": self.trial_run,
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
-                       "preview_crop": self.preview_crop, "remove_asset": self.remove_asset}
+                       "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
+                       "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
+                       "read_manifest_source": self.read_manifest_source,
+                       "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
+                       "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git,
+                       "request_feedback": self.request_feedback,
+                       "page_list": self.page_list, "page_read": self.page_read,
+                       "page_create": self.page_create, "page_update": self.page_update,
+                       "page_preview": self.page_preview}
+            methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
+                           read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
         except Exception as error:
             details = error_details(error, "tool:" + name,
@@ -60,6 +82,131 @@ class RepairTools:
                          "name": name, "arguments": arguments, "result": result})
         filename = f"tool-{self.sequence}.json"
         return self.log.tool_result(filename, result)
+
+    def page_drafts(self):
+        from .page_drafts import PageDrafts
+        if self.host is None or not getattr(self.host, "session", None):
+            raise ValueError("页面工具需要 GUI Construct Session。")
+        return PageDrafts(self.host.session)
+
+    def page_list(self, **arguments):
+        return self.text(self.page_drafts().list(**arguments))
+
+    def page_read(self, **arguments):
+        return self.text(self.page_drafts().read(**arguments))
+
+    def page_create(self, **arguments):
+        return self.text(self.page_drafts().create(**arguments))
+
+    def page_update(self, **arguments):
+        return self.text(self.page_drafts().update(**arguments))
+
+    def page_preview(self, filename, summary):
+        """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""
+        from .page_preview import PreviewRequest
+        if not isinstance(summary, str) or not summary.strip():
+            raise ValueError("请总结字段变化、旧配置和 Plan 影响及兼容授权情况。")
+        if self.on_page_preview is None:
+            raise ValueError("当前入口未连接页面预览界面。")
+        drafts = self.page_drafts()
+        request = PreviewRequest(drafts, drafts.snapshot(filename), summary,
+                                 (self.log.identity, self.log.group, self.sequence))
+        self.log.save_json(f"tool-{self.sequence}-page-preview.json", {
+            "filename": filename, "sha256": request.snapshot["sha256"],
+            "source": request.snapshot["source"].decode("utf-8"), "summary": summary,
+            "replace": request.snapshot["replace"]})
+        try:
+            self.on_page_preview(request)
+            while not request.done.wait(.05):
+                self.checkpoint()
+            self.checkpoint()
+            if request.result is None:
+                raise RuntimeError("页面审查已取消。")
+            result = self.text(request.result)
+            if request.result.get("status") == "preview_failed":
+                result["isError"] = True
+            return result
+        finally:
+            request.close()
+
+    def request_feedback(self, message):
+        """等待 GUI 的真实答复；线程取消先作废请求再完成工具收尾。"""
+        from .human_feedback import FeedbackRequest
+        if not isinstance(message, str) or not message.strip():
+            raise ValueError("人工反馈请求内容不能为空。")
+        if self.on_feedback is None:
+            raise ValueError("当前入口未连接人工反馈界面。")
+        request = FeedbackRequest(message, (self.log.identity, self.log.group, self.sequence))
+        try:
+            self.on_feedback(request)
+            while not request.done.wait(.05):
+                self.checkpoint()
+            self.checkpoint()
+            if request.result is None:
+                raise RuntimeError("人工反馈请求已取消。")
+            return self.text(request.result)
+        finally:
+            request.close()
+
+    def list_manifests(self, offset=0, limit=50):
+        return self.text(ManifestReference(self.host.manager).list(offset, limit))
+
+    def list_game_versions(self, **arguments):
+        """只查版本索引，不遍历历史日志目录。"""
+        from .agent_history import AgentHistory
+        return self.text(AgentHistory(self.library.data_root).versions(**arguments))
+
+    def search_agent_sessions(self, **arguments):
+        """按观测字段筛选已索引对话；版本筛选不扩张文件读取权限。"""
+        from .agent_history import AgentHistory
+        return self.text(AgentHistory(self.library.data_root).search(**arguments))
+
+    def read_agent_session(self, **arguments):
+        """有界读取历史文字或显式图片，不恢复历史 Session 或执行工具。"""
+        from .agent_history import AgentHistory
+        metadata, content = AgentHistory(self.library.data_root).read(**arguments)
+        result = self.text(metadata)
+        if content is not None:
+            extension = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}[metadata["mime_type"]]
+            path = self.log.path / f"tool-{self.sequence}-history.{extension}"
+            path.write_bytes(content)
+            self.log.store.register_image(path)
+            result["content"].append({"type": "image", "mimeType": metadata["mime_type"],
+                                      "data": base64.b64encode(content).decode()})
+        return result
+
+    def knowledge_list(self, **arguments):
+        return self.text(self.knowledge.list(**arguments))
+
+    def knowledge_search(self, **arguments):
+        return self.text(self.knowledge.search(**arguments))
+
+    def knowledge_git(self, **arguments):
+        metadata = self.knowledge.git_operation(**arguments)
+        return self.knowledge_result(metadata, metadata.pop("_image", None))
+
+    def knowledge_read(self, **arguments):
+        """保留资料原图与 MIME，不调用游戏截图 OCR 或 Asset PNG 专用路径。"""
+        metadata, content = self.knowledge.read(**arguments)
+        return self.knowledge_result(metadata, content)
+
+    def knowledge_result(self, metadata, content):
+        """知识库原图沿用同轮结果文件和自包含日志，不改变 Asset 专用行为。"""
+        result = self.text(metadata)
+        if content is not None:
+            filename = f"tool-{self.sequence}-knowledge.{metadata['extension']}"
+            path = self.log.path / filename
+            path.write_bytes(content)
+            self.log.store.register_image(path)
+            result["content"].append({"type": "image", "mimeType": metadata["mime_type"],
+                                      "data": base64.b64encode(content).decode()})
+        return result
+
+    def read_manifest(self, manifest_id, offset=0, limit=50):
+        return self.text(ManifestReference(self.host.manager).structure(manifest_id, offset, limit))
+
+    def read_manifest_source(self, manifest_id, section, logical_name, offset=0, limit=100):
+        return self.text(ManifestReference(self.host.manager).source(manifest_id, section, logical_name, offset, limit))
 
     def add_component(self, filename, logical_name, source):
         """创建普通 Component 并登记；角色由实际源码决定。"""
@@ -248,11 +395,31 @@ class RepairTools:
         return session, metadata, path
 
     def game_screenshot(self):
+        """返回同次原图、网格图及完整 OCR；识别失败保留图片并说明错误，不支持韩文。"""
+        from .recognition import client_image
+
         session, metadata, path = self.capture()
         result = self.image(path.read_bytes(), {**metadata, "view": "original"})
         overlay = self.image(self.marked_image(session, grid=True), {"view": "grid", "spacing": 40}, 2)
         result["content"].extend(overlay["content"])
         result["details"]["grid"] = overlay["details"]
+        def checkpoint():
+            self.checkpoint()
+            session.check(record=False)
+
+        try:
+            recognized = self.ocr_service.recognize(client_image(session.image, session.size), checkpoint=checkpoint)
+            ocr = {"ocr": {"observation": session.observation, **recognized}}
+        except UserInterruption:
+            raise
+        except Exception as error:
+            # 窗口失效或取消不能被 OCR 降级掩盖。
+            checkpoint()
+            details = error_details(error, "tool:game_screenshot:ocr", keys=self.log.keys)
+            ocr = {"ocr_error": details}
+        checkpoint()
+        result["content"].extend(self.text(ocr)["content"])
+        result["details"].update(ocr)
         return result
 
     @staticmethod
@@ -293,7 +460,7 @@ class RepairTools:
         identity = uuid.uuid4().hex
         details = {"preview_id": identity, "logical_name": logical_name, "region": area, "tags": tags,
                    "threshold": threshold, "matches": matches, "match_count": len(matches),
-                   "source_screenshot": metadata["path"], "interaction_id": self.log.path.name}
+                   "source_screenshot": metadata["path"], "interaction_id": self.log.identity}
         result = self.image(self.marked_image(session, region=area), {**details, "view": "crop_region"})
         crop = self.image(content, {"view": "crop"}, 2)
         result["content"].extend(crop["content"])
@@ -306,7 +473,7 @@ class RepairTools:
     def crop_asset(self, preview_id):
         """只保存本对话已预览的原始像素，不重新截图或接受外部路径。"""
         if not isinstance(preview_id, str) or preview_id not in self.previews:
-            raise ValueError("未知 preview_id；请先调用 preview_crop，不能引用其他对话的预览。")
+            raise ValueError("未知或已失效的 preview_id；请重新调用 preview_crop，不能引用其他对话或重启前的预览。")
         preview = self.previews[preview_id]
         self.checkpoint()
         result = self.library.save_crop(preview["logical_name"], preview["pixels"], preview["size"],
@@ -315,7 +482,7 @@ class RepairTools:
         # 来源同时指向独立留存的完整截图，不能依赖下次会被替换的 Candidate。
         result["source_screenshot"] = preview["source_screenshot"]
         result["preview_id"] = preview_id
-        result["interaction_id"] = self.log.path.name
+        result["interaction_id"] = self.log.identity
         from .runtime import atomic_write_json
         atomic_write_json(self.library.data_root / "asset-provenance" / f"{result['provenance_id']}.json", result)
         return self.image(self.library.read({"path": result["path"], "sha256": result["sha256"]}), result)

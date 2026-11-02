@@ -8,23 +8,25 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer, QSize
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
-    QFileDialog,
+    QFileDialog, QListWidgetItem, QAbstractItemView, QSizePolicy, QStyle,
     QMessageBox, QDialog, QDialogButtonBox,
 )
 
 from qfluentwidgets import (
     BodyLabel as QLabel, PushButton as QPushButton, LineEdit as QLineEdit,
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
-    CheckBox as QCheckBox,
+    CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
+    TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action,
 )
 
 from .i18n import tr
 
-from .repair_chat import RepairChat
+from .repair_chat import RepairChat, chat_title, raw_output_text
+from .chat_input import ChatInput
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
 from .agent_diagnostics import check_settings, details_text
 
@@ -64,6 +66,62 @@ class Operation(QThread):
         finally:
             self.loop = None
             self.task = None
+
+
+class FeedbackDialog(QDialog):
+    """非模态人工反馈；窗口关闭只跳过，取消按钮结束发起轮次。"""
+
+    def __init__(self, request, window):
+        super().__init__(window)
+        self.request = request
+        self.setWindowTitle(tr('Waiting for feedback'))
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.resize(640, 420)
+        layout = QVBoxLayout(self)
+        content = QPlainTextEdit()
+        content.setAccessibleName(tr('Agent request'))
+        content.setReadOnly(True)
+        content.setPlainText(request.message)
+        layout.addWidget(content)
+        notice = QLabel(tr('Feedback does not verify game state or approve installation. Empty confirmation is allowed.'))
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+        self.reply = QPlainTextEdit()
+        self.reply.setAccessibleName(tr('Your feedback (optional)'))
+        self.reply.setPlaceholderText(tr('Your feedback (optional)'))
+        layout.addWidget(self.reply)
+        controls = QHBoxLayout()
+        self.confirm = button(tr('Confirm'), lambda: self.respond('confirmed'), controls)
+        self.skip = button(tr('Skip'), self.reject, controls)
+        self.cancel = button(tr('Cancel round'), self.cancel_round, controls)
+        layout.addLayout(controls)
+        self.window = window
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.expire)
+        self.timer.start(50)
+
+    def respond(self, status):
+        self.request.finish(status, self.reply.toPlainText())
+        self.close()
+
+    def reject(self):
+        self.request.finish('skipped')
+        super().reject()
+
+    def closeEvent(self, event):
+        self.request.finish('skipped')
+        super().closeEvent(event)
+
+    def cancel_round(self):
+        """先请求轮次取消再作废反馈，不把取消记成 Skip。"""
+        if not self.request.done.is_set():
+            self.window.cancel_operation()
+            self.request.close()
+        self.close()
+
+    def expire(self):
+        if self.request.done.is_set():
+            self.close()
 
 
 class TrialDialog(QDialog):
@@ -733,72 +791,539 @@ class SettingsPage(QWidget):
 
 
 class RepairPage(QWidget):
-    """分轮连续对话与工作区入口；Diff、校验、Publish 和 Default 分开操作。"""
+    """统一 Session 工作台；未发送的准备状态不创建或重建 Candidate。"""
 
     def __init__(self, window):
         super().__init__()
         self.window, self.host = window, window.host
-        self.images = []
-        self.tool_errors = {}
-        self.controls = []
-        layout = QVBoxLayout(self)
+        self.session = None
+        self.images, self.manifest_references = [], []
+        self.tool_errors, self.titles = {}, {}
+        self._round_running = False
+        self._auto_collapsed = False
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(16)
+        self.sidebar = QWidget()
+        self.sidebar.setFixedWidth(260)
+        side = QVBoxLayout(self.sidebar)
+        side.setContentsMargins(0, 0, 0, 0)
         row = QHBoxLayout()
+        row.addWidget(QLabel(tr('Sessions')))
+        row.addStretch()
+        self.refresh_button = TransparentToolButton(FluentIcon.SYNC, self)
+        self.refresh_button.setToolTip(tr('Refresh Sessions'))
+        self.refresh_button.setAccessibleName(tr('Refresh Sessions'))
+        self.refresh_button.clicked.connect(self.refresh_sessions)
+        row.addWidget(self.refresh_button)
+        side.addLayout(row)
+        self.new_button = button(tr('New Chat'), self.new, side)
+        self.history = QListWidget()
+        self.history.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.history.itemClicked.connect(self.open_session)
+        side.addWidget(self.history, 1)
+        layout.addWidget(self.sidebar)
+        main = QWidget()
+        main.setMinimumWidth(0)
+        main_layout = QVBoxLayout(main)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        top = QHBoxLayout()
+        self.history_button = TransparentToolButton(FluentIcon.MENU, self)
+        self.history_button.setAccessibleName(tr('Toggle chat history'))
+        self.history_button.setToolTip(tr('Toggle chat history'))
+        self.history_button.clicked.connect(self.toggle_history)
+        top.addWidget(self.history_button)
+        top.addStretch()
+        self.mode = SegmentedWidget(self)
+        self.mode.setFixedWidth(240)
+        self.mode.addItem('Construct', 'Construct', icon=FluentIcon.CODE)
+        self.mode.addItem('Repair', 'Repair', icon=FluentIcon.DEVELOPER_TOOLS)
+        self.mode.setCurrentItem('Repair')
+        top.addWidget(self.mode)
+        top.addStretch()
+        self.context_button = TransparentToolButton(FluentIcon.SETTING, self)
+        self.context_button.setAccessibleName(tr('Chat context'))
+        self.context_button.setToolTip(tr('Chat context'))
+        self.context_button.clicked.connect(lambda: self.source_panel.setVisible(self.source_panel.isHidden()))
+        top.addWidget(self.context_button)
+        main_layout.addLayout(top)
+        centered = QHBoxLayout()
+        centered.setContentsMargins(0, 0, 0, 0)
+        centered.addStretch(1)
+        self.column = QWidget()
+        self.column.setMinimumWidth(0)
+        self.column.setMaximumWidth(920)
+        self.column.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        body = QVBoxLayout(self.column)
+        body.setContentsMargins(0, 0, 0, 0)
+        body.setSpacing(10)
+        centered.addWidget(self.column, 100)
+        centered.addStretch(1)
+        main_layout.addLayout(centered, 1)
+        layout.addWidget(main, 1)
+        title_row = QHBoxLayout()
+        self.identity = QLabel(tr('New Chat'))
+        self.identity.setMinimumWidth(0)
+        self.identity.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        title_row.addWidget(self.identity, 1)
+        self.mode_badge = QLabel()
+        title_row.addWidget(self.mode_badge)
+        body.addLayout(title_row)
+        self.source_panel = QWidget()
+        source_layout = QHBoxLayout(self.source_panel)
+        source_layout.setContentsMargins(0, 0, 0, 0)
+        source_layout.addWidget(QLabel(tr('Source Manifest')))
         self.baseline = QComboBox()
-        row.addWidget(self.baseline)
-        self.controls.append(button(tr('Refresh Manifests'), self.refresh_manifests, row))
-        self.controls.append(button(tr('Initialize / rebuild Candidate'), self.initialize, row))
-        layout.addLayout(row)
-        row = QHBoxLayout()
-        self.controls.append(button(tr("New Conversation"), self.new, row))
-        self.workspace_button = button(tr('Open Agent workspace'), self.open_workspace, row)
-        self.pages_button = button(tr('Open external settings page directory'), self.open_pages, row)
-        layout.addLayout(row)
-        self.identity = QLabel(tr('No conversation started'))
-        layout.addWidget(self.identity)
-        self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / "agent-interactions")
-        layout.addWidget(self.diagnostics)
+        self.baseline.setMinimumWidth(0)
+        source_layout.addWidget(self.baseline, 1)
+        body.addWidget(self.source_panel)
+        self.source_panel.hide()
+        self.diagnostics = DiagnosticPanel(window, self.host.service.data_root / 'developer-sessions')
+        self.diagnostics.setParent(self)
+        self.diagnostics.hide()
         self.chat = RepairChat()
-        layout.addWidget(self.chat, 1)
-        self.message = QPlainTextEdit()
-        self.message.setPlaceholderText(tr('Enter a question, error or next instruction; text-only messages are supported'))
-        self.message.setMaximumHeight(85)
-        layout.addWidget(self.message)
-        row = QHBoxLayout()
-        self.attach = button(tr('Attach images'), self.attach_image, row)
-        self.controls.append(self.attach)
-        self.controls.append(button(tr('Clear attachments'), self.clear_image, row))
-        self.controls.append(button(tr('Send'), self.send, row))
-        self.cancel_button = button(tr('Cancel round'), window.cancel_operation, row)
-        layout.addLayout(row)
-        self.request_progress = QLabel(tr('Conversation round: not started; model requests this round: 0'))
-        layout.addWidget(self.request_progress)
-        self.status = QLabel()
+        self.chat.setMinimumSize(0, 80)
+        self.chat.setStyleSheet('QTextBrowser { border: none; background: transparent; }')
+        body.addWidget(self.chat, 1)
+        self.raw_timer = QTimer(self)
+        self.raw_timer.setSingleShot(True)
+        self.raw_timer.setInterval(50)
+        self.raw_timer.timeout.connect(self.flush_raw_output)
+        self.raw_pending = ''
+        self.clear_raw_output()
+        self.status = QLabel(self)
+        self.status.setMinimumWidth(0)
+        self.status.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.status.setTextFormat(Qt.TextFormat.PlainText)
-        self.status.setWordWrap(True)
-        layout.addWidget(self.status)
+        self.status.hide()
+        self.composer = QWidget()
+        self.composer.setObjectName('chatComposer')
+        self.composer.setStyleSheet('#chatComposer { background: rgba(128,128,128,0.07); border: 1px solid rgba(128,128,128,0.25); border-radius: 18px; }')
+        composer_layout = QVBoxLayout(self.composer)
+        composer_layout.setContentsMargins(12, 8, 12, 10)
+        composer_layout.setSpacing(4)
+        self.message = ChatInput()
+        self.message.setPlaceholderText(tr('Message the Agent…'))
+        self.message.setStyleSheet('QPlainTextEdit { border: none; background: transparent; }')
+        self.message.sendRequested.connect(self.send)
+        composer_layout.addWidget(self.message)
+        self.attachment_notice = QLabel()
+        self.attachment_notice.setWordWrap(True)
+        self.attachment_notice.hide()
+        composer_layout.addWidget(self.attachment_notice)
         row = QHBoxLayout()
-        for text, callback in ((tr('View cumulative Diff'), self.show_diff), (tr('Validate'), self.validate),
-                               (tr('Publish'), self.publish), (tr('Set Default'), self.set_default)):
-            self.controls.append(button(text, callback, row))
-        layout.addLayout(row)
+        self.attach = TransparentToolButton(FluentIcon.ADD, self)
+        self.attach.setAccessibleName(tr('Attachments'))
+        self.attach.setToolTip(tr('Attachments'))
+        self.attach.clicked.connect(self.open_attachment_menu)
+        row.addWidget(self.attach)
+        row.addStretch()
+        self.more_button = TransparentToolButton(FluentIcon.MORE, self)
+        self.more_button.setAccessibleName(tr('More developer tools'))
+        self.more_button.setToolTip(tr('More developer tools'))
+        self.more_button.clicked.connect(self.open_more_menu)
+        row.addWidget(self.more_button)
+        self.send_button = PrimaryToolButton(FluentIcon.UP, self)
+        self.send_button.setFixedSize(36, 36)
+        self.send_button.clicked.connect(self.send_or_cancel)
+        row.addWidget(self.send_button)
+        composer_layout.addLayout(row)
+        body.addWidget(self.composer)
+        self.request_progress = QLabel(self)
+        self.request_progress.hide()
+        self.build_menus()
+        self.mode.currentItemChanged.connect(self.update_source)
+        self.message.textChanged.connect(lambda: self.update_actions(self.is_busy()))
+        self.diagnostics.errors.currentIndexChanged.connect(lambda: self.update_actions(self.is_busy()))
+        self.refresh_sessions()
+        self.set_manifests(self.host.manager.list_manifests())
+        self.show_empty_chat()
 
-    def refresh_manifests(self):
-        self.window.launch(self.host.manager.list_manifests, self.set_manifests)
+    def set_status(self, text, tooltip=None):
+        """保留状态读取接口，将可见状态统一呈现在当前轮回复顶部。"""
+        self.status.setText(text)
+        self.status.setToolTip(text if tooltip is None else tooltip)
+        number = self.host.conversation.log.group if self.host.conversation else 0
+        self.chat.set_activity(text, number, self.status.toolTip())
+
+    def clear_raw_output(self):
+        """只丢弃尚未完成的流式缓冲，完整生成过程随回复保留。"""
+        self.raw_timer.stop()
+        self.raw_pending = ''
+        activity = self.chat.activity()
+        changed = bool(activity['pending'])
+        activity['pending'] = ''
+        if not activity['messages']:
+            activity['expanded'] = False
+        if changed:
+            self.chat.render()
+
+    def flush_raw_output(self):
+        """展开时合并绘制，滚动规则沿用聊天记录。"""
+        if self.chat.activity()['expanded']:
+            self.chat.render()
+
+    def update_raw_output(self, content, number=None):
+        """流式内容属于当前轮折叠区，完整消息到达时替换为保留记录。"""
+        if number is not None:
+            self.chat.activity_round = number
+        text = raw_output_text(content)
+        if not text or text == self.raw_pending:
+            return
+        first = not self.raw_pending
+        self.raw_pending = text
+        activity = self.chat.activity()
+        activity['pending'] = text
+        if first:
+            self.chat.render()
+        elif activity['expanded'] and not self.raw_timer.isActive():
+            self.raw_timer.start()
+
+    def is_busy(self):
+        state = self.window.service.state
+        return bool(self.window.jobs) or bool(state.get('activity')) or state['phase'] == 'running' or self.window.closing
+
+    def build_menus(self):
+        """菜单只改变入口位置；所有操作继续走原宿主校验和活动边界。"""
+        self.attachment_menu = RoundMenu(parent=self)
+        self.image_action = Action(tr('Attach images'), self)
+        self.image_action.triggered.connect(self.attach_image)
+        self.reference_action = Action(tr('Attach Manifests'), self)
+        self.reference_action.triggered.connect(self.attach_manifests)
+        self.clear_action = Action(tr('Clear attachments'), self)
+        self.clear_action.triggered.connect(self.clear_image)
+        self.attachment_menu.addActions([self.image_action, self.reference_action, self.clear_action])
+        self.more_menu = RoundMenu(parent=self)
+        workspace = RoundMenu(tr('Workspace and pages'), self)
+        logs = RoundMenu(tr('Logs and diagnostics'), self)
+        self.logs_menu = logs
+        development = RoundMenu(tr('Development and validation'), self)
+        self.more_menu.addMenu(workspace)
+        self.more_menu.addMenu(logs)
+        self.more_menu.addMenu(development)
+        self.workspace_action = Action(tr('Open Agent workspace'), self)
+        self.workspace_action.triggered.connect(self.open_workspace)
+        self.page_drafts_action = Action(tr('Open Session page drafts'), self)
+        self.page_drafts_action.triggered.connect(self.open_page_drafts)
+        self.pages_action = Action(tr('Open external settings page directory'), self)
+        self.pages_action.triggered.connect(self.open_pages)
+        self.knowledge_action = Action(tr('Open external knowledge directory'), self)
+        self.knowledge_action.triggered.connect(self.open_knowledge)
+        workspace.addActions([self.workspace_action, self.page_drafts_action, self.pages_action, self.knowledge_action])
+        self.logs_action = Action(tr('Open log directory'), self)
+        self.logs_action.triggered.connect(self.diagnostics.open_logs)
+        self.app_logs_action = Action(tr('Open application log directory'), self)
+        self.app_logs_action.triggered.connect(lambda: self.diagnostics.open_directory(self.window.service.data_root / 'logs'))
+        logs.addActions([self.logs_action, self.app_logs_action])
+        self.error_menu = RoundMenu(tr('View error details'), self)
+        self.error_actions = []
+        self.error_action = Action(tr('View error details'), self)
+        self.error_action.setEnabled(False)
+        logs.addAction(self.error_action)
+        self.copy_action = Action(tr('Copy details'), self)
+        self.copy_action.triggered.connect(self.diagnostics.copy_error)
+        logs.addAction(self.copy_action)
+        self.diff_action = Action(tr('View cumulative Diff'), self)
+        self.diff_action.triggered.connect(self.show_diff)
+        self.validate_action = Action(tr('Validate'), self)
+        self.validate_action.triggered.connect(self.validate)
+        self.publish_action = Action(tr('Publish'), self)
+        self.publish_action.triggered.connect(self.publish)
+        development.addActions([self.diff_action, self.validate_action, self.publish_action])
+
+    def open_attachment_menu(self):
+        self.update_actions(self.is_busy())
+        self.attachment_menu.exec(self.attach.mapToGlobal(self.attach.rect().topLeft()))
+
+    def open_more_menu(self):
+        self.logs_menu.removeMenu(self.error_menu)
+        self.logs_menu.removeAction(self.error_action)
+        self.error_menu.clear()
+        for action in self.error_actions:
+            action.deleteLater()
+        self.error_actions.clear()
+        for index in range(self.diagnostics.errors.count()):
+            action = Action(self.diagnostics.errors.itemText(index), self.error_menu)
+            self.error_actions.append(action)
+            action.triggered.connect(lambda checked=False, index=index: self.show_saved_error(index))
+            self.error_menu.addAction(action)
+        if self.error_actions:
+            self.logs_menu.addMenu(self.error_menu)
+        else:
+            self.logs_menu.addAction(self.error_action)
+        self.update_actions(self.is_busy())
+        self.more_menu.exec(self.more_button.mapToGlobal(self.more_button.rect().topLeft()))
+
+    def show_saved_error(self, index):
+        self.diagnostics.errors.setCurrentIndex(index)
+        self.diagnostics.show_error()
+
+    def update_actions(self, busy):
+        has_candidate = self.session is not None and self.host.candidate.is_dir()
+        self.page_drafts_action.setEnabled(has_candidate and self.session.mode == 'Construct' and not busy)
+        for action in (self.workspace_action, self.diff_action, self.validate_action, self.publish_action):
+            action.setEnabled(has_candidate and not busy)
+        self.pages_action.setEnabled(not busy)
+        self.knowledge_action.setEnabled(not busy)
+        self.logs_action.setEnabled(self.diagnostics.path.is_dir())
+        self.app_logs_action.setEnabled((self.window.service.data_root / 'logs').is_dir())
+        self.copy_action.setEnabled(self.diagnostics.errors.currentData() is not None)
+        self.error_menu.menuAction().setEnabled(bool(self.diagnostics.errors.count()))
+        for action in (self.image_action, self.reference_action):
+            action.setEnabled(not busy)
+        self.clear_action.setEnabled(not busy and bool(self.images or self.manifest_references))
+        running = self._round_running and bool(self.window.jobs)
+        cancelling = running and any(job.cancel_requested for job in self.window.jobs)
+        if cancelling:
+            self.clear_raw_output()
+            self.set_status(tr('Cancelling…'))
+            self.status.setToolTip(self.status.text())
+        if running:
+            self.send_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MediaStop))
+            title = tr('Cancelling…') if cancelling else tr('Cancel round')
+            self.send_button.setEnabled(not cancelling)
+        else:
+            self.send_button.setIcon(FluentIcon.UP)
+            title = tr('Send')
+            self.send_button.setEnabled(not busy and bool(self.message.toPlainText().strip()))
+        self.send_button.setAccessibleName(title)
+        self.send_button.setToolTip(title + ('\n' + self.request_progress.text() if self.request_progress.text() else ''))
+
+    def send_or_cancel(self):
+        if self._round_running and self.window.jobs:
+            if not any(job.cancel_requested for job in self.window.jobs):
+                self.window.cancel_operation()
+        else:
+            self.send()
+
+    def toggle_history(self):
+        self._auto_collapsed = False
+        self.sidebar.setVisible(self.sidebar.isHidden())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.width() < 700 and not self.sidebar.isHidden():
+            self.sidebar.hide()
+            self._auto_collapsed = True
+        elif self.width() >= 700 and self._auto_collapsed:
+            self.sidebar.show()
+            self._auto_collapsed = False
+
+    def show_empty_chat(self):
+        self.chat.setHtml('<p style="color:#808080;text-align:center">' + tr('Start a new chat. Choose a mode and set the source in Chat context.') + '</p>')
+
+    def update_attachment_notice(self):
+        attached = bool(self.images or self.manifest_references)
+        self.attachment_notice.setVisible(attached)
+        self.attachment_notice.setText(tr('{0} images · {1} Manifest references').format(len(self.images), len(self.manifest_references)))
+        details = '\n'.join([*(str(path) for path in self.images), *self.manifest_references])
+        self.attach.setToolTip(details or tr('Attachments'))
+        self.attachment_notice.setToolTip(details)
+
+    def update_source(self):
+        self.baseline.setItemText(0, tr('Blank (Construct only)') if self.mode.currentRouteKey() == 'Construct'
+                                  else tr('Select a published Manifest'))
 
     def set_manifests(self, values):
         previous = self.baseline.currentData()
         self.baseline.clear()
+        self.baseline.addItem(tr('Select a published Manifest'), userData=None)
         for value in values:
-            self.baseline.addItem(value["manifest_id"], userData=value["manifest_id"])
+            self.baseline.addItem(value['manifest_id'], userData=value['manifest_id'])
         index = self.baseline.findData(previous)
-        if index >= 0:
-            self.baseline.setCurrentIndex(index)
+        if previous is not None and index < 0:
+            self.baseline.addItem(previous, userData=previous)
+            index = self.baseline.count() - 1
+        self.baseline.setCurrentIndex(max(0, index))
+        self.update_source()
+
+    def saved_title(self, path):
+        """只读首条用户消息；忙会话使用已有缓存，不阻塞或恢复执行。"""
+        if path.name in self.titles:
+            return self.titles[path.name]
+        from .developer_session import DeveloperSession
+        from .agent_log import read_events
+        events = path / 'log' / 'events.jsonl'
+        if (path / 'log').is_symlink() or events.is_symlink():
+            raise ValueError('Session log symlink')
+        session = DeveloperSession(self.window.service, path.name, entry='gui')
+        with session.host.candidate_lock():
+            if not events.exists():
+                return '', ''
+            for row in read_events(events):
+                if not isinstance(row, dict) or not isinstance(row.get('event'), dict):
+                    raise ValueError('Invalid Session event')
+                value = row['event']
+                if value.get('type') == 'session_message' and (not isinstance(value.get('message'), dict)
+                        or not isinstance(value['message'].get('content'), list)
+                        or any(not isinstance(part, dict) for part in value['message']['content'])):
+                    raise ValueError('Invalid Session message')
+                if value.get('type') == 'session_message' and value['message'].get('role') == 'user':
+                    text = '\n'.join(part.get('text', '') for part in value['message'].get('content', []) if part.get('type') == 'text')
+                    title = chat_title(text)
+                    if title[0]:
+                        self.titles[path.name] = title
+                        return title
+        return '', ''
+
+    def refresh_sessions(self):
+        """列表只读取不可变身份；打开时在锁内校验并恢复全部状态。"""
+        root = self.window.service.data_root / 'developer-sessions'
+        self.history.clear()
+        if root.is_symlink():
+            self.set_status(tr('Invalid Session directory'))
+            return
+        if root.exists():
+            paths = (path for path in root.iterdir() if not path.name.startswith('.'))
+            for path in sorted(paths, key=lambda item: item.lstat().st_mtime, reverse=True):
+                try:
+                    if path.is_symlink() or (path / 'session.json').is_symlink():
+                        raise ValueError('Session symlink')
+                    value = json.loads((path / 'session.json').read_text())
+                    if value['mode'] not in {'Construct', 'Repair'}:
+                        raise ValueError('Invalid Session mode')
+                    try:
+                        title, full = self.saved_title(path)
+                    except OSError:
+                        title, full = self.titles.get(path.name, (tr('Chat in use'), ''))
+                    mode_label = '🛠 Construct' if value['mode'] == 'Construct' else '🔧 Repair'
+                    label = f"{title or tr('New Chat')}\n{mode_label}"
+                except (ValueError, OSError, KeyError, TypeError):
+                    label = tr('Unavailable Session')
+                    full = ''
+                item = QListWidgetItem(label)
+                item.setData(Qt.ItemDataRole.UserRole, path.name)
+                item.setToolTip((full + '\n' if full else '') + path.name)
+                item.setSizeHint(QSize(240, 66))
+                self.history.addItem(item)
+                if self.session and self.session.identity == path.name:
+                    self.history.setCurrentItem(item)
+        if self.session:
+            title, full = self.titles.get(self.session.identity, ('', ''))
+            self.identity.setText(title or tr('New Chat'))
+            self.identity.setToolTip((full + '\n' if full else '') + self.session.identity)
+        if hasattr(self, 'baseline'):
+            self.set_manifests(self.window.host.manager.list_manifests())
+
+    def new(self):
+        if self.window.jobs or self.window.service.state.get('activity') or self.window.service.state['phase'] == 'running':
+            return
+        self.clear_raw_output()
+        self.session = None
+        self.host = self.window.host
+        self.chat.clear()
+        self.tool_errors.clear()
+        self.diagnostics.errors.clear()
+        self.message.clear()
+        self.clear_image()
+        self.identity.setText(tr('New Chat'))
+        self.identity.setToolTip('')
+        self.source_panel.hide()
+        self.show_empty_chat()
+        self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
+        self.set_status('')
+        self.status.setToolTip('')
+        self.refresh_sessions()
+        self.baseline.setCurrentIndex(0)
+        self.render(False)
+
+    def open_session(self, item):
+        if self.window.jobs or self.window.service.state.get('activity') or self.window.service.state['phase'] == 'running':
+            return
+        from .developer_session import DeveloperSession
+        identity = item.data(Qt.ItemDataRole.UserRole)
+        def operation():
+            session = DeveloperSession(self.window.service, identity, entry='gui')
+            session.host.secrets = self.window.host.secrets
+            session.conversation()
+            return session
+        self.window.launch(operation, self.activate_session)
+
+    def activate_session(self, session, *, restore_history=True):
+        self.clear_raw_output()
+        self.session, self.host = session, session.host
+        self.mode.setCurrentItem(session.mode)
+        metadata = json.loads((session.path / 'session.json').read_text())
+        self.set_manifests(self.host.manager.list_manifests())
+        self.baseline.setCurrentIndex(max(0, self.baseline.findData(metadata['source_manifest_id'])))
+        self.identity.setToolTip(session.identity)
+        self.mode_badge.setText(('🛠 Construct' if session.mode == 'Construct' else '🔧 Repair'))
+        self.diagnostics.set_path(self.host.conversation.log.path)
+        if restore_history:
+            self.reload_history()
+        self.refresh_sessions()
+        self.render(bool(self.window.jobs))
+
+    def reload_history(self):
+        """从原始持久事件重建视图，保留工具关联，不触发模型或工具。"""
+        if self.session is None:
+            return
+        self.clear_raw_output()
+        from .agent_log import read_events, read_json
+        from .agent_repair import final_answer, FORMAT_RETRY_PREFIX
+        from .agent_prompts import user_message_text
+        with self.host.candidate_lock():
+            self.session.restore(self.host.conversation)
+            events_path = self.host.conversation.log.root / 'events.jsonl'
+            rows = list(read_events(events_path)) if events_path.exists() else []
+            number = self.host.conversation.log.group
+            result = read_json(events_path.parent / f'round-{number}/result.json') if number else None
+            if result is not None:
+                result.setdefault('requests', self.host.conversation.log.requests)
+        self.chat.clear()
+        self.tool_errors.clear()
+        self.diagnostics.errors.clear()
+        self._replaying = True
+        try:
+            for row in rows:
+                value, number = row['event'], row.get('round', 0)
+                kind = value.get('type')
+                if kind == 'session_message':
+                    text = '\n'.join(part.get('text', '') for part in value['message'].get('content', []) if part.get('type') == 'text')
+                    if not text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', FORMAT_RETRY_PREFIX)):
+                        self.chat.add_message('你', user_message_text(text), number)
+                elif kind == 'message_end' and value.get('message', {}).get('role') == 'assistant':
+                    self.chat.remember_message(number, value['message'].get('content', []))
+                    try:
+                        text = final_answer(value['message'])['message']
+                    except ValueError:
+                        text = ''
+                    if text:
+                        self.chat.add_message('Agent', text, number)
+                elif kind == 'manual_publish':
+                    self.chat.add_message('系统', tr('Published new Manifest: ') + value['manifest_id'] + tr('; Default is unchanged.'), number)
+                elif kind in {'repair_error', 'gui_error'}:
+                    self.diagnostics.add_error(value)
+                elif kind == 'round_interrupted':
+                    self.chat.add_message('系统', tr('Interrupted; results may be unknown. No operations replayed.'), number)
+                else:
+                    self.show_event(row)
+        finally:
+            self._replaying = False
+        self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
+            self.host.conversation.log.group, self.host.conversation.log.requests,
+            load_settings(self.host.service.data_root)['max_requests']))
+        if not self.window.jobs and not self.window.closing:
+            if result is not None:
+                self.show_result_status(result)
+            else:
+                self.set_status('')
+                self.status.setToolTip('')
+        self.refresh_sessions()
 
     def open_pages(self):
-        """打开实际页面发现目录；首次使用时创建空目录，不重载页面。"""
+        """打开正式页面目录，不把页面加入 Candidate 或自动重载。"""
         def operation():
-            path = self.host.service.data_root / "pages"
+            path = self.host.service.data_root / 'pages'
             path.mkdir(parents=True, exist_ok=True)
+            open_directory(self.window, path)
+        self.window._interact(operation)
+
+    def open_knowledge(self):
+        """固定资料目录缺失时创建空目录，不要求先初始化开发会话。"""
+        from .knowledge import knowledge_root
+        def operation():
+            path = knowledge_root(self.window.service.data_root, create=True)
             open_directory(self.window, path)
         self.window._interact(operation)
 
@@ -806,113 +1331,205 @@ class RepairPage(QWidget):
         from PySide6.QtCore import QUrl
         from PySide6.QtGui import QDesktopServices
         def operation():
-            if not self.host.candidate.is_dir():
-                raise ValueError("请先明确初始化 Candidate，再打开 Agent 工作区。")
+            if self.session is None or not self.host.candidate.is_dir():
+                raise ValueError('请先发送首条消息初始化 Candidate。')
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.host.candidate))):
-                raise ValueError(f"无法打开 Agent 工作区：{self.host.candidate}")
+                raise ValueError(f'无法打开 Agent 工作区：{self.host.candidate}')
         self.window._interact(operation)
 
-    def initialize(self):
-        identity = self.baseline.currentData()
-        if identity is None:
-            self.status.setText(tr('Refresh and select a base Manifest first.'))
-            return
-        exists = self.host.candidate.exists() and any(self.host.candidate.iterdir())
-        if exists or self.host.conversation is not None:
-            response = QMessageBox.question(self, tr('Rebuild Candidate'), tr('Success replaces the non-empty Candidate and starts a new conversation; the previous conversation and artifacts are retained. Continue?'))
-            if response != QMessageBox.StandardButton.Yes:
-                return
-        def done(_):
-            self.chat.clear()
-            self.tool_errors.clear()
-            self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
-            self.diagnostics.errors.clear()
-            self.diagnostics.set_path(self.host.conversation.log.path)
-            self.identity.setText(tr('Conversation: {0}\nCandidate rebuilt; log: {1}').format(self.host.conversation.log.path.name, self.host.conversation.log.path))
-        self.window.launch(lambda: self.host.initialize(identity, replace=exists), done)
-
-    def new(self):
-        def action():
-            conversation = self.host.new_conversation()
-            self.chat.clear()
-            self.tool_errors.clear()
-            self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
-            self.diagnostics.errors.clear()
-            self.diagnostics.set_path(conversation.log.path)
-            self.clear_image()
-            self.message.clear()
-            self.identity.setText(tr('Conversation: {0}\nLog: {1}').format(conversation.log.path.name, conversation.log.path))
-        self.window._interact(action)
-
     def attach_image(self):
-        names, _ = QFileDialog.getOpenFileNames(self, tr('Choose images (multiple selection allowed)'), "", tr('All files (*)'))
+        names, _ = QFileDialog.getOpenFileNames(self, tr('Choose images (multiple selection allowed)'), '', tr('All files (*)'))
         if names:
             self.images.extend(Path(name) for name in names)
-            self.attach.setText(tr('{0} images attached').format(len(self.images)))
-            self.attach.setToolTip("\n".join(str(path) for path in self.images))
+            self.update_attachment_notice()
+
+    def attach_manifests(self):
+        def action():
+            from .manifest_reference import ManifestReference
+            values = ManifestReference(self.window.host.manager).list(limit=200)
+            dialog = QDialog(self)
+            dialog.setWindowTitle(tr('Attach Manifests'))
+            dialog.resize(560, 420)
+            layout = QVBoxLayout(dialog)
+            choices = QListWidget()
+            choices.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
+            layout.addWidget(choices)
+            offset = 0
+            while True:
+                for value in values['items']:
+                    item = QListWidgetItem(value['manifest_id'])
+                    choices.addItem(item)
+                    item.setSelected(value['manifest_id'] in self.manifest_references)
+                if values['next_offset'] is None:
+                    break
+                offset = values['next_offset']
+                values = ManifestReference(self.window.host.manager).list(offset=offset, limit=200)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(buttons)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self.manifest_references = [item.text() for item in choices.selectedItems()]
+                self.update_attachment_notice()
+        self.window._interact(action)
 
     def clear_image(self):
-        self.images = []
-        self.attach.setText(tr('Attach images'))
-        self.attach.setToolTip("")
+        self.images, self.manifest_references = [], []
+        self.update_attachment_notice()
 
     def send(self):
+        """冻结本次输入；创建与执行在同一后台作业，禁止中途切换 Session。"""
         def action():
+            if self.window.jobs:
+                return
+            from .developer_session import DeveloperSession
             message = self.message.toPlainText().strip()
             if not message:
-                raise ValueError("消息不能为空。")
-            if self.host.conversation is None:
-                self.host.new_conversation()
-            conversation = self.host.conversation
-            self.diagnostics.set_path(conversation.log.path)
-            images = list(self.images)
-            args = SimpleNamespace(pi="pi", ask_api_key=False)
-            limit = load_settings(self.host.service.data_root)["max_requests"]
-            self.request_progress.setText(tr('Conversation round: {0}; model requests this round: 0/{1}').format(conversation.log.group + 1, limit))
-            self.chat.add_message("你", message, conversation.log.group + 1)
-            self.identity.setText(tr('Conversation: {0}\nLog: {1}').format(conversation.log.path.name, conversation.log.path))
-            self.message.clear()
-            self.clear_image()
+                raise ValueError('消息不能为空。')
+            session = self.session
+            mode, source = self.mode.currentRouteKey(), self.baseline.currentData()
+            images, references = list(self.images), list(self.manifest_references)
+            if session is None and mode == 'Repair' and source is None:
+                self.source_panel.show()
+                self.baseline.setFocus()
+                raise ValueError(tr('Repair requires a published source Manifest.'))
             def operation():
-                return conversation.run(message, args, images=images, key=None,
-                                        on_event=self.window.operation_event.emit)
+                current = session or DeveloperSession.create(self.window.service, source, mode=mode, entry='gui')
+                current.host.secrets = self.window.host.secrets
+                conversation = current.host.conversation or current.conversation()
+                self.window.operation_event.emit({'event': {'type': 'workbench_session', 'session': current,
+                    'message': message, 'round': conversation.log.group + 1}})
+                return conversation.run(message, SimpleNamespace(pi='pi', ask_api_key=False), images=images,
+                                        manifest_references=references, on_event=self.window.operation_event.emit,
+                                        on_feedback=self.window.feedback_requested.emit,
+                                        on_page_preview=self.window.page_preview_requested.emit)
+            self._round_running = True
             self.window.launch(operation, self.answered)
         self.window._interact(action)
 
     def answered(self, result):
+        expanded = {number: activity['expanded'] for number, activity in self.chat.activities.items()}
+        self.reload_history()
+        for number, activity in self.chat.activities.items():
+            activity['expanded'] = expanded.get(number, False)
+        self.chat.render()
         answer = result.get("answer", {})
         if result.get("diagnostics"):
-            self.diagnostics.add_error(result["diagnostics"])
+            details = result['diagnostics']
+            match = next((i for i in reversed(range(self.diagnostics.errors.count()))
+                          if all(self.diagnostics.errors.itemData(i).get(key) == value
+                                 for key, value in details.items() if key != 'budget_exhausted')), None)
+            if match is None:
+                self.diagnostics.add_error(details)
+            else:
+                self.diagnostics.errors.setItemData(match, {**self.diagnostics.errors.itemData(match), **details})
+                self.diagnostics.select_error()
             self.diagnostics.show_error()
         elif result.get("error"):
             self.diagnostics.add_error({"message": result["error"], "stage": result["reason"],
                                         "round": result.get("round"), "log_path": result.get("log_path")})
             self.diagnostics.show_error()
-        elif result["reason"] == "answered":
-            self.chat.add_message("Agent", str(answer.get("message", "")),
-                                  result.get("round", self.host.conversation.log.group if self.host.conversation else 0))
-        summary = tr('Error: ') + result["error"] if result.get("error") else tr('Round ended: ') + result["reason"]
-        self.status.setText(tr('{0}; actual requests: {1}').format(summary, result['requests']))
+        if result.get('reason') == 'answered':
+            text = str(answer.get('message', ''))
+            number = result.get('round', self.host.conversation.log.group if self.host.conversation else 0)
+            if not any(row.get('role') == 'Agent' and row.get('text') == text and row.get('round') == number
+                       for row in self.chat.entries):
+                self.chat.add_message('Agent', text, number)
+        self.show_result_status(result)
+        self.update_actions(self.is_busy())
+
+    def show_result_status(self, result):
+        """实时收尾和历史恢复共用结果摘要，不弹窗或修改聊天及运行状态。"""
+        summary = tr('Error: ') + result['error'] if result.get('error') else {
+            'answered': tr('Round complete'), 'user_cancelled': tr('Round cancelled'),
+            'host_interrupted': tr('Interrupted; results may be unknown. No operations replayed.'),
+        }.get(result.get('reason'), tr('Round incomplete'))
+        self.set_status(summary, tr('{0}; actual requests: {1}').format(summary, result.get('requests', 0)))
+
+    def open_page_drafts(self):
+        def action():
+            from .page_drafts import PageDrafts
+            drafts = PageDrafts(self.session)
+            drafts.root.mkdir(parents=True, exist_ok=True)
+            self.diagnostics.open_directory(drafts.root)
+        self.window._interact(action)
+
+    def show_page_preview(self, request):
+        """只接当前 Construct 活动；迟到请求不能重新取得安装许可。"""
+        chat = self.host.conversation
+        if (request.done.is_set() or self.window.closing or not self.window.jobs or chat is None
+                or self.session is None or self.session.mode != 'Construct'
+                or 'page_preview' not in chat.allowed
+                or any(job.cancel_requested for job in self.window.jobs)
+                or request.identity[:2] != (chat.log.identity, chat.log.group)):
+            request.close()
+            return
+        from .page_preview import PagePreviewDialog
+        try:
+            dialog = PagePreviewDialog(request, self.window)
+            if (dialog.ready and not request.done.is_set() and not self.window.closing
+                    and not any(job.cancel_requested for job in self.window.jobs)):
+                self.page_preview_dialog = dialog
+                dialog.show()
+            else:
+                request.close()
+                dialog.deleteLater()
+        except BaseException:
+            request.close()
+            raise
+
+    def show_feedback(self, request):
+        """只展示当前活动轮次；取消后排队到达的旧请求直接作废。"""
+        chat = self.host.conversation
+        if (request.done.is_set() or self.window.closing or not self.window.jobs or chat is None
+                or any(job.cancel_requested for job in self.window.jobs)
+                or request.identity[:2] != (chat.log.identity, chat.log.group)):
+            request.close()
+            return
+        self.feedback_dialog = FeedbackDialog(request, self.window)
+        self.feedback_dialog.show()
+        self.set_status(tr('Waiting for feedback'))
 
     def show_event(self, event):
         value = event["event"]
         kind, number = value.get("type"), event.get("round", 0)
+        live = (not getattr(self, '_replaying', False) and not self.window.closing
+                and not any(job.cancel_requested for job in self.window.jobs))
+        if kind == 'raw_output':
+            if live and self._round_running:
+                self.update_raw_output(value.get('content', []), number)
+            return
+        if kind == 'message_end' and value.get('message', {}).get('role') == 'assistant':
+            self.chat.remember_message(number, value['message'].get('content', []))
+        if kind in {'message_end', 'tool_execution_start', 'repair_error', 'round_finished',
+                    'round_interrupted', 'final_answer_retry', 'agent_settled'}:
+            self.clear_raw_output()
+        status = None
+        if kind == 'workbench_session':
+            self.titles[value['session'].identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
+            self.activate_session(value['session'], restore_history=False)
+            self.chat.add_message('你', value['message'], value['round'])
+            self.message.clear()
+            self.clear_image()
+            return
         if kind == "lalc_request":
             self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(number, value['requests'], value.get('request_limit', '—')))
-            self.status.setText(tr('Model requests sent: {0}').format(value['requests']))
+            status = tr('Agent is responding…')
+        elif kind == "repair_error":
+            self.diagnostics.add_error(value)
         elif kind == "final_answer_retry":
-            self.diagnostics.add_error(value["diagnostics"])
-            self.status.setText(tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining']))
+            self.chat.format_retry(number)
+            status = tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining'])
         elif kind == "pi_version_warning":
             self.chat.add_message("系统", "WARNING: " + value["message"], number)
         elif kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation"}:
-            if kind == "validation" and value.get("source") == "manual":
+            if kind == "validation" and value.get("source") == "manual" and not getattr(self, "_replaying", False):
                 return
             identity = value.get("toolCallId", f"event-{len(self.chat.entries)}")
             name = value.get("toolName") or value.get("name") or "validate"
             entry = self.chat.upsert_tool(number, identity, name, kind, value)
             if kind == "tool_execution_start":
-                self.status.setText(tr('Calling tool: ') + name)
+                status = tr('Calling tool: ') + name
             if entry["failed"]:
                 host = entry["events"].get("repair_tool", {}).get("result", {}).get("details", {})
                 validation = entry["events"].get("validation", {})
@@ -930,9 +1547,15 @@ class RepairPage(QWidget):
                 else:
                     self.diagnostics.errors.setItemData(self.tool_errors[key], details)
                     self.diagnostics.select_error()
-                self.status.setText(tr('Error: ') + details["message"] + tr('; details are available, processing continues this round.'))
+                status = tr('Error: ') + details["message"] + tr('; details are available, processing continues this round.')
+        if live and status is not None:
+            self.set_status(status)
+            self.status.setToolTip(status)
+        self.update_actions(self.is_busy())
 
     def show_diff(self):
+        if self.session is None:
+            return
         self.window.launch(self.host.diff, self.open_diff)
 
     def open_diff(self, value):
@@ -956,30 +1579,35 @@ class RepairPage(QWidget):
         dialog.show()
 
     def validate(self):
+        if self.session is None:
+            return
         def done(value):
-            self.show_event({"round": self.host.conversation.log.group if self.host.conversation else 0,
-                             "event": {"type": "validation", **value, "toolCallId": f"manual-{len(self.chat.entries)}"}})
+            self.reload_history()
             if not value.get("ok"):
                 self.diagnostics.show_error()
         self.window.launch(self.host.validate, done)
 
     def publish(self):
-        self.window.launch(self.host.publish, lambda identity: self.chat.add_message("系统", tr('Published new Manifest: ') + identity + tr('; Default is unchanged.')))
-
-    def set_default(self):
-        identity = self.baseline.currentData()
-        def operation():
-            if identity is None:
-                raise ValueError("请刷新并选择要设为 Default 的 Manifest。")
-            result = self.host.manager.set_default(identity)
-            if not result.ok:
-                raise ValueError(json.dumps([error.as_dict() for error in result.errors]))
-            return identity
-        self.window.launch(operation, lambda value: self.status.setText("Default：" + value))
+        if self.session is None:
+            return
+        self.window.launch(self.host.publish, lambda identity: self.reload_history())
 
     def render(self, busy):
-        for control in self.controls:
+        if not self.window.jobs:
+            self.clear_raw_output()
+            if self._round_running and self.status.text() == tr('Cancelling…'):
+                self.set_status(tr('Round cancelled'))
+                self.status.setToolTip(self.status.text())
+            self._round_running = False
+        for control in (self.new_button, self.refresh_button, self.history, self.message, self.attach):
             control.setEnabled(not busy)
-            control.setToolTip(tr('The current activity has not finished') if busy else "")
-        self.baseline.setEnabled(not busy)
-        self.cancel_button.setEnabled(self.window.service.state.get("activity") == "Agent")
+        preparing = self.session is None
+        self.mode.setVisible(preparing)
+        self.mode.setEnabled(preparing and not busy)
+        self.mode_badge.setVisible(not preparing)
+        self.context_button.setVisible(preparing)
+        self.context_button.setEnabled(preparing and not busy)
+        self.baseline.setEnabled(preparing and not busy)
+        if not preparing:
+            self.source_panel.hide()
+        self.update_actions(busy)

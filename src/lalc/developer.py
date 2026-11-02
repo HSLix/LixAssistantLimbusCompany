@@ -63,7 +63,6 @@ class DeveloperHost:
         self.manager = service.manifest_manager
         self.candidate = Path(candidate).absolute()
         self.metadata = self.candidate.parent / f".{self.candidate.name}-baseline.json"
-        self.preferences = service.data_root / "developer-settings.json"
         self.conversation = None
         self.preview = None
         self.monitored_window = None
@@ -194,10 +193,13 @@ class DeveloperHost:
         return {name: base64.b64decode(content) for name, content in metadata["files"].items()}
 
     def diff(self) -> str:
-        return file_diff(self.baseline(), candidate_files(self.candidate))
+        with self.candidate_activity("Candidate Diff"):
+            return file_diff(self.baseline(), candidate_files(self.candidate))
 
     def validate(self) -> dict:
         with self.candidate_activity("Candidate 校验"):
+            if getattr(self, "session", None) and self.conversation:
+                self.session.restore(self.conversation)
             errors = self.manager.validate(self.candidate / "manifest.json")
             result = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
             if self.conversation:
@@ -206,9 +208,16 @@ class DeveloperHost:
 
     def publish(self) -> str:
         with self.candidate_activity("Candidate 发布"):
+            if getattr(self, "session", None) and self.conversation:
+                self.session.restore(self.conversation)
             result = self.manager.publish(self.candidate / "manifest.json")
             if not result.ok:
                 raise ValueError(json.dumps([error.as_dict() for error in result.errors], ensure_ascii=False))
+            if getattr(self, "session", None) and self.conversation:
+                self.conversation.log.record({"type": "manual_publish", "manifest_id": result.loaded.manifest_id})
+                self.conversation.append_user({"role": "user", "content": [{"type": "text", "text":
+                    "开发者已 Publish 完整草稿，Manifest ID：" + result.loaded.manifest_id + "；Default 未改变。"}], "timestamp": 0})
+                self.conversation.log.save_json("context.json", self.conversation.history)
             return result.loaded.manifest_id
 
     def new_conversation(self):
@@ -219,22 +228,6 @@ class DeveloperHost:
                 raise ValueError("请先明确初始化 Candidate，保存固定基线。")
             self.conversation = RepairConversation(self)
             return self.conversation
-
-    def runner_selection(self):
-        if not self.preferences.exists():
-            return None
-        value = json.loads(self.preferences.read_text(encoding="utf-8"))
-        identity = value["runner_manifest_id"]
-        if identity is not None and not isinstance(identity, str):
-            raise ValueError("Invalid saved Runner selection")
-        return identity
-
-    def select_runner(self, manifest_id: str | None):
-        if manifest_id is not None:
-            loaded = self.manager.load(manifest_id)
-            if not loaded.ok:
-                raise ValueError(json.dumps([error.as_dict() for error in loaded.errors]))
-        atomic_write_json(self.preferences, {"runner_manifest_id": manifest_id})
 
     def capture(self):
         """固定预览原始像素；不写 Asset，失败不展示为新截图。"""

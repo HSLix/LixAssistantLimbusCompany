@@ -1,5 +1,7 @@
 # Stage 3 — Implementation Slices
 
+2026-10-30 当前状态：开发者试用未发现明显问题，明确决定不等待完整验收，#329、父 Spec #323 和原阶段跟踪 #312 已关闭为 completed；完整实机／真实模型／游戏前后对照及 TA 交付未在本次补验。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)；下列早期记录及未勾选验收项保留原证据状态。
+
 2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，代码尚未迁移，不得把这些旧操作说明当作新 Stage 4 规格。
 
 状态（2026-10-26）：步骤 1–4 已关闭；开发者确认 #328 案例已准备完成，#330 四页及后续增量已完成实现与回归核验，按本次确认关闭两项。#329 保留 Windows、真实模型/游戏前后对照与 TA 交付验收；未执行项不计为通过。#330 当前关闭核验见 [设计记录](developer-gui-design.md#2026-10-26-关闭核验)。以下早期测试记录保留其日期与证据范围。

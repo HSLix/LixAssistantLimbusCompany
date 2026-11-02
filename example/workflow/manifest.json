@@ -25,6 +25,9 @@
     "steps.match": {
       "source_path": "steps.match.py"
     },
+    "steps.ocr": {
+      "source_path": "steps.ocr.py"
+    },
     "plans.default": {
       "source_path": "plan.py"
     },

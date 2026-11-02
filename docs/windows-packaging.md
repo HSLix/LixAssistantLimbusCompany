@@ -1,5 +1,11 @@
 # Windows x64 本地构建和 #334 验收
 
+2026-11-01 游戏版本读取：automation 固定 UnityPy 1.25.4，冻结配置收集 UnityPy/resources/lzma.tpk，组包检查其存在；不再提供独立 pi-probe 命令。真实 Windows 冻结运行未在 macOS 验收，见[游戏版本历史](game-version-history.md)。
+
+2026-11-01 #337 知识库增量：成品使用系统已安装的 Git，不额外捆绑或自动安装。Git 不可用时跳过同步与提交查看、记录日志，本地资料仍可读取；不弹安装窗口。私有仓库须由开发者预先准备非交互认证，首次内容访问才会尝试 fetch。目录与操作见[知识库实施记录](stage-5-337-implementation.md)；Windows 上的 Git / 凭据辅助程序 / 取消清理尚待原生验收。
+
+2026-11-01 OCR 增量：两个 ZIP 均包含 RapidOCR 3.10.0、ONNX Runtime 1.31.1 CPU 及 PP-OCRv6 Small 的 det/rec ONNX 模型。字典内嵌于识别模型，不需要额外下载。构建与归档前校验固定模型摘要，启动不自动下载；必须另行验收断网后的首次识别、工具 OCR 故障降级和 Run 中断。此增量尚不代表 Windows 冻结包或真实游戏验收通过。接口见 [OCR 用法](ocr.md)。
+
 2026-10-30：以下为已实现的构建和验收流程；尚无本票 Windows 成品现场通过记录。真实模型验证不属于本票，回归不调用真实模型。GitHub Actions 在 Stage 6 完成后再考虑。
 
 ## 构建输入与两个输出
@@ -39,12 +45,12 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - User：双击 `LALC.exe`。
 - Developer：双击 `Developer.cmd`，实际启动同一 `LALC.exe --developer`；重复入口归并到现有应用。
 - CLI：在终端运行 `LALC-console.exe` 加原有命令，保留标准输出与交互；它使用同一 main、服务及数据，并非另一套执行实现。
-- 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标。
+- 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标；同一 ICO 随包提供给 Qt，User／Developer 窗口与任务栏显式使用该图标。若覆盖旧成品后文件图标未更新，可先临时改名 EXE 验证 Windows 图标缓存。
 - Windows 的所有 GUI 入口（User、Developer、语言重启，以及源码 GUI）在创建服务、读写数据或归并窗口前检查管理员权限；未提权时通过 UAC 重新启动，保留启动参数与工作目录。拒绝或提权启动失败时显示中英双语提示并退出。CLI 命令不主动提权；其他平台维持原行为。若 UAC 使用另一个管理员账号，数据目录和 DPAPI 凭据也会属于该账号。
 - 成品数据统一在 `%LOCALAPPDATA%\LALC`：`candidate/`、`.candidate-baseline.json`、`pages/`、Manifest、Component、Assets、配置、日志与证据。替换程序目录不搬移数据；源码运行仍沿用项目 `candidate/`。不自动寻找、迁移或删除旧草稿。
 - 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出以后另做。
 - 默认 pi 选择：`LALC.exe` 同级 `pi/pi.exe` 优先，其次环境路径；显式 CLI `--pi` 保持调用者指定。
-- 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条模型 prompt 发送前即关闭本轮回退，包括图片／连接预检；预检后的正式修复进程失败也不换 pi。
+- 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条正式模型 prompt 发送前即关闭本轮回退，之后不因进程故障改换 pi；每轮图片／连接推理预检已取消。
 - 没有可用 pi 时只拒绝实际 Agent 启动；User Agent 关闭时仍可执行确定性任务，不自动联网安装 pi。
 
 ## 开发者单独准备验收示例
@@ -102,4 +108,9 @@ Copy-Item -Recurse "$repo\example\pages" "$data\pages"
 
 GUI Agent 对话会请求配置中的模型，不能为了“检查路径”随意发消息到真实服务；无真实模型验收要求，可使用受控替身。两包选择／回退的自动化边界检查参见 `tests/test_pi_startup.py`，冻结资源／双包内容检查参见 `tests/test_windows_packaging.py`。
 
-Windows 现场检查完成后，由开发者确认结果，再关闭 #334。功能实现、构建成功、源码／offscreen／HTTP 替身通过都不能单独替代该确认。
+2026-10-30：开发者试用反馈“没明显问题”，明确决定不等待完整验收并关闭 #334；见[关闭记录](stage-3-4-closure-2026-10-30.md)。上表保留可执行的验收方法，未执行项仍未验证，不因关闭变成通过。
+
+
+## 开发 Agent SOP 资源
+
+程序包包含 `_internal/lalc/sop.md`，wheel 包含 `lalc/sop.md`；组装 Windows ZIP 时检查该资源存在。开发者按文件内说明编辑三个正文区，保留标题和 XML 标签，UTF-8 保存。源码运行对应 `src/lalc/sop.md`；每条用户消息执行时读取，轮内固定，无需重启。不存在用户数据目录覆盖文件或 GUI 编辑器。更新程序可能替换 SOP，请自行备份填写内容。标签损坏或缺少文件时 Agent 在调用模型前报告错误；普通确定性执行不依赖该文件。

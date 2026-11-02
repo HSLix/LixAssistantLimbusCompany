@@ -34,7 +34,10 @@ def snapshot(root):
 
 
 @pytest.fixture
-def tools(tmp_path):
+def tools(tmp_path, monkeypatch):
+    from lalc.ocr import OcrService
+    monkeypatch.setattr(OcrService, "recognize", lambda self, image, **kwargs: {
+        "region": {"x": 0, "y": 0, "width": image.shape[1], "height": image.shape[0]}, "items": []})
     return RepairTools(tmp_path / "data", RepairLog(tmp_path / "data", "test-secret"),
                        platform=FakeWindowPlatform())
 
@@ -123,6 +126,46 @@ def test_every_capture_refocuses_and_crop_preserves_old_tags_and_source(tools):
     tags = json.loads(tools.library.path("ui/new/asset-tag.json").read_text())
     assert tags == {added["sha256"]: ["keep", "keep"], other["sha256"]: []}
     assert invoke(tools, "asset_images", images=[{"logical_name": "ui/new", "sha256": other["sha256"]}])["details"]["images"]
+
+
+def test_screenshot_ocr_is_complete_same_pixels_and_model_visible(tools, monkeypatch):
+    from lalc.ocr import OcrService
+    import numpy as np
+    expected = {"region": {"x": 0, "y": 0, "width": 2, "height": 2}, "items": [
+        {"text": "保持 原文", "score": 0.1, "polygon": [[0, 0], [1, 0], [1, 1], [0, 1]],
+         "box": {"x": 0, "y": 0, "width": 2, "height": 2}, "centerxy": [0, 0]}]}
+    def recognize(self, image, *, checkpoint):
+        checkpoint()
+        assert np.array_equal(image, np.full((2, 2, 3), [1, 2, 3], dtype=np.uint8))
+        return expected
+    monkeypatch.setattr(OcrService, "recognize", recognize)
+    result = invoke(tools, "game_screenshot")
+    ocr = {"observation": 1, **expected}
+    assert result["details"]["ocr"] == ocr
+    assert json.loads(result["content"][-1]["text"]) == {"ocr": ocr}
+    assert tools.platform.captures == 1
+    assert len([part for part in result["content"] if part["type"] == "image"]) == 2
+
+
+@pytest.mark.parametrize("failure", ["ocr", "cancel", "window"])
+def test_screenshot_ocr_error_retains_images_except_cancel_or_invalid_window(tools, monkeypatch, failure):
+    from lalc.ocr import OcrService
+    def recognize(self, image, *, checkpoint):
+        if failure == "cancel":
+            tools.cancelled.set()
+        if failure == "window":
+            tools.platform.foreground = False
+        raise OSError("OCR failed")
+    monkeypatch.setattr(OcrService, "recognize", recognize)
+    result = invoke(tools, "game_screenshot")
+    images = [part for part in result["content"] if part["type"] == "image"]
+    if failure == "ocr":
+        assert len(images) == 2 and not result.get("isError")
+        assert "ocr" not in result["details"]
+        assert result["details"]["ocr_error"]["message"] == "OCR failed"
+        assert json.loads(result["content"][-1]["text"])["ocr_error"] == result["details"]["ocr_error"]
+    else:
+        assert result["isError"] and not images
 
 
 def test_reusing_image_without_tag_file_does_not_create_metadata(tools):

@@ -1,5 +1,7 @@
 # Stage 3 — Agent-assisted Component Repair
 
+2026-10-30：#312、#323、#329 已按开发者试用反馈和明确阶段收尾决定关闭为 completed；原定完整验收未补齐，关闭不表示旧清单逐项通过。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)。当前设计继续以后续已接受 ADR 为准。
+
 2026-10-27 Stage 4 接受设计更新：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 与 [Stage 4 规格](stage-4-extensible-user-gui.md) 替代本文涉及的旧 JSON Plan、固定四页/独立 Runner、单窗口生命周期及 Plan 只读目标边界；未涉及的执行/Asset/权限契约保持。下文保留当前 Stage 2/3 实现及历史验收，代码尚未迁移，不得把这些旧操作说明当作新 Stage 4 规格。
 
 2026-10-26 排期更新：本文原 Stage 3.5 的完整运行时维护范围已确认延后至 Stage 6；Stage 3 已有修复能力保留。其他 Stage 4–6 内容仅为[待讨论草案](reconstruction-plan.md#2026-10-26-规划记录已确认排期与待讨论草案)，不替代既有执行/权限契约。
