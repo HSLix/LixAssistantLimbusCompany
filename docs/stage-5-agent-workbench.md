@@ -1,5 +1,7 @@
 # Stage 5 — Agent 工作台
 
+2026-11-05 外部知识库当前规则见[外部搜索](external-code-search.md)与 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md)。新规则替代下文 fetch 不更新工作区的旧约定：独立副本完成文件／索引更新后切换，磁盘不足等失败保留旧版并报告；GUI 权限范围保持。
+
 2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](page-review-tabs-implementation.md)。
 
 2026-11-02 试用修订：页面审批采用 Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页加载 / 契约 / ID 检查失败直接返回同轮 Agent，不打开审批。切换 Tab 不重新加载，Review 集中显示 Agent 总结、页面 ID 和版本详情，三按钮和快照批准保持。见[修订决定](stage-5-339-340-decisions.md#2026-11-02-试用反馈后的修订讨论)、[影响审查](page-review-tabs-design-impact-review.md)及[实施记录](page-review-tabs-implementation.md)。替代下文历史双栏和失败留窗规则，两票仍待验收。

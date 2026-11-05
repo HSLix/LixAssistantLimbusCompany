@@ -2,10 +2,12 @@
 
 日期：2026-11-01。决定与影响范围见 [影响审查](agent-prompt-impact-review.md)，操作说明见 [Agent 指南](agent-repair.md#prompt-与-sop)。
 
+2026-11-04 页面整包工具修订：Construct 页面指导已涵盖目录页面、受控资源工具和整包版本审批。SOP 现有实现读取四段正文，选择当前模式＋Asset＋Page；本次同步原先仍只构造三段的测试夹具，并补 Page 标签嵌套校验，未改变既有四段加载行为。工具链实施与验证见[Sharing 接续记录](sharing-implementation-progress.md)。下文 2026-11-01 的预检及旧诊断入口描述为历史，不代表本次重新启用这些入口。
+
 ## 当前行为
 
 - `src/lalc/agent_prompts.py` 集中维护 Core、Construct / Repair Mode、严格 JSON 输出语义、三个典型结果示例和精简纠错提示。严格解析器及工具权限实现保持不变。
-- `src/lalc/sop.md` 是唯一 SOP 资源，附开发者填写说明。三个正文区为空；每轮开始执行时校验文件并读取当前模式 + Asset，轮内冻结，下一轮读取新内容。缺失、重复或嵌套错误在发出模型请求前明确报告，不静默用空默认值替代。
+- `src/lalc/sop.md` 是唯一 SOP 资源，附开发者填写说明。Construct、Repair、Asset、Page 四个正文区可留空或填写默认流程；每轮开始校验并读取当前模式＋Asset＋Page，轮内冻结，下一轮读取新内容。Page SOP 不授予 Repair／CLI 页面工具权限。缺失、重复或嵌套错误在发出模型请求前明确报告，不静默用空默认值替代。
 - `agent_repair.py` 在用户消息中分别组织 Runtime Context 和 User Request，包含模式、入口、Candidate 相对根、来源 Manifest（空白 Construct 为 null）、已有可编辑文件和 Manifest 参考附件。历史不迁移，不自动重放。GUI 标题及历史显示兼容新旧包装，保留用户正文中的标签。
 - `pi_probe.ts` 从 `getAllTools()` 获取实际注册名称和描述，按 `getActiveTools()` 过滤，追加工具概览；参数 Schema 不重复注入。预检和格式纠正工具概览为空。预检由扩展使用专用连接 / 图片检查指令，不要求开发结果 JSON；不修改 pi 启动 / 回退路径。独立 `run_probe()` 仍为只读诊断命令。
 - `input.json` 保留所选 SOP 正文及宿主 Prompt；每次完整实际请求继续落入 `request-*.json`，含扩展追加内容。动态额度通知仍是 user 消息，系统消息保留停止规则。相关旧文档已纠正。

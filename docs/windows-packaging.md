@@ -1,5 +1,11 @@
 # Windows x64 本地构建和 #334 验收
 
+2026-11-05 双包更新：以下 with-pi／without-pi 命名由 with-agent／without-agent 替代，两包仍共用相同应用。新增输入和当前行为如下；原 #334 验收数字仅为历史。
+
+需另外准备官方 codesearch 1.7.9 基础版 `codesearch_resources/codesearch-windows-x86_64.zip`，SHA-256 为 `235d47228f53b6cc822a6cf924f83011aefc0f098fd8fb9f8f8c8f9091e20f6a`，以及 `codesearch_resources/models/models--Xenova--all-MiniLM-L6-v2/snapshots/751bff37182d3f1213fa05d7196b954e230abad9/` 的固定模型文件，清单与哈希见 `src/lalc/codesearch.py:MODEL_FILES`。资源目录被 Git 忽略，需要复制到 Windows 构建机，不会由普通启动下载。可用 `--codesearch-zip` 和 `--models` 指定离线资源路径。
+
+输出为 `LALC-<version>-windows-x64-with-agent.zip` 与 `LALC-<version>-windows-x64-without-agent.zip`。自带包额外含完整 pi/ 和 agent/（codesearch.exe、固定 MiniLM 模型及许可／来源说明）；精简包不禁用功能，允许外部安装资源。主体文件排除这两个资源目录后逐项相同，build-info 记录资源版本／哈希。模型复制到可写的数据目录缓存，程序安装目录保持只读。Windows 本机 PyInstaller 构建与断网运行仍须原生验收。
+
 2026-11-01 游戏版本读取：automation 固定 UnityPy 1.25.4，冻结配置收集 UnityPy/resources/lzma.tpk，组包检查其存在；不再提供独立 pi-probe 命令。真实 Windows 冻结运行未在 macOS 验收，见[游戏版本历史](game-version-history.md)。
 
 2026-11-01 #337 知识库增量：成品使用系统已安装的 Git，不额外捆绑或自动安装。Git 不可用时跳过同步与提交查看、记录日志，本地资料仍可读取；不弹安装窗口。私有仓库须由开发者预先准备非交互认证，首次内容访问才会尝试 fetch。目录与操作见[知识库实施记录](stage-5-337-implementation.md)；Windows 上的 Git / 凭据辅助程序 / 取消清理尚待原生验收。
@@ -32,11 +38,11 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 
 脚本校验原始 ZIP 和版本，使用独立的 `.generated/windows-build/venv`、锁定依赖及同一次 PyInstaller onedir 构建，检查必需资源，然后生成：
 
-- `dist/LALC-0.1.0-windows-x64.zip`
-- `dist/LALC-0.1.0-windows-x64-with-pi.zip`
+- `dist/LALC-0.1.0-windows-x64-without-agent.zip`
+- `dist/LALC-0.1.0-windows-x64-with-agent.zip`
 - `dist/SHA256SUMS`
 
-两个 ZIP 都以 `LALC/` 为顶层目录。公共文件逐项比对；含 pi 版本仅多出 `pi/`，该目录保留完整上游运行资源并补带 MIT 许可文本。`build-info.json` 记录源码文件摘要、commit、锁文件摘要及 pi 来源／版本／摘要；未提交源码也计入实际快照。输入文件夹不会整目录归档。首次同步依赖需要网络或预先填充的 uv 缓存。
+两个 ZIP 都以 `LALC/` 为顶层目录。公共文件逐项比对；自带 Agent 版本多出 `pi/` 与 `agent/`，分别保留 pi 运行资源及 codesearch／MiniLM，并补带许可与来源说明。`build-info.json` 记录源码文件摘要、commit、锁文件摘要及 pi／codesearch／MiniLM 来源、版本与摘要；未提交源码也计入实际快照。输入文件夹不会整目录归档。首次同步依赖需要网络或预先填充的 uv 缓存。
 
 这不承诺不同构建时间所得 ZIP 字节完全相同；可复现指锁定输入、依赖和步骤。仅在 Windows x64 构建，不在 macOS 交叉生成 Windows 程序。
 

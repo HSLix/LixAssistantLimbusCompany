@@ -1,4 +1,6 @@
 ---
+
+2026-11-05 补充：[ADR 0038](0038-use-versioned-reference-search-and-reusable-agent-processes.md) 替代本 ADR 的 Git fetch 不更新工作区约定，采用文件／索引一致的 A/B 更新；本 ADR 其他权限边界保持。
 status: accepted
 supersedes: 0029 (Agent shared Candidate and conversation reset lifecycle), 0032 (Developer GUI Agent entry and page construction prohibition)
 ---

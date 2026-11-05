@@ -1,4 +1,4 @@
-"""开发知识库的受控只读访问；Git 同步仅更新对象与引用，不更新工作区。"""
+"""开发知识库的受控只读访问；Git 参考版本仅在文件和索引全部完成后切换。"""
 
 from __future__ import annotations
 
@@ -13,13 +13,17 @@ import signal
 import subprocess
 import tempfile
 import time
+import uuid
 
 from .process_lock import ProcessLock
+from .file_content import require_disk
+from .page_packages import real_directory
+from .codesearch import CodeSearch, digest
 
 
 MAX_BYTES = 2 * 1024 * 1024
 MAX_OUTPUT = 4 * 1024 * 1024
-TEXT_SUFFIXES = {".md", ".txt", ".rst", ".py", ".ts", ".js", ".tsx", ".jsx", ".json",
+TEXT_SUFFIXES = {".md", ".txt", ".rst", ".py", ".ts", ".js", ".tsx", ".jsx", ".json", ".jsonl",
                  ".toml", ".yaml", ".yml", ".ini", ".cfg", ".csv", ".xml", ".html",
                  ".css", ".sql", ".sh", ".ps1", ".bat", ".c", ".h", ".cpp", ".cs",
                  ".go", ".rs", ".java", ".log", ".gitignore", ".gitattributes"}
@@ -48,21 +52,24 @@ def git_diagnostic(text):
 class KnowledgeLibrary:
     """每轮记录已尝试同步的仓库；读取结果明确区分工作区与提交内容。"""
 
-    def __init__(self, data_root, checkpoint):
+    def __init__(self, data_root, checkpoint, codesearch=None):
         self.root = Path(data_root).resolve() / "knowledge"
         self.checkpoint = checkpoint
         self.attempted = {}
         self.git = shutil.which("git")
+        self.codesearch = codesearch or CodeSearch(data_root)
+        self.versions = Path(data_root).resolve() / "knowledge-versions"
+        self._mapped = {}
 
     def begin_round(self):
         self.attempted.clear()
         self.git = shutil.which("git")
 
-    def path(self, name="."):
+    def source_path(self, name="."):
         if not isinstance(name, str) or not name or "\\" in name or ":" in name:
             raise ValueError("知识库路径必须为相对路径。")
         parts = PurePosixPath(name).parts
-        if PurePosixPath(name).is_absolute() or any(p in {"..", ".git"} for p in parts):
+        if PurePosixPath(name).is_absolute() or any(p in {"..", ".git", ".codesearch.db", ".codesearch-build.log"} for p in parts):
             raise ValueError("知识库路径越界或指向 Git 元数据。")
         current = knowledge_root(self.root.parent)
         for part in parts:
@@ -73,8 +80,86 @@ class KnowledgeLibrary:
             raise ValueError("知识库路径越界。")
         return current
 
+    def path(self, name="."):
+        """逻辑知识库路径统一读取当前可用版本；解析本身不触发同步。"""
+        source = self.source_path(name)
+        repo = self.repository(source)
+        if repo is None:
+            return source
+        active = self.active(repo)
+        if active is None:
+            return source
+        target = active[0] / source.relative_to(repo)
+        current = active[0]
+        for part in target.relative_to(current).parts:
+            current /= part
+            if current.is_symlink() or current.is_junction():
+                raise ValueError("参考版本内容不允许链接。")
+        return target
+
     def relative(self, path):
+        for physical, original in self._mapped.items():
+            if path.is_relative_to(physical):
+                return (original / path.relative_to(physical)).relative_to(self.root).as_posix()
         return path.relative_to(self.root).as_posix()
+
+    def version_home(self, repo):
+        key = hashlib.sha256(repo.relative_to(self.root).as_posix().encode()).hexdigest()
+        return real_directory(self.versions / key)
+
+    def active(self, repo):
+        home = self.version_home(repo)
+        pointer = home / "active.json"
+        if not pointer.exists():
+            return None
+        if pointer.is_symlink():
+            raise ValueError("参考版本记录不允许链接。")
+        record = json.loads(pointer.read_text(encoding="utf-8"))
+        generation = record.get("generation", "")
+        if not re.fullmatch(r"[0-9a-f]{32}", generation):
+            raise ValueError("参考版本记录损坏。")
+        target = real_directory(home / generation)
+        if (target / ".git").is_symlink() or (target / ".git").is_junction() or not (target / ".git").is_dir():
+            raise ValueError("已发布的参考版本缺失。")
+        self._mapped[target] = repo
+        return target, record
+
+    def repositories(self, path="."):
+        """只发现真实知识库 Git 根；不纳入宿主保留目录或嵌套仓库。"""
+        target = self.source_path(path)
+        containing = self.repository(target)
+        if containing is not None:
+            return [containing]
+        found = []
+        for directory, dirs, _files in os.walk(target, followlinks=False):
+            self.checkpoint()
+            root = Path(directory)
+            dirs[:] = sorted(d for d in dirs if d not in {".git", ".codesearch.db", "imported-agent-history"}
+                             and not (root / d).is_symlink() and not (root / d).is_junction())
+            if (root / ".git").exists():
+                found.append(self.repository(root))
+                dirs.clear()
+        return found
+
+    def walk(self, path):
+        """遍历虚拟知识库树，用可用版本替代原始仓库子树。"""
+        pending = [self.path(path)]
+        while pending:
+            target = pending.pop()
+            for directory, dirs, files in os.walk(target, followlinks=False):
+                current = Path(directory)
+                kept = []
+                for name in sorted(dirs):
+                    child = current / name
+                    if name in {".git", ".codesearch.db"} or child.is_symlink() or child.is_junction():
+                        continue
+                    if child.is_relative_to(self.root) and (child / ".git").exists():
+                        selected = self.path(self.relative(child))
+                        pending.append(selected)
+                    else:
+                        kept.append(name)
+                dirs[:] = kept
+                yield directory, dirs, files
 
     @staticmethod
     def page(items, offset, limit, expected=None, *, maximum=200):
@@ -101,7 +186,7 @@ class KnowledgeLibrary:
         items = []
         for item in directory.iterdir():
             self.checkpoint()
-            if item.name == ".git":
+            if item.name in {".git", ".codesearch.db", ".codesearch-build.log"}:
                 continue
             # 不跟随资料中的链接；目录清单仍能说明其被跳过的原因。
             kind = "symlink_unavailable" if item.is_symlink() or item.is_junction() else "directory" if item.is_dir() else "file"
@@ -111,12 +196,22 @@ class KnowledgeLibrary:
         return {"path": path, "exists": True, **self.page(sorted(items, key=lambda item: item['path']), offset, limit, version)}
 
     def repository(self, path):
+        for physical, original in self._mapped.items():
+            if path.is_relative_to(physical):
+                return original
         current = path if path.is_dir() else path.parent
         while current.is_relative_to(self.root):
             metadata = current / ".git"
             if metadata.exists() or metadata.is_symlink():
                 if metadata.is_symlink() or metadata.is_junction() or not metadata.is_dir():
                     raise ValueError("首版仅支持知识库内含真实 .git 目录的普通仓库。")
+                if current == self.root or current.relative_to(self.root).parts[0] == "imported-agent-history":
+                    raise ValueError("知识库根与宿主历史目录不能作为参考仓库。")
+                for parent in current.parents:
+                    if parent == self.root:
+                        break
+                    if parent.is_relative_to(self.root) and (parent / ".git").exists():
+                        raise ValueError("不支持嵌套参考仓库。")
                 for index, item in enumerate(metadata.rglob("*")):
                     self.checkpoint()
                     if item.is_symlink() or item.is_junction() or index > 100000:
@@ -148,7 +243,7 @@ class KnowledgeLibrary:
                    "-c", "credential.interactive=false", "-c", "protocol.ext.allow=never",
                    "-c", "protocol.file.allow=never", "-c", "gc.auto=0", "-C", str(repo),
                    "--git-dir=" + str(repo / ".git"), "--work-tree=" + str(repo)]
-        if args[0] in {"diff", "status"}:
+        if args[0] in {"diff", "status", "reset"}:
             # 工作区比较也可能触发 clean/process filter；只看原始资料，不运行转换器。
             filters = self._run(repo, ["config", "--null", "--name-only", "--get-regexp",
                                        r"^filter\..*\.(clean|smudge|process|required)$"])
@@ -203,13 +298,10 @@ class KnowledgeLibrary:
             raise ValueError("指定提交不存在或 Git 不可用。")
         return value
 
-    def synchronize(self, repo, *, explicit=False):
+    def fetch(self, repo):
         key = self.relative(repo)
-        if not explicit and key in self.attempted:
-            return self.attempted[key]
         result = {"repository": key, "fetch": {"ok": False, "skipped": True}, "reference": None,
                   "before": None, "after": None, "checked_remote": False}
-        self.attempted[key] = result
         if not self.git:
             result["fetch"]["reason"] = "系统 Git 不可用"
             logging.getLogger(__name__).info("知识库 Git 不可用，跳过同步：%s", key)
@@ -232,19 +324,22 @@ class KnowledgeLibrary:
                             result["fetch"]["reason"] = "远端连接协议不受支持。"
                         else:
                             try:
+                                remote_ref = self._value(repo, ["for-each-ref", "--format=%(upstream:remoteref)", branch])
+                                if (not remote_ref or not remote_ref.startswith("refs/heads/")
+                                        or not upstream.startswith("refs/remotes/")
+                                        or not self._run(repo, ["check-ref-format", remote_ref])["ok"]
+                                        or not self._run(repo, ["check-ref-format", upstream])["ok"]):
+                                    raise ValueError("upstream 不是明确的远端分支。")
+                                # 显式获取该分支；远端删除或 refspec 不包含它时不能沿用旧引用冒充最新。
                                 result["fetch"] = self._run(repo, ["fetch", "--no-recurse-submodules", "--no-tags",
-                                                                  "--no-auto-maintenance", remote], timeout=30)
+                                                                  "--no-auto-maintenance", remote,
+                                                                  "+" + remote_ref + ":" + upstream], timeout=30)
                             except (TimeoutError, OSError, ValueError) as error:
                                 result["fetch"] = {"ok": False, "error": git_diagnostic(str(error))}
                             result["checked_remote"] = result["fetch"]["ok"]
                     result["after"] = self._value(repo, ["rev-parse", "--verify", upstream + "^{commit}"])
                 result["head"] = self._value(repo, ["rev-parse", "--verify", "HEAD"])
-                result["status"] = self._run(repo, ["status", "--porcelain=v1", "--untracked-files=normal"])
-                status = result["status"]
-                if status["ok"]:
-                    entries = status.pop("stdout").splitlines()
-                    status.update(dirty=bool(entries), entry_count=len(entries),
-                                  untracked_count=sum(line.startswith("??") for line in entries))
+                result["status"] = self.status(repo)
                 fetch = result["fetch"]
                 if "stdout" in fetch:
                     fetch["output_truncated"] = len(fetch["stdout"]) > 2000
@@ -257,7 +352,164 @@ class KnowledgeLibrary:
             result["error"] = git_diagnostic(str(error))
         return result
 
-    def read(self, path, offset=0, limit=8000, version=None):
+    def status(self, repo):
+        """状态采集独立报告，不把远端检查成功当作工作区干净。"""
+        result = self._run(repo, ["status", "--porcelain=v1", "--untracked-files=normal"])
+        if result["ok"]:
+            entries = result.pop("stdout").splitlines()
+            result.update(dirty=bool(entries), entry_count=len(entries),
+                          untracked_count=sum(line.startswith("??") for line in entries))
+        return result
+
+    def synchronize(self, repo, *, explicit=False):
+        """预检后独立构建 B，失败保留 A；空间及构建错误必须出现在结果和日志中。"""
+        key = self.relative(repo)
+        if not explicit and key in self.attempted:
+            return self.attempted[key]
+        result = {"repository": key, "fetch": {"ok": False, "skipped": True},
+                  "update": {"ok": False}, "checked_remote": False}
+        self.attempted[key] = result
+        candidate = None
+        queried = False
+        try:
+            with ProcessLock("knowledge:" + str(repo.resolve())):
+                old = self.active(repo)
+                source = old[0] if old else repo
+                if old:
+                    result["available_commit"] = old[1]["commit"]
+                if not self.git:
+                    raise FileNotFoundError("系统 Git 不可用；未检查远端。")
+                self.codesearch.prepare()
+                home = self.version_home(repo)
+                home.mkdir(parents=True, exist_ok=True)
+                size = 0
+                for entry in source.rglob("*"):
+                    self.checkpoint()
+                    if entry.is_symlink() or entry.is_junction():
+                        raise ValueError("参考仓库含链接，不能复制为受控版本。")
+                    if entry.is_file():
+                        size += entry.stat().st_size
+                # 副本、重建索引与 Git 临时对象会并存；预检仍不能代替实际写入错误处理。
+                require_disk([(home, size * 3)])
+                candidate = home / uuid.uuid4().hex
+                def copy_file(source_file, destination):
+                    self.checkpoint()
+                    return shutil.copy2(source_file, destination)
+                shutil.copytree(source, candidate, copy_function=copy_file,
+                                ignore=shutil.ignore_patterns(".codesearch.db", ".codesearch-build.log"))
+                self._mapped[candidate] = repo
+                fetched = self.fetch(candidate)
+                result.update(fetched)
+                if not fetched["fetch"]["ok"] or not fetched.get("after"):
+                    raise ValueError(fetched["fetch"].get("error") or fetched["fetch"].get("reason") or "fetch 失败。")
+                commit = fetched["after"]
+                if old and commit == old[1]["commit"] and all(
+                        (source / name).is_file() and digest(source / name) == expected
+                        for name, expected in old[1]["files"].items()):
+                    result.update(available_commit=commit, head=commit, update={"ok": True, "unchanged": True})
+                    return result
+                reset = self._run(candidate, ["reset", "--hard", "--no-recurse-submodules", commit])
+                if not reset["ok"]:
+                    raise ValueError(reset["error"] or "reset 失败。")
+                hashes = {}
+                for entry in candidate.rglob("*"):
+                    self.checkpoint()
+                    if entry.is_symlink() or entry.is_junction():
+                        raise ValueError("更新后的参考仓库含链接。")
+                    relative = entry.relative_to(candidate)
+                    if entry.is_file() and ".git" not in relative.parts:
+                        hashes[relative.as_posix()] = digest(entry)
+                require_disk([(home, sum((candidate / name).stat().st_size for name in hashes) * 2)])
+                excludes = candidate / ".git/info/exclude"
+                excludes.parent.mkdir(exist_ok=True)
+                existing = excludes.read_text(encoding="utf-8") if excludes.exists() else ""
+                with excludes.open("a", encoding="utf-8") as stream:
+                    for rule in ("/.codesearch.db/", "/.codesearch-build.log"):
+                        if rule not in existing.splitlines():
+                            stream.write("\n" + rule + "\n")
+                self.codesearch.build(candidate, self.checkpoint)
+                result["status"] = self.status(candidate)
+                # 发布前实际查询，防止只有 metadata 而没有可用向量图的索引进入 A。
+                alias = hashlib.sha256(key.encode()).hexdigest()[:24]
+                queried = True
+                self.codesearch.search({alias: candidate}, "code", 1, self.checkpoint)
+                record = {"generation": candidate.name, "commit": commit, "files": hashes}
+                temporary = home / "active-next.json"
+                temporary.write_text(json.dumps(record), encoding="utf-8")
+                self.checkpoint()
+                os.replace(temporary, home / "active.json")
+                result.update(available_commit=commit, head=commit, update={"ok": True})
+                candidate = None
+                # 验证查询已切到 B，旧 mmap 已释放；清理失败不能撤销成功发布。
+                for entry in home.iterdir():
+                    if entry.is_dir() and entry.name != record["generation"] and re.fullmatch(r"[0-9a-f]{32}", entry.name):
+                        try:
+                            shutil.rmtree(entry)
+                            self._mapped.pop(entry, None)
+                        except OSError:
+                            logging.getLogger(__name__).warning("过期知识库副本清理失败：%s", entry)
+        except (OSError, TimeoutError, ValueError, RuntimeError) as error:
+            result["update"] = {"ok": False, "error": git_diagnostic(str(error))}
+            result["error"] = result["update"]["error"]
+            logging.getLogger(__name__).warning("知识库更新失败 %s：%s", key, result["error"])
+        finally:
+            if candidate is not None:
+                if queried:
+                    self.codesearch.close()
+                try:
+                    shutil.rmtree(candidate)
+                except OSError:
+                    logging.getLogger(__name__).warning("未完成知识库副本保留待下次清理：%s", candidate)
+                self._mapped.pop(candidate, None)
+        return result
+
+    def search_hybrid(self, query, repositories=None, limit=20):
+        """混合检索只返回当前版本的文件位置；正文通过已有哈希读取接口获取。"""
+        if not isinstance(query, str) or not query or len(query) > 1000:
+            raise ValueError("query 必须为 1–1000 字符。")
+        if type(limit) is not int or not 1 <= limit <= 50:
+            raise ValueError("limit 必须为 1–50。")
+        selected = self.repositories() if repositories is None else [self.source_path(name) for name in repositories]
+        ready, records, syncs, unavailable = {}, {}, [], []
+        for repo in selected:
+            if self.repository(repo) != repo:
+                raise ValueError("repository 必须指向允许的 Git 仓库根。")
+            syncs.append(self.synchronize(repo))
+            active = self.active(repo)
+            if active is None:
+                unavailable.append(self.relative(repo))
+                continue
+            alias = hashlib.sha256(self.relative(repo).encode()).hexdigest()[:24]
+            ready[alias], records[alias] = active[0], (repo, active[1])
+        if not ready:
+            raise RuntimeError("混合搜索不可用；请使用 knowledge_search_literal 或 knowledge_read。 " +
+                               json.dumps(syncs, ensure_ascii=False))
+        response = self.codesearch.search(ready, query, limit, self.checkpoint)
+        hits = []
+        for item in response["results"]:
+            alias = item.get("source")
+            if alias is None and len(records) == 1:
+                alias = next(iter(records))
+            name = item.get("path", "")
+            if not isinstance(alias, str) or alias not in records:
+                raise ValueError("codesearch 返回了未注册的来源。")
+            if name.startswith(alias + "/"):
+                name = name[len(alias) + 1:]
+            repo, record = records[alias]
+            if name not in record["files"]:
+                raise ValueError("codesearch 返回了版本之外的路径。")
+            logical = self.relative(repo) + "/" + name
+            path = self.path(logical)
+            if digest(path) != record["files"][name]:
+                raise ValueError("参考内容已变化，拒绝返回过期搜索结果。")
+            hits.append({"path": logical, "repository": self.relative(repo), "commit": record["commit"],
+                         "sha256": record["files"][name], "line": item["start_line"], "end_line": item["end_line"],
+                         "score": item["score"], "signature": item.get("signature"),
+                         "read_arguments": {"path": logical, "sha256": record["files"][name]}})
+        return {"items": hits, "sync": syncs, "unavailable_repositories": unavailable,
+                "complete_scope": not unavailable and not response.get("warnings"), "warnings": response.get("warnings", [])}
+
+    def read(self, path, offset=0, limit=8000, version=None, sha256=None):
         target = self.path(path)
         repo = self.repository(target)
         sync = self.synchronize(repo) if repo else None
@@ -268,6 +520,8 @@ class KnowledgeLibrary:
             content = stream.read(MAX_BYTES + 1)
         if len(content) > MAX_BYTES:
             raise ValueError("文件超过 2 MiB；请先拆分资料。")
+        if sha256 is not None and hashlib.sha256(content).hexdigest() != sha256:
+            raise ValueError("资料已变化，请重新搜索。")
         metadata = {"path": self.relative(target), "source": "worktree" if repo else "file",
                     "sha256": hashlib.sha256(content).hexdigest(), "sync": sync}
         return self.view(content, target, metadata, offset, limit, version)
@@ -303,22 +557,23 @@ class KnowledgeLibrary:
         """字面文本检索，不建立索引；扫描上限与跳过项如实返回。"""
         if not isinstance(query, str) or not query or len(query) > 500:
             raise ValueError("query 必须为 1–500 字符的文本。")
+        syncs = {self.relative(repo): self.synchronize(repo) for repo in self.repositories(path)}
         target = self.path(path)
-        hits, skipped, syncs, identities = [], [], {}, []
+        hits, skipped, identities = [], [], []
         total_bytes = 0
         complete = True
         if not target.is_dir():
             raise ValueError("检索路径必须为已有目录。")
         def unreadable(error):
             skipped.append(self.relative(Path(error.filename)))
-        for directory, dirs, files in os.walk(target, followlinks=False, onerror=unreadable):
+        for directory, dirs, files in self.walk(path):
             self.checkpoint()
-            dirs[:] = sorted(d for d in dirs if d != ".git" and not (Path(directory) / d).is_symlink()
+            dirs[:] = sorted(d for d in dirs if d not in {".git", ".codesearch.db"} and not (Path(directory) / d).is_symlink()
                              and not (Path(directory) / d).is_junction())
             for name in sorted(files):
                 self.checkpoint()
                 file = Path(directory) / name
-                if name == ".git" or file.is_symlink() or not file.is_file() or not self.text_file(file):
+                if name in {".git", ".codesearch-build.log"} or file.is_symlink() or not file.is_file() or not self.text_file(file):
                     continue
                 file = self.path(self.relative(file))
                 if len(identities) + len(skipped) >= 5000 or total_bytes > 16 * MAX_BYTES:
@@ -368,12 +623,14 @@ class KnowledgeLibrary:
     def git_operation(self, repository, operation, ref="HEAD", before=None, after=None, path=None,
                       offset=0, limit=8000, version=None, history_offset=0):
         """仅提供结构化的 fetch / show / log / diff，引用解析后只传提交 ID。"""
-        repo = self.path(repository)
+        repo = self.source_path(repository)
         if self.repository(repo) != repo:
             raise ValueError("repository 必须指向知识库中的普通 Git 仓库根目录。")
         if operation not in {"fetch", "show", "log", "diff"}:
             raise ValueError("仅允许 fetch / show / log / diff。")
         sync = self.synchronize(repo, explicit=operation == "fetch")
+        available = self.active(repo)
+        repo = available[0] if available else repo
         if operation == "fetch" or not self.git:
             return {"sync": sync, "unavailable": not bool(self.git)}
         selected = None

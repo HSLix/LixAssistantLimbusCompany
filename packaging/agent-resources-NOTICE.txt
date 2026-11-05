@@ -1,0 +1,15 @@
+LALC bundled Agent resources
+
+pi 1.4.0: https://github.com/earendil-works/pi (MIT; pi/LICENSE.txt)
+codesearch 1.7.9 base build: https://github.com/flupkede/codesearch
+Apache-2.0; agent/codesearch-LICENSE.txt. No SCIP helper is included.
+
+Default retrieval embedding model: Xenova/all-MiniLM-L6-v2, quantized ONNX.
+Source: https://huggingface.co/Xenova/all-MiniLM-L6-v2
+Pinned revision: 751bff37182d3f1213fa05d7196b954e230abad9
+Original model: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2
+Both model cards identify the model license as Apache-2.0.
+Apache-2.0 license text: agent/MiniLM-LICENSE.txt.
+Sentence Transformers project: https://github.com/UKPLab/sentence-transformers
+
+These resources do not include a conversational model or model service.

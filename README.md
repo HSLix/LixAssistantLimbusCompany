@@ -1,5 +1,9 @@
 # LALC
 
+2026-11-05 外部搜索与进程复用已本地接入：新增 knowledge_search_hybrid，原字面工具改名 knowledge_search_literal；Git 文件与索引按 A/B 完整版本切换，磁盘不足／更新失败保留旧版并报告。pi／codesearch 按需启动、跨轮复用、宿主退出关闭。当前用法及验收限制见 [外部搜索](docs/external-code-search.md)和[实施记录](docs/external-code-search-implementation.md)。
+
+2026-11-04 Sharing：User GUI → General Settings 已提供 ZIP 导入导出，支持 Workflow、独立 Assets、整包页面及只读外部 Agent 历史。Manifest 冲突分配新 UUID 并确认，页面资源及相关工具同步升级。资源处理采用可用容量检查、流式文件和可取消后台暂存，无固定文件准入限额。用法、边界与验证见 [Sharing](docs/sharing.md) 和[实施记录](docs/sharing-implementation-progress.md)。
+
 2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](docs/page-review-tabs-implementation.md)。
 
 2026-11-02 页面审批试用修订：Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页缺 PAGE_ID 等加载 / 接口 / 注册错误直接退回同轮 Agent 修正，不再留窗等人关闭。配置隔离和人工快照安装保持。见[修订说明](docs/page-review-tabs-implementation.md)，两票仍待验收。

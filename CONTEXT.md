@@ -89,15 +89,19 @@ A message-level pointer to one or more published Manifests suggested as referenc
 _Avoid_: Manifest access whitelist, Candidate initialization, trial selection
 
 **External Knowledge Library**:
-The collection of reference repositories, documents and images readable by both developer Agent interfaces without permission to edit the reference content. Repository synchronization can obtain newer committed versions without making them the checked-out or working copy.
+The collection of reference repositories, documents and images readable by permitted developer Agent modes without permission to edit the reference content. Git reference repositories are replaceable copies of their upstream versions; synchronization may replace their local content, while user-authored material belongs outside those repositories.
 _Avoid_: Developer Candidate, editable project source, runtime state
 
 **Page Draft**:
 A proposed complete Business Settings Page created from scratch or copied from an existing page for review. It has no effect on the installed page until a developer approves the previewed version for installation.
 _Avoid_: Manifest Component, installed page, preview configuration
 
+**Page Package**:
+The source and page-owned resources that together form one complete distributable Business Settings Page version. Its resources are part of the reviewed and replaced version; private user settings remain separate.
+_Avoid_: Manifest Component, installed configuration, shared Asset Library
+
 **Page Preview**:
-A human comparison of the current installed Business Settings Page, when present, and one proposed Page Draft version, each using independent disposable configuration. Approval applies only to the previewed draft version and does not adopt trial configuration.
+A human comparison of the current installed Business Settings Page, when present, and one proposed Page Package version, each using independent disposable configuration. Approval applies only to the previewed package version and does not adopt trial configuration.
 _Avoid_: Workflow trial, formal page installation, business acceptance
 
 **Human Intervention Request**:
@@ -128,9 +132,9 @@ _Avoid_: Runtime Step Recheck, Candidate execution
 The Agent's runtime maintenance responsibility governed by Stage 6 (formerly Stage 3.5), distinct from developer-directed work. It has no deletion tools or deletion authority and does not inherit Workbench permissions; other repair changes and paused-caller integration remain subject to the Stage 6 contract.
 _Avoid_: Developer Policy, full Repair tool set, Workbench tool set
 
-**Capability Bundle**:
-The transport-neutral software-release data package containing one complete retained Component Manifest, immutable Component source and the Asset metadata and images needed by the distributed capabilities. It carries no Default Manifest selection and is distributed as a whole rather than as individual Component updates.
-_Avoid_: Developer Candidate, application binary, single-Component package
+**Sharing Package**:
+A distributable selection of complete Workflows, independent Asset groups, Page Packages and external Agent history. Each selected object retains its own identity and import behavior; the package carries no Default selection, active Session authority or permission to execute.
+_Avoid_: Capability Bundle, full backup, executable Session archive
 
 **Recovery Ladder**:
 The fixed escalation order for an interrupted task: exhaust Deterministic Recovery, optionally invoke the Agent through Runtime Exception Handling, and otherwise perform Safe Task Termination.

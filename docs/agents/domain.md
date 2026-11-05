@@ -1,5 +1,13 @@
 # Domain Docs
 
+2026-11-05 本地实现：外部混合搜索、字面工具改名、A/B 完整版本与磁盘预检、pi／codesearch 宿主级复用及双包资源构建已接入，当前用法见[外部搜索](../external-code-search.md)，证据见[实施记录](../external-code-search-implementation.md)。下方早先“尚未实施”说明为设计阶段记录；Windows 成品、真实模型／远端与大仓库仍须另验收。验证代码／资源／结果继续保留。
+
+2026-11-05 设计确认、尚未实施：外部参考库新增混合搜索并将字面工具改名；采用文件／索引一致的 A/B 更新，磁盘不足或构建失败保留 A 并上传错误。pi／专用 codesearch 按需启动、跨轮复用、宿主退出关闭；Windows 同时产出带 pi／codesearch／MiniLM 的自带 Agent 功能包与可调用外部资源的精简包。不扩大 CLI／Runtime 知识库权限。此设计替代下文“不更新工作区”及“pi 按轮退出”的旧约定，不表示生产实现或 Windows 已验收。见 [ADR 0038](../adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md)、[16 项决定](../external-code-search-decisions.md)、[影响审查](../external-code-search-design-impact-review.md)及[验证证据](../external-code-search-validation.md)。验证脚本和结果继续保留，开发者确认本次验证结束前不清理。
+
+2026-11-04 Sharing 资源修订：已撤销 Sharing 导入／导出与 Agent 页面资源的固定数量／大小／像素准入限制；采用当前可用资源预检、流式磁盘快照、后台进度／取消及按需预览。ZIP 校验后复用受控暂存，不再依赖原归档。见 [ADR 0037](../adr/0037-budget-sharing-against-available-resources.md)、[影响审查](../sharing-resource-impact-review.md)及[当前用法](../sharing.md)。不改变四类对象与人工执行授权边界。
+
+2026-11-04 Sharing 本地实现：General Settings 已接入四类内容的 ZIP 导入导出、静态安全审查、独立 Assets 选择／冲突策略、Manifest UUID 冲突换号确认、整包页面 Review／统一安装及外部只读历史。页面加载／草稿工具／预览／日志同步支持资源目录；旧单文件兼容。Sharing 可跳过 Review 的额外确认不授予 Agent 绕过安装审批。当前契约见[Sharing](../sharing.md)、[ADR 0036](../adr/0036-share-selected-objects-and-install-complete-page-packages.md)，证据与验收限制见[实施记录](../sharing-implementation-progress.md)。不表示 Windows 成品、真实模型或游戏验收。
+
 2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](../page-review-tabs-implementation.md)。
 
 2026-11-02 页面审批试用修订：拟安装页加载 / 接口 / 注册失败不显示审批，直接把错误返回同轮 Agent 修正；成功才显示默认 Proposed 的 Current / Proposed / Review 三 Tab，切换保留页面实例与独立试填。Review 集中呈现 Agent 总结、ID 与版本，三操作和人工快照安装保持。见[决定](../stage-5-339-340-decisions.md#2026-11-02-试用反馈后的修订讨论)及[修订记录](../page-review-tabs-implementation.md)。此前双栏 / 失败留窗规则为历史。

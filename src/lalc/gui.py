@@ -450,6 +450,20 @@ class UserWindow(MainWindow):
         developer.clicked.connect(lambda: self._interact(self.open_developer))
         tools_layout.addWidget(developer)
         options.addWidget(tools)
+        sharing = CardWidget()
+        sharing_layout = QVBoxLayout(sharing)
+        sharing_layout.setContentsMargins(16, 16, 16, 16)
+        sharing_layout.addWidget(SubtitleLabel(tr('Sharing')))
+        sharing_notice = QLabel(tr('Share Workflows, Assets, extension pages or Agent history.'))
+        sharing_notice.setWordWrap(True)
+        sharing_layout.addWidget(sharing_notice)
+        self.sharing_buttons = []
+        for label, exporting in ((tr('Export…'), True), (tr('Import…'), False)):
+            entry = QPushButton(label)
+            entry.clicked.connect(lambda _, exporting=exporting: self._interact(lambda: self.open_sharing(exporting)))
+            sharing_layout.addWidget(entry)
+            self.sharing_buttons.append(entry)
+        options.addWidget(sharing)
         application = CardWidget()
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
@@ -568,6 +582,10 @@ class UserWindow(MainWindow):
                     raise ValueError("; ".join(error.message for error in result.errors))
                 self.render_state(self.service.state)
             self._interact(select)
+
+    def open_sharing(self, exporting):
+        from .sharing_gui import open_sharing
+        open_sharing(self, exporting=exporting)
 
     def submit_pages(self):
         """运行与重载前强制提交所有已加载页面，错误保留页面身份。"""
@@ -705,6 +723,8 @@ class UserWindow(MainWindow):
         if not hasattr(self, "start_button"):
             return
         busy = state["phase"] == "running" or bool(state.get("activity")) or self.closing
+        for button in getattr(self, "sharing_buttons", []):
+            button.setEnabled(not busy and not self.jobs)
         if self.current_manifest_id != state["default_manifest_id"] or not hasattr(self, "_tasks_initialized"):
             self._tasks_initialized = True
             self.refresh_tasks()
@@ -873,6 +893,8 @@ class GuiCoordinator:
 
 def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, restore=()) -> int:
     """归并重复 GUI 入口，在唯一事件循环内持有双窗口。"""
+    from .sharing import cleanup_staging
+    cleanup_staging()
     if lifecycle is None:
         return run_application(lambda owner: run_gui(owner, developer=developer, restore=restore))
     from .gui_instance import GuiInstance

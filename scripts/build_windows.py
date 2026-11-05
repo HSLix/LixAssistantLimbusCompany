@@ -18,9 +18,15 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from lalc.ocr import MODEL_HASHES
+from lalc.codesearch import MODEL_REPO, MODEL_REVISION, MODEL_FILES
 
 PI_VERSION = "1.4.0"
 PI_SHA256 = "0f7256ea8bdac3af20012b94fdc1252a31cc6dc0d2f9b9eb539555d22e3e321b"
+CODESEARCH_VERSION = "1.7.9"
+CODESEARCH_SHA256 = "235d47228f53b6cc822a6cf924f83011aefc0f098fd8fb9f8f8c8f9091e20f6a"
+CODESEARCH_ARCHIVE = ROOT / "codesearch_resources/codesearch-windows-x86_64.zip"
+MODEL_ROOT = ROOT / "codesearch_resources/models"
+
 PI_URL = "https://github.com/earendil-works/pi/releases/download/v1.4.0/pi-windows-x64.zip"
 
 
@@ -49,7 +55,7 @@ def file_manifest(directory: Path, *, exclude_pi=False) -> dict[str, str]:
     result = {}
     for path in sorted(directory.rglob("*")):
         relative = path.relative_to(directory)
-        if exclude_pi and relative.parts[0] == "pi":
+        if exclude_pi and relative.parts[0] in {"pi", "agent"}:
             continue
         if path.is_file():
             result[relative.as_posix()] = digest(path)
@@ -66,7 +72,22 @@ def source_snapshot() -> dict:
             "files_sha256": hashlib.sha256(content).hexdigest(), "files": files}
 
 
-def assemble(application: Path, archive: Path, destination: Path, info: dict) -> list[Path]:
+def check_codesearch(archive: Path, models: Path) -> None:
+    """固定程序与模型哈希；不接受辅助程序或不安全归档路径。"""
+    if digest(archive) != CODESEARCH_SHA256:
+        raise ValueError("codesearch ZIP 摘要不符。")
+    with zipfile.ZipFile(archive) as bundle:
+        if bundle.namelist() != ["codesearch.exe"]:
+            raise ValueError("codesearch 基础归档必须仅包含 codesearch.exe。")
+        if bundle.infolist()[0].external_attr >> 16 & 0o170000 == 0o120000:
+            raise ValueError("codesearch 可执行文件不能为符号链接。")
+    snapshot = models / MODEL_REPO / "snapshots" / MODEL_REVISION
+    for filename, expected in MODEL_FILES.items():
+        if not (snapshot / filename).is_file() or digest(snapshot / filename) != expected:
+            raise ValueError("MiniLM model hash mismatch: " + filename)
+
+
+def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
@@ -78,21 +99,39 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict) ->
     for name, expected in MODEL_HASHES.items():
         if digest(application / "_internal/rapidocr/models" / name) != expected:
             raise ValueError(f"Packaged OCR model hash mismatch: {name}")
+    codesearch_archive = Path(codesearch_archive or CODESEARCH_ARCHIVE)
+    models = Path(models or MODEL_ROOT)
+    check_codesearch(codesearch_archive, models)
     destination.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="lalc-release-", dir=destination) as directory:
         stage = Path(directory)
-        base = stage / "without-pi" / "LALC"
+        base = stage / "without-agent" / "LALC"
         shutil.copytree(application, base)
         (base / "Developer.cmd").write_bytes(b'@echo off\r\nstart "" "%~dp0LALC.exe" --developer\r\n')
         (base / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-        with_pi = stage / "with-pi" / "LALC"
+        with_pi = stage / "with-agent" / "LALC"
         shutil.copytree(base, with_pi)
         with zipfile.ZipFile(archive) as bundle:
             bundle.extractall(with_pi / "pi")
         shutil.copyfile(ROOT / "packaging/pi-LICENSE.txt", with_pi / "pi/LICENSE.txt")
+        agent = with_pi / "agent"
+        agent.mkdir()
+        with zipfile.ZipFile(codesearch_archive) as bundle:
+            bundle.extractall(agent)
+        snapshot = Path(MODEL_REPO) / "snapshots" / MODEL_REVISION
+        for filename in MODEL_FILES:
+            target = agent / "models" / snapshot / filename
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(models / snapshot / filename, target)
+        refs = agent / "models" / MODEL_REPO / "refs"
+        refs.mkdir(parents=True)
+        (refs / "main").write_text(MODEL_REVISION)
+        for name in ("codesearch-LICENSE.txt", "MiniLM-LICENSE.txt", "agent-resources-NOTICE.txt"):
+            shutil.copyfile(ROOT / "packaging" / name, agent / name)
+
         if file_manifest(base) != file_manifest(with_pi, exclude_pi=True):
             raise ValueError("Two packages have different application files")
-        names = [f"LALC-{info['version']}-windows-x64", f"LALC-{info['version']}-windows-x64-with-pi"]
+        names = [f"LALC-{info['version']}-windows-x64-without-agent", f"LALC-{info['version']}-windows-x64-with-agent"]
         outputs = []
         for name, source in zip(names, (base, with_pi)):
             output = stage / f"{name}.zip"
@@ -111,11 +150,14 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict) ->
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pi-zip", type=Path, default=ROOT / "pi_resources/pi-windows-x64.zip")
+    parser.add_argument("--codesearch-zip", type=Path, default=CODESEARCH_ARCHIVE)
+    parser.add_argument("--models", type=Path, default=MODEL_ROOT)
     args = parser.parse_args(argv)
     if sys.platform != "win32" or platform.machine().lower() not in {"amd64", "x86_64"}:
         parser.error("请在 Windows x64 构建，macOS 不能交叉生成该成品。")
     archive = args.pi_zip.resolve(strict=True)
     check_pi(archive)
+    check_codesearch(args.codesearch_zip, args.models)
     version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     if f"StringStruct('ProductVersion', '{version}.0')" not in (ROOT / "LALC.version").read_text(encoding="utf-8"):
         raise ValueError("LALC.version and pyproject.toml versions differ")
@@ -131,8 +173,10 @@ def main(argv=None) -> int:
          "{d.metadata['Name']:d.version for d in m.distributions()}}))"], cwd=ROOT, env=env, text=True, encoding="utf-8"))
     info = {"version": version, "source": source_snapshot(), "uv_lock_sha256": digest(ROOT / "uv.lock"),
             "environment": installed,
-            "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}}
-    for path in assemble(work / "dist/LALC", archive, ROOT / "dist", info):
+            "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}, "codesearch": {"version": CODESEARCH_VERSION,
+            "archive_sha256": CODESEARCH_SHA256, "model_revision": MODEL_REVISION, "model_files": MODEL_FILES}}
+    for path in assemble(work / "dist/LALC", archive, ROOT / "dist", info,
+                         codesearch_archive=args.codesearch_zip, models=args.models):
         print(path)
     return 0
 

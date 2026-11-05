@@ -23,7 +23,16 @@ from lalc.process_lock import ProcessLock
 def library(tmp_path):
     root = knowledge_root(tmp_path, create=True)
     (root / "guide.md").write_text("第一行\nneedle is here\n" + "z" * 700 + "needle\n", encoding="utf-8")
-    return KnowledgeLibrary(tmp_path, lambda: None)
+    class Search:
+        def prepare(self):
+            pass
+        def build(self, repo, checkpoint):
+            (repo / ".codesearch.db").mkdir(exist_ok=True)
+        def search(self, repositories, query, limit, checkpoint):
+            return {"results": []}
+        def close(self):
+            pass
+    return KnowledgeLibrary(tmp_path, lambda: None, Search())
 
 
 def git(repo, *args):
@@ -121,12 +130,13 @@ def test_git_full_interval_head_worktree_and_once_per_round(library, repository,
     read, _ = library.read("repo/guide.md")
     sync = read["sync"]
     assert sync["before"] == ids[0] and sync["after"] == ids[2] and sync["status"]["ok"]
-    assert read["text"] == "local uncommitted\n"
+    assert read["text"] == "version 2\nneedle\n"
+    assert sync["update"]["ok"]
     committed = library.git_operation("repo", "show", ref=ids[0], path="guide.md")
     assert "version 0" in committed["text"] and committed["ref_commit"] == ids[0]
     delta = library.git_operation("repo", "diff", before=ids[0], after=ids[2])
     assert "-version 0" in delta["text"] and "+version 2" in delta["text"]
-    assert "local uncommitted" in library.git_operation("repo", "diff")["text"]
+    assert library.git_operation("repo", "diff")["text"] == ""
     library.search("needle")
     assert len(fetches) == 1
     library.git_operation("repo", "fetch")
@@ -263,7 +273,7 @@ def test_search_each_involved_repo_once_and_git_cannot_escape(library, repositor
     original = library._run
     def run(repo, args, **kwargs):
         if args[0] == 'fetch':
-            fetches.append(repo.name)
+            fetches.append(library.relative(repo))
             return {'ok': True, 'stdout': '', 'error': ''}
         return original(repo, args, **kwargs)
     monkeypatch.setattr(library, '_run', run)
@@ -321,3 +331,112 @@ def test_git_output_limit_and_diagnostic_redaction(library, tmp_path, monkeypatc
     command.write_text(f'#!{sys.executable}\nprint("x" * 8192)\n')
     with pytest.raises(ValueError, match='输出超过'):
         library._run(library.root, ['show'])
+
+
+def prepare_version(library, repository, monkeypatch):
+    """替身 fetch 使用仓库已有对象，构建与查询由普通测试替身完成。"""
+    repo, ids = repository
+    original = library._run
+    def run(path, args, **kwargs):
+        if args[0] == 'fetch':
+            git(path, 'update-ref', 'refs/remotes/origin/main', ids[2])
+            return {'ok': True, 'stdout': '', 'error': ''}
+        return original(path, args, **kwargs)
+    monkeypatch.setattr(library, '_run', run)
+    assert library.synchronize(repo)['update']['ok']
+    return repo
+
+
+def test_disk_failure_keeps_a_and_reports_error(library, repository, monkeypatch):
+    repo = prepare_version(library, repository, monkeypatch)
+    active, record = library.active(repo)
+    before = (library.version_home(repo) / 'active.json').read_bytes()
+    def insufficient(*args):
+        raise OSError('磁盘空间不足：预计需要 999 bytes，可用 1 bytes。')
+    monkeypatch.setattr('lalc.knowledge.require_disk', insufficient)
+    result = library.synchronize(repo, explicit=True)
+    assert not result['update']['ok'] and '磁盘空间不足' in result['error']
+    assert result['available_commit'] == record['commit']
+    assert (library.version_home(repo) / 'active.json').read_bytes() == before
+    assert library.read('repo/guide.md')[0]['text'] == (active / 'guide.md').read_text()
+    assert len([p for p in library.version_home(repo).iterdir() if p.is_dir()]) == 1
+
+
+def test_build_failure_keeps_a_and_first_failure_still_reads(library, repository, monkeypatch):
+    repo, ids = repository
+    original = library._run
+    target = [ids[0]]
+    def run(path, args, **kwargs):
+        if args[0] == 'fetch':
+            git(path, 'update-ref', 'refs/remotes/origin/main', target[0])
+            return {'ok': True, 'stdout': '', 'error': ''}
+        return original(path, args, **kwargs)
+    monkeypatch.setattr(library, '_run', run)
+    assert library.synchronize(repo)['update']['ok']
+    pointer = (library.version_home(repo) / 'active.json').read_bytes()
+    target[0] = ids[2]
+    def fail(*args):
+        raise OSError('index ENOSPC')
+    monkeypatch.setattr(library.codesearch, 'build', fail)
+    result = library.synchronize(repo, explicit=True)
+    assert 'ENOSPC' in result['error'] and not result['update']['ok']
+    assert (library.version_home(repo) / 'active.json').read_bytes() == pointer
+    assert 'version 0' in library.read('repo/guide.md')[0]['text']
+    second = library.root / 'fresh'
+    shutil.copytree(repo, second)
+    result = library.synchronize(second)
+    assert not result['update']['ok'] and library.active(second) is None
+    assert library.read('fresh/guide.md')[0]['text']
+
+
+def test_hybrid_returns_hash_bound_reads_and_rejects_changed_content(library, repository, monkeypatch):
+    repo = prepare_version(library, repository, monkeypatch)
+    def search(repositories, query, limit, checkpoint):
+        alias = next(iter(repositories))
+        return {'results': [{'source': alias, 'path': alias + '/guide.md', 'start_line': 1,
+                             'end_line': 2, 'score': .1}]}
+    monkeypatch.setattr(library.codesearch, 'search', search)
+    result = library.search_hybrid('documentation')
+    hit = result['items'][0]
+    assert library.read(**hit['read_arguments'])[0]['sha256'] == hit['sha256']
+    library.path('repo/guide.md').write_text('changed')
+    with pytest.raises(ValueError, match='过期'):
+        library.search_hybrid('documentation')
+    with pytest.raises(ValueError, match='变化'):
+        library.read(**hit['read_arguments'])
+
+
+def test_unchanged_version_reuses_index(library, repository, monkeypatch):
+    repo = prepare_version(library, repository, monkeypatch)
+    active = library.active(repo)[0]
+    monkeypatch.setattr(library.codesearch, 'build', lambda *args: pytest.fail('不应重建相同版本'))
+    result = library.synchronize(repo, explicit=True)
+    assert result['update']['unchanged'] and library.active(repo)[0] == active
+
+
+def test_reserved_and_nested_repositories_are_rejected(library, repository):
+    repo, _ = repository
+    nested = repo / 'nested'
+    nested.mkdir()
+    git(nested, 'init')
+    with pytest.raises(ValueError, match='嵌套'):
+        library.read('repo/nested/guide.md')
+    git(library.root, 'init')
+    with pytest.raises(ValueError, match='根'):
+        library.repository(library.root)
+
+
+def test_missing_remote_branch_does_not_publish_stale_upstream(library, repository, monkeypatch):
+    repo = prepare_version(library, repository, monkeypatch)
+    original = library._run
+    before = (library.version_home(repo) / 'active.json').read_bytes()
+    def run(path, args, **kwargs):
+        if args[0] == 'fetch':
+            assert args[-1] == '+refs/heads/main:refs/remotes/origin/main'
+            return {'ok': False, 'stdout': '', 'error': "couldn't find remote ref refs/heads/main"}
+        return original(path, args, **kwargs)
+    monkeypatch.setattr(library, '_run', run)
+    result = library.synchronize(repo, explicit=True)
+    assert not result['update']['ok'] and not result['checked_remote']
+    assert 'remote ref' in result['error']
+    assert (library.version_home(repo) / 'active.json').read_bytes() == before

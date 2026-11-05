@@ -191,7 +191,7 @@ def test_catalog_covers_literal_gui_messages_and_preserves_format_fields(app):
     messages = {item.findtext("source"): item.findtext("translation") for item in catalog.findall("context/message")}
     fields = lambda value: sorted(field for _, field, _, _ in Formatter().parse(value) if field is not None)
     install_translations(app, "zh_CN")
-    for filename in ("gui.py", "developer_gui.py", "repair_chat.py", "page_preview.py", "lifecycle.py", "i18n.py"):
+    for filename in ("gui.py", "developer_gui.py", "repair_chat.py", "page_preview.py", "sharing_gui.py", "lifecycle.py", "i18n.py"):
         for node in ast.walk(ast.parse((root / filename).read_text())):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr":
                 assert isinstance(node.args[0], ast.Constant), (filename, node.lineno)

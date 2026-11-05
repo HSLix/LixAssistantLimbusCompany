@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import inspect
 import json
 import threading
@@ -36,7 +37,7 @@ class RepairTools:
         self.cancelled = threading.Event()
         self.on_feedback = None
         self.on_page_preview = None
-        self.knowledge = KnowledgeLibrary(data_root, self.checkpoint)
+        self.knowledge = KnowledgeLibrary(data_root, self.checkpoint, host.service.codesearch if host is not None else None)
         self.sequence = 0
         self.previews = {}
         self.ocr_service = host.service.ocr_service if host is not None else ocr_service
@@ -63,10 +64,12 @@ class RepairTools:
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
                        "read_manifest_source": self.read_manifest_source,
                        "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
-                       "knowledge_search": self.knowledge_search, "knowledge_git": self.knowledge_git,
+                       "knowledge_search_literal": self.knowledge_search_literal,
+                       "knowledge_search_hybrid": self.knowledge_search_hybrid, "knowledge_git": self.knowledge_git,
                        "request_feedback": self.request_feedback,
                        "page_list": self.page_list, "page_read": self.page_read,
                        "page_create": self.page_create, "page_update": self.page_update,
+                       "page_resource": self.page_resource,
                        "page_preview": self.page_preview}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
@@ -92,8 +95,18 @@ class RepairTools:
     def page_list(self, **arguments):
         return self.text(self.page_drafts().list(**arguments))
 
-    def page_read(self, **arguments):
-        return self.text(self.page_drafts().read(**arguments))
+    def page_read(self, *, image=False, **arguments):
+        if not image:
+            return self.text(self.page_drafts().read(**arguments))
+        from pathlib import Path
+        scope = arguments.get("scope", "installed")
+        filename, path = arguments.get("filename", ""), arguments.get("path", "page.py")
+        from .file_content import image_preview
+        content = self.page_drafts().file_content(scope, filename, path)
+        picture = image_preview(content)
+        metadata = {"scope": scope, "filename": filename, "path": path, "sha256": content.sha256,
+                    "mime_type": "image/jpeg", "extension": "jpg", "preview": True, "original_size": len(content)}
+        return self.knowledge_result(metadata, picture)
 
     def page_create(self, **arguments):
         return self.text(self.page_drafts().create(**arguments))
@@ -101,9 +114,43 @@ class RepairTools:
     def page_update(self, **arguments):
         return self.text(self.page_drafts().update(**arguments))
 
+    def page_resource(self, filename, path, *, content_base64=None, copy_from=None, remove=False):
+        """只写 Session 草稿资源；复制来源限页面、Asset 和已授权知识库。"""
+        from .file_content import FileContent, content_hash, require_memory
+        if sum((content_base64 is not None, copy_from is not None, remove is True)) != 1:
+            raise ValueError("必须且只能选择 Base64 内容、受控复制来源或移除资源。")
+        content = None
+        if content_base64 is not None:
+            if not isinstance(content_base64, str):
+                raise ValueError("页面资源必须是 Base64 字符串。")
+            require_memory(len(content_base64) * 2)
+            content = base64.b64decode(content_base64, validate=True)
+        if copy_from is not None:
+            if not isinstance(copy_from, dict):
+                raise ValueError("资源复制来源无效。")
+            scope = copy_from.get("scope")
+            if scope in {"installed", "drafts"} and set(copy_from) == {"scope", "filename", "path"}:
+                content = self.page_drafts().file_content(scope, copy_from["filename"], copy_from["path"])
+            elif scope == "assets" and set(copy_from) == {"scope", "path", "sha256"}:
+                from .page_packages import real_directory
+                real_directory(self.library.root)
+                asset = {key: copy_from[key] for key in ("path", "sha256")}
+                source = self.library.path(asset["path"])
+                real_directory(source.parent)
+                content = FileContent.from_path(source)
+                if content_hash(content) != asset["sha256"]:
+                    raise ValueError("Asset 内容哈希不符。")
+            elif scope == "knowledge" and set(copy_from) == {"scope", "path"}:
+                source = self.knowledge.path(copy_from["path"])
+                content = FileContent.from_path(source)
+            else:
+                raise ValueError("资源复制仅允许页面、Asset 或知识库中的明确文件。")
+        return self.text(self.page_drafts().write_resource(filename, path, content, remove=remove))
+
     def page_preview(self, filename, summary):
         """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""
         from .page_preview import PreviewRequest
+        from .file_content import content_hash
         if not isinstance(summary, str) or not summary.strip():
             raise ValueError("请总结字段变化、旧配置和 Plan 影响及兼容授权情况。")
         if self.on_page_preview is None:
@@ -111,10 +158,14 @@ class RepairTools:
         drafts = self.page_drafts()
         request = PreviewRequest(drafts, drafts.snapshot(filename), summary,
                                  (self.log.identity, self.log.group, self.sequence))
+        evidence = f"tool-{self.sequence}-page-package"
+        self.log.snapshot(evidence, request.snapshot["package"].files)
         self.log.save_json(f"tool-{self.sequence}-page-preview.json", {
             "filename": filename, "sha256": request.snapshot["sha256"],
             "source": request.snapshot["source"].decode("utf-8"), "summary": summary,
-            "replace": request.snapshot["replace"]})
+            "replace": request.snapshot["replace"], "package_path": evidence,
+            "files": [{"path": path, "sha256": content_hash(content), "size": len(content)}
+                      for path, content in sorted(request.snapshot["package"].files.items())]})
         try:
             self.on_page_preview(request)
             while not request.done.wait(.05):
@@ -178,8 +229,11 @@ class RepairTools:
     def knowledge_list(self, **arguments):
         return self.text(self.knowledge.list(**arguments))
 
-    def knowledge_search(self, **arguments):
+    def knowledge_search_literal(self, **arguments):
         return self.text(self.knowledge.search(**arguments))
+
+    def knowledge_search_hybrid(self, **arguments):
+        return self.text(self.knowledge.search_hybrid(**arguments))
 
     def knowledge_git(self, **arguments):
         metadata = self.knowledge.git_operation(**arguments)

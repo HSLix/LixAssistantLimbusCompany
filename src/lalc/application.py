@@ -93,6 +93,22 @@ class ApplicationService:
         }
 
     @property
+    def pi_process(self):
+        """按需持有 pi，独立于窗口与每轮事件循环。"""
+        if not hasattr(self, "_pi_process"):
+            from .pi_process import PiProcess
+            self._pi_process = PiProcess()
+        return self._pi_process
+
+    @property
+    def codesearch(self):
+        """知识库查询进程只由应用宿主关闭。"""
+        if not hasattr(self, "_codesearch"):
+            from .codesearch import CodeSearch
+            self._codesearch = CodeSearch(self.data_root)
+        return self._codesearch
+
+    @property
     def state(self) -> dict[str, Any]:
         """返回不会与服务内部共享可变对象的公共状态快照。"""
 
@@ -467,6 +483,12 @@ class ApplicationService:
         finally:
             if self._thread is not None:
                 self._thread.join()
+            try:
+                if (process := getattr(self, "_pi_process", None)) is not None:
+                    process.close()
+            finally:
+                if (search := getattr(self, "_codesearch", None)) is not None:
+                    search.close()
 
     def _worker(self, execute: Callable[..., dict[str, Any]], *arguments: Any) -> None:
         """统一包住执行、输入清理和结果发布；未处理错误标为致命且保证唤醒观察者。"""

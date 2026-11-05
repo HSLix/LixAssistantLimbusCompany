@@ -1369,5 +1369,349 @@ Original pixel region: {2}</source>
       <source>Page loading was checked. Configuration and Plan compatibility are reviewed by the Agent.</source>
       <translation>已检查拟安装页加载。配置及 Plan 兼容影响由 Agent 审查说明。</translation>
     </message>
+    <message>
+      <source>Workflow</source>
+      <translation>Workflow</translation>
+    </message>
+    <message>
+      <source>Assets</source>
+      <translation>Assets</translation>
+    </message>
+    <message>
+      <source>Extension Pages</source>
+      <translation>扩展页面</translation>
+    </message>
+    <message>
+      <source>Agent History</source>
+      <translation>Agent 历史</translation>
+    </message>
+    <message>
+      <source>Export Package</source>
+      <translation>导出分享包</translation>
+    </message>
+    <message>
+      <source>Step 1 of 2 · Select contents</source>
+      <translation>第 1 步，共 2 步 · 选择内容</translation>
+    </message>
+    <message>
+      <source>Back</source>
+      <translation>上一步</translation>
+    </message>
+    <message>
+      <source>Cancel</source>
+      <translation>取消</translation>
+    </message>
+    <message>
+      <source>Review contents</source>
+      <translation>审阅导出内容</translation>
+    </message>
+    <message>
+      <source>Import Package</source>
+      <translation>导入分享包</translation>
+    </message>
+    <message>
+      <source>Import this Manifest</source>
+      <translation>导入此 Manifest</translation>
+    </message>
+    <message>
+      <source>Select an Asset to inspect conflicts.</source>
+      <translation>请选择 Asset 查看冲突。</translation>
+    </message>
+    <message>
+      <source>Show conflict details</source>
+      <translation>展开冲突详情</translation>
+    </message>
+    <message>
+      <source>Review Page…</source>
+      <translation>Review 页面…</translation>
+    </message>
+    <message>
+      <source>I understand imported code and records are untrusted.</source>
+      <translation>我理解导入的代码和记录来自不可信来源。</translation>
+    </message>
+    <message>
+      <source>Recheck</source>
+      <translation>重新检查</translation>
+    </message>
+    <message>
+      <source>Import Selected</source>
+      <translation>导入所选内容</translation>
+    </message>
+    <message>
+      <source>Files (including dependencies):</source>
+      <translation>文件清单（含必要依赖）：</translation>
+    </message>
+    <message>
+      <source>Imported page package. Check code, resources and effects on existing settings. Approval is only for this version.</source>
+      <translation>导入的页面包：请审阅代码、资源及其对现有配置的影响。批准仅适用于此版本。</translation>
+    </message>
+    <message>
+      <source>An operation has not finished.</source>
+      <translation>当前操作尚未结束。</translation>
+    </message>
+    <message>
+      <source>Images and tags</source>
+      <translation>图片与标签</translation>
+    </message>
+    <message>
+      <source>Only selected objects are shared. Assets are independent of Workflow. Agent History is off by default.</source>
+      <translation>仅分享所选对象；Assets 与 Workflow 独立选择，Agent 历史默认不勾选。</translation>
+    </message>
+    <message>
+      <source>Privacy warning: conversations, screenshots, paths, source and resources may contain private information. No privacy scan is performed. Check before sharing.</source>
+      <translation>注意隐私泄露：对话、截图、路径、源码和资源可能包含私人信息。本功能不进行隐私扫描，请确认后再分享。</translation>
+    </message>
+    <message>
+      <source>Save shared package</source>
+      <translation>保存分享包</translation>
+    </message>
+    <message>
+      <source>Replace all conflicts</source>
+      <translation>全部替换重复项</translation>
+    </message>
+    <message>
+      <source>Skip all conflicts</source>
+      <translation>全部跳过重复项</translation>
+    </message>
+    <message>
+      <source>Review runs page Python in this application. Approval does not install it. Unreviewed pages require an extra installation confirmation.</source>
+      <translation>Review 会在本应用中运行页面 Python；批准不会立即安装。未 Review 的页面在安装前需要额外确认。</translation>
+    </message>
+    <message>
+      <source>Imported history is read-only external knowledge. Conversations, baseline, Candidate and page drafts cannot restore a Session or replay tools.</source>
+      <translation>历史将导入只读外部知识库；对话、基线、Candidate 和页面草稿不能恢复为可执行会话，也不会重放工具。</translation>
+    </message>
+    <message>
+      <source>No contents in this category.</source>
+      <translation>此类别没有内容。</translation>
+    </message>
+    <message>
+      <source>Review failed</source>
+      <translation>Review 失败</translation>
+    </message>
+    <message>
+      <source>Import results</source>
+      <translation>导入结果</translation>
+    </message>
+    <message>
+      <source>Choose shared package</source>
+      <translation>选择分享包</translation>
+    </message>
+    <message>
+      <source>Step 2 of 2 · Review and save</source>
+      <translation>第 2 步，共 2 步 · 审阅并保存</translation>
+    </message>
+    <message>
+      <source>Save ZIP…</source>
+      <translation>保存 ZIP…</translation>
+    </message>
+    <message>
+      <source>Export failed</source>
+      <translation>导出失败</translation>
+    </message>
+    <message>
+      <source>No Default change or automatic execution. Assets are imported separately.</source>
+      <translation>不改变 Default，不自动执行；Assets 独立导入。</translation>
+    </message>
+    <message>
+      <source>{0}/{1} categories viewed</source>
+      <translation>已查看 {0}/{1} 个类别</translation>
+    </message>
+    <message>
+      <source>Asset conflicts: {0} groups, {1} files</source>
+      <translation>Asset 冲突：{0} 组，{1} 个文件</translation>
+    </message>
+    <message>
+      <source>Check failed</source>
+      <translation>检查失败</translation>
+    </message>
+    <message>
+      <source>Reviewed</source>
+      <translation>已 Review</translation>
+    </message>
+    <message>
+      <source>Not reviewed</source>
+      <translation>未 Review</translation>
+    </message>
+    <message>
+      <source>Install these pages without Review? Runtime identity, loading and interface have not been verified; they may fail after reload.</source>
+      <translation>是否安装以下尚未 Review 的页面？运行时身份、加载和页面接口未经验证，重载后可能报错。</translation>
+    </message>
+    <message>
+      <source>Unreviewed pages</source>
+      <translation>未 Review 的页面</translation>
+    </message>
+    <message>
+      <source>Pages were installed. Reload the application manually to use them.</source>
+      <translation>页面已安装，请手动重载应用后使用。</translation>
+    </message>
+    <message>
+      <source>Import failed</source>
+      <translation>导入失败</translation>
+    </message>
+    <message>
+      <source>Unreviewed runtime identity, loading and interface are not verified. Existing settings are kept. Reload manually after installation.</source>
+      <translation>未 Review 时，运行身份、加载和接口未经验证；保留现有配置，安装后请手动重载。</translation>
+    </message>
+    <message>
+      <source>{0}: {1} changed files. Action: {2}</source>
+      <translation>{0}：{1} 个不同文件。处理：{2}</translation>
+    </message>
+    <message>
+      <source>Same content</source>
+      <translation>内容相同</translation>
+    </message>
+    <message>
+      <source>Not included</source>
+      <translation>未包含</translation>
+    </message>
+    <message>
+      <source>Choose Replace all conflicts or Skip all conflicts for Assets.</source>
+      <translation>请为重复的 Assets 选择全部替换或全部跳过。</translation>
+    </message>
+    <message>
+      <source>Conflict</source>
+      <translation>冲突</translation>
+    </message>
+    <message>
+      <source>Manifest UUID {0} is already occupied and cannot be overwritten. New UUID {1} has been allocated for this import. Continue?</source>
+      <translation>要导入的 Manifest UUID {0} 已被占用，不可直接覆盖。已为本次导入分配新 UUID {1}，是否继续？</translation>
+    </message>
+    <message>
+      <source>Manifest UUID already used</source>
+      <translation>Manifest UUID 已被占用</translation>
+    </message>
+    <message>
+      <source>Completed: {0}</source>
+      <translation>已完成：{0}</translation>
+    </message>
+    <message>
+      <source>Destination: {0}</source>
+      <translation>保存位置：{0}</translation>
+    </message>
+    <message>
+      <source>UUID occupied. Proposed new UUID: {0}</source>
+      <translation>UUID 已占用，拟分配新 UUID：{0}</translation>
+    </message>
+    <message>
+      <source>New</source>
+      <translation>新增</translation>
+    </message>
+    <message>
+      <source>Replace</source>
+      <translation>替换</translation>
+    </message>
+    <message>
+      <source>Declared page identity: {0}</source>
+      <translation>页面声明信息：{0}</translation>
+    </message>
+    <message>
+      <source>Failed: {0}</source>
+      <translation>失败：{0}</translation>
+    </message>
+    <message>
+      <source>Not processed: {0}</source>
+      <translation>未处理：{0}</translation>
+    </message>
+    <message>
+      <source>Image preview unavailable</source>
+      <translation>无法预览图片</translation>
+    </message>
+    <message>
+      <source>Sharing</source>
+      <translation>分享</translation>
+    </message>
+    <message>
+      <source>Share Workflows, Assets, extension pages or Agent history.</source>
+      <translation>分享 Workflow、Assets、扩展页面或 Agent 历史。</translation>
+    </message>
+    <message>
+      <source>Export…</source>
+      <translation>导出…</translation>
+    </message>
+    <message>
+      <source>Import…</source>
+      <translation>导入…</translation>
+    </message>
+    <message>
+      <source>Approve this version</source>
+      <translation>批准此版本</translation>
+    </message>
+    <message>
+      <source>Close without approving</source>
+      <translation>关闭，不批准</translation>
+    </message>
+    <message>
+      <source>Approval records this package version. Import Selected installs it later.</source>
+      <translation>批准只记录本页包版本，之后由“导入所选内容”统一安装。</translation>
+    </message>
+    <message>
+      <source>Assets are selected by default. Deselect groups you do not want to share.</source>
+      <translation>Assets 默认全选，请取消不希望分享的逻辑组。</translation>
+    </message>
+    <message>
+      <source>Candidate and page drafts are snapshots taken at export time, not per-round versions.</source>
+      <translation>Candidate 和页面草稿为导出时的快照，不是每一历史轮次的精确版本。</translation>
+    </message>
+    <message>
+      <source>Missing evidence: {0}</source>
+      <translation>缺失证据：{0}</translation>
+    </message>
+    <message>
+      <source>Skipped</source>
+      <translation>已跳过</translation>
+    </message>
+    <message>
+      <source>Imported</source>
+      <translation>已导入</translation>
+    </message>
+    <message>
+      <source>Installed</source>
+      <translation>已安装</translation>
+    </message>
+    <message>
+      <source>Current images</source>
+      <translation>当前图片</translation>
+    </message>
+    <message>
+      <source>Imported images</source>
+      <translation>导入图片</translation>
+    </message>
+    <message>
+      <source>Reviewed page identity: {0}</source>
+      <translation>已 Review 的页面身份：{0}</translation>
+    </message>
+    <message>
+      <source>Select all</source>
+      <translation>全选</translation>
+    </message>
+    <message>
+      <source>Select none</source>
+      <translation>全部取消</translation>
+    </message>
+    <message>
+      <source>{0}/{1} selected</source>
+      <translation>已选择 {0}/{1}</translation>
+    </message>
+    <message>
+      <source>Processing sharing files</source>
+      <translation>处理分享文件</translation>
+    </message>
+    <message>
+      <source>Checking files and available resources…</source>
+      <translation>正在检查文件和可用资源…</translation>
+    </message>
+    <message>
+      <source>Disk capacity unknown</source>
+      <translation>无法确认磁盘容量</translation>
+    </message>
+    <message>
+      <source>Available disk space could not be checked. Continue anyway? Writes may fail.</source>
+      <translation>无法检查磁盘可用空间。是否仍要继续？写入可能失败。</translation>
+    </message>
+    <message>
+      <source>Processing: {0}</source>
+      <translation>正在处理：{0}</translation>
+    </message>
   </context>
 </TS>

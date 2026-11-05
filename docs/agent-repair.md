@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-05 当前知识库工具、A/B 更新和 pi／codesearch 跨轮进程复用见[用法](external-code-search.md)。原 knowledge_search 已改名 knowledge_search_literal，新增混合工具；以下历史实施说明不代表当前进程按轮退出。
+
 2026-11-02 页面审查修订：拟安装页失败直接返回 preview_failed / isError，Agent 在同轮内按错误修正再请求，不需要人先关闭错误页。成功审批为默认 Proposed 的三 Tab，Review 展示总结与版本详情。保持同轮额度、固定预览字节和独立安装授权，见[修订记录](page-review-tabs-implementation.md)。
 
 2026-11-02 页面开发仅 GUI Construct 通过 page_* 工具操作当前 Session 的 page-drafts，不扩大原生 read/edit 或 CLI / Repair 权限。正式源码只读，安装只由应用级模态对比窗口批准固定预览字节；普通人工反馈不能批准安装。旧配置及 Plan 影响由 Agent 审查总结，无固定配置兼容检测，安装不清空旧配置 / 不自动重载。见[实施记录](stage-5-339-340-implementation.md)；两票待开发者验收。

@@ -1,0 +1,63 @@
+"""覆盖 codesearch 缺失资源不下载及冻结启动环境恢复失败时的清理，不启动进程。
+
+项目根目录运行：.venv/bin/python -m pytest -q tests/test_codesearch.py
+"""
+
+from contextlib import contextmanager
+from types import SimpleNamespace
+
+import pytest
+
+from lalc import codesearch
+
+
+def test_missing_model_fails_before_index_or_service_spawn(tmp_path, monkeypatch):
+    binary = tmp_path / 'codesearch'
+    binary.write_bytes(b'fake')
+    monkeypatch.setenv('LALC_CODESEARCH', str(binary))
+    monkeypatch.setenv('LALC_CODESEARCH_MODELS', str(tmp_path / 'absent-models'))
+    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout='codesearch 1.7.9'))
+    monkeypatch.setattr(codesearch.subprocess, 'Popen', lambda *a, **k: pytest.fail('资源缺失不能启动下载或查询'))
+    with pytest.raises(FileNotFoundError, match='不会自动下载'):
+        codesearch.CodeSearch(tmp_path / 'data').prepare()
+
+
+def test_environment_restore_error_reaps_spawned_child(monkeypatch):
+    process = object()
+    stopped = []
+    @contextmanager
+    def environment(env):
+        yield env
+        raise RuntimeError('restore failed')
+    monkeypatch.setattr(codesearch, 'pi_process_environment', environment)
+    monkeypatch.setattr(codesearch.subprocess, 'Popen', lambda *a, **k: process)
+    monkeypatch.setattr(codesearch, 'stop', stopped.append)
+    with pytest.raises(RuntimeError, match='restore failed'):
+        codesearch.spawn(['fake'], {})
+    assert stopped == [process]
+
+
+def test_host_attempts_both_process_cleanups_even_if_pi_cleanup_fails(tmp_path):
+    from lalc.application import ApplicationService
+    service = ApplicationService(tmp_path)
+    closed = []
+    def fail():
+        closed.append('pi')
+        raise OSError('cleanup failed')
+    service._pi_process = SimpleNamespace(close=fail)
+    service._codesearch = SimpleNamespace(close=lambda: closed.append('codesearch'))
+    with pytest.raises(OSError, match='cleanup failed'):
+        service.shutdown()
+    assert closed == ['pi', 'codesearch']
+
+
+def test_index_refuses_parent_git_root_before_spawning_indexer(tmp_path, monkeypatch):
+    search = codesearch.CodeSearch(tmp_path)
+    search.binary, search.env = 'fake-codesearch', {}
+    monkeypatch.setattr(search, 'prepare', lambda: None)
+    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=str(tmp_path)))
+    monkeypatch.setattr(codesearch, 'spawn', lambda *a, **k: pytest.fail('不能索引父目录'))
+    child = tmp_path / 'child'
+    child.mkdir()
+    with pytest.raises(ValueError, match='独立 Git 根'):
+        search.build(child, lambda: None)

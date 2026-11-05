@@ -187,3 +187,26 @@ def test_version_environment_failure_does_not_switch_pi(packaged, tmp_path, monk
     with pytest.raises(probe.AgentDiagnosticError, match="restore failed"):
         startup.select("pi", {}, str(tmp_path), None)
     assert startup.fallback == "/environment/pi"
+
+
+def test_dead_reused_process_restarts_once_before_prompt():
+    from types import SimpleNamespace
+    calls, sends = [], []
+    class Pool:
+        process = SimpleNamespace(poll=lambda: None)
+        @asynccontextmanager
+        async def session(self, *args):
+            calls.append('start')
+            if len(calls) == 1:
+                raise probe.PiExited('old process exited before ready')
+            async def send(value):
+                sends.append(value)
+            async def event():
+                return {'type': 'lalc_ready'}
+            yield send, event
+    async def run():
+        async with probe.rpc_session(['pi'], {}, '.', lambda _: None, startup=probe.PiStartup(), pool=Pool()) as (send, event):
+            assert await event() == {'type': 'lalc_ready'}
+            await send({'type': 'prompt', 'message': 'once'})
+    asyncio.run(run())
+    assert len(calls) == 2 and len(sends) == 1
