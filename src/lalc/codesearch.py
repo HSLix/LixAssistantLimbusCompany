@@ -104,7 +104,9 @@ class CodeSearch:
         words = version.stdout.strip().split()
         if version.returncode or len(words) != 2 or words[0] != "codesearch" or words[1].split("+", 1)[0] != "1.7.9":
             raise ValueError("codesearch 需要已验证的 1.7.9 基础版。")
-        source = Path(os.environ.get("LALC_CODESEARCH_MODELS", bundled / "models"))
+        source = Path(os.environ["LALC_CODESEARCH_MODELS"]) if "LALC_CODESEARCH_MODELS" in os.environ else next(
+            (path for path in (selected.parent / "models", bundled / "models") if path.exists()),
+            self.root / "models")
         if not source.exists():
             source = self.root / "models"
         snapshot = source / MODEL_REPO / "snapshots" / MODEL_REVISION

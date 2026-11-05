@@ -37,14 +37,14 @@
 
 固定使用 codesearch **1.7.9 基础版**和量化 MiniLM，固定模型 revision `751bff37182d3f1213fa05d7196b954e230abad9`；不包含 SCIP 分析辅助程序。普通使用不自动下载安装。
 
-源码开发将本机基础版放在 `codesearch_resources/codesearch`（Windows 为 codesearch.exe），模型缓存放在该目录的 models/。也可明确设置：
+Windows 外部安装可将基础版 `codesearch.exe` 与 `models/` 放在同一目录，把该目录加入系统 `Path`，重启应用即可，无需额外模型路径变量。源码开发也可将本机基础版放在 `codesearch_resources/codesearch`（Windows 为 codesearch.exe），模型缓存放在该目录的 models/。也可明确设置：
 
 ```text
 LALC_CODESEARCH=<本机 codesearch 基础版绝对路径>
 LALC_CODESEARCH_MODELS=<已准备的模型缓存根，内含 models--Xenova--all-MiniLM-L6-v2/>
 ```
 
-没有资源目录中的程序时可从 PATH 找 codesearch；模型也可预先准备在 `data_root/codesearch/models/`。应用检查固定模型文件哈希，再准备自己的缓存与单独基础版程序；不共享用户 repos.json。服务只监听本机临时端口，使用专用注册表、只读索引与受限 Git 工具路径，不开放符号分析或远端 federation。缺失资源或服务启动失败时向 Agent 反馈不可用，可改用字面搜索／读取。
+没有资源目录中的程序时可从 PATH 找 codesearch。未显式配置模型路径时，依次寻找所选程序旁的 `models/`、随包资源的 `models/`、`data_root/codesearch/models/`；只跳过不存在的目录，已存在但缺文件或哈希不符直接报错。显式模型路径不存在时仍沿用数据目录缓存回退，不改选随包模型。应用检查固定模型文件哈希，再准备自己的缓存与单独基础版程序；不共享用户 repos.json。服务只监听本机临时端口，使用专用注册表、只读索引与受限 Git 工具路径，不开放符号分析或远端 federation。缺失资源或服务启动失败时向 Agent 反馈不可用，可改用字面搜索／读取。
 
 pi 和 codesearch 首次需要时启动，跨轮次／Session 复用，由 ApplicationService 在宿主退出或重载时关闭；关闭 Developer GUI 本身不等于关闭整个应用。pi 每轮 new_session 并加载宿主轮次配置，权限、历史、根目录、额度和提示不继承旧轮；连接配置变化时重建进程。pi 中途退出结束本轮，不重跑工具，下轮再启动；取消或异常后丢弃无法安全复用的进程。不使用后台保活或周期探测。
 
