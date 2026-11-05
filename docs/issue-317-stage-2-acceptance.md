@@ -1,5 +1,7 @@
 # Stage 2 收尾与 #317 延期说明
 
+2026-11-05 状态修订：[#317 已由开发者取消并关闭](https://github.com/HSLix/LixAssistantLimbusCompany/issues/317#issuecomment-6652564769)，不再保留独立邮箱 Workflow 验收任务；当前验收由 #340 推进。下文 #317 延期／待恢复的清单保留为原时点记录，取消不表示这些检查已通过。
+
 更新：2026-10-22。本文替代原邮箱验收指导；原“邮箱通过才结束 Stage 2”的规则已由开发者明确修订，见 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md)。
 
 ## 已确认的阶段边界

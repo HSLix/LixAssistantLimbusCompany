@@ -54,7 +54,7 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - 两个 EXE 沿用根目录 `MagicAndWonder.ico` 作为程序图标；同一 ICO 随包提供给 Qt，User／Developer 窗口与任务栏显式使用该图标。若覆盖旧成品后文件图标未更新，可先临时改名 EXE 验证 Windows 图标缓存。
 - Windows 的所有 GUI 入口（User、Developer、语言重启，以及源码 GUI）在创建服务、读写数据或归并窗口前检查管理员权限；未提权时通过 UAC 重新启动，保留启动参数与工作目录。拒绝或提权启动失败时显示中英双语提示并退出。CLI 命令不主动提权；其他平台维持原行为。若 UAC 使用另一个管理员账号，数据目录和 DPAPI 凭据也会属于该账号。
 - 成品数据统一在 `%LOCALAPPDATA%\LALC`：`candidate/`、`.candidate-baseline.json`、`pages/`、Manifest、Component、Assets、配置、日志与证据。替换程序目录不搬移数据；源码运行仍沿用项目 `candidate/`。不自动寻找、迁移或删除旧草稿。
-- 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出以后另做。
+- 两个程序包不带业务数据或示例，首次启动不自动生成示例。数据导入导出使用 [Sharing](sharing.md)，不随应用 ZIP 自动导入。
 - 默认 pi 选择：`LALC.exe` 同级 `pi/pi.exe` 优先，其次环境路径；显式 CLI `--pi` 保持调用者指定。
 - 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条正式模型 prompt 发送前即关闭本轮回退，之后不因进程故障改换 pi；每轮图片／连接推理预检已取消。
 - 没有可用 pi 时只拒绝实际 Agent 启动；User Agent 关闭时仍可执行确定性任务，不自动联网安装 pi。

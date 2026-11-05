@@ -1,4 +1,6 @@
-# Developer GUI — Accepted Design
+# Developer GUI — 历史设计与实施记录
+
+本文保留 Stage 3／4 的决定、当时实现与验收过程。现行 Workbench／Session／权限／页面包规格见 [Stage 5](stage-5-agent-workbench.md)，操作见 [Agent 用法](agent-repair.md)，状态见[当前入口](current-state.md)。下文 Confirmed decisions 等标题均指其记录时点；已被明确替代的 Runner、共享 Candidate、重建和无历史浏览等条款不再作为当前操作要求。
 
 2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](page-review-tabs-implementation.md)。
 

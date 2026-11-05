@@ -1,20 +1,8 @@
 # Stage 5 — Agent 工作台
 
-2026-11-05 外部知识库当前规则见[外部搜索](external-code-search.md)与 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md)。新规则替代下文 fetch 不更新工作区的旧约定：独立副本完成文件／索引更新后切换，磁盘不足等失败保留旧版并报告；GUI 权限范围保持。
+本文为当前规格，依据 [ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md) 及明确的后续修订维护；原决定和实施时点保留在[讨论记录](stage-5-2026-10-31-decisions.md)及相关实施记录。页面包由 ADR 0036 扩展，外部版本同步由 ADR 0038 替代旧 fetch-only 约定。页面三 Tab 依据[已确认的试用修订](stage-5-339-340-decisions.md#2026-11-02-试用反馈后的修订讨论)。
 
-2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](page-review-tabs-implementation.md)。
-
-2026-11-02 试用修订：页面审批采用 Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页加载 / 契约 / ID 检查失败直接返回同轮 Agent，不打开审批。切换 Tab 不重新加载，Review 集中显示 Agent 总结、页面 ID 和版本详情，三按钮和快照批准保持。见[修订决定](stage-5-339-340-decisions.md#2026-11-02-试用反馈后的修订讨论)、[影响审查](page-review-tabs-design-impact-review.md)及[实施记录](page-review-tabs-implementation.md)。替代下文历史双栏和失败留窗规则，两票仍待验收。
-
-2026-11-02 #339 / #340 合并实施：Construct 专属单文件页面草稿、双实例应用级模态预览及人工版本安装已接入，本地检查已完成，尚待开发者验收。程序只检查加载、页面契约及路径 / ID 注册边界，不自动 submit 或固定检验配置兼容；字段 / 旧配置 / Plan 影响由 Agent 总结。当前规则及工具见[决定](stage-5-339-340-decisions.md)、[影响审查](stage-5-339-340-design-impact-review.md)及[实施记录](stage-5-339-340-implementation.md)。下文此前待实现状态保留为历史。
-
-2026-11-01 #338 本地实施：GUI Construct / Repair 已接入统一文字人工反馈，支持空确认、Skip、取消本轮及无自动超时的普通非模态等待；CLI / Runtime 不继承。见[实施记录](stage-5-338-implementation.md)。#338 已经开发者简单验证通过并按 completed 关闭，#339 / #340 与 Stage 6 仍待实现；下文历史“#338 待实现”已被此状态替代。
-
-2026-11-01 #337 本地实施：GUI 两种模式已接入独立知识库列目录、文本检索、文本 / 原图读取及受控 Git 工具；知识库目录可直接打开，缺失时创建空目录。每轮内容首次访问才尝试同步，系统 Git 不可用则跳过记日志。操作、范围及未验收项见[实施记录](stage-5-337-implementation.md)；#337 已经开发者人工验收通过并关闭，#338–#340 与 Stage 6 仍待实现。下文历史“#337 待实现”描述不表示本增量尚未接入。
-
-2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
-
-状态：2026-10-31 逐项 grill 已确认。#335 的 CLI Repair Session 已本地实现并经开发者确认关闭，见[实施记录](stage-5-335-implementation.md)；GUI Session 接入及 Manifest 参考能力已在 #336 本地实现并等待开发者验收，其余工作台能力由后续票实现。[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)记录架构取舍，[影响审查](stage-5-design-impact-review.md)记录审查时的代码差距及验收边界，[讨论记录](stage-5-2026-10-31-decisions.md)保留决定来源。本文是当前完整规格，替代旧双入口、共享 Agent Candidate 及独立进程预览方案。
+截至 2026-11-05，#335–#339 已关闭；#340 本地已实现、仍 OPEN，等待开发者 Windows 实验与另行确认。分项状态和验收边界见[当前状态](current-state.md)。关闭不等于 Windows 成品、真实模型或游戏验收。
 
 ## 目标与责任
 
@@ -80,7 +68,7 @@ Asset Library、已发布 Manifest、正式页面、业务配置及外部知识�
 | Asset / Trusted Action 契约检查、游戏截图、专用 crop / 归档 remove_asset | 是 | 是 | 是 |
 | Publish、显式已发布版本 trial_run、Run 日志 | 是 | 是 | 是 |
 | 任意已发布 Manifest 结构及登记源码只读查看 | 是 | 是 | 是 |
-| 外部知识库只读检索及受控 Git | 是 | 是 | 不自动继承 GUI 新授权 |
+| 外部知识库只读检索及受控 Git | 是 | 是 | 否 |
 | 请求人工答复或操作并等待反馈 | 是 | 是 | 否 |
 | 页面草稿构建、当前正式页受控只读访问、预览及人工版本确认安装流程 | 否 | 是 | 否 |
 
@@ -110,19 +98,19 @@ Stage 6 已确定将同一“任意已发布 Manifest 内容只读查看”能�
 
 2026-11-01 #337 细化：固定目录为 `data_root/knowledge`，GUI 点击打开时缺失则创建空目录，不要求先开始 Session，不授予 Agent 写权限。列目录不触发 fetch；读取内容、内容检索及 Git 历史访问触发，跨库检索按实际参与仓库分别处理。首版读取 UTF-8 文本、查看原图，不做资料图片 OCR；PDF / Word 等仅列出并提示需转换。使用系统 Git，不捆绑或自动安装，不可用则跳过、记日志、继续读取本地，不能声称已检查远端。认证由开发者预先配置为非交互，fetch 最长 30 秒；禁用内容查看中的非必要转换器，不建立全面 Git 配置审查机制。详见[专项决定](stage-5-337-decisions.md)及[当前工具与限制](stage-5-337-implementation.md)。
 
-- 每轮首次访问某 Git 仓库时自动尝试一次 fetch，同轮后续读取不重复；允许显式 fetch。失败如实报告，不自动重试，本地资料仍可读取。每次尝试后均执行 status，分别返回 fetch / status 实际结果。
-- 更新比较默认参考当前分支配置的 upstream，记录该引用 fetch 前后的明确提交 ID，新提交反馈完整 `before → after` 区间差异，不只比较最后一个提交与父提交。无 upstream 或 detached HEAD 时说明参考分支未确定，不猜 main / master，不宣称已是最新；首版不做分支选择界面。
-- 受控 Git 操作限 diff / show / fetch / log，status 是 fetch 后宿主动作。fetch 只取得对象、更新必要引用元数据，不 pull / merge / checkout / reset，不修改工作区或 push。没有参考引用时不默认猜测远端；普通本地读取不因此失败。
-- 无更新不妨碍 show / log / diff。`show HEAD:<path>` 读取本地提交，`show <after>:<path>` 读取指定取得版本；普通文件读取看到工作区和可能的未提交内容。明确区分 HEAD、参考提交和工作区；无 fetch 更新不代表 HEAD 已追上参考分支，也不证明工作区干净。
-- 限定真实路径、符号链接边界、仓库目标、引用与 Git 参数，不开放命令拼接、外部程序或写文件参数。Git 受控同步不能绕过只读资料边界。输出定位到来源与版本，截断须明确并可继续查看，不得把截断结果称为完整 diff。
+当前同步与检索遵循 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md) 和[外部搜索用法](external-code-search.md)：
 
-首版不要求向量数据库或复杂索引；检索接口、输出分页及错误呈现在实施时细化，Repo Map / BM25 / Embedding / Pi Skill / 跨历史经验检索均未成为既定交付。
+- 列目录不触发同步；每轮首次内容访问按实际参与仓库尝试一次完整更新，可显式 fetch，不自动重试。
+- 在独立 B 副本 fetch 明确 upstream、reset、建索引并查询验证，成功才切换文件／索引指针。磁盘不足、fetch 或构建失败保留可用 A 并报告，不把失败当作零命中或最新版本。
+- 工具返回明确提交、可用版本及同步结果；没有 upstream 或 detached HEAD 不猜分支。原 clone 是发现与初次准备入口，默认读取可用版本，不用原 clone 的 HEAD 推断 Agent 所读版本。
+- Agent 的 Git 接口仍限受控 fetch／show／log／diff，无通用终端、参考资料编辑或项目执行权限。内部 reset 仅用于构建受控参考副本；路径、链接、Git 元数据、参数与非交互认证边界保持。
+- 字面工具为 `knowledge_search_literal`，新增向量＋BM25 的 `knowledge_search_hybrid`；缺索引保留字面搜索和读取，混合搜索明确不可用。哈希绑定读取拒绝搜索后已变化的文件。CLI／Runtime 不继承 GUI 知识库权限。
 
 ## 页面草稿、对比预览与安装
 
 仅 GUI Construct 提供页面构建。新增从空白创建完整草稿，编辑从当前正式页复制；可通过受控只读入口重读最新正式页，在自己的 Session 草稿继续适配，不直接改正式目录、不重建 Candidate。页面不进入 Manifest，不随 Publish 发布。
 
-2026-11-02 细化：每份草稿是单个完整 Python 文件，保存在 `developer-sessions/<Session ID>/page-drafts/`；首版不附带资源目录、多文件包或新增依赖。复制正式页时固定原文件名为安装目标；新增目标不得误覆盖已存在的正式文件。安装后草稿继续保留。固定程序不检验配置兼容、不自动调用 submit()，也不增加检查配置按钮；下节“兼容检查”指 Agent 代码审查与影响总结，宿主只保留加载 / 页面契约 / 必要路径和 ID 检查。
+每份草稿是完整 Page Package，保存在 `developer-sessions/<Session ID>/page-drafts/`，包含 `page.py` 与页内资源；资源通过 `context.resource_path(...)` 定位。旧单文件草稿继续兼容，复制／安装或增加资源时按 [Sharing 页面包规则](sharing.md#页面包与-agent-工具)处理，不批量迁移。此边界由 [ADR 0036](adr/0036-share-selected-objects-and-install-complete-page-packages.md) 明确替代原单文件限制。复制正式页时固定原文件名为安装目标；新增目标不得误覆盖已存在的正式文件。安装后草稿继续保留。固定程序不检验配置兼容、不自动调用 submit()，也不增加检查配置按钮；下节“兼容检查”指 Agent 代码审查与影响总结，宿主只保留加载 / 页面契约 / 必要路径和 ID 检查。
 
 ### 兼容检查
 

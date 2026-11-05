@@ -1,155 +1,36 @@
 # LALC
 
-2026-11-05 外部搜索与进程复用已本地接入：新增 knowledge_search_hybrid，原字面工具改名 knowledge_search_literal；Git 文件与索引按 A/B 完整版本切换，磁盘不足／更新失败保留旧版并报告。pi／codesearch 按需启动、跨轮复用、宿主退出关闭。当前用法及验收限制见 [外部搜索](docs/external-code-search.md)和[实施记录](docs/external-code-search-implementation.md)。
+LixAssistantLimbusCompany (LALC) automates Limbus Company tasks in a focused Windows game window. It provides a user dashboard, Python Workflows and an Agent-assisted developer workspace.
 
-2026-11-04 Sharing：User GUI → General Settings 已提供 ZIP 导入导出，支持 Workflow、独立 Assets、整包页面及只读外部 Agent 历史。Manifest 冲突分配新 UUID 并确认，页面资源及相关工具同步升级。资源处理采用可用容量检查、流式文件和可取消后台暂存，无固定文件准入限额。用法、边界与验证见 [Sharing](docs/sharing.md) 和[实施记录](docs/sharing-implementation-progress.md)。
+## Deployment
 
-2026-11-02 验收状态：开发者明确确认 #339 通过，已按 completed 关闭；#340 保持 OPEN，等待开发者 Windows 实验验证后另行确认。此前“两票待验收 / 一起关闭”状态由本条替代；不表示 Windows 成品或真实游戏已验收。见[当前记录](docs/page-review-tabs-implementation.md)。
+LALC runs on **Windows x64**. Keep the game window restored and in the foreground during automation.
 
-2026-11-02 页面审批试用修订：Current / Proposed / Review 三 Tab，默认 Proposed；拟安装页缺 PAGE_ID 等加载 / 接口 / 注册错误直接退回同轮 Agent 修正，不再留窗等人关闭。配置隔离和人工快照安装保持。见[修订说明](docs/page-review-tabs-implementation.md)，两票仍待验收。
+### Windows package
 
-2026-11-02 #339 / #340 合并本地实施：GUI Construct 可持久创建页面草稿、双页模态对比并由人安装实际预览版本；关闭不安装可继续，取消结束本轮。安装保留正式配置、不改变 Default、不自动重载；当前两票等待开发者验收。工具及验证边界见[实施记录](docs/stage-5-339-340-implementation.md)。此前页面待实现描述为历史状态。
+Extract the complete package, then launch:
 
-GUI Construct / Repair 已本地接入同轮人工反馈：统一文字输入，允许空确认，可跳过或取消，不设自动超时；CLI / Runtime 不开放。#338 已经开发者简单验证通过并按 completed 关闭，见[用法与验证记录](docs/stage-5-338-implementation.md)。下文历史“人工反馈待实现”不代表当前状态；页面工具仍待后续票实现。
+- `LALC.exe` — User Dashboard.
+- `Developer.cmd` — Developer workspace.
+- `LALC-console.exe` — command-line tools.
 
-游戏版本与 AI 历史关联、Steam 路径设置及只读检索工具见 [使用说明](docs/game-version-history.md)。独立 `lalc pi-probe` 命令已移除。
+The `with-agent` package includes pi, codesearch and the search embedding model. The `without-agent` package uses separately installed resources. Agent conversations require a separately configured model service.
 
-2026-11-01 #337 本地实施：GUI 工作台两种模式已支持外部知识库只读检索、文本 / 原图查看和受控 Git；More 菜单可打开知识库文件夹，缺失时创建空目录。系统 Git 不可用则跳过记日志，不影响本地资料。详见[使用与验收边界](docs/stage-5-337-implementation.md)。#336 已关闭，#337 已经开发者人工验收通过并关闭；下文此前的待实现 / 待验收描述保留为历史状态。
+Application data is stored in `%LOCALAPPDATA%\LALC`, independently of the program directory. Use General Settings → Sharing to import or export Workflows, Assets and pages; see [Sharing](docs/sharing.md).
 
-2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](docs/stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
+### From source
 
-2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](docs/fluent-gui-migration.md)。
+Install [uv](https://docs.astral.sh/uv/), then run these commands from the project root. The project pins Python 3.12.10.
 
-
-LALC automates supported Limbus Company tasks in a focused Windows game window.
-
-The `architecture-refactor` branch is the clean Workflow 2.0 reconstruction. It intentionally does not contain or remain compatible with the legacy global node registry, JSON node graph, or manual Pipeline runtime. The former branch remains available for historical reference and rollback.
-
-## Current status
-
-- Stage 1 product and Agent boundaries: accepted.
-- Stage 2 Workflow and deterministic-execution architecture: accepted.
-- Stage 2 implementation: complete under the revised scope in [ADR 0026](docs/adr/0026-close-stage-2-without-a-real-game-workflow.md), covering deterministic execution and the developer loop. Real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317.
-- Stage 3 Agent-assisted Component Repair: CLI/Developer GUI and later Developer Policy increments implemented; tracking issues #329, #323 and #312 are closed by developer decision after trial use, without completing the full acceptance matrix; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
-- Stage 4 Extensible User GUI and Python Plan: #331 Python Plan/coexisting windows and #332 external pages/shared Agent settings implemented locally; #333 bilingual GUI/language reload is implemented locally and has passed developer manual acceptance; #333 is closed. #334 is closed by developer decision after trial use; full Windows acceptance was not completed ([closure record](docs/stage-3-4-closure-2026-10-30.md)); see [#334 evidence](docs/stage-4-334-implementation.md). See [#333 usage and evidence](docs/stage-4-333-implementation.md). See [#332 usage and evidence](docs/stage-4-332-implementation.md). See [current usage and evidence](docs/stage-4-331-implementation.md) and [accepted design](docs/stage-4-extensible-user-gui.md); see [vertical slices](docs/stage-4-implementation-slices.md).
-- Stage 5 Agent Workbench: design accepted on 2026-10-31. Independent, resumable CLI Repair Sessions are implemented locally under #335 and closed by explicit developer acceptance of the regression evidence; see [implementation](docs/stage-5-335-implementation.md). GUI Session Workbench and Manifest references are implemented under #336 (now closed); see [implementation](docs/stage-5-336-implementation.md). Read-only external knowledge and controlled Git tools are implemented under #337 and closed after explicit developer manual acceptance; see [implementation](docs/stage-5-337-implementation.md). GUI human feedback is implemented under #338 and closed after explicit developer acceptance of a simple verification; see [implementation](docs/stage-5-338-implementation.md). Page tools remain pending. The accepted target includes Construct / Repair modes, human feedback, Construct page drafts with modal comparison and human installation approval, and bounded read-only reference access. See [specification](docs/stage-5-agent-workbench.md) and [impact review](docs/stage-5-design-impact-review.md).
-- Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance: Runtime has no deletion tools or authority and inherits no Workbench permissions; other repair changes and integration remain Stage 6 discussion TODOs. Additional proposals remain [pending discussion](docs/reconstruction-plan.md).
-- The historical Architecture Demo from Issue #306 remains design evidence; its hard-coded runtime is no longer the product path.
-- Developer-directed Workflow construction is accepted for Stage 5; autonomous Capability Expansion remains deferred.
-
-Start with:
-
-- [Domain language](CONTEXT.md)
-- [Reconstruction plan](docs/reconstruction-plan.md)
-- [Stage 2 implementation slices](docs/stage-2-implementation-slices.md)
-- [Developer Workflow tutorial](docs/developer-workflow-tutorial.md)
-- [Three-level Workflow and all Trusted Actions sample](example/workflow/README.md)
-- [Stage 3 Agent-assisted Component Repair](docs/stage-3-agent-assisted-component-repair.md)
-- [Stage 6 (formerly Stage 3.5) Agent Runtime Step Recovery and Maintenance](docs/stage-3.5-agent-runtime-step-recovery-and-maintenance.md)
-- [Architecture decisions](docs/adr/)
-
-## Development
-
-The commands below use the Python Plan implementation from #331 under [ADR 0032](docs/adr/0032-use-python-plans-and-coexisting-user-developer-guis.md). External settings pages and shared Agent profiles are implemented in #332. Bilingual GUI controls and restart-based language changes are implemented locally in #333; #334 has since been closed by developer decision without completing full Windows acceptance; see the [closure record](docs/stage-3-4-closure-2026-10-30.md).
-
-The current formal runtime uses Python 3.12.10 and uv. It supports focused
-Windows game observation and focused input (click, Esc/P/Enter, drag, wait).
-Semantic Asset matching with optional priority tags, explicit local detection, and fresh-screenshot
-template cropping are available through observe Trusted Actions; Assets update independently of Manifests; see
-[the developer tutorial](docs/developer-workflow-tutorial.md).
-Input takeover has automated coverage and prior standalone Windows acceptance;
-current Workflow integration and Windows package acceptance remain deferred.
-Local PP-OCRv6 Small OCR is available through `observe.ocr` and the Agent's
-`game_screenshot` tool; see [OCR usage and validation limits](docs/ocr.md).
-Korean and custom-model recognition are unsupported.
-
-```bash
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv sync --all-extras
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run lalc
-UV_CACHE_DIR=.generated/uv-cache UV_PYTHON_INSTALL_DIR=.generated/python312 uv run --all-extras pytest
+```sh
+uv sync --frozen --all-extras
+uv run --frozen lalc
 ```
 
-Running `lalc` without arguments opens User Dashboard; `lalc --developer` opens Developer GUI. Both windows share one application service. Repeated GUI launches activate the existing application, and game activities also exclude independent CLI runs. The developer workflow uses a
-Git-ignored `candidate/` directory for manual development in the current project:
+Use `uv run --frozen lalc --developer` to open the developer workspace. Source development keeps the manual `candidate/` in the project directory; other application data uses the user data directory, shown by `uv run --frozen lalc data-dir`.
 
-```bash
-uv run lalc init
-# Edit candidate/manifest.json and Component source.
-uv run lalc validate
-uv run lalc publish
-uv run lalc set-default <publish输出的UUID>
-uv run lalc run <logical-name> --inputs '{}'
-uv run lalc run-plan
-uv run lalc --developer
-uv run lalc list-manifests
-uv run lalc clear
-uv run lalc data-dir
-```
-
-CLI Agent Repair uses a separate persistent Session, leaving the manual Candidate unchanged:
-
-```bash
-uv run lalc repair --from <saved-manifest-uuid> --problem 'Inspect and repair this workflow' --chat
-uv run lalc repair --session <printed-session-uuid> --problem 'Check the current state and continue'
-```
-
-Creation requires an explicit saved Manifest. Each round reloads the Session under a cross-process lock; idle input holds no lock. Restarting preserves saved evidence and marks unfinished rounds interrupted without automatically replaying actions. GUI integration follows in #336.
-
-On Windows, `uv run lalc connect` finds the unique running Limbus Company
-window, brings it to the foreground once, captures its client area, and writes
-the PNG image plus a text log under the local application data directory's
-`connections/` folder. It prints both paths; it does not keep a connection
-after the command exits. `uv run lalc data-dir` prints the default data
-directory for the current system. Every formal Run connects and focuses the game
-window and starts physical input monitoring before Component execution.
-Foreground activation is requested once and awaited without an automatic cutoff.
-Run Stop or terminal Ctrl-C can interrupt cooperative waiting; actual errors retain
-their original exception chain.
-
-Physical input interrupts the current Step,
-releases held input, and pauses until manual Resume. Resume refreshes observation,
-checks the Step's optional condition, and invokes that same Step from its entrypoint;
-it never replays the interrupted action. GUI notices appear once and remain movable;
-CLI Runs offer an explicit resume/stop prompt. Release failure terminates the Run
-and skips later Plan tasks. Reported errors retain the complete original traceback.
-
-Use `publish` → `set-default` → `run` / `run-plan` for normal development. After selecting the Default, omit `--manifest`; reserve it for temporarily running another retained version.
-
-`publish` keeps the editable candidate and does not change the Default
-Manifest. `clear` is the only command that removes it and asks for confirmation.
-`init` creates and registers an empty `plan.py`. Edit it in the Candidate, then validate and publish. Each runnable Manifest requires exactly one `@automation_plan`; `run-plan` executes its saved immutable source, with optional `--inputs` / `--inputs-file` containing `task_repetitions` and `settings`. JSON Plan paths are no longer executable; old data is preserved and requires explicit republication. CLI returns 1 for completed Plans containing failed tasks. Each Plan uses one Run ID, and its Task/Subworkflow records are saved
-under the local data directory's `ledger/` folder.
-
-Windows x64 builds use a separate non-editable environment and produce two ZIPs,
-with and without pi. Place the original pi 1.4.0 Windows x64 ZIP in the ignored
-`pi_resources/pi-windows-x64.zip`, then run on Windows:
-
-```powershell
-uv run --no-project --python 3.12 python scripts/build_windows.py
-```
-
-Outputs are under `dist/`. Neither package contains business data or installs
-examples on first launch. Run `LALC.exe` for User, `Developer.cmd` for Developer,
-and `LALC-console.exe` for CLI commands. Packaged Candidate and other data use
-`%LOCALAPPDATA%\LALC`; source development retains the project Candidate.
-See [build and Windows acceptance instructions](docs/windows-packaging.md) and
-[#334 local implementation evidence](docs/stage-4-334-implementation.md).
-
-`--packaging-probe EXTERNAL.py RESULT.json` is a temporary internal diagnostic;
-delete it after the later formal external-process runner covers external source
-loading and frozen `lalc` API imports. Windows x64 acceptance must be run on
-Windows and is not implied by a macOS spike.
-
-## Text encoding
-
-- Project-controlled text files and JSON use UTF-8 without relying on the
-  operating-system locale.
-- Python text reads and writes must pass `encoding="utf-8"` explicitly,
-  including `Path.read_text()`, `Path.write_text()`, and `open()`.
-- External text in another encoding must be decoded explicitly at its input
-  boundary. Component hashing continues to use the original bytes without a
-  decode-and-reencode round trip.
+See [Windows build and resource preparation](docs/windows-packaging.md), [Workflow development](docs/developer-workflow-tutorial.md) and [Agent setup and usage](docs/agent-repair.md) for details.
 
 ## License
 
-This project is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+GNU Affero General Public License v3.0. See [LICENSE](LICENSE).

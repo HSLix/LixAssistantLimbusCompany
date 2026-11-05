@@ -1,5 +1,7 @@
 # LALC Reconstruction Plan
 
+当前阶段状态和文档职责集中见[当前状态](current-state.md)。本文保留各阶段规划时点；下文旧“待实现／待验收”不作为现今状态。Stage 1–4 的历史范围只在未被后续明确决定替代时适用；Stage 6 新提案仍待讨论。
+
 2026-10-30 后续收尾：#334、#329、#323、#312 已由开发者明确确认关闭为 completed，完整验收不再作为这些票本次关闭前置；未补验的项目保持未验证。见[开发者确认关闭记录](stage-3-4-closure-2026-10-30.md)。既有 Stage 5／6 排期不变。
 
 2026-10-30：#334 本地实现 Windows x64 双 ZIP 构建、pi 优先／回退与成品数据路径，见[实施记录](stage-4-334-implementation.md)。Windows 成品现场验收与开发者确认仍待完成；不带业务数据，导入导出另做，GitHub Actions 仅在 Stage 6 完成后考虑。
@@ -33,7 +35,7 @@ Locked contracts:
 
 ## Stage 2: Python-first Workflow and deterministic execution
 
-Status: architecture and implementation complete under the revised acceptance scope of ADR 0026 (2026-10-22). A real mailbox Workflow and remaining Windows integration/package acceptance are deferred in #317; completion does not claim those scenarios passed.
+Status: architecture and implementation complete under the revised acceptance scope of ADR 0026 (2026-10-22). The separate mailbox acceptance ticket #317 was [cancelled by the developer on 2026-11-05](https://github.com/HSLix/LixAssistantLimbusCompany/issues/317#issuecomment-6652564769); current acceptance proceeds under #340. Cancellation does not establish that the former checklist passed.
 
 Confirmed contracts:
 
@@ -123,7 +125,7 @@ The first version also does not export, inherit, migrate, or persist Task Workfl
 
 Stage 2 closes without further architecture work on persistence formats, a complete failure-code catalogue, or game-specific Safe Task Termination actions. Recovery Rules are enumerated by stable logical-name order without adding a Manifest field. Storage formats and failure codes follow actual implemented paths. Runtime Agent recovery, maintenance trials, and their budgets belong to Stage 3.5. Stage 3 began with independent single-Component CLI repair; ADR 0029 adds Developer GUI and existing-Candidate-file repair before its final demo. Agent-assisted Workflow Drafting and autonomous Capability Expansion are deferred. ADR 0026 records the revised implementation completion boundary.
 
-The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 began on a clean orphan branch; the old branch remains a historical reference and rollback path, not a parallel runtime. ADR 0026 replaces the original mailbox completion gate with foundation acceptance, existing single-capability evidence, crop/tag configuration and a runnable teaching sample. Coordinate display, region selection and real business authoring await GUI developer tools; #317 retains the mailbox and outstanding Windows integration acceptance.
+The accepted implementation baseline is maintained in [Stage 2 Minimum Implementation Slices](stage-2-implementation-slices.md). Workflow 2.0 began on a clean orphan branch; the old branch remains a historical reference and rollback path, not a parallel runtime. ADR 0026 replaces the original mailbox completion gate with foundation acceptance, existing single-capability evidence, crop/tag configuration and a runnable teaching sample. The former #317 mailbox gate has been cancelled; GUI developer tools are available, and current acceptance proceeds under #340 rather than reopening a separate mailbox ticket.
 
 ## Stage 3 — Agent-assisted Component Repair
 
@@ -160,13 +162,13 @@ See [Stage 3](stage-3-agent-assisted-component-repair.md), [Developer GUI](devel
 
 ## Stage 5：Agent 工作台与外部知识迁移
 
-**状态：2026-10-31 grill 与影响审查已确认，#335 CLI Repair Session 本地实现并经开发者确认关闭；GUI 工作台 / Session 与 Manifest 参考已在 #336 本地实现并等待开发者验收，见[实施记录](stage-5-336-implementation.md)；其余工具增量待实现。** [实施记录](stage-5-335-implementation.md)、[完整规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)、[影响审查](stage-5-design-impact-review.md)。
+**状态：工具已本地接入，#335–#339 已关闭，#340 仍待开发者 Windows 实验及另行确认；不表示完整实机验收。** [实施记录](stage-5-335-implementation.md)、[完整规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)、[影响审查](stage-5-design-impact-review.md)。
 
 - 单一工作台保留 Construct / Repair，Session 首条用户消息提交前可调整模式和来源，首次提交时固定两者，每种模式有初始 Prompt 和工具白名单，模型声明和宿主分发都执行权限。GUI 两种模式均可请求人工反馈，仅 Construct 可构建页面。
 - 每 Session 独立保存 Candidate、固定基线、聊天和页面草稿，可跨重启继续；不重建、不自动删除。Construct 可空白 / 已发布来源，Repair 从已发布来源开始；CLI Repair / GUI 共用存储与互斥，Agent 不再接管手工 Candidate，旧草稿和日志不自动迁移。
 - 删除 Developer GUI 的 Manifest 选择和人工运行入口，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持。Agent 保留完整校验、Publish、显式已发布版本试运行及日志能力，不修改 Default 或草稿来源。
-- 知识库供 GUI 两种模式只读查阅，每轮首次访问仓库自动尝试 fetch 一次，可显式 fetch，每次后 status；以 upstream 前后提交比较，无参考分支时报告不确定。受控 diff / show / fetch / log 不修改工作区，不开放通用终端。
-- 页面采用同进程应用级模态双栏对比，当前正式页 / 拟安装页分别运行及内存试填，锁住其他 LALC 窗口，人工确认实际预览版本后安装。由人判断覆盖，不做自动版本冲突检测 / 合并；失败保留原页，正式接入由人主动整应用重载。
+- 知识库供 GUI 两种模式只读查阅，每轮首次访问仓库自动尝试 fetch 一次，可显式 fetch，每次后 status；以 upstream 前后提交比较，无参考分支时报告不确定。受控 diff / show / fetch / log 不开放通用终端；参考文件与索引按 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md) 在独立副本完整更新后切换，失败保留旧版。
+- 页面采用同进程应用级模态 Current／Proposed／Review 三 Tab，当前正式页／拟安装页分别运行及内存试填；草稿和安装覆盖完整源码与资源包（ADR 0036），锁住其他 LALC 窗口，人工确认实际预览版本后安装。由人判断覆盖，不做自动版本冲突检测 / 合并；失败保留原页，正式接入由人主动整应用重载。
 - 活动和预览期间不切换 / 新建 Session；意外退出标记中断，不自动重放操作或确认。全局 Asset / 正式页面 / 配置不随 Session 切换回滚。
 - 业务选择、搭建和验收由开发者承担，不以特定业务交付作为工具增量前置。Runtime 无删除工具，其人工交互仅有人值守开放，其余接入仍留 Stage 6。模型、Windows 成品、实际游戏证据分别记录。
 

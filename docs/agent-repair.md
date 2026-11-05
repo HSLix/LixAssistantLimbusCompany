@@ -1,54 +1,20 @@
 # Agent Repair — Developer Candidate 开发与修复
 
-2026-11-05 当前知识库工具、A/B 更新和 pi／codesearch 跨轮进程复用见[用法](external-code-search.md)。原 knowledge_search 已改名 knowledge_search_literal，新增混合工具；以下历史实施说明不代表当前进程按轮退出。
-
-2026-11-02 页面审查修订：拟安装页失败直接返回 preview_failed / isError，Agent 在同轮内按错误修正再请求，不需要人先关闭错误页。成功审批为默认 Proposed 的三 Tab，Review 展示总结与版本详情。保持同轮额度、固定预览字节和独立安装授权，见[修订记录](page-review-tabs-implementation.md)。
-
-2026-11-02 页面开发仅 GUI Construct 通过 page_* 工具操作当前 Session 的 page-drafts，不扩大原生 read/edit 或 CLI / Repair 权限。正式源码只读，安装只由应用级模态对比窗口批准固定预览字节；普通人工反馈不能批准安装。旧配置及 Plan 影响由 Agent 审查总结，无固定配置兼容检测，安装不清空旧配置 / 不自动重载。见[实施记录](stage-5-339-340-implementation.md)；两票待开发者验收。
-
-2026-11-01 临时原始输出：每条模型消息生成时，在本轮用户消息后、Agent 工具 / 回答前显示默认收起的内联临时区，状态文字作为折叠标题，可展开查看文字、接口返回的 thinking 和生成中的工具名称 / 参数；完整生成过程按轮次保留，最终回答后仍可展开 / 收起，重开历史从已有完整消息恢复且默认收起；取消或错误只清除未完成的流式缓冲。每轮强制连接 / 图片推理预检已取消，正式请求从第 1 次计数，图片直接随正式请求发送；GUI 设置页手动连接 / 模型状态检查保留（读取模型列表，不请求推理）。发送前配置 / 图片能力校验及格式纠正额度保持。下文预检要求和历史验证记录以本条现行规则为准。见[决定](agent-raw-output-decisions.md)、[影响审查](agent-raw-output-impact-review.md)。
-
-2026-11-01 #338 本地实施：GUI Construct / Repair 的 Agent 可用 `request_feedback(message)` 展示交互内容 / 意图并等待同轮文字反馈。普通非模态窗口不置顶，可切换游戏；Confirm 可空答复，Skip / 关闭 / Esc 表示跳过，取消本轮则终止并收尾。等待无自动超时，期间不能切换 / 新建 Session、启动试运行或自动输入；反馈不证明状态、不解除暂停、不批准安装。CLI / Runtime 不开放，重启不恢复未完成等待。用法、验证与未验收项见[实施记录](stage-5-338-implementation.md)。#338 已经开发者简单验证通过并按 completed 关闭；下文“#338 待实现”为历史状态。
-
-2026-11-01 游戏版本历史：每轮持久记录版本组与时间，GUI / CLI 共用三个只读历史工具；Steam 设置与索引恢复见[用法](game-version-history.md)。独立 `lalc pi-probe` 已移除，共享启动 / RPC 保留，强制推理预检按本页现行规则取消。
-
-2026-11-01 #337 已本地实现：GUI Construct / Repair 可在 More → Workspace and pages 打开外部知识库文件夹，缺失时创建空目录，无须先开始聊天。将文本、图片或自行准备的普通 Git 仓库放入数据目录 `knowledge/`，Agent 按需只读检索 / 查看。首次内容访问按轮同步，系统 Git 不可用则跳过记日志；CLI / Runtime 不获得该权限。格式、分页、Git 版本及验收限制见[知识库实施记录](stage-5-337-implementation.md)。下文“#337 待实现”为旧阶段记录。
-
-#336 后续聊天交互重构已本地实施：New Chat、可折叠标题历史、首次提交前分段模式选择、底部输入 / 取消及 More 菜单；原运行 / 权限边界保持，当前界面见[实施记录](stage-5-336-chat-ui-implementation.md)。下文纵向按钮及常驻诊断描述仅为前一版用法。
-
-2026-10-31 #336 本地实施：GUI 已接入独立 Construct / Repair Session 工作台、历史续聊及多 Manifest 参考 / 共享只读工具；模式与来源在首条消息提交时固定。删除 Developer GUI 人工运行入口，Agent 试运行完整保留。当前用法及验收限制见[实施记录](stage-5-336-implementation.md)；#336 等待开发者验收，#337–#340 与 Stage 6 仍待实现。下文旧重建 / Runner 用法仅为历史实现描述。
-
-2026-10-31 Manifest 参考补充（#336 待实现）：GUI 附件可多选已发布版本，参考重点写在消息；GUI Construct / Repair 与 CLI Repair 均可只读查看任意已发布 Manifest，无须先附加。附件为上下文信息，不是授权清单；查看不导入 / 执行源码，不改草稿来源或任何运行版本选择。Runtime Repair 白名单已明确包含该只读能力，实际接入留 Stage 6。见[专项影响审查](stage-5-manifest-reference-impact-review.md)。
-
-2026-10-31 #335 本地实现：CLI Repair 已改用独立持久 Session，创建 / 恢复用法见下文 CLI；不再操作手工 Candidate。GUI 尚沿用旧入口，Session 历史及 CLI / GUI 互通待 #336。实施与验收边界见[记录](stage-5-335-implementation.md)，#335 已由开发者基于回归结果确认关闭，后续重点为 #336 GUI 工作台。
-
-2026-10-31 Stage 5 已确认、待实现：Developer GUI 统一为 Agent 工作台，Construct / Repair 按 Session 固定模式并分别提供初始 Prompt 与工具白名单；GUI 两种模式均可请求人工答复或操作反馈，页面构建仅 Construct 提供。每 Session 独立持久保存 Candidate、固定基线、聊天和页面草稿，不重建、不自动删除；CLI Repair 与 GUI 共用 Session 存储，按入口限权，不再使用手工 Candidate。Developer GUI 的 Manifest 选择及人工运行入口删除，不提供“应用到 User GUI”快捷设置；User GUI 普通启动保持，Agent 的显式版本试运行和日志能力完整保留。页面采用同进程应用级模态双栏对比，锁住其他 LALC 窗口，配置仅内存，由人确认预览版本后安装；不做自动版本冲突检测。见 [Stage 5 规格](stage-5-agent-workbench.md)、[ADR 0034](adr/0034-extend-developer-agent-with-reviewed-page-drafts.md)及[影响审查](stage-5-design-impact-review.md)。下文现有用法与历史证据不表示新能力已实现。
-
-2026-10-31 外部知识库目标（待实现）：数据目录中的 Git / 非 Git 资料供 GUI 两种模式只读查阅。每轮首次访问仓库自动尝试一次 fetch，可显式 fetch，每次尝试后 status；以当前分支 upstream 的前后提交报告更新，无 upstream / detached HEAD 报告不确定。受控工具限 diff / show / fetch / log，不更新工作区，不授予通用终端或编辑权限；CLI 不自动继承 GUI 新授权，Runtime 保持 Stage 6 边界。详见[版本语义](stage-5-agent-workbench.md#外部知识与-git-内容的版本语义)。
-
-2026-10-30 #334：成品草稿和基线随用户数据保存；默认随包 pi 优先、请求前限定故障回退一次。模型预检也会锁定本轮 pi，后续修复进程启动失败不能重开回退。源码仍保留项目草稿及显式 `--pi`；当前构建与证据见[#334 记录](stage-4-334-implementation.md)。
-
-2026-10-27 Fluent GUI：User/Developer 已正式迁到完整 FluentWindow，固定页/外置页及三页开发工具使用 Fluent 导航；原有共享服务、即时保存、单一编辑入口和重载边界保持。当前操作与验证见[迁移记录](fluent-gui-migration.md)。
-
-
-2026-10-27：#331 已替换 JSON Plan 与独立 Runner，使用并存 User/Developer 窗口及唯一 Python Plan；见[实施记录](stage-4-331-implementation.md)。本文保留的 Stage 3 历史验收只代表对应版本。
-
-#330 按 [ADR 0029](adr/0029-use-explicit-candidate-edit-selection-and-continuous-developer-chat.md) 升级了 GUI/CLI 共用修复宿主，[ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 增加 Developer Policy 的自主发布和试运行。使用当前 Candidate，可编辑全部已有文件（含已有 Python Plan），按每条用户消息处理一轮并保留上下文；不自动重建草稿、不执行可变 Candidate、不设置 Default。Agent 可 Publish 后显式选择保存的 Manifest 进行试运行。
-
-> Capture 窗口宽高与放大预览、专用源码新增工具、多图片附件及 Recovery Rule 示例已实现；Windows/真实游戏验收仍单列。完整边界见 [GUI 增量要求](developer-gui-design.md)。
+当前开发入口为 Agent Workbench 与 CLI Repair Session，完整规格见 [Stage 5](stage-5-agent-workbench.md)，阶段状态和历史证据入口见[当前状态](current-state.md)。知识库、A/B 更新及 pi／codesearch 进程复用见[外部搜索](external-code-search.md)，页面资源和 Sharing 见[Sharing](sharing.md)。
 
 ## Developer GUI
 
 安装已有 `gui`、`automation` extras 后运行 `uv run --frozen lalc --developer`；无参数启动 User Dashboard，可在 General Settings 打开 Developer。普通执行不启动 pi；Agent 当前接入回归基线为 pi 1.4.0；其他版本也允许启动，版本不匹配会写 WARNING 日志，在 CLI 终端及 GUI 对话提示，兼容性须另行验证。
 
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
-- **Developer Selected Manifest**：窗口上方独立选择已保存版本，点击“试运行所选 Plan”运行其唯一不可变 Python Plan。不修改 Default 或 Candidate 来源；没有独立 Runner 页。Task/Subworkflow/Step 的直接启动仍可用 CLI 或 Agent trial_run。
-- **Agent Settings**：User/Developer 复用同一控件，每 provider 保存一套完整设置，两侧分别选用；输入框失焦保存、选择项立即保存，无需保存按钮。Developer 打开时 User Agent 设置不可编辑，关闭时提交后交还编辑权。保存完整 Base URL、Model 和每轮请求上限，默认 20、最小 2。API Key 普通空输入保留原值；新输入覆盖，明确清除解除凭据。界面仅显示是否设置，不回读旧明文。Windows 使用当前用户 DPAPI；其他平台仅在本次 GUI 内存中保留输入的临时密钥。不会读写其他 pi 实例的个人配置。
-- **Agent Repair**：从已有 Manifest 明确初始化或重建 Candidate；非空替换须确认，成功后开启新对话，失败保留原草稿及原对话。通过“打开 Agent 工作区”在系统文件管理器查看 Candidate，无需选择编辑目标；Agent 可修改多个已有文件，已有 Python Plan 可编辑，不开放任意文件创建。支持纯文字及任意数量的可选图片，每条消息启动一轮，最终回答后等待主动发送下一条。New Conversation 保留 Candidate 和固定 Diff 基线，旧日志保留。提问和最终回答按轮分块，工具默认显示可展开摘要；“查看累计 Diff”主动打开可伸缩滚动窗口，无常驻预览框。
+- **Agent Settings**：User／Developer 共用 provider 设置内容，各自选用；失焦或选择变化时保存。Developer 打开时独占编辑，关闭后交还 User。每轮请求上限默认 20、最小 2；Windows 凭据使用当前用户 DPAPI，其他平台仅在本次 GUI 内存中保留临时密钥，不读取其他 pi 实例的个人配置。
+- **Agent Workbench**：新聊天选择 Construct／Repair 及来源，首条消息提交时固定。Construct 可空白起步，Repair 必须选择已发布 Manifest。每 Session 独立保存 Candidate、固定 Diff 基线、聊天与页面草稿；GUI 可打开 CLI Repair Session。开始后更换模式／来源须新建 Session，旧 Session 保留，不重建或清空。
+- **聊天与审阅**：纯文字及可选多图片，每条用户消息启动一轮；历史续聊不重放操作。模型原始输出按轮保留在默认收起的内联区域。工具摘要、累计 Diff、Validate 与 Publish 绑定当前 Session。人工反馈限 GUI 两种模式；页面包构建和人工预览安装限 GUI Construct，详见 [Stage 5 权限表](stage-5-agent-workbench.md#prompt-与工具权限)。
+- **运行入口**：Developer GUI 不再提供所选 Manifest 或人工运行区域。普通执行从 User GUI 启动；Agent `trial_run` 仍显式运行已发布版本，CLI 也保留直接运行入口。
 
 实际 Diff 与 Validator 结果供人工审阅。Publish 重新校验并生成新的不可变 Manifest，不运行它，也不设置 Default；设置 Default 是另一个明确操作。GUI 不增加运行时审批流程。
 
-User Run/Developer Trial（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥；Agent 所属的串行试运行是内部执行入口，仍阻止外部 Run/Capture。被动坐标和已有图片框选/预览可以继续。候选初始化、手动校验、发布也通过共享宿主活动检查。关闭时可返回继续，或取消并等待输入释放、日志保存和 pi 回收；切换页面不取消任务。
+User Run/Developer Trial（包括暂停）、Agent 一轮处理、人工截图和保存由同一应用服务互斥；Agent 所属的串行试运行是内部执行入口，仍阻止外部 Run/Capture。被动坐标和已有图片框选/预览可以继续。候选初始化、手动校验、发布也通过共享宿主活动检查。关闭活动所属窗口时可返回继续，或取消并等待输入释放与日志保存；安全可复用的进程归宿主持有，宿主退出时关闭。切换页面不取消任务。
 
 ## CLI
 
@@ -109,7 +75,7 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 
 ## 连接错误诊断
 
-LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI/CLI 的 Agent 预检及正式请求共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
+LALC 启动 pi 子进程时默认设置 `NODE_USE_SYSTEM_CA=1`，使支持该选项的 Node 运行环境同时使用当前系统信任的 CA，适用于系统已信任而 Node 默认未信任的网络 CA。不修改父进程或系统环境变量；用户显式设置的值及 `NODE_EXTRA_CA_CERTS` 继续保留。不关闭 TLS 证书校验。GUI／CLI 的正式 Agent 请求共用此启动配置，更新并重启 LALC 后无需再逐次手动设置 PowerShell。
 
 pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_error`，含请求序号、地址（去掉查询及认证信息）、阶段、耗时及底层异常的 name/message/code/cause；不记录认证头或请求体，不自动重试。失败详情会关联该次请求的 transport 证据，下一请求开始即清除旧错误，避免跨请求误归因。正式请求覆盖；旧预检日志仍在 round-N/events.jsonl，新轮次不再生成预检日志；正式交互日志位于对话根 events.jsonl。
 
@@ -127,7 +93,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 
 GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停止；阻止操作主界面，显示时不主动抢游戏焦点。暂停/接管仅人工恢复。结束、报错或停止后窗口自动关闭，结果作为工具响应交给同轮 Agent，后续请求继续计入原额度；不会自动创建新一轮。停止只结束当前运行并建议总结等待，不禁用后续工具。取消本轮则停止试运行、等待输入释放及收尾，再结束 Agent。CLI 复用相同工具与结果，模态窗口仅用于 GUI。
 
-每个对话在数据目录 `agent-interactions/<UTC日期>/<UUID4>/` 下独立留存：
+当前 Session 对话在数据目录 `developer-sessions/<Session UUID>/log/` 下独立留存；早期 `agent-interactions/<UTC日期>/<UUID4>/` 日志原样保留、不自动迁移。日志内容包括：
 
 - `events.jsonl`：实际模型/工具/校验和逐轮结束事件；旧预检事件保留原样。
 - `baseline/`：该对话首次处理时固定的候选物化基线。
@@ -136,13 +102,13 @@ GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停
 - `round-N/original/`、`final/`、`cumulative.diff`、`result.json`：真实候选快照、相对固定基线的累计 Diff、请求次数及结束原因。
 - `context.json`、`tool-N.json` 和图片：保留消息、图片及工具结果；工具序号跨轮递增，不覆盖旧产物。
 
-2026-10-28 起新对话采用 [ADR 0033](adr/0033-deduplicate-agent-logs-with-conversation-local-references.md) 的去重表示：log-format.json 标识格式，重复内容通过对话内相对路径和 SHA-256 引用保存，图片优先引用本对话已留存的原图。上述请求、事件、上下文和工具 JSON 可包含引用，完整信息、事件顺序、模型实际接收内容与 GUI 实时事件不变。复制整个对话目录即可按需展开；旧日志不迁移、不重写。本次不提供历史加载/展示界面。诊断命令与验证见[日志设计](agent-interaction-log-design.md)。
+2026-10-28 起新对话采用 [ADR 0033](adr/0033-deduplicate-agent-logs-with-conversation-local-references.md) 的去重表示：log-format.json 标识格式，重复内容通过对话内相对路径和 SHA-256 引用保存，图片优先引用本对话已留存的原图。上述请求、事件、上下文和工具 JSON 可包含引用，完整信息、事件顺序、模型实际接收内容与 GUI 实时事件不变。复制整个对话目录即可按需展开；旧日志不迁移、不重写。该去重增量本身未提供历史加载／展示；后续 Session 工作台已支持历史恢复，见 [Stage 5](stage-5-agent-workbench.md)。诊断命令与验证见[日志设计](agent-interaction-log-design.md)。
 
-每轮回收 pi 进程，下一轮通过 pi context hook 显式带入此前消息、图片和工具结果，不重写模型工具循环。最终回答必须是严格 JSON，不剥离说明或代码块；解析或字段错误自动反馈具体错误，要求在同一会话重新生成 JSON，同时禁用剩余工具，避免重复修改。纠正请求计入本轮共享上限；合法回答、超限、服务错误或取消结束本轮，不自动开启下一轮。最终 JSON 中 `revise_success` 是模型报告，不能代替 Validator、人工审阅或游戏验收。
+宿主持有 pi 进程并跨轮复用；每轮 new_session 和 context hook 显式配置权限、此前消息、图片及工具结果，不沿用旧轮授权。进程中途退出结束本轮，不重放工具；取消或异常后丢弃不安全进程，宿主退出时关闭，见 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md)。最终回答必须是严格 JSON，不剥离说明或代码块；解析或字段错误自动反馈具体错误，要求在同一会话重新生成 JSON，同时禁用剩余工具，避免重复修改。纠正请求计入本轮共享上限；合法回答、超限、服务错误或取消结束本轮，不自动开启下一轮。最终 JSON 中 `revise_success` 是模型报告，不能代替 Validator、人工审阅或游戏验收。
 
 单次输出上限仅提供“使用服务端默认值”，应用不发送输出 token 上限参数，不再强制 4096。Settings 中的每条消息请求次数上限是另一项设置；流式输出不改变二者的含义。服务仍可能因其自身配置或资源限制截断输出，诊断记录为 `output_limit`。
 
-Candidate 基线保存在工作目录的 `.candidate-baseline.json`，不进入 Candidate 或正式 Manifest。它保存初始化时的 UUID 和物化文件，跨 New Conversation、Default 变化和 Runner 选择不变；明确重建时才更新。源码内容标识仍是 SHA-256，Manifest 标识仍是 UUID。
+Agent Candidate 与固定基线归各自 Developer Session 保存，不进入正式 Manifest，不随 Default 或聊天轮次改变；手工 Candidate 及其 `.candidate-baseline.json` 保持独立。更换 Agent 来源须新建 Session。源码内容标识仍是 SHA-256，Manifest 标识仍是 UUID。
 
 ## 验证与验收
 
@@ -167,6 +133,8 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 
 ## 历史：2026-10-24 文件选择修订
+
+以下至“Prompt 与 SOP”之前保留各时点的实施和验证过程；其中共享 Candidate、重建、Runner、预检及旧议题状态不再作为当前操作要求。现行规则见本文前部及[当前状态](current-state.md)，历史测试数字不视为当前版本通过。
 
 2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），已有 Python Plan 可编辑，不开放任意文件创建；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
 
@@ -288,7 +256,7 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 
 ## Prompt 与 SOP
 
-2026-11-01：开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。预检和格式纠正禁用工具，概览明确为空；预检使用独立连接 / 图片检查指令，不要求开发结果 JSON。独立 `lalc pi-probe` 已移除。
+开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。格式纠正禁用工具，概览明确为空。每轮强制连接／图片推理预检已取消，正式请求从第 1 次计数；发送前配置／图片能力校验保持，GUI 设置页手动检查读取模型列表，不请求推理。独立 `lalc pi-probe` 已移除。
 
 开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset 对应 XML 标签内写 Markdown 流程；三段正文当前留空，说明文字不会注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset，Repair 选 Repair + Asset；轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
 
