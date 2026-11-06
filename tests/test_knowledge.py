@@ -362,7 +362,9 @@ def test_disk_failure_keeps_a_and_reports_error(library, repository, monkeypatch
     assert len([p for p in library.version_home(repo).iterdir() if p.is_dir()]) == 1
 
 
-def test_build_failure_keeps_a_and_first_failure_still_reads(library, repository, monkeypatch):
+@pytest.mark.parametrize('failure', [OSError('index ENOSPC'),
+                                   UnicodeDecodeError('utf-8', b'\xff', 0, 1, 'invalid start byte')])
+def test_build_failure_keeps_a_and_first_failure_still_reads(library, repository, monkeypatch, failure):
     repo, ids = repository
     original = library._run
     target = [ids[0]]
@@ -376,10 +378,10 @@ def test_build_failure_keeps_a_and_first_failure_still_reads(library, repository
     pointer = (library.version_home(repo) / 'active.json').read_bytes()
     target[0] = ids[2]
     def fail(*args):
-        raise OSError('index ENOSPC')
+        raise failure
     monkeypatch.setattr(library.codesearch, 'build', fail)
     result = library.synchronize(repo, explicit=True)
-    assert 'ENOSPC' in result['error'] and not result['update']['ok']
+    assert str(failure) in result['error'] and not result['update']['ok']
     assert (library.version_home(repo) / 'active.json').read_bytes() == pointer
     assert 'version 0' in library.read('repo/guide.md')[0]['text']
     second = library.root / 'fresh'

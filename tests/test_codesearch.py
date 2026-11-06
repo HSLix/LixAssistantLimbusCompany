@@ -1,12 +1,15 @@
-"""覆盖 codesearch 模型路径发现、缺失资源不下载及进程清理，使用进程替身。
+"""覆盖 codesearch 资源发现、UTF-8 边界与进程清理，索引进程使用替身。
 
 项目根目录运行：.venv/bin/python -m pytest -q tests/test_codesearch.py
 """
 
 from contextlib import contextmanager
 import hashlib
+import json
+import os
 from pathlib import Path
 import shutil
+import subprocess
 from types import SimpleNamespace
 
 import pytest
@@ -31,7 +34,10 @@ def test_model_discovery_for_path_executable(tmp_path, monkeypatch, location):
     monkeypatch.setattr(codesearch, 'MODEL_FILES', {'config.json': hashlib.sha256(content).hexdigest()})
     monkeypatch.setattr(codesearch.shutil, 'which', lambda name, **kw: str(binary) if name == 'codesearch' else
                         (str(Path(codesearch.sys.executable)) if name == 'git' else None))
-    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout='codesearch 1.7.9'))
+    def version(*args, **kwargs):
+        assert not kwargs.get('text') and 'encoding' not in kwargs
+        return SimpleNamespace(returncode=0, stdout=b'codesearch 1.7.9')
+    monkeypatch.setattr(codesearch.subprocess, 'run', version)
     monkeypatch.setattr(codesearch.subprocess, 'Popen', lambda *a, **k: pytest.fail('prepare 不应启动服务'))
     for name, root in sources.items():
         snapshot = root / codesearch.MODEL_REPO / 'snapshots' / codesearch.MODEL_REVISION
@@ -60,7 +66,7 @@ def test_missing_model_fails_before_index_or_service_spawn(tmp_path, monkeypatch
     binary.write_bytes(b'fake')
     monkeypatch.setenv('LALC_CODESEARCH', str(binary))
     monkeypatch.setenv('LALC_CODESEARCH_MODELS', str(tmp_path / 'absent-models'))
-    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout='codesearch 1.7.9'))
+    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=b'codesearch 1.7.9'))
     monkeypatch.setattr(codesearch.subprocess, 'Popen', lambda *a, **k: pytest.fail('资源缺失不能启动下载或查询'))
     with pytest.raises(FileNotFoundError, match='不会自动下载'):
         codesearch.CodeSearch(tmp_path / 'data').prepare()
@@ -99,9 +105,56 @@ def test_index_refuses_parent_git_root_before_spawning_indexer(tmp_path, monkeyp
     search = codesearch.CodeSearch(tmp_path)
     search.binary, search.env = 'fake-codesearch', {}
     monkeypatch.setattr(search, 'prepare', lambda: None)
-    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=str(tmp_path)))
+    monkeypatch.setattr(codesearch.subprocess, 'run', lambda *a, **k: SimpleNamespace(returncode=0, stdout=str(tmp_path).encode('utf-8')))
     monkeypatch.setattr(codesearch, 'spawn', lambda *a, **k: pytest.fail('不能索引父目录'))
     child = tmp_path / 'child'
     child.mkdir()
     with pytest.raises(ValueError, match='独立 Git 根'):
         search.build(child, lambda: None)
+
+
+def test_chinese_git_root_and_index_metadata(tmp_path, monkeypatch):
+    repo = tmp_path / '中文用户' / '参考仓库'
+    repo.mkdir(parents=True)
+    subprocess.run(['git', 'init', '-q', str(repo)], check=True)
+    search = codesearch.CodeSearch(tmp_path)
+    search.binary, search.env = 'fake-codesearch', dict(os.environ)
+    monkeypatch.setattr(search, 'prepare', lambda: None)
+    original_run = subprocess.run
+    def run(*args, **kwargs):
+        assert not kwargs.get('text') and 'encoding' not in kwargs
+        return original_run(*args, **kwargs)
+    monkeypatch.setattr(codesearch.subprocess, 'run', run)
+    process = SimpleNamespace(returncode=0, poll=lambda: 0)
+    stopped = []
+    def spawn(*args, **kwargs):
+        index = repo / '.codesearch.db'
+        index.mkdir()
+        (index / 'metadata.json').write_text(json.dumps(
+            {'model_short_name': 'minilm-l6-q', 'description': '中文元数据'}, ensure_ascii=False), encoding='utf-8')
+        return process
+    monkeypatch.setattr(codesearch, 'spawn', spawn)
+    monkeypatch.setattr(codesearch, 'stop', stopped.append)
+    search.build(repo, lambda: None)
+    assert stopped == [process]
+
+
+@pytest.mark.parametrize('operation', ['version', 'git-root'])
+def test_invalid_utf8_raises_in_caller_before_index_spawn(tmp_path, monkeypatch, operation):
+    search = codesearch.CodeSearch(tmp_path)
+    def run(*args, **kwargs):
+        assert not kwargs.get('text') and 'encoding' not in kwargs
+        return SimpleNamespace(returncode=0, stdout=b'\xff')
+    monkeypatch.setattr(codesearch.subprocess, 'run', run)
+    monkeypatch.setattr(codesearch, 'spawn', lambda *a, **k: pytest.fail('非法输出不能启动索引'))
+    if operation == 'version':
+        binary = tmp_path / 'codesearch-binary'
+        binary.write_bytes(b'fake')
+        monkeypatch.setenv('LALC_CODESEARCH', str(binary))
+        call = search.prepare
+    else:
+        search.binary, search.env = 'fake-codesearch', {}
+        monkeypatch.setattr(search, 'prepare', lambda: None)
+        call = lambda: search.build(tmp_path, lambda: None)
+    with pytest.raises(UnicodeDecodeError):
+        call()

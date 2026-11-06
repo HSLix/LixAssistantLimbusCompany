@@ -99,9 +99,10 @@ class CodeSearch:
             raise FileNotFoundError("codesearch 未准备；仍可使用 knowledge_search_literal 和 knowledge_read。")
         selected = Path(selected).resolve(strict=True)
         with pi_process_environment(os.environ) as prepared:
-            version = subprocess.run([str(selected), "--version"], env=prepared, capture_output=True, text=True, timeout=10,
+            version = subprocess.run([str(selected), "--version"], env=prepared, capture_output=True, timeout=10,
                                      **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-        words = version.stdout.strip().split()
+        # 在调用线程解码，避免 Windows 管道读取线程的编码异常触发全局致命错误。
+        words = version.stdout.decode("utf-8").strip().split()
         if version.returncode or len(words) != 2 or words[0] != "codesearch" or words[1].split("+", 1)[0] != "1.7.9":
             raise ValueError("codesearch 需要已验证的 1.7.9 基础版。")
         source = Path(os.environ["LALC_CODESEARCH_MODELS"]) if "LALC_CODESEARCH_MODELS" in os.environ else next(
@@ -155,9 +156,9 @@ class CodeSearch:
         self.prepare()
         assert self.binary is not None and self.env is not None
         top = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], env=self.env,
-                             capture_output=True, text=True, timeout=10,
+                             capture_output=True, timeout=10,
                              **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
-        if top.returncode or Path(top.stdout.strip()).resolve() != repo.resolve():
+        if top.returncode or Path(top.stdout.decode("utf-8").strip()).resolve() != repo.resolve():
             raise ValueError("索引目标必须是允许的独立 Git 根，不能上溯或指向外部工作区。")
         with tempfile.TemporaryFile() as output:
             if (repo / ".codesearch.db").exists():
@@ -180,7 +181,7 @@ class CodeSearch:
                 if process.returncode:
                     output.seek(0)
                     raise ValueError("codesearch 建索引失败：" + output.read(8000).decode(errors="replace"))
-                metadata = json.loads((repo / ".codesearch.db/metadata.json").read_text())
+                metadata = json.loads((repo / ".codesearch.db/metadata.json").read_text(encoding="utf-8"))
                 if metadata.get("partial") or metadata.get("model_short_name") != "minilm-l6-q":
                     raise ValueError("codesearch 索引未完整建立或模型不符。")
             finally:
