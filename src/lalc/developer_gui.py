@@ -788,6 +788,7 @@ class RepairPage(QWidget):
         self.images, self.manifest_references = [], []
         self.tool_errors, self.titles = {}, {}
         self._round_running = False
+        self._page_preview_requests = []
         self._auto_collapsed = False
         layout = QHBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
@@ -1443,7 +1444,9 @@ class RepairPage(QWidget):
                                         on_feedback=self.window.feedback_requested.emit,
                                         on_page_preview=self.window.page_preview_requested.emit)
             self._round_running = True
+            self._page_preview_requests = []
             self.window.launch(operation, self.answered)
+            self.window.jobs[-1].finished.connect(self.finish_page_installations)
         self.window._interact(action)
 
     def answered(self, result):
@@ -1477,6 +1480,16 @@ class RepairPage(QWidget):
         self.show_result_status(result)
         self.update_actions(self.is_busy())
 
+    def finish_page_installations(self):
+        """轮次后台作业清理后汇总实际安装，取消或失败也提示；历史恢复不触发。"""
+        requests, self._page_preview_requests = self._page_preview_requests, []
+        if self.window.closing or not any(
+                request.result and request.result.get('status') == 'installed' for request in requests):
+            return
+        from .page_preview import PageInstalledDialog
+        self.window.page_installed_dialog = PageInstalledDialog(self.window)
+        self.window.page_installed_dialog.show()
+
     def show_result_status(self, result):
         """实时收尾和历史恢复共用结果摘要，不弹窗或修改聊天及运行状态。"""
         summary = tr('Error: ') + result['error'] if result.get('error') else {
@@ -1509,6 +1522,7 @@ class RepairPage(QWidget):
             if (dialog.ready and not request.done.is_set() and not self.window.closing
                     and not any(job.cancel_requested for job in self.window.jobs)):
                 self.page_preview_dialog = dialog
+                self._page_preview_requests.append(request)
                 dialog.show()
             else:
                 request.close()
