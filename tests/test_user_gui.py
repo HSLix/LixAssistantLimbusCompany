@@ -112,7 +112,7 @@ def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, fr
 def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(windows):
     from PySide6.QtCore import Qt
     _, _, user, developer = windows
-    assert [user.pages.widget(i).objectName() for i in range(2)] == ["dashboard", "general-settings"]
+    assert [user.pages.widget(i).objectName() for i in range(3)] == ["dashboard", "run-logs", "general-settings"]
     user.switchTo(user.general_settings)
     assert user.pages.currentWidget() is user.general_settings
     assert not user.pages.isAnimationEnabled()
@@ -129,13 +129,13 @@ def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows)
     app, _, user, developer = windows
     panel = user.navigationInterface.panel
     widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
-    assert len(widgets) == 5
-    general, dashboard, settings, separator, workflow = widgets
+    assert len(widgets) == 6
+    general, dashboard, logs, settings, separator, workflow = widgets
     assert isinstance(general, NavigationItemHeader) and general.text() == "通用"
     assert isinstance(workflow, NavigationItemHeader) and workflow.text() == "业务设置"
     assert isinstance(separator, NavigationSeparator)
     assert dashboard._icon == FluentIcon.HOME and settings._icon == FluentIcon.SETTING
-    assert user.pages.count() == 2 and not user.business_pages
+    assert user.pages.count() == 3 and not user.business_pages
     assert not developer.navigationInterface.findChildren(NavigationItemHeader)
     assert panel.expandWidth == 220
     user.navigationInterface.expand(useAni=False)
@@ -218,7 +218,7 @@ def test_agent_activity_blocks_user_start_but_not_navigation_or_settings(windows
         with pytest.raises(StartError):
             user.start_plan()
         user.switchTo(user.general_settings)
-        assert user.pages.currentIndex() == 1 and user.pages.isEnabled()
+        assert user.pages.currentWidget() is user.general_settings and user.pages.isEnabled()
         assert user.close()
         assert owner.user is None and owner.developer is developer
         assert developer.service.state['activity'] == 'Agent'

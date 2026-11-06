@@ -184,6 +184,7 @@ class WorkflowExecutor:
         ocr: Callable[..., dict[str, Any]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
+        debug_screenshot: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
     ) -> None:
         self.task_results: list[dict[str, Any]] = []
@@ -192,6 +193,7 @@ class WorkflowExecutor:
         self.gate = gate
         self.emit = emit
         self._save_screenshot = save_screenshot
+        self._debug_screenshot = debug_screenshot
         self._capture_screen = capture_screen
         self._control_input = control_input
         self._check_input = check_input
@@ -669,6 +671,9 @@ class WorkflowExecutor:
         while True:
             self.gate.checkpoint()
             try:
+                if logical_name in {"control.click", "control.drag", "observe.ocr", "observe.match_asset"}:
+                    fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
+                              else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")
             except UserInterruption as error:
                 if (error.reason == "cancel" or caller.role == "recovery_rule"
@@ -793,6 +798,8 @@ class WorkflowExecutor:
         """统一记录调用、耗时和完整异常；保留已归一错误，只有原始错误需包装。"""
 
         fields = {"manifest_id": self.manifest.manifest_id, "inputs": {}, **fields, "phase": phase}
+        if event == "trusted_action":
+            fields = {**fields, "level": "debug"}
         self.emit(f"{event}_started", fields)
         started = time.monotonic()
         self._frames.append(_Frame(

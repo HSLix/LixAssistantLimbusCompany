@@ -6,6 +6,7 @@ import ctypes
 import struct
 import time
 import zlib
+from datetime import UTC, datetime
 from ctypes import wintypes
 from pathlib import Path
 from typing import Any, Callable
@@ -26,6 +27,7 @@ class FocusedAutomationSession:
         self.image: bytes | None = None
         self.size: tuple[int, int] | None = None
         self.observation = 0
+        self.captured_at: str | None = None
 
     def connect(self) -> dict[str, Any]:
         """唯一匹配后只恢复并置前一次，随后核验真实前台状态。"""
@@ -96,6 +98,7 @@ class FocusedAutomationSession:
         self.image = pixels
         self.size = (info["width"], info["height"])
         self.observation += 1
+        self.captured_at = datetime.now(UTC).isoformat()
         result = {"observation": self.observation, "width": info["width"], "height": info["height"]}
         self.emit("screenshot_refreshed", result)
         return result

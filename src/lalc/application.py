@@ -282,8 +282,19 @@ class ApplicationService:
         observation = session.observation
         path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
         evidence_id = f"{run_id}/{observation}"
-        saved = session.save(path, evidence_id=evidence_id)
-        return {"observation": observation, "evidence_path": saved["path"], "evidence_id": evidence_id}
+        session.check()
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise WindowError("Screenshot evidence path is not a regular file.")
+        if not path.exists():
+            session.save(path, evidence_id=evidence_id)
+        return {"observation": observation, "evidence_path": str(path), "evidence_id": evidence_id,
+                "captured_at": session.captured_at}
+
+    def _debug_screenshot(self) -> dict[str, Any]:
+        """关联动作已有帧；无图不截图，有图则沿用正式证据写入边界。"""
+        if self._focused_session is None or self._focused_session.image is None:
+            return {"image_unavailable": True}
+        return self._save_screenshot()
 
     def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]]:
         """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
@@ -558,6 +569,7 @@ class ApplicationService:
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
             capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
+            debug_screenshot=self._debug_screenshot,
             control_input=self._control_input, check_input=self._check_input,
             prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,

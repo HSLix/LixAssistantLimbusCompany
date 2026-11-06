@@ -493,6 +493,15 @@ references; it never captures again. Multiple references to one observation use 
 or invalid screenshots and evidence/Trace write failures propagate through the existing failure boundary.
 Plain text logs require no screenshot. Direct entry and all tasks in a Plan share their Run Trace.
 
+2026-11-06: Trusted Action invocation events additionally carry `level=debug`; the terminal
+returned/failed/interrupted event is one visible automatic Debug log item. Click/Drag associate the
+existing pre-action frame, OCR/Match Asset the frame actually used, via optional `debug_image` evidence
+and capture time. No extra capture is triggered; no frame is marked unavailable without blocking the
+action. Evidence writes retain the existing failure boundary and reuse an already saved observation.
+Original images remain unchanged; viewers draw annotations from action inputs/results. This applies to
+all executor-backed runs and trials, not independent GUI diagnostics; `ctx.log` remains unavailable
+inside a Trusted Action. See [Run Logs](user-run-logs.md).
+
 `level` accepts only `debug`, `info`, `warning`, and `error`, case-insensitively, and is stored
 as lowercase in the event's `level` field. Omitting it records `info`. Other values (including
 non-strings, aliases such as `warn`, and strings with surrounding whitespace) raise `ValueError`

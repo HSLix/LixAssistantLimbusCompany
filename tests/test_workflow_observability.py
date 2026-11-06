@@ -144,3 +144,42 @@ def test_formal_match_center_passes_through_action_validation_as_tuple(tmp_path)
     assert type(matched['detections'][0]['centerxy']) is list
     clicked = next(e for e in state['trace'] if e['event'] == 'trusted_action_started' and e['logical_name'] == 'control.click')
     assert clicked['inputs']['centerxy'] == list(matched['detections'][0]['centerxy'])
+
+
+def test_action_debug_records_reuse_capture_and_keep_matching_results(tmp_path):
+    """动作自动 Debug 与业务日志分开，识别和输入共用原始证据帧。"""
+    service, window, manifest = make_service(tmp_path,
+        '    ctx.action("observe.capture_screen")\n'
+        '    matches = ctx.action("observe.match_asset", asset="ui/claim", threshold=0.999)\n'
+        '    ctx.action("control.click", centerxy=matches[0]["centerxy"])\n'
+        '    ctx.action("control.wait", seconds=0)\n')
+    entry(tmp_path, 'ui/claim')
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    assert state['result']['status'] == 'success'
+    ended = [e for e in state['trace'] if e['event'] == 'trusted_action_returned']
+    assert len(ended) == 4 and all(e['level'] == 'debug' for e in ended)
+    matched, clicked = ended[1:3]
+    assert len(matched['return_value']) == 2
+    assert matched['debug_image'] == clicked['debug_image']
+    assert matched['debug_image']['captured_at'] <= clicked['recorded_at']
+    assert window.captures == 1
+    assert sum(e['event'] == 'screenshot_saved' for e in state['trace']) == 1
+
+
+@pytest.mark.parametrize('outcome', ['failed', 'interrupted'])
+def test_action_debug_preserves_failure_or_interruption(tmp_path, monkeypatch, outcome):
+    """动作异常仍沿原边界传播，失败／取消记录保留尝试坐标和已有截图。"""
+    from lalc.runtime import UserInterruption
+    service, window, manifest = make_service(tmp_path,
+        '    ctx.action("observe.capture_screen")\n'
+        '    ctx.action("control.click", x=3, y=2)\n')
+    error = ValueError('test click failed') if outcome == 'failed' else UserInterruption('cancel')
+    def fail(*_):
+        raise error
+    monkeypatch.setattr(service, '_control_input', fail)
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    event = next(e for e in state['trace'] if e['event'] == f'trusted_action_{outcome}')
+    assert event['level'] == 'debug'
+    assert event['inputs']['x'] == 3 and event['inputs']['y'] == 2
+    assert event['debug_image']['observation'] == 1
+    assert state['result']['status'] != 'success'

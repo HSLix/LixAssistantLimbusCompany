@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-06 User GUI 新增按需加载的运行日志页，支持级别／全文／图片筛选、阅读锚点、长文本折叠和截图标注；共用执行器自动保留 Trusted Action Debug。设计、影响与限制见[运行日志页](user-run-logs.md)，不代表 Windows 或真实游戏验收。
+
 2026-11-06 Developer SOP 迁入数据目录 Skills，采用 pi 原生元数据发现、按需只读加载和每轮固定副本；原 SOP 已在内容承接后移除。用法见 [Developer Skills](agent-skills.md)，设计及验证见[实施记录](agent-skills-implementation.md)；不代表真实模型、Windows 成品或游戏验收。
 
 2026-11-06 Developer 在 Capture 下方新增模板匹配调试页：增量素材树、整组／单图选择、独立固定截图及真实参数匹配，不写运行使用索引。设计、影响审查与用法见[模板匹配调试页](template-match-lab.md)；Windows 与真实游戏待验收。
