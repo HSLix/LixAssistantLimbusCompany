@@ -41,7 +41,7 @@ def test_three_level_example_and_all_production_actions(tmp_path):
         assert persisted == state["trace"]
         traces.extend(state["trace"])
         return state
-    state = run("tasks.exp", {})
+    state = run("tasks.mirror", {})
     entered = [e["role"] for e in state["trace"] if e["event"] == "component_started"]
     assert entered == ["task_workflow", "sub_workflow", "step", "step"]
     assert Path(state["result"]["output"]["evidence_path"]).is_file()
@@ -50,18 +50,18 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     assert {record["workflow_kind"] for record in ledger["records"]} == {"task", "sub"}
     assert all(record["result"] == "success" and record["agent_invocations"] == 0 for record in ledger["records"])
     for entry, inputs in [
-        ("steps.click", {"x": 2, "y": 1}),
-        ("steps.key_press", {"key": "esc"}),
-        ("steps.drag", {"x": 2, "y": 1, "end_x": 4, "end_y": 3, "seconds": 0.0}),
+        ("click", {"x": 2, "y": 1}),
+        ("key_press", {"key": "esc"}),
+        ("drag", {"x": 2, "y": 1, "end_x": 4, "end_y": 3, "seconds": 0.0}),
     ]:
-        state = run(entry, inputs)
+        state = run("steps.actions", {"operation": entry, **inputs})
         assert any(e["event"] == "input_released" for e in state["trace"])
-    crop = run("steps.crop", {"asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2}})["result"]["output"]
+    crop = run("steps.actions", {"operation": "crop", "asset": "ui/claim", "region": {"x": 2, "y": 1, "width": 2, "height": 2}})["result"]["output"]
     service = ApplicationService(manager.data_root, manifest_manager=manager, game_language="zh")
     assert service.tag_asset("ui/claim", Path(crop["image_path"]), ["zh"])["tags"] == ["zh"]
-    detections = run("steps.match", {"asset": "ui/claim", "threshold": 0.999})["result"]["output"]
+    detections = run("steps.actions", {"operation": "match", "asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
-    assert run("steps.ocr", {"min_score": 0.9})["result"]["output"]["items"][0]["text"] == "战斗开始"
+    assert run("steps.actions", {"operation": "ocr", "min_score": 0.9})["result"]["output"]["items"][0]["text"] == "战斗开始"
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())
 
 

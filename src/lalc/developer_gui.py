@@ -330,9 +330,10 @@ def capture_tags(text: str) -> list[str]:
 class OcrView(CropView):
     """在原图展示识别框；标注不写回截图像素或影响框选。"""
 
-    def __init__(self):
+    def __init__(self, *, color=Qt.GlobalColor.green, line_width=2):
         super().__init__()
         self.items = []
+        self.color, self.line_width = color, line_width
 
     def paintEvent(self, event):
         super().paintEvent(event)
@@ -340,7 +341,7 @@ class OcrView(CropView):
         if rect.isEmpty():
             return
         painter = QPainter(self)
-        painter.setPen(QPen(Qt.GlobalColor.green, 2))
+        painter.setPen(QPen(self.color, self.line_width))
         sx, sy = rect.width() / self.image.width(), rect.height() / self.image.height()
         for number, item in enumerate(self.items, 1):
             box = item["box"]
@@ -509,23 +510,41 @@ class CapturePage(QWidget):
             asset_name(name)
             self.host.service.asset_library.tags(tags)
             snapshot = self.host.preview
-            pixels, size, _ = snapshot
-            content, _ = self.host.service.asset_library.crop_content(pixels, size, region)
-            dialog = QDialog(self)
-            dialog.setWindowTitle(tr('Confirm Asset save'))
-            body = QVBoxLayout(dialog)
-            body.addWidget(QLabel(tr('{0}\nTags: {1}\nOriginal pixel region: {2}').format(name, json.dumps(tags, ensure_ascii=False), region)))
-            label = QLabel()
-            label.setPixmap(QPixmap.fromImage(QImage.fromData(content)).scaled(640, 400, Qt.AspectRatioMode.KeepAspectRatio))
-            body.addWidget(label)
-            controls = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-            controls.accepted.connect(dialog.accept)
-            controls.rejected.connect(dialog.reject)
-            body.addWidget(controls)
-            if dialog.exec() == QDialog.DialogCode.Accepted:
-                self.window.launch(lambda: self.host.save_crop(name, region, tags, preview=snapshot),
-                                   lambda value: self.region_label.setText(tr('Saved: {0}').format(value['image_path'])))
+            def shown(result):
+                content, matches = result
+                self.show_save_preview(name, tags, region, snapshot, content, matches)
+            self.window.launch(lambda: self.host.match_crop_preview(snapshot, region), shown)
         self.window._interact(preview)
+
+    def show_save_preview(self, name, tags, region, snapshot, content, matches):
+        """编号展示同图匹配；仅确认后保存固定原始像素，覆盖层不进入模板。"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr('Confirm Asset save'))
+        body = QVBoxLayout(dialog)
+        body.addWidget(QLabel(tr('{0}\nTags: {1}\nOriginal pixel region: {2}').format(name, json.dumps(tags, ensure_ascii=False), region)))
+        label = QLabel()
+        label.setPixmap(QPixmap.fromImage(QImage.fromData(content)).scaled(640, 200, Qt.AspectRatioMode.KeepAspectRatio))
+        body.addWidget(label)
+        view = OcrView(color=Qt.GlobalColor.red, line_width=1)
+        view.set_image(snapshot[0], snapshot[1])
+        view.items = [{"box": match} for match in matches]
+        view.setEnabled(False)
+        body.addWidget(view, 3)
+        results = QPlainTextEdit()
+        results.setReadOnly(True)
+        results.setAccessibleName(tr('Template match scores (threshold: 0.8)'))
+        results.setPlainText(tr('Template match scores (threshold: 0.8)') + "\n" + (
+            "\n".join(f'{number}. {match["score"]!r}' for number, match in enumerate(matches, 1))
+            or tr('No matches.')))
+        body.addWidget(results, 1)
+        dialog.resize(900, 720)
+        controls = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        controls.accepted.connect(dialog.accept)
+        controls.rejected.connect(dialog.reject)
+        body.addWidget(controls)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.window.launch(lambda: self.host.save_crop(name, region, tags, preview=snapshot),
+                               lambda value: self.region_label.setText(tr('Saved: {0}').format(value['image_path'])))
 
     def render(self, busy):
         for control in (self.capture_button, self.save_button, self.resize_button, self.window_width, self.window_height):

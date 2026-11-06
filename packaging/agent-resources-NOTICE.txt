@@ -1,6 +1,6 @@
 LALC bundled Agent resources
 
-pi 1.4.0: https://github.com/earendil-works/pi (MIT; pi/LICENSE.txt)
+pi 1.5.0: https://github.com/earendil-works/pi (MIT; pi/LICENSE.txt)
 codesearch 1.7.9 base build: https://github.com/flupkede/codesearch
 Apache-2.0; agent/codesearch-LICENSE.txt. No SCIP helper is included.
 

@@ -160,7 +160,7 @@ def test_windows_native_dpapi_roundtrip_and_corruption(tmp_path):
         settings.resolve_key(arguments(), {"secret_name": "named-service"}, tmp_path)
 
 
-@pytest.mark.parametrize("version", ["0.86.1", "1.4.0", "0.85.0"])
+@pytest.mark.parametrize("version", ["0.86.1", "1.4.0", "1.5.0"])
 def test_pi_version_mismatch_warns_and_continues(monkeypatch, tmp_path, caplog, capsys, version):
     """版本差异不阻止启动；日志、终端及 GUI 共用事件包含实际版本。"""
     import logging

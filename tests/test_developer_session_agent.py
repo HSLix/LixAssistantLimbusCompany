@@ -24,6 +24,43 @@ from test_developer_gui import gui
 pytestmark = pytest.mark.agent
 
 
+def test_large_page_source_streamed_in_fragments(conversation):
+    """长源码经分段工具参数传输后完整落盘，不丢中文、引号或换行。"""
+    from lalc.page_drafts import PageDrafts
+    from test_page_drafts import SOURCE
+    original, options, state = conversation
+    chat = DeveloperSession.create(original.host.service, None, mode='Construct', entry='gui').conversation()
+    source = SOURCE + ('\n# 中文 "quoted" \\ escaped' * 10000) + '\n'
+    arguments = json.dumps({'filename': 'large.py', 'source': source}, ensure_ascii=False)
+    changes = [{'role': 'assistant', 'tool_calls': [{'index': 0, 'id': 'large-page', 'type': 'function',
+                'function': {'name': 'page_create', 'arguments': ''}}]}]
+    changes.extend({'tool_calls': [{'index': 0, 'function': {'arguments': arguments[offset:offset + 128]}}]}
+                   for offset in range(0, len(arguments), 128))
+    script(state, [(changes, 'tool_calls'), answer('created')])
+    result = asyncio.run(chat.run('创建长源码页面草稿', options))
+    assert result['status'] == 'completed' and result['requests'] == 2, result
+    assert PageDrafts(chat.session).snapshot('large.py')['source'] == source.encode()
+
+
+@pytest.mark.parametrize('name,arguments', [
+    ('page_create', {'source': 'invalid'}),
+    ('page_create', {'filename': 'invalid.py', 'source': {'invalid': True}}),
+    ('page_list', {'limit': 0}),
+    ('page_list', {'scope': 'outside'}),
+])
+def test_invalid_tool_arguments_return_error_without_changing_drafts(conversation, name, arguments):
+    """新参数校验器拒绝缺字段、错误类型和越界值；错误回到模型且无草稿副作用。"""
+    original, options, state = conversation
+    chat = DeveloperSession.create(original.host.service, None, mode='Construct', entry='gui').conversation()
+    script(state, [tool(name, arguments), answer('invalid arguments handled')])
+    result = asyncio.run(chat.run('检查无效参数', options))
+    assert result['status'] == 'completed' and result['requests'] == 2, result
+    returned = [item for item in chat.history if item.get('toolName') == name]
+    assert returned[-1]['isError']
+    assert any(message.get('role') == 'tool' for message in state['calls'][-1]['messages'])
+    assert not (chat.session.path / 'page-drafts').exists()
+
+
 @pytest.mark.parametrize('mode', ['Construct', 'Repair'])
 def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mode):
     """页面工具仅 Construct 声明；源码保存和预览结果经真实 pi 回到同轮。"""
@@ -69,7 +106,7 @@ def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mod
 
 @pytest.mark.parametrize('invalid_first', [False, True])
 def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_first):
-    """真实 GUI → pi → 双页审查 → 人工点击安装 → 同轮继续，不自动重载。"""
+    """真实 GUI 安装后同轮继续，清理结束才提示重启，取消提示不重载。"""
     from PySide6.QtCore import QTimer
     from lalc.agent_settings import save_settings
     from test_page_drafts import SOURCE
@@ -109,7 +146,11 @@ def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_fir
     assert (window.service.data_root / 'pages/sample/page.py').read_text() == SOURCE
     assert read_json(session.path / 'log/result.json')['status'] == 'completed'
     assert any(message.get('role') == 'tool' and 'reload_required' in str(message) for message in state['calls'][-1]['messages'])
-    assert app.activeModalWidget() is None and window.service.state['activity'] is None
+    notice = window.page_installed_dialog
+    assert app.activeModalWidget() is notice and window.service.state['activity'] is None
+    notice.cancel.click()
+    app.processEvents()
+    assert app.activeModalWidget() is None
     results = [item for item in session.host.conversation.history if item.get('toolName') == 'page_preview']
     if invalid_first:
         assert len(results) == 2

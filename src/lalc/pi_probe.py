@@ -20,7 +20,7 @@ from urllib.error import HTTPError, URLError
 from .agent_diagnostics import AgentDiagnosticError, redact
 
 
-PI_VERSION = "1.4.0"
+PI_VERSION = "1.5.0"
 _spawn_lock = threading.Lock()
 
 

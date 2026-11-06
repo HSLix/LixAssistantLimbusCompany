@@ -36,7 +36,7 @@ See [Windows build and resource preparation](docs/windows-packaging.md), [Workfl
 pi runs Agent conversations. Deterministic Workflows do not require pi or a model service. LALC does not automatically install pi or read another pi instance's personal configuration.
 
 - **with-agent package**: uses the bundled `pi/pi.exe` first, then an installed pi if the bundled program is unavailable.
-- **without-agent package / source**: install pi for your platform and add the directory containing `pi.exe` (`pi` on other platforms) to `PATH`. The verified integration baseline is **pi 1.4.0**; other versions produce a warning and require separate compatibility checks. CLI Repair also accepts `--pi <absolute-path-to-pi>`.
+- **without-agent package / source**: install pi for your platform and add the directory containing `pi.exe` (`pi` on other platforms) to `PATH`. The verified integration baseline is **pi 1.5.0**; other versions produce a warning and require separate compatibility checks. CLI Repair also accepts `--pi <absolute-path-to-pi>`.
 
 For example, in PowerShell, with pi extracted to `C:\Tools\pi`:
 

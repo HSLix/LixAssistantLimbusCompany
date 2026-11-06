@@ -108,3 +108,55 @@ def test_capture_defaults_and_magnifier_tracks_original_pixels_without_changing_
     assert view.magnifier.isHidden()
     page.render(True)
     assert not page.resize_button.isEnabled()
+
+
+def test_capture_match_preview_uses_default_algorithm_and_cancel_does_not_save(gui, monkeypatch):
+    """同图默认匹配、编号分数与红框一致，取消不保存或重新截图。"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor
+    from PySide6.QtWidgets import QDialog
+    from qfluentwidgets import PlainTextEdit
+    from lalc.developer_gui import OcrView
+    from lalc.assets import AssetLibrary
+    from lalc.recognition import detect_template
+    from test_assets import pixels, screenshot, template
+    app, window = gui
+    page = window.capture_page
+    image = screenshot()
+    snapshot = (pixels(image), (12, 8), 7)
+    window.host.preview = snapshot
+    page.view.set_image(snapshot[0], snapshot[1])
+    region = dict(x=2, y=1, width=2, height=2)
+    page.view.region = region
+    page.name.setText('ui/match-preview')
+    expected = detect_template(image, template(), threshold=0.8)
+    assert len(expected) == 2
+    content, matches = window.host.match_crop_preview(snapshot, region)
+    assert matches == expected
+    assert content == AssetLibrary.crop_content(snapshot[0], snapshot[1], region)[0]
+    checked = []
+    def inspect(dialog):
+        view = dialog.findChild(OcrView)
+        assert view.items == [{"box": match} for match in expected]
+        assert view.color == Qt.GlobalColor.red and view.line_width == 1
+        view.resize(600, 400)
+        plain = OcrView()
+        plain.set_image(snapshot[0], snapshot[1])
+        plain.resize(view.size())
+        assert view.image == plain.image
+        marked = view.grab().toImage()
+        assert marked != plain.grab().toImage()
+        rect = view.image_rect()
+        assert marked.pixelColor(rect.x() + round(2 * rect.width() / 12),
+                                 rect.y() + round(2 * rect.height() / 8)) == QColor('red')
+        text = dialog.findChild(PlainTextEdit).toPlainText()
+        assert text.splitlines()[1:] == [f'{i}. {match["score"]!r}' for i, match in enumerate(expected, 1)]
+        checked.append(True)
+        # 即使当前截图被替换，弹窗仍展示固定快照。
+        window.host.preview = (bytes(len(snapshot[0])), snapshot[1], 8)
+        return QDialog.DialogCode.Rejected
+    monkeypatch.setattr(QDialog, 'exec', inspect)
+    page.save()
+    wait_jobs(app, window)
+    assert checked == [True]
+    assert not (window.service.asset_library.root / 'ui/match-preview').exists()

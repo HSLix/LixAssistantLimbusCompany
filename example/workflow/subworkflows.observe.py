@@ -5,4 +5,4 @@ from lalc import RunContext, sub_workflow
 @sub_workflow
 def execute(ctx: RunContext, *, save: bool = True) -> dict[str, int | str]:
     """通过 Step 获取当前客户区的观察信息。"""
-    return ctx.call("steps.capture", save=save)
+    return ctx.call("steps.actions", operation="capture", save=save)
