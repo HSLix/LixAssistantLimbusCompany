@@ -160,3 +160,38 @@ def test_expand_command_keeps_existing_output(tmp_path, monkeypatch):
     with pytest.raises(SystemExit) as error:
         main()
     assert error.value.code == 1 and json.loads(output.read_text()) == value
+
+
+def test_round_reader_is_lazy_incremental_and_keeps_noncontiguous_rounds(tmp_path):
+    from lalc.agent_log import RoundEventReader
+    log = RepairLog(tmp_path)
+    body = {'type': 'session_message', 'message': {'role': 'user', 'content': [
+        {'type': 'text', 'text': 'old content ' * 1000}]}}
+    log.group = 1
+    log.record(body)
+    log.group = 2
+    log.record({'type': 'lalc_request', 'requests': 3})
+    # 历史内容损坏不妨碍索引和读取新轮次，访问该轮时仍必须报错。
+    object_path = next(log.root.glob('objects/*.txt'))
+    object_path.write_text('corrupt')
+    reader = RoundEventReader(log.root / 'events.jsonl')
+    reader.refresh()
+    assert reader.read(2)[0]['event']['requests'] == 3
+    with pytest.raises(ValueError):
+        reader.read(1)
+    log.group = 1
+    log.record({'type': 'round_interrupted'})
+    reader.refresh()
+    reader.refresh()
+    assert len(reader.rounds[1]) == 2
+    assert len(reader.rounds[2]) == 1
+
+
+def test_round_reader_rejects_event_file_symlink_before_indexing(tmp_path):
+    from lalc.agent_log import RoundEventReader
+    log = RepairLog(tmp_path)
+    outside = tmp_path / 'outside.jsonl'
+    outside.write_text('{"round":1,"event":{}}\n')
+    (log.root / 'events.jsonl').symlink_to(outside)
+    with pytest.raises(ValueError, match='符号链接'):
+        RoundEventReader(log.root / 'events.jsonl').refresh()

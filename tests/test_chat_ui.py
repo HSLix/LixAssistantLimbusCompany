@@ -332,3 +332,108 @@ def test_live_retry_and_budget_failure_keep_one_diagnostic_per_failed_response(g
     page.answered({'reason': 'request_limit', 'requests': 20, 'diagnostics': {**details, 'budget_exhausted': True}})
     assert page.diagnostics.errors.count() == 2
     assert page.diagnostics.errors.itemData(1)['budget_exhausted']
+
+
+def test_history_loads_latest_round_then_prepends_on_scroll_without_replay(gui, monkeypatch):
+    app, window = gui
+    page = window.repair_page
+    log = page.host.conversation.log
+    for number in range(1, 5):
+        log.group = number
+        (log.root / f'round-{number}').mkdir()
+        log.record({'type': 'session_message', 'message': {'role': 'user', 'content': [
+            {'type': 'text', 'text': f'question {number}\n' * 30}]}})
+        for index in range(20):
+            log.record({'type': 'tool_execution_start', 'toolCallId': f'call-{index}', 'toolName': 'read'})
+            log.record({'type': 'tool_execution_end', 'toolCallId': f'call-{index}',
+                        'toolName': 'read', 'result': {}})
+        log.record({'type': 'message_end', 'message': {'role': 'assistant', 'content': [
+            {'type': 'text', 'text': '{"revise_success":false,"message":"answer %s"}' % number}]}})
+        log.save_json(f'round-{number}/result.json', {'status': 'completed', 'reason': 'answered'})
+    window.show()
+    window.switchTo(page)
+    app.processEvents()
+    renders = []
+    original = page.chat.setHtml
+    monkeypatch.setattr(page.chat, 'setHtml', lambda html: (renders.append(html), original(html))[-1])
+    monkeypatch.setattr(page.session, 'restore', lambda *_: pytest.fail('视图不得重新恢复完整模型历史'))
+    page.reload_history()
+    assert {entry['round'] for entry in page.chat.entries} == {4}
+    assert len(renders) <= 2
+    assert page.history_rounds == [1, 2, 3]
+    status = page.status.text(), page.status.toolTip()
+    while page.history_rounds:
+        previous = min(entry['round'] for entry in page.chat.entries)
+        bar = page.chat.verticalScrollBar()
+        assert bar.value() > 0
+        bar.setValue(0)
+        cursor = page.chat.cursorForPosition(QPoint(0, 0))
+        old_block = cursor.block().text()
+        wait_jobs(app, window)
+        assert min(entry['round'] for entry in page.chat.entries) == previous - 1
+        assert bar.value() > 0
+        assert page.chat.cursorForPosition(QPoint(0, 0)).block().text() == old_block
+        assert (page.status.text(), page.status.toolTip()) == status
+    numbers = [entry['round'] for entry in page.chat.entries]
+    assert numbers == sorted(numbers)
+    assert len(page.chat.tools) == 80
+    assert all(entry['status'] == '成功' for entry in page.chat.tools.values())
+    assert all(len(activity['messages']) == 1 for number, activity in page.chat.activities.items() if number)
+    assert page.chat.activity_round == 4
+    page.new()
+    assert not page.history_rounds and page.history_reader is None
+
+
+def test_short_history_can_load_older_round_with_wheel(gui):
+    from PySide6.QtCore import QPointF
+    from PySide6.QtGui import QWheelEvent
+    app, window = gui
+    page = window.repair_page
+    log = page.host.conversation.log
+    for number in (1, 2):
+        log.group = number
+        log.record({'type': 'session_message', 'message': {'role': 'user', 'content': [
+            {'type': 'text', 'text': f'question {number}'}]}})
+    page.reload_history()
+    assert page.chat.verticalScrollBar().value() == 0
+    wheel = QWheelEvent(QPointF(10, 10), QPointF(10, 10), QPoint(), QPoint(0, 120),
+                        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                        Qt.ScrollPhase.NoScrollPhase, False)
+    QApplication.sendEvent(page.chat.viewport(), wheel)
+    wait_jobs(app, window)
+    assert [entry['round'] for entry in page.chat.entries] == [1, 2]
+    assert not page.history_rounds
+
+
+def test_open_history_prepares_only_latest_round_in_background(gui, monkeypatch):
+    from lalc.agent_log import RoundEventReader
+    from lalc.developer_session import DeveloperSession
+    app, window = gui
+    page = window.repair_page
+    log = page.host.conversation.log
+    for number in (1, 2):
+        log.group = number
+        (log.root / f'round-{number}').mkdir()
+        log.record({'type': 'session_message', 'message': {'role': 'user', 'content': [
+            {'type': 'text', 'text': f'question {number}'}]}})
+        log.save_json(f'round-{number}/result.json', {'status': 'completed', 'reason': 'answered'})
+    main_thread = threading.get_ident()
+    reads, restores = [], []
+    original_read, original_restore = RoundEventReader.read, DeveloperSession.restore
+    def read(self, number):
+        reads.append((number, threading.get_ident()))
+        return original_read(self, number)
+    def restore(self, chat, *, load_history=True):
+        restores.append(load_history)
+        return original_restore(self, chat, load_history=load_history)
+    monkeypatch.setattr(RoundEventReader, 'read', read)
+    monkeypatch.setattr(DeveloperSession, 'restore', restore)
+    identity = page.session.identity
+    page.new()
+    item = next(page.history.item(i) for i in range(page.history.count())
+                if page.history.item(i).data(Qt.ItemDataRole.UserRole) == identity)
+    page.open_session(item)
+    wait_jobs(app, window)
+    assert restores == [False]
+    assert len(reads) == 1 and reads[0][0] == 2 and reads[0][1] != main_thread
+    assert {entry['round'] for entry in page.chat.entries} == {2}

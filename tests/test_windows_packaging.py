@@ -167,10 +167,18 @@ def test_acceptance_sample_uses_real_plan_boundaries(tmp_path, monkeypatch, mess
     service = application.ApplicationService(tmp_path, manifest_manager=manager)
     service.start_plan(manifest_id=published.loaded.manifest_id, task_repetitions={"exp": 3},
                        settings={"exp": {"message": message}})
-    result = service.wait_for(lambda state: state["phase"] == "finished")["result"]
+    state = service.wait_for(lambda state: state["phase"] == "finished")
+    result = state["result"]
     service.shutdown()
     assert result["status"] == status, result
     assert [item["status"] for item in result["items"]] == outcomes
+    messages = [event["message"] for event in state["trace"] if event["event"] == "component_log"]
+    for index, item in enumerate(result["items"]):
+        assert f"tasks.acceptance (exp) 第 {index + 1}/3 次 status={item['status']}" in messages
+        if item["status"] == "failure":
+            assert f"failure_code={item['failure_code']} failure_message={item['failure_message']}" in messages
+        else:
+            assert f"output={item['output']}" in messages
 
 
 def test_codesearch_and_model_tampering_are_rejected(agent_resources, tmp_path):

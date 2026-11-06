@@ -27,6 +27,8 @@ uv run lalc run-plan
 
 `plan.py` 是正式源码，随本样例 Manifest 一起校验和发布；不能直接执行源码文件路径。它声明 `SUPPORTED_TASK_IDS = ["exp", "mirror"]`，读取对应页面的消息和 Dashboard 重复次数，分别调用 `tasks.exp`、`tasks.mirror`。普通任务失败后可继续，CLI 对含失败的已完成 Plan 返回 1。
 
+Plan 记录 Task 逻辑名、当前/总循环次数及 `status`；失败保留 `failure_code`、`failure_message`，成功记录 `output`。不捕获取消或不可恢复环境故障。页面 `TASK_ID` 必须出现在当前 Default Plan 的 `SUPPORTED_TASK_IDS` 中；配置属于 `settings[PAGE_ID]`，循环次数属于 `task_repetitions[TASK_ID]`。仅安装页面或重载不足以接通新任务，发布后需用户选择相应 Default。
+
 先安装 [exp、mirror 页面](../pages/README.md)，再在 GUI 选择发布的 Default Manifest，填写教学消息、勾选任务并设置次数，开始运行。每个 Task 都通过 `subworkflows.observe` → `steps.capture` 截图，再调用 `steps.wait`，最后返回含页面消息与观察证据的结果；每次 Task 调用均保留结果。运行中修改配置只影响下次执行。
 
 CLI 无页面配置快照时，直接 `run-plan` 的重复次数默认为 0；可用 `run tasks.exp` / `run tasks.mirror` 配合 `--inputs-file` 传入 `{"message":"教学消息"}`。也可独立运行下面的 Step，学习全部应用动作。
@@ -52,6 +54,8 @@ Run Result 的 `output` 含观察标识及证据路径；详细记录保存在�
 
 控制样例在动作前后显式截图，展示调用和观察顺序，不判断领取成功等业务含义。它们也不具备真实任务的安全续跑判断；被接管后应先检查游戏，无法确认适用状态就 Stop。新业务 Step 应自己识别部分完成/已完成状态，决定是否发送输入。
 
+业务 Step 还必须观察并确认完成，不能以点击返回或固定等待结束代替业务成功。Task／Subworkflow 只排布调用、传参及按 Step 结果分支、循环、汇总。点击优先复用 `ctx.action("control.click", centerxy=target["centerxy"])`，也支持完整 `x/y`，两种形式不可混用；本目录独立 `steps.click` 演示的是 x/y 包装，其签名并不自动支持 Action 的 centerxy 参数，不能原样套用。
+
 ## 裁剪、标签、匹配
 
 未准备模板时可直接运行 `steps.crop`，它会重新截图并返回 image_path、完整哈希和来源。可选 tags 默认为空列表；图片保存后就参与匹配。检查裁剪图后，可继续设置标签：
@@ -63,6 +67,8 @@ uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags zh event
 无需 Candidate、publish 或重新 set-default。标签用新列表整体覆盖，保留输入顺序及重复项；省略标签或传空列表将清空已有标签。图片使用 `assets/ui/claim/<完整哈希>.png`，标签位于同目录的 asset-tag.json；缺记录也按无标签参与匹配，不接受任意外部 PNG 导入。
 
 直接运行 steps.match，输入文件可为 `{"asset":"ui/claim","priority_tags":["zh"],"threshold":0.9}`。优先组内全部模板匹配，命中则不匹配其余组；未命中才尝试剩余全部模板。priority_tags 默认为 None，无优先条件时全部匹配。结果统一 NMS 和分数排序，标签是普通描述，不自动根据游戏语言选择。
+
+该 Step 保留完整命中及 centerxy、分数、来源等字段；多匹配不自动失败、不视为没有目标，也不要求全部动作。业务 Step 判断歧义并通过 `ctx.log` 记录 warning 语义，按业务需要选择目标，再确认动作结果。
 
 crop-asset CLI 可现场裁剪并配置 tags；observe.crop_asset 也能传 tags。每次匹配重新读取目录及标签，同一个 Run 内新增图片或改标签从下一次匹配生效，Manifest 切换不切换素材。
 

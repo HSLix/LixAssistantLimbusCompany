@@ -1,4 +1,4 @@
-"""覆盖三层样例发布、动作调用、裁剪设置标签后直接匹配，以及持久执行证据。
+"""覆盖三层样例发布、动作调用、完整匹配、Plan 成败日志及失败后继续调度。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_example_workflow.py
@@ -8,6 +8,8 @@ import json
 import shutil
 from pathlib import Path
 from types import SimpleNamespace
+
+import pytest
 
 from lalc.actions import application_actions
 from lalc.application import ApplicationService
@@ -63,7 +65,8 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())
 
 
-def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
+@pytest.mark.parametrize("fail_exp", [False, True])
+def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path, fail_exp):
     """两个真实页面的配置、循环次数进入已发布 Plan，并产生动作及 Task 记录。"""
     from PySide6.QtWidgets import QApplication
     from qfluentwidgets import FluentIcon
@@ -72,7 +75,14 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     example = Path(__file__).resolve().parents[1] / "example"
     assert {path.name for path in example.iterdir() if not path.name.startswith(".")} == {"pages", "workflow", "acceptance"}
     manager = ManifestManager(tmp_path / "data", actions=application_actions())
-    saved = manager.publish(example / "workflow/manifest.json")
+    candidate = tmp_path / "candidate"
+    shutil.copytree(example / "workflow", candidate)
+    if fail_exp:
+        path = candidate / "exp.py"
+        path.write_text(path.read_text().replace(
+            '    observation = ctx.call("subworkflows.observe", save=save)',
+            '    raise ValueError("example: task failed")'))
+    saved = manager.publish(candidate / "manifest.json")
     assert saved.ok, saved.errors
     store = UserSettings(manager.data_root)
     pages, errors = discover_pages(example / "pages", store)
@@ -93,8 +103,18 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path):
     state = service.wait_for(lambda current: current["phase"] == "finished")
     service._thread.join()
     result = state["result"]
-    assert result["status"] == "completed" and result["all_tasks_succeeded"], result
-    assert [item["output"]["message"] for item in result["items"]] == ["exp message", "exp message", "mirror message"]
+    assert result["status"] == "completed" and result["all_tasks_succeeded"] == (not fail_exp), result
+    assert [item["status"] for item in result["items"]] == [
+        "failure" if fail_exp else "success", "failure" if fail_exp else "success", "success"]
+    assert [item["output"]["message"] for item in result["items"] if item["status"] == "success"] == (
+        ["mirror message"] if fail_exp else ["exp message", "exp message", "mirror message"])
+    messages = [event["message"] for event in state["trace"] if event["event"] == "component_log"]
+    for item, sequence in zip(result["items"], ["1/2", "2/2", "1/1"]):
+        assert f"{item['task']} 第 {sequence} 次 status={item['status']}" in messages
+        if item["status"] == "failure":
+            assert f"failure_code={item['failure_code']} failure_message={item['failure_message']}" in messages
+        else:
+            assert f"output={item['output']}" in messages
     assert {event["logical_name"] for event in state["trace"] if event["event"] == "trusted_action_started"} == {
         "observe.capture_screen", "control.wait"}
     for page in pages:

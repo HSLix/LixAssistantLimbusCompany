@@ -64,6 +64,9 @@ def test_readonly_tree_directory_images_and_actual_action_contracts(tools):
     actions = invoke(tools, "action_contracts")["details"]["actions"]
     assert [item["logical_name"] for item in actions] == list(application_actions())
     assert all("ctx" in item["signature"] and "->" in item["signature"] and item["docstring"] for item in actions)
+    click = next(item for item in actions if item["logical_name"] == "control.click")
+    assert click["signature"].index("centerxy") < click["signature"].index("x:")
+    assert 'centerxy=target["centerxy"]' in click["docstring"]
     assert "def click" not in json.dumps(actions)
     assert snapshot(tools.library.root) == before
 

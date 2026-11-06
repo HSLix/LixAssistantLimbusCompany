@@ -3,6 +3,7 @@
 from html import escape
 import json
 
+from PySide6.QtCore import Signal
 from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import QTextBrowser
 
@@ -30,14 +31,28 @@ def raw_output_text(content):
 class RepairChat(QTextBrowser):
     """用原生富文本区呈现角色与 Markdown，按调用 ID 合并可展开工具记录。"""
 
+    olderRequested = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.batch_render = False
+        self._rendering = False
         self.entries = []
         self.tools = {}
         self.activities = {}
         self.activity_round = 0
         self.setOpenLinks(False)
         self.anchorClicked.connect(self.open_link)
+        self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
+
+    def _scroll_changed(self, value):
+        if value == 0 and not self._rendering and not self.batch_render:
+            self.olderRequested.emit()
+
+    def wheelEvent(self, event):
+        if event.angleDelta().y() > 0 and self.verticalScrollBar().value() == 0:
+            self.olderRequested.emit()
+        super().wheelEvent(event)
 
     def clear(self):
         self.entries.clear()
@@ -148,6 +163,9 @@ class RepairChat(QTextBrowser):
 
     def render(self, *, follow=True):
         """只在本来位于底部时跟随新内容；查看历史与展开详情时保留滚动位置。"""
+        if self.batch_render:
+            return
+        self._rendering = True
         bar = self.verticalScrollBar()
         position = bar.value()
         at_bottom = position >= bar.maximum() - 2
@@ -208,3 +226,4 @@ class RepairChat(QTextBrowser):
         # 富文本可能延迟排版，先取得完整高度再恢复阅读位置。
         self.document().documentLayout().documentSize()
         bar.setValue(bar.maximum() if follow and at_bottom else position)
+        self._rendering = False

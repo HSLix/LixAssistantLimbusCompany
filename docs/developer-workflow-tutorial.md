@@ -25,9 +25,15 @@ Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另�
 
 初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其固定输入为 `task_repetitions: dict[str, int]` 与 `settings: dict[str, Any]`，由宿主规范化并复制；完整示例见[实施记录](stage-4-331-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
+业务 Step 负责识别当前状态、执行动作、确认完成及抛出业务异常；已完成时直接返回，预期过渡继续观察，未知或停滞状态按证据失败。完成标识可用模板、OCR 或其他可靠状态，点击返回或固定等待结束不能证明业务完成。基础截图、等待 Step 只保证自身职责。Task／Subworkflow 负责排布、传参和按 Step 结果分支、循环、汇总，不能把游戏状态检查搬到这些非恢复边界。
+
+Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败含 `failure_code`、`failure_message`。记录 Task 逻辑名、当前/总循环次数和这些字段，不把失败简化为 `unknown`；普通 Task 失败可继续，取消及不可恢复环境故障仍向外传播。完整 Trace 已由宿主记录，无需新建日志存储。
+
 ## Trusted Action 类型补全
 
 开发者从根包导入 `RunContext`，给 execute、condition 或 detect/recover 的 ctx 参数添加注解。IDE 使用项目的 Python 环境，即可补全 Action 名称、对应关键字参数和返回类型；其他 Context 成员（例如 `ctx.call()` 和 `ctx.game_language`）也保留类型信息。
+
+Agent 编写代码前读取 `action_contracts` 和已有 Component 签名。点击优先使用 `ctx.action("control.click", centerxy=target["centerxy"])`，复用匹配返回的中心点；也支持完整 `x/y`，两种形式不可混用。不要裁掉返回字段后重新计算中心。`ctx.call("steps.click", ...)` 的参数以该 Step 自身签名为准，不自动继承 Action 参数。以下独立动作样例展示直接坐标形式，不是完成业务检查的示例。
 
 ```python
 from lalc import RunContext, step
@@ -74,6 +80,8 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 
 选定批次统一 NMS（默认启用、IoU 阈值 0.5），按分数降序、同分按稳定位置和哈希返回；关闭 NMS 保留所有达标结果。结果包含模板路径、完整哈希、tag、客户区坐标、分数、归一化区域和观察 ID。未知逻辑名是错误，存在但无命中的目录返回 `[]`；哈希、解码或标签文件格式错误保留原始异常，不伪装成未找到。
 
+匹配 Step 保留全部返回结果及 `centerxy` 等字段。多匹配只代表多个候选，不自动失败、不视为没有目标，也不要求全部点击；业务 Step 根据界面含义决定如何使用，有歧义时用 `ctx.log` 记录 warning 语义和依据。不能仅靠“没有匹配到关闭按钮／角标”认定已回到主界面，应确认可靠的完成标识。
+
 每次匹配重新读取该逻辑名目录和标签，并固定本次候选/标签。新增图片或改标签从下一次匹配生效，包括同一 Run；不需要 publish 或 set-default，也不建立跨调用缓存。observe.crop_asset 同样可传 tags，始终重新截图，保存后立即可被后续匹配发现。
 
 ## 证据和边界
@@ -91,3 +99,5 @@ Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md
 Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打开扩展配置页面文件夹”会打开数据目录下的 `pages/`，目录不存在时先创建。添加、编辑或删除页面文件后，通过 General Settings 的整应用重载使其生效；此入口不授予内置 Agent 读取或编辑页面的权限。
 
 #332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/workflow/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。
+
+注册循环任务必须同时在页面声明 `TASK_ID`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[TASK_ID]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。

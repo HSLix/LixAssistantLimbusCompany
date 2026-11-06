@@ -260,7 +260,9 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 
 开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。格式纠正禁用工具，概览明确为空。每轮强制连接／图片推理预检已取消，正式请求从第 1 次计数；发送前配置／图片能力校验保持，GUI 设置页手动检查读取模型列表，不请求推理。独立 `lalc pi-probe` 已移除。
 
-开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset 对应 XML 标签内写 Markdown 流程；三段正文当前留空，说明文字不会注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset，Repair 选 Repair + Asset；轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
+开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset、Page 对应 XML 标签内写 Markdown 流程；四段正文提供默认指导，标签外说明不注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset + Page，Repair 选 Repair + Asset + Page；Page 指导不授予 Repair 页面工具权限。轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
+
+2026-11-06 指导修订：业务 Step 负责识别、动作和完成确认，Workflow 负责排布；匹配保留全部结果，多命中由业务 Step 判断歧义，不要求全部动作。点击先介绍 `centerxy` 再介绍完整 `x/y`，不丢字段后手算。循环页须同步接通 Plan 的 `SUPPORTED_TASK_IDS`，配置仍按 `PAGE_ID` 读取；Plan 保留 Task 状态和详细失败字段。Core 保留通用原则，默认 SOP 提供工作检查项；centerxy 等具体 API 用法放在 Agent 读取 ctx.action 契约的入口，不写入 Core 或 SOP。工具契约和示例同步说明，不新增 Validator 强制业务规则。决策及影响见[审查记录](agent-step-guidance-impact-review.md)，具体编写方式见[开发教程](developer-workflow-tutorial.md)。
 
 用户消息通过 `<runtime_context>` 携带模式、入口、Candidate 相对根、来源 Manifest、可编辑文件和参考附件，通过 `<user_request>` 保留用户原文。XML 仅帮助区分来源，宿主不解析正文为权限。参考附件及外部工具结果不能覆盖系统规则，历史聊天兼容旧消息格式，无需迁移。
 

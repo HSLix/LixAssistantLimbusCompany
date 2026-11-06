@@ -222,8 +222,8 @@ def test_preview_independent_memory_no_submit_and_install_exact_version(gui, dra
         assert store.path.read_bytes() == config
     finally:
         dialog.close()
-    assert app.activeModalWidget() is window.page_installed_dialog
-    window.page_installed_dialog.cancel.click()
+    assert app.activeModalWidget() is None
+    assert not hasattr(window, 'page_installed_dialog')
     # 新应用发现正式文件，配置仍按稳定 ID 进入 Dashboard / Plan。
     pages, errors = discover_pages(drafts.installed, UserSettings(root))
     assert not errors
@@ -243,8 +243,8 @@ def test_broken_current_page_still_allows_repair(gui, drafts):
     dialog.install_button.click()
     assert request.result['status'] == 'installed'
     app.processEvents()
-    assert app.activeModalWidget() is gui[1].page_installed_dialog
-    gui[1].page_installed_dialog.cancel.click()
+    assert app.activeModalWidget() is None
+    assert not hasattr(gui[1], 'page_installed_dialog')
 
 
 @pytest.mark.parametrize('source,expected', [
@@ -431,8 +431,11 @@ def test_installed_page_reload_and_real_plan_keep_formal_configuration(owner, ap
     count.setValue(2)
     enabled.setChecked(True)
     monkeypatch.setattr(owner, "restart_process", lambda windows: None)
-    developer.page_installed_dialog.restart.click()
-    developer.page_installed_dialog.wait_for_restart()
+    from lalc.page_preview import PageInstalledDialog
+    notice = PageInstalledDialog(developer)
+    notice.show()
+    notice.restart.click()
+    notice.wait_for_restart()
     assert owner.reloading
     owner.shutdown()
     owner.lifecycle.restart()
@@ -475,11 +478,14 @@ def test_install_notice_cancel_keeps_round_and_draft_editable(gui, drafts, monke
         dialog.install_button.click()
         assert request.result['status'] == 'installed'
         assert drafts.path('sample.py', 'installed').read_bytes() == request.snapshot['source']
-        notice = window.page_installed_dialog
-        assert notice.isVisible() and 'Restart LALC' in notice.message.text()
-        notice.cancel.click()
-        app.processEvents()
+        assert not hasattr(window, 'page_installed_dialog')
         assert app.activeModalWidget() is None
+    from lalc.page_preview import PageInstalledDialog
+    notice = PageInstalledDialog(window)
+    notice.show()
+    notice.cancel.click()
+    app.processEvents()
+    assert app.activeModalWidget() is None
 
 
 def test_install_notice_restart_waits_for_operation_cleanup(gui, monkeypatch):
@@ -515,3 +521,76 @@ def test_install_notice_restart_waits_for_operation_cleanup(gui, monkeypatch):
         app.processEvents()
         time.sleep(.005)
     assert restarted == [True]
+
+
+@pytest.mark.parametrize("installs,outcome", [(0, 'answered'), (1, 'answered'), (2, 'answered'),
+                                              (1, 'error'), (1, 'cancel'), (0, 'cancel'), (0, 'decline')])
+def test_round_end_prompts_once_only_for_actual_page_installations(gui, monkeypatch, installs, outcome):
+    """实际发送入口等待轮次收尾；多次安装合并，异常或取消不丢失已安装事实。"""
+    from lalc.page_preview import PreviewRequest
+    app, window = gui
+    page = window.repair_page
+    session = DeveloperSession.create(window.service, None, mode='Construct', entry='gui')
+    conversation = session.conversation()
+    page.activate_session(session)
+    drafts = PageDrafts(session)
+    drafts.create('sample.py', SOURCE)
+    requests = []
+    ready, release = threading.Event(), threading.Event()
+
+    async def run(message, args, *, on_page_preview, **kwargs):
+        for index in range(installs or (outcome == 'decline')):
+            request = PreviewRequest(drafts, drafts.snapshot('sample.py'), '安装测试',
+                                     (session.identity, conversation.log.group, index))
+            requests.append(request)
+            on_page_preview(request)
+            while not request.done.is_set():
+                await asyncio.sleep(.005)
+            assert request.result['status'] == ('not_installed' if outcome == 'decline' else 'installed')
+        ready.set()
+        while not release.is_set():
+            await asyncio.sleep(.005)
+        if outcome == 'error':
+            raise RuntimeError('injected round failure')
+        return {'reason': 'answered', 'answer': {'message': '完成'}, 'requests': 0}
+
+    monkeypatch.setattr(conversation, 'run', run)
+    page.message.setPlainText('安装页面')
+    page.send()
+    for index in range(installs or (outcome == 'decline')):
+        until = time.monotonic() + 3
+        while time.monotonic() < until:
+            app.processEvents()
+            dialog = getattr(page, 'page_preview_dialog', None)
+            if len(requests) > index and dialog and dialog.request is requests[index]:
+                break
+            time.sleep(.005)
+        else:
+            pytest.fail('没有收到页面预览')
+        if outcome == 'decline':
+            dialog.close_button.click()
+        else:
+            dialog.install_button.click()
+        assert not hasattr(window, 'page_installed_dialog')
+    until = time.monotonic() + 3
+    while not ready.is_set() and time.monotonic() < until:
+        app.processEvents()
+        time.sleep(.005)
+    assert ready.is_set() and window.jobs
+    assert not hasattr(window, 'page_installed_dialog')
+    if outcome == 'cancel':
+        window.cancel_operation()
+    else:
+        release.set()
+    wait_jobs(app, window)
+    if installs:
+        notice = window.page_installed_dialog
+        assert notice.isVisible()
+        notice.cancel.click()
+        page.finish_page_installations()
+        page.reload_history()
+        app.processEvents()
+        assert window.page_installed_dialog is notice
+        assert not page._page_preview_requests
+    else:
+        assert not hasattr(window, 'page_installed_dialog')

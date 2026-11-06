@@ -274,10 +274,10 @@ class PagePreviewDialog(QDialog):
             return
         try:
             if self.request.review_only:
-                completed = self.request.finish({"status": "reviewed", "sha256": self.request.snapshot["sha256"],
+                self.request.finish({"status": "reviewed", "sha256": self.request.snapshot["sha256"],
                     "page_id": self.proposed.page_id, "task_id": self.proposed.task_id})
             else:
-                completed = self.request.finish(action=lambda: {
+                self.request.finish(action=lambda: {
                     **self.request.drafts.install(self.request.snapshot, self.proposed.page_id, self.proposed.task_id),
                     "errors": dict(self.errors)})
         except Exception as error:
@@ -286,9 +286,6 @@ class PagePreviewDialog(QDialog):
             self.status.setText(message)
             return
         self.close()
-        if completed and not self.request.review_only:
-            self.window.page_installed_dialog = PageInstalledDialog(self.window)
-            self.window.page_installed_dialog.show()
 
     def reject(self):
         self.finish_closed()
