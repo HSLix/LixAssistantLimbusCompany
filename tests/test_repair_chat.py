@@ -196,3 +196,28 @@ def test_history_scroll_position_is_kept_and_bottom_can_follow(gui):
     chat.add_message("你", "继续", 14)
     app.processEvents()
     assert bar.value() == bar.maximum()
+
+
+@pytest.mark.parametrize("at_bottom", [True, False])
+@pytest.mark.parametrize("resize", [True, False])
+def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resize):
+    app, window = gui
+    page, chat = window.repair_page, window.repair_page.chat
+    window.switchTo(page)
+    window.resize(900, 800)
+    window.show()
+    app.processEvents()
+    for number in range(150):
+        chat.upsert_tool(1, f"previous-{number}", "read", "tool_execution_end", {"result": {}})
+    app.processEvents()
+    bar = chat.verticalScrollBar()
+    assert bar.maximum() > 0
+    bar.setValue(bar.maximum() if at_bottom else bar.maximum() // 3)
+    position = bar.value()
+    for kind in ("tool_execution_start", "repair_tool", "tool_execution_end"):
+        if resize:
+            # 布局调整和工具事件可能在同一轮界面事件处理中发生。
+            window.resize(window.width(), window.height() - 20)
+        emit(page, kind, result={}, isError=False)
+        app.processEvents()
+        assert bar.value() == (bar.maximum() if at_bottom else position)

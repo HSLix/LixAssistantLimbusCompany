@@ -41,7 +41,7 @@ def test_old_single_file_session_still_updates_after_target_converts_to_package(
     drafts.root.mkdir()
     legacy = drafts.root / "sample.py"
     legacy.write_text(SOURCE)
-    (drafts.root / "sample.json").write_text(json.dumps({"filename": "sample.py", "replace": True}))
+    (drafts.root / "sample.json").write_text(json.dumps({"filename": "sample.py", "replace": False}))
     # 模拟旧 Session 留有单文件草稿，而正式页已由其他 Session 换成目录。
     (drafts.installed / "sample").mkdir(parents=True)
     (drafts.installed / "sample/page.py").write_text(SOURCE)
@@ -64,7 +64,7 @@ def test_copy_installed_page_preserves_complete_resource_package(drafts):
     other = PageDrafts(DeveloperSession.create(drafts.session.host.service, None, mode="Construct", entry="gui"))
     other.create("sample.py", copy_from="sample.py")
     assert other.snapshot("sample.py")["package"].files == frozen["package"].files
-    assert other.metadata("sample.py")["replace"] is True
+    assert not (other.root / "sample.json").exists()
 
 
 def test_invalid_resource_inputs_leave_draft_unchanged_and_large_files_work(drafts, monkeypatch):

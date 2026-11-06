@@ -138,6 +138,14 @@ class RepairChat(QTextBrowser):
         elif url.scheme() in {"http", "https"}:
             QDesktopServices.openUrl(url)
 
+    def resizeEvent(self, event):
+        """聊天区重新分配高度时保留贴底状态，阅读历史时不主动滚动。"""
+        bar = self.verticalScrollBar()
+        at_bottom = bar.value() >= bar.maximum() - 2
+        super().resizeEvent(event)
+        if at_bottom:
+            bar.setValue(bar.maximum())
+
     def render(self, *, follow=True):
         """只在本来位于底部时跟随新内容；查看历史与展开详情时保留滚动位置。"""
         bar = self.verticalScrollBar()
@@ -197,4 +205,6 @@ class RepairChat(QTextBrowser):
         for number in activity_at.get(len(self.entries), []):
             parts.append(self.activity_html(number))
         self.setHtml("".join(parts))
+        # 富文本可能延迟排版，先取得完整高度再恢复阅读位置。
+        self.document().documentLayout().documentSize()
         bar.setValue(bar.maximum() if follow and at_bottom else position)

@@ -1721,5 +1721,17 @@ Original pixel region: {2}</source>
       <source>Processing: {0}</source>
       <translation>正在处理：{0}</translation>
     </message>
+    <message>
+      <source>Page installation is complete. Restart LALC to apply the changes.</source>
+      <translation>页面安装完成，重启 LALC 以应用修改。</translation>
+    </message>
+    <message>
+      <source>Restart now</source>
+      <translation>现在重启</translation>
+    </message>
+    <message>
+      <source>Finishing current operations before restarting LALC…</source>
+      <translation>正在结束当前操作，随后重启 LALC…</translation>
+    </message>
   </context>
 </TS>

@@ -66,7 +66,7 @@ def test_persistent_drafts_readonly_source_settings_and_permissions(drafts):
     drafts.update("sample.py", SOURCE)
     restored = PageDrafts(DeveloperSession(drafts.session.host.service, drafts.session.identity, entry="gui"))
     assert restored.snapshot("sample.py")["source"] == SOURCE.encode()
-    assert restored.metadata("sample.py")["replace"] is True
+    assert not (restored.root / "sample.json").exists()
     assert not marker.exists()
     raw = SOURCE.replace("\n", "\r\n").encode()
     (installed / "windows.py").write_bytes(raw)
@@ -108,7 +108,7 @@ def test_creation_update_failure_and_symlinks_preserve_files(drafts, tmp_path, m
         drafts.create("new.py", SOURCE)
     with pytest.raises(SyntaxError):
         drafts.update("new.py", "def broken(")
-    monkeypatch.setattr(storage.os, "link", lambda *args: (_ for _ in ()).throw(OSError("disk failure")))
+    monkeypatch.setattr(storage, "install_page_package", lambda *args, **kwargs: (_ for _ in ()).throw(OSError("disk failure")))
     with pytest.raises(OSError):
         drafts.create("failed.py", SOURCE)
     assert not (drafts.root / "failed.py").exists()
@@ -120,14 +120,13 @@ def test_creation_update_failure_and_symlinks_preserve_files(drafts, tmp_path, m
     with pytest.raises(ValueError, match="符号链接"):
         drafts.read("drafts", "link.py")
     (drafts.root / "link.py").unlink()
-    (drafts.root / "new.json").unlink()
+    # 旧元数据已不参与任何草稿操作，连符号链接也不会读取。
     (drafts.root / "new.json").symlink_to(outside)
-    with pytest.raises(ValueError):
-        drafts.snapshot("new.py")
+    assert drafts.snapshot("new.py") == original
     assert outside.read_text() == SOURCE
 
 
-def test_install_snapshot_no_clobber_conflict_and_failed_replace(drafts, monkeypatch):
+def test_repeated_install_snapshot_conflict_and_failed_replace(drafts, monkeypatch):
     drafts.create("sample.py", SOURCE)
     snapshot = drafts.snapshot("sample.py")
     drafts.update("sample.py", SOURCE.replace('"Sample"', '"Changed"'))
@@ -135,8 +134,15 @@ def test_install_snapshot_no_clobber_conflict_and_failed_replace(drafts, monkeyp
     assert installed["sha256"] == snapshot["sha256"]
     target = drafts.path("sample.py", "installed")
     assert target.read_bytes() == SOURCE.encode()
-    with pytest.raises(ValueError, match="已存在"):
-        drafts.install(snapshot, "sample.page", "sample.task")
+    drafts.install(snapshot, "sample.page", "sample.task")
+    changed = drafts.snapshot("sample.py")
+    drafts.install(changed, "sample.page", "sample.task")
+    assert target.read_bytes() == changed["source"]
+    # 独立草稿也可从完整源码创建并覆盖同名正式页。
+    other_session = PageDrafts(DeveloperSession.create(drafts.session.host.service, None, mode="Construct", entry="gui"))
+    other_session.create("sample.py", SOURCE)
+    other_session.install(other_session.snapshot("sample.py"), "sample.page", "sample.task")
+    assert target.read_bytes() == SOURCE.encode()
     drafts.create("other.py", SOURCE)
     with pytest.raises(ValueError, match="冲突"):
         drafts.install(drafts.snapshot("other.py"), "sample.page", "other.task")
@@ -216,7 +222,8 @@ def test_preview_independent_memory_no_submit_and_install_exact_version(gui, dra
         assert store.path.read_bytes() == config
     finally:
         dialog.close()
-    assert app.activeModalWidget() is None
+    assert app.activeModalWidget() is window.page_installed_dialog
+    window.page_installed_dialog.cancel.click()
     # 新应用发现正式文件，配置仍按稳定 ID 进入 Dashboard / Plan。
     pages, errors = discover_pages(drafts.installed, UserSettings(root))
     assert not errors
@@ -236,7 +243,8 @@ def test_broken_current_page_still_allows_repair(gui, drafts):
     dialog.install_button.click()
     assert request.result['status'] == 'installed'
     app.processEvents()
-    assert app.activeModalWidget() is None
+    assert app.activeModalWidget() is gui[1].page_installed_dialog
+    gui[1].page_installed_dialog.cancel.click()
 
 
 @pytest.mark.parametrize('source,expected', [
@@ -423,7 +431,9 @@ def test_installed_page_reload_and_real_plan_keep_formal_configuration(owner, ap
     count.setValue(2)
     enabled.setChecked(True)
     monkeypatch.setattr(owner, "restart_process", lambda windows: None)
-    owner.request_reload()
+    developer.page_installed_dialog.restart.click()
+    developer.page_installed_dialog.wait_for_restart()
+    assert owner.reloading
     owner.shutdown()
     owner.lifecycle.restart()
     assert UserSettings(owner.service.data_root).value["pages"]["sample.message"] == {"message": "formal"}
@@ -446,3 +456,62 @@ def test_installed_page_reload_and_real_plan_keep_formal_configuration(owner, ap
         if fresh.user is not None:
             fresh.user.close()
         app.processEvents()
+
+
+def test_install_notice_cancel_keeps_round_and_draft_editable(gui, drafts, monkeypatch):
+    from lalc.page_preview import PagePreviewDialog, PreviewRequest
+    app, window = gui
+    monkeypatch.setattr(window.notifications, 'notify', lambda *args: pytest.fail('安装成功不用通知栏'))
+    monkeypatch.setattr(window, 'cancel_operation', lambda: pytest.fail('取消提示不能取消 Agent'))
+    request, dialog = preview(gui, drafts)
+    dialog.close_button.click()
+    assert request.result['status'] == 'not_installed'
+    for name in ('First', 'Second'):
+        drafts.update('sample.py', SOURCE.replace('"Sample"', repr(name)))
+        request = PreviewRequest(drafts, drafts.snapshot('sample.py'), name, (drafts.session.identity, 1, 1))
+        dialog = PagePreviewDialog(request, window)
+        assert dialog.ready
+        dialog.show()
+        dialog.install_button.click()
+        assert request.result['status'] == 'installed'
+        assert drafts.path('sample.py', 'installed').read_bytes() == request.snapshot['source']
+        notice = window.page_installed_dialog
+        assert notice.isVisible() and 'Restart LALC' in notice.message.text()
+        notice.cancel.click()
+        app.processEvents()
+        assert app.activeModalWidget() is None
+
+
+def test_install_notice_restart_waits_for_operation_cleanup(gui, monkeypatch):
+    from types import SimpleNamespace
+    from lalc.page_preview import PageInstalledDialog
+    app, window = gui
+    cleaned = threading.Event()
+    started = threading.Event()
+    restarted = []
+    async def operation():
+        started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await asyncio.sleep(.02)
+            cleaned.set()
+    def reload():
+        assert cleaned.is_set() and not window.jobs
+        restarted.append(True)
+    monkeypatch.setattr(window, 'coordinator', SimpleNamespace(
+        user=None, developer=window, reloading=False, request_reload=reload, closed=lambda window: None))
+    window.launch(operation)
+    assert started.wait(2)
+    notice = PageInstalledDialog(window)
+    notice.show()
+    notice.restart.click()
+    assert not restarted and not notice.restart.isEnabled()
+    notice.wait_for_restart()
+    assert not restarted
+    wait_jobs(app, window)
+    until = time.monotonic() + 2
+    while not restarted and time.monotonic() < until:
+        app.processEvents()
+        time.sleep(.005)
+    assert restarted == [True]

@@ -37,6 +37,56 @@ class PreviewRequest:
         self.finish()
 
 
+class PageInstalledDialog(QDialog):
+    """安装完成单独提示；主动重启先等待当前操作取消和清理。"""
+
+    def __init__(self, window):
+        super().__init__(window)
+        self.window = window
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setWindowTitle(tr('Page installed'))
+        layout = QVBoxLayout(self)
+        self.message = BodyLabel(tr('Page installation is complete. Restart LALC to apply the changes.'))
+        self.message.setWordWrap(True)
+        layout.addWidget(self.message)
+        controls = QHBoxLayout()
+        self.cancel = PushButton(tr('Cancel'))
+        self.cancel.clicked.connect(self.reject)
+        self.restart = PrimaryPushButton(tr('Restart now'))
+        self.restart.clicked.connect(self.restart_now)
+        controls.addWidget(self.cancel)
+        controls.addWidget(self.restart)
+        layout.addLayout(controls)
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.wait_for_restart)
+        self.finished.connect(lambda: self.timer.stop())
+
+    def restart_now(self):
+        """不绕过重载门控；先请求结束活动，再由定时器等待清理。"""
+        coordinator = self.window.coordinator
+        self.windows = tuple(window for window in (coordinator.user, coordinator.developer) if window)
+        self.restart.setEnabled(False)
+        self.message.setText(tr('Finishing current operations before restarting LALC…'))
+        for window in self.windows:
+            window.cancel_operation()
+        self.window.service.stop()
+        self.timer.start(50)
+
+    def wait_for_restart(self):
+        service = self.window.service
+        if (any(window.closing for window in self.windows) or self.window.coordinator.reloading):
+            self.reject()
+            return
+        if (any(window.jobs for window in self.windows) or service.state.get('activity')
+                or service.state['phase'] == 'running'
+                or service._thread is not None and service._thread.is_alive()):
+            return
+        self.timer.stop()
+        self.window._interact(self.window.coordinator.request_reload)
+        self.accept()
+
+
 class PagePreviewDialog(QDialog):
     """加载成功后才显示三 Tab 审批；配置只在内存，批准绑定固定快照。"""
 
@@ -235,9 +285,10 @@ class PagePreviewDialog(QDialog):
             self.errors["install"] = message
             self.status.setText(message)
             return
-        if completed and not self.request.review_only:
-            self.window.notifications.notify(tr('Page installed'), tr('Reload the application to use the installed page.'))
         self.close()
+        if completed and not self.request.review_only:
+            self.window.page_installed_dialog = PageInstalledDialog(self.window)
+            self.window.page_installed_dialog.show()
 
     def reject(self):
         self.finish_closed()

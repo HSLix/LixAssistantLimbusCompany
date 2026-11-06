@@ -5,7 +5,6 @@ from __future__ import annotations
 from copy import deepcopy
 import hashlib
 import json
-import os
 from pathlib import Path
 import tempfile
 
@@ -17,17 +16,14 @@ from .page_packages import (PageSnapshot, _relative, install_page_package, page_
 from .file_content import FileContent, content_bytes, content_hash, require_memory
 
 
-def write_source(path, source, *, exclusive=False):
+def write_source(path, source):
     """同目录临时文件提交；写入或替换失败保留旧源码。"""
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".page-", suffix=".tmp", delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(source)
-        if exclusive:
-            os.link(temporary, path)
-        else:
-            temporary.replace(path)
+        temporary.replace(path)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
@@ -77,22 +73,6 @@ class PageDrafts:
             return page_entry(package)
         return package / "page.py"
 
-    def metadata_path(self, filename):
-        page_filename(filename)
-        real_directory(self.root)
-        path = self.root / Path(filename).with_suffix(".json").name
-        if path.is_symlink():
-            raise ValueError("草稿元数据不能是符号链接。")
-        return path
-
-    def metadata(self, filename):
-        path = self.metadata_path(filename)
-        value = json.loads(path.read_bytes())
-        if (type(value) is not dict or set(value) != {"filename", "replace"}
-                or value["filename"] != filename or type(value["replace"]) is not bool):
-            raise ValueError("草稿目标元数据无效。")
-        return value
-
     def list(self, scope="installed", offset=0, limit=50, filename=None):
         if scope not in {"installed", "drafts"} or type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 200:
             raise ValueError("无效页面范围或分页参数。")
@@ -139,8 +119,6 @@ class PageDrafts:
             result = {"scope": scope, "filename": filename, "source": source[offset:offset + limit], "path": path,
                       "sha256": hashlib.sha256(source.encode()).hexdigest(),
                       "next_offset": offset + limit if offset + limit < len(source) else None}
-        if scope == "drafts":
-            result["target"] = self.metadata(filename)
         return result
 
     def file_content(self, scope, filename, path="page.py"):
@@ -161,26 +139,18 @@ class PageDrafts:
         return content_bytes(self.file_content(scope, filename, path))
 
     def create(self, filename, source=None, copy_from=None):
-        """空白完整源码或复制正式页；新建不覆盖已有草稿或正式页。"""
+        """完整源码或复制正式页创建草稿；正式页只在人工批准后覆盖。"""
         target = self.package_path(filename)
-        metadata = self.metadata_path(filename)
-        if target.exists() or metadata.exists():
+        if target.exists():
             raise ValueError("草稿已存在，请使用 page_update。")
         if copy_from is not None:
             if source is not None or filename != copy_from:
                 raise ValueError("复制正式页须沿用原文件名，且不能同时提供 source。")
             package = snapshot_page(self.package_path(copy_from, "installed"), freeze=False)
         else:
-            if self.package_path(filename, "installed").exists():
-                raise ValueError("正式文件已存在；请用 copy_from 创建替换草稿。")
             package = PageSnapshot({"page.py": self.source_bytes(source)})
         self.root.mkdir(parents=True, exist_ok=True)
-        try:
-            write_source(metadata, json.dumps({"filename": filename, "replace": copy_from is not None}).encode(), exclusive=True)
-            install_page_package(self.root, Path(filename).stem, package)
-        except BaseException:
-            metadata.unlink(missing_ok=True)
-            raise
+        install_page_package(self.root, Path(filename).stem, package)
         return self.read("drafts", filename)
 
     @staticmethod
@@ -193,7 +163,6 @@ class PageDrafts:
         return source.encode("utf-8")
 
     def update(self, filename, source):
-        self.metadata(filename)
         target = self.path(filename)
         if not target.is_file():
             raise ValueError("草稿不存在。")
@@ -202,9 +171,8 @@ class PageDrafts:
 
     def snapshot(self, filename):
         """固定拟安装字节与目标身份；后续草稿修改不进入已有批准。"""
-        target = self.metadata(filename)
         package = snapshot_page(self.package_path(filename))
-        return {**target, "source": content_bytes(package.files["page.py"]), "sha256": package.sha256,
+        return {"filename": filename, "source": content_bytes(package.files["page.py"]), "sha256": package.sha256,
                 "package": package}
 
     def write_resource(self, filename, path, content=None, *, remove=False):
@@ -216,7 +184,6 @@ class PageDrafts:
             raise ValueError("移除资源不能同时提供内容。")
         if not remove and not isinstance(content, (bytes, FileContent)):
             raise ValueError("页面资源必须是字节或受控文件内容。")
-        self.metadata(filename)
         current = self.package_path(filename)
         files = dict(snapshot_page(current, freeze=False).files)
         if remove:
@@ -234,8 +201,6 @@ class PageDrafts:
     def check_registration(self, snapshot, page_id, task_id):
         """按当前正式注册检查必要冲突，不检查旧文件版本或自动合并。"""
         package = self.package_path(snapshot["filename"], "installed")
-        if package.exists() and not snapshot["replace"]:
-            raise ValueError("新增目标已存在，不能覆盖；请复制当前正式页重新审查。")
         check_page_registration(self.installed, package if package.is_file() else package / "page.py", page_id, task_id)
 
     def install(self, snapshot, page_id, task_id):
@@ -246,7 +211,7 @@ class PageDrafts:
         package = snapshot["package"]
         if package.sha256 != snapshot["sha256"] or package.files["page.py"] != snapshot["source"]:
             raise ValueError("页面快照与批准版本不一致。")
-        install_page_package(self.installed, Path(filename).stem, package, replace=snapshot["replace"],
+        install_page_package(self.installed, Path(filename).stem, package, replace=True,
                              legacy_filename=filename if current.is_file() else None)
         return {"status": "installed", "filename": snapshot["filename"], "sha256": snapshot["sha256"],
                 "page_id": page_id, "task_id": task_id, "reload_required": True}
