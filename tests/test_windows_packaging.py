@@ -31,6 +31,25 @@ def archive(tmp_path, monkeypatch):
     return path
 
 
+@pytest.fixture(autouse=True)
+def agent_resources(tmp_path, monkeypatch):
+    path = tmp_path / "codesearch.zip"
+    with zipfile.ZipFile(path, "w") as bundle:
+        bundle.writestr("codesearch.exe", b"test-codesearch")
+    monkeypatch.setattr(build, "CODESEARCH_ARCHIVE", path)
+    monkeypatch.setattr(build, "CODESEARCH_SHA256", build.digest(path))
+    models = tmp_path / "models"
+    snapshot = models / build.MODEL_REPO / "snapshots" / build.MODEL_REVISION
+    hashes = {}
+    for name in build.MODEL_FILES:
+        file = snapshot / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_bytes(name.encode())
+        hashes[name] = build.digest(file)
+    monkeypatch.setattr(build, "MODEL_ROOT", models)
+    monkeypatch.setattr(build, "MODEL_FILES", hashes)
+
+
 def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
     for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
@@ -47,9 +66,13 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
     with zipfile.ZipFile(outputs[0]) as plain, zipfile.ZipFile(outputs[1]) as bundled:
         core = {name: plain.read(name) for name in plain.namelist()}
-        assert core == {name: bundled.read(name) for name in bundled.namelist() if not name.startswith("LALC/pi/")}
+        assert core == {name: bundled.read(name) for name in bundled.namelist() if not name.startswith(("LALC/pi/", "LALC/agent/"))}
         assert bundled.read("LALC/pi/native/win32/prebuilds/win32-x64/helper.dll") == b"test-runtime"
         assert b"MIT License" in bundled.read("LALC/pi/LICENSE.txt")
+        assert bundled.read("LALC/agent/codesearch.exe") == b"test-codesearch"
+        assert any(name.endswith("onnx/model_quantized.onnx") for name in bundled.namelist())
+        assert "LALC/agent/agent-resources-NOTICE.txt" in bundled.namelist()
+        assert outputs[0].name.endswith("without-agent.zip") and outputs[1].name.endswith("with-agent.zip")
         assert not any("user-settings" in name or "candidate" in name for name in bundled.namelist())
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
@@ -148,3 +171,15 @@ def test_acceptance_sample_uses_real_plan_boundaries(tmp_path, monkeypatch, mess
     service.shutdown()
     assert result["status"] == status, result
     assert [item["status"] for item in result["items"]] == outcomes
+
+
+def test_codesearch_and_model_tampering_are_rejected(agent_resources, tmp_path):
+    build.check_codesearch(build.CODESEARCH_ARCHIVE, build.MODEL_ROOT)
+    snapshot = build.MODEL_ROOT / build.MODEL_REPO / 'snapshots' / build.MODEL_REVISION
+    target = snapshot / next(iter(build.MODEL_FILES))
+    target.write_bytes(b'tampered')
+    with pytest.raises(ValueError, match='MiniLM model hash'):
+        build.check_codesearch(build.CODESEARCH_ARCHIVE, build.MODEL_ROOT)
+    build.CODESEARCH_ARCHIVE.write_bytes(b'tampered archive')
+    with pytest.raises(ValueError, match='codesearch ZIP'):
+        build.check_codesearch(build.CODESEARCH_ARCHIVE, build.MODEL_ROOT)

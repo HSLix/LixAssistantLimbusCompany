@@ -41,7 +41,7 @@ def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, mon
     selected, other = mode.upper(), "REPAIR" if mode == "Construct" else "CONSTRUCT"
     path = tmp_path / "sop.md"
     def content(version):
-        return sop_text(f"CONSTRUCT_V{version}", f"REPAIR_V{version}", f"ASSET_V{version}")
+        return sop_text(f"CONSTRUCT_V{version}", f"REPAIR_V{version}", f"ASSET_V{version}", f"PAGE_V{version}")
     path.write_text(content(1))
     monkeypatch.setattr(agent_prompts, "SOP_PATH", path)
     steps = iter([tool("read", {"path": "plan.py" if mode == "Construct" else "steps.total.py"}), answer()])
@@ -67,16 +67,16 @@ def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, mon
             compile(sample, '<page-create-tool-example>', 'exec')
     for payload in first:
         system = payload["messages"][0]["content"]
-        assert f"{selected}_V1" in system and "ASSET_V1" in system
-        assert f"{selected}_V2" not in system and f"{other}_V1" not in system
+        assert f"{selected}_V1" in system and "ASSET_V1" in system and "PAGE_V1" in system
+        assert f"{selected}_V2" not in system and f"{other}_V1" not in system and "PAGE_V2" not in system
     saved = read_json(chat.log.path / "round-1/input.json")
-    assert saved["sop"] == {mode.lower(): f"{selected}_V1", "asset": "ASSET_V1"}
+    assert saved["sop"] == {mode.lower(): f"{selected}_V1", "asset": "ASSET_V1", "page": "PAGE_V1"}
     assert agent_prompts.user_message_text(saved["prompt"]["message"]) == original
     assert saved["source_manifest_id"] == (None if mode == "Construct" else chat.host.manager.default_manifest_id())
     state["respond"] = lambda _: answer()
     assert asyncio.run(chat.run("继续", options))["status"] == "completed"
     second = read_json(chat.log.path / "round-2/input.json")
-    assert second["sop"] == {mode.lower(): f"{selected}_V2", "asset": "ASSET_V2"}
+    assert second["sop"] == {mode.lower(): f"{selected}_V2", "asset": "ASSET_V2", "page": "PAGE_V2"}
     assert f"{selected}_V2" in state["calls"][-1]["messages"][0]["content"]
 
 
@@ -87,7 +87,10 @@ def conversation(agent_server, tmp_path):
     options = SimpleNamespace(pi="pi", ask_api_key=False,
                              base_url=address, model="gemma4-test", max_requests=20)
     state["respond"] = lambda body: answer()
-    return host.new_conversation(), options, state
+    try:
+        yield host.new_conversation(), options, state
+    finally:
+        host.service.shutdown()
 
 
 def script(state, steps):

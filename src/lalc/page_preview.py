@@ -1,6 +1,6 @@
 """同进程页面双实例审查；仅人工批准快照可写正式目录。"""
 
-import hashlib
+from contextlib import ExitStack
 import threading
 
 from PySide6.QtCore import QEvent, Qt, QTimer
@@ -9,14 +9,18 @@ from qfluentwidgets import BodyLabel, PushButton, PrimaryPushButton, PlainTextEd
 
 from .i18n import tr
 from .page_drafts import MemorySettings
+from .file_content import content_bytes
+from .page_packages import materialized_page, snapshot_page
 from .user_pages import UserSettings, create_business_page, load_page_module
 
 
 class PreviewRequest:
     """绑定 Session / 轮次与源码快照；取消和批准只能有一个生效。"""
 
-    def __init__(self, drafts, snapshot, summary, identity):
+    def __init__(self, drafts, snapshot, summary, identity, *, data_root=None, review_only=False):
         self.drafts, self.snapshot, self.summary, self.identity = drafts, snapshot, summary, identity
+        self.data_root = data_root if data_root is not None else drafts.session.host.service.data_root
+        self.review_only = review_only
         self.done = threading.Event()
         self.lock = threading.Lock()
         self.result = None
@@ -42,6 +46,7 @@ class PagePreviewDialog(QDialog):
         self.errors = {}
         self.current = self.proposed = None
         self.current_hash = None
+        self.packages = ExitStack()
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setWindowTitle(tr('Review settings page'))
@@ -77,12 +82,19 @@ class PagePreviewDialog(QDialog):
         layout.addWidget(self.status)
         controls = QHBoxLayout()
         self.install_button = PrimaryPushButton(tr('Install this version'))
+        if request.review_only:
+            self.install_button.setText(tr('Approve this version'))
         self.install_button.setEnabled(False)
         self.install_button.clicked.connect(self.install)
         self.close_button = PushButton(tr('Close without installing'))
+        if request.review_only:
+            self.close_button.setText(tr('Close without approving'))
         self.close_button.clicked.connect(self.reject)
         self.cancel = PushButton(tr('Cancel round'))
-        self.cancel.clicked.connect(self.cancel_round)
+        self.cancel.clicked.connect(self.reject if request.review_only else self.cancel_round)
+        if request.review_only:
+            self.cancel.setText(tr('Cancel'))
+            self.status.setText(tr('Approval records this package version. Import Selected installs it later.'))
         for button in (self.install_button, self.close_button, self.cancel):
             controls.addWidget(button)
         layout.addLayout(controls)
@@ -95,6 +107,7 @@ class PagePreviewDialog(QDialog):
             QApplication.instance().installEventFilter(self)
         else:
             self.ready = False
+            self.packages.close()
             self.deleteLater()
 
     def tab(self, key, title):
@@ -117,6 +130,8 @@ class PagePreviewDialog(QDialog):
         column.addWidget(text)
 
     def clean_error(self, error):
+        if self.request.review_only:
+            return self.window.clean_details(f"{type(error).__name__}: {error}")
         from .agent_diagnostics import redact
         host = self.request.drafts.session.host
         keys = {value for value in host.secrets.values() if value}
@@ -141,11 +156,11 @@ class PagePreviewDialog(QDialog):
         request, drafts = self.request, self.request.drafts
         snapshot = request.snapshot
         try:
-            value = UserSettings(drafts.session.host.service.data_root).value
+            value = UserSettings(request.data_root).value
         except Exception as error:
             return self.fail_preview('settings', error)
         try:
-            path = drafts.path(snapshot['filename'])
+            path = self.packages.enter_context(materialized_page(snapshot['package']))
             self.proposed = create_business_page(path, *load_page_module(path, snapshot['source']), MemorySettings(value))
             self.proposed_column.addWidget(self.proposed.widget)
             drafts.check_registration(snapshot, self.proposed.page_id, self.proposed.task_id)
@@ -154,11 +169,12 @@ class PagePreviewDialog(QDialog):
         if request.done.is_set():
             return False
         try:
-            path = drafts.path(snapshot['filename'], 'installed')
-            if path.exists():
-                content = path.read_bytes()
-                self.current_hash = hashlib.sha256(content).hexdigest()
-                self.current = create_business_page(path, *load_page_module(path, content), MemorySettings(value))
+            current = drafts.package_path(snapshot['filename'], 'installed')
+            if current.exists():
+                package = snapshot_page(current, freeze=False)
+                path = self.packages.enter_context(materialized_page(package))
+                self.current_hash = package.sha256
+                self.current = create_business_page(path, *load_page_module(path, content_bytes(package.files['page.py'])), MemorySettings(value))
                 self.current_column.addWidget(self.current.widget)
             else:
                 self.current_column.addWidget(BodyLabel(tr('New page; no installed page exists.')))
@@ -207,15 +223,19 @@ class PagePreviewDialog(QDialog):
             self.close()
             return
         try:
-            completed = self.request.finish(action=lambda: {
-                **self.request.drafts.install(self.request.snapshot, self.proposed.page_id, self.proposed.task_id),
-                "errors": dict(self.errors)})
+            if self.request.review_only:
+                completed = self.request.finish({"status": "reviewed", "sha256": self.request.snapshot["sha256"],
+                    "page_id": self.proposed.page_id, "task_id": self.proposed.task_id})
+            else:
+                completed = self.request.finish(action=lambda: {
+                    **self.request.drafts.install(self.request.snapshot, self.proposed.page_id, self.proposed.task_id),
+                    "errors": dict(self.errors)})
         except Exception as error:
             message = self.clean_error(error)
             self.errors["install"] = message
             self.status.setText(message)
             return
-        if completed:
+        if completed and not self.request.review_only:
             self.window.notifications.notify(tr('Page installed'), tr('Reload the application to use the installed page.'))
         self.close()
 
@@ -228,6 +248,7 @@ class PagePreviewDialog(QDialog):
                              "sha256": self.request.snapshot["sha256"], "errors": dict(self.errors)})
         QApplication.instance().removeEventFilter(self)
         self.timer.stop()
+        self.packages.close()
 
     def closeEvent(self, event):
         self.finish_closed()

@@ -39,7 +39,10 @@ def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mod
         request.finish({'status': 'not_installed', 'sha256': request.snapshot['sha256']})
     if mode == 'Construct':
         script(state, [tool('page_create', {'filename': 'sample.py', 'source': SOURCE}),
+                       tool('page_resource', {'filename': 'sample.py', 'path': 'assets/info.txt', 'content_base64': base64.b64encode(b'hello').decode()}),
                        tool('page_list', {'scope': 'drafts'}),
+                       tool('page_list', {'scope': 'drafts', 'filename': 'sample.py'}),
+                       tool('page_read', {'scope': 'drafts', 'filename': 'sample.py', 'path': 'assets/info.txt'}),
                        tool('page_read', {'scope': 'settings'}),
                        tool('page_update', {'filename': 'sample.py', 'source': SOURCE.replace('"Sample"', '"Updated"')}),
                        tool('page_preview', {'filename': 'sample.py', 'summary': '保留字段和 ID，未改变 Plan 参数。'}),
@@ -57,6 +60,7 @@ def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mod
         assert any(message.get('role') == 'tool' and 'not_installed' in str(message) for message in state['calls'][-1]['messages'])
         restored = DeveloperSession(chat.host.service, session.identity, entry='gui').conversation()
         assert PageDrafts(restored.session).snapshot('sample.py')['source'] == SOURCE.replace('"Sample"', '"Updated"').encode()
+        assert PageDrafts(restored.session).snapshot('sample.py')['package'].files['assets/info.txt'] == b'hello'
         assert [message for message in restored.history if message.get('toolName') == 'page_preview'][-1]['details']['status'] == 'not_installed'
         assert not (chat.host.service.data_root / 'pages').exists()
     else:
@@ -102,7 +106,7 @@ def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_fir
         window.cancel_operation()
         wait_jobs(app, window)
     assert len(seen) == 1 and seen[0].result['status'] == 'installed'
-    assert (window.service.data_root / 'pages/sample.py').read_text() == SOURCE
+    assert (window.service.data_root / 'pages/sample/page.py').read_text() == SOURCE
     assert read_json(session.path / 'log/result.json')['status'] == 'completed'
     assert any(message.get('role') == 'tool' and 'reload_required' in str(message) for message in state['calls'][-1]['messages'])
     assert app.activeModalWidget() is None and window.service.state['activity'] is None
@@ -338,7 +342,7 @@ def test_gui_knowledge_tools_images_and_cli_permissions(conversation, tmp_path, 
     Image.new('RGB', (3, 2), 'red').save(root / 'reference.jpg')
     before = {p: p.read_bytes() for p in session.host.candidate.rglob('*') if p.is_file()}
     script(state, [tool('knowledge_list', {}), tool('knowledge_read', {'path': 'guide.md'}),
-                   tool('knowledge_search', {'query': 'needle'}),
+                   tool('knowledge_search_literal', {'query': 'needle'}),
                    tool('knowledge_read', {'path': 'reference.jpg'}), answer('knowledge read')])
     result = asyncio.run(gui_chat.run('read external references', options))
     assert result['status'] == 'completed', result

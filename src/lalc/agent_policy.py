@@ -5,9 +5,9 @@ BASE_TOOLS = ("read", "edit", "validate", "asset_tree", "asset_directory", "asse
               "publish", "trial_run", "list_runs", "read_run_log", "preview_crop", "remove_asset",
               "list_manifests", "read_manifest", "read_manifest_source",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
-KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search", "knowledge_git")
+KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git")
 GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback",)
-PAGE_TOOLS = ("page_list", "page_read", "page_create", "page_update", "page_preview")
+PAGE_TOOLS = ("page_list", "page_read", "page_create", "page_update", "page_resource", "page_preview")
 MODE_TOOLS = {"Construct": frozenset(BASE_TOOLS + GUI_TOOLS + PAGE_TOOLS),
               "Repair": frozenset(BASE_TOOLS + GUI_TOOLS)}
 ENTRY_TOOLS = {"gui": frozenset(BASE_TOOLS + GUI_TOOLS + PAGE_TOOLS), "cli": frozenset(BASE_TOOLS)}

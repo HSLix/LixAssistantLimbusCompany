@@ -11,10 +11,10 @@ from lalc import agent_prompts as prompts
 from test_agent_repair import host_for
 
 
-def sop_text(construct="", repair="", asset=""):
+def sop_text(construct="", repair="", asset="", page=""):
     return ("# SOP\n填写说明不发送给模型\n"
             f"<construct_sop>{construct}</construct_sop>\n"
-            f"<repair_sop>{repair}</repair_sop>\n<asset_sop>{asset}</asset_sop>")
+            f"<repair_sop>{repair}</repair_sop>\n<asset_sop>{asset}</asset_sop>\n<page_sop>{page}</page_sop>")
 
 
 def test_sop_selects_only_mode_and_asset_and_accepts_empty(tmp_path, monkeypatch):
@@ -22,13 +22,13 @@ def test_sop_selects_only_mode_and_asset_and_accepts_empty(tmp_path, monkeypatch
     monkeypatch.setattr(prompts, "SOP_PATH", path)
     path.write_text(sop_text("构建步骤", "修复步骤", "素材步骤"))
     selected = prompts.load_sop("Repair")
-    assert selected == {"repair": "修复步骤", "asset": "素材步骤"}
+    assert selected == {"repair": "修复步骤", "asset": "素材步骤", "page": ""}
     built = prompts.system_prompt("Repair", selected)
     assert "构建步骤" not in built and "填写说明不发送给模型" not in built
     assert "<repair_sop>\n修复步骤" in built
-    assert prompts.load_sop("Construct") == {"construct": "构建步骤", "asset": "素材步骤"}
+    assert prompts.load_sop("Construct") == {"construct": "构建步骤", "asset": "素材步骤", "page": ""}
     path.write_text(sop_text())
-    assert prompts.load_sop("Repair") == {"repair": "", "asset": ""}
+    assert prompts.load_sop("Repair") == {"repair": "", "asset": "", "page": ""}
 
 
 @pytest.mark.parametrize("text", ["", sop_text() + "<asset_sop></asset_sop>",

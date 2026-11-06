@@ -55,3 +55,37 @@ User GUI → General Settings → 应用 → 界面语言可选“跟随系统 /
 `context.language` 是本次已生效的 `zh_CN` 或 `en_US`；`context.translate(中文文案, English_text)` 按该语言选择页面自带文案，无需编译翻译资源。导航名可选声明 `PAGE_NAMES = {"zh_CN": "中文名称", "en_US": "English name"}`，键只允许这两个语言，值须为非空字符串；未提供当前语言时回退原有 `PAGE_NAME`。`PAGE_NAME` 仍必需，原有 create_page、submit、配置保存契约不变。
 
 `exp.py` 和 `mirror.py` 同时翻译导航、页面标签及输入校验提示，保持现有页面/任务 ID 和 message 配置键。新增 `legacy.py` 是不使用语言接口的纯设置页：导航和标签固定中文，不注册循环任务，切换英文仍保留原文，用于验证旧页面兼容；其 note 配置仍正常保存。页面作者负责自己的翻译，宿主不调用模型翻译页面，也不翻译用户填写的内容。旧页面无需迁移，修改已安装页面后仍需整应用重载。
+
+## 页面目录与图片资源
+
+Sharing 第二批底层已支持普通加载器同时发现旧 `pages/sample.py` 和新 `pages/sample/page.py`。新页面使用独立目录，入口固定为 `page.py`，图片等资源放在该目录内，例如：
+
+```text
+pages/
+  sample/
+    page.py
+    assets/
+      banner.png
+```
+
+页面代码可通过 `context.resource_path("assets/banner.png")` 取得本页资源的绝对 `Path`，例如在 `create_page(context)` 中加载图片：
+
+```python
+from PySide6.QtGui import QPixmap
+
+pixmap = QPixmap(str(context.resource_path("assets/banner.png")))
+```
+
+资源路径必须是包内相对文件路径，不接受 `..`、绝对路径、Windows 保留名或链接。资源通过页面目录定位，不依赖程序工作目录。不要将用户私人配置写入页面资源目录；继续使用 `context.load/save`，由目录外的 `user-settings.json` 保存。
+
+整包快照覆盖源码及资源字节，图片的增删改也会改变页面版本。安装替换整个页面包，不合并旧资源；从旧单文件转成同名目录时只在明确替换后移除旧文件。旧页面与新目录同时声明相同 PAGE_ID／TASK_ID 时，仍按现有规则拒绝全部冲突注册。
+
+Agent 的 GUI Construct 页面工具现已接通整包：`filename="sample.py"` 是逻辑名称，实际草稿为 `sample/page.py`。`page_create(copy_from="sample.py")` 复制已安装整包，旧单文件自动包装；`page_update` 只更新入口源码并保留资源。旧 Session 的单文件草稿仍可读取／修改，新增资源或正式安装时转换为目录，不批量迁移。
+
+`page_list(filename="sample.py")` 分页列出页内文件、大小和哈希；`page_read(path="assets/banner.png", image=true)` 返回 JPEG 预览并保留原始资源，默认流式分页读取 UTF-8 文本。资源没有固定大小或像素准入上限；复制流式处理，内存解析和图片解码按当前可用资源检查。Base64 写入仍受模型服务消息容量及实际内存约束。
+
+`page_resource` 只修改当前 Session 草稿中的一个非 Python 资源：严格 Base64 写入、从页面／Asset／知识库明确文件复制，或显式移除该草稿资源，三者选一。不允许任意本地文件路径、正式页写入、配置修改或借资源接口改 Python。知识库复制只取当前文件，不自动 fetch；Asset 复制需验证所声明的图片内容哈希。
+
+`page_preview` 的 Current 和 Proposed 使用各自固定整包副本及独立内存配置，切换 Tab 保持实例。人工点击安装提交批准的源码和资源，即使草稿随后变化也不混入新内容；关闭后清理临时包，安装日志保留所审批的完整包证据。CLI／Repair 不获得这些工具，安装仍需专用人工审批。
+
+General Settings 的 [Sharing 向导](../../docs/sharing.md) 已支持整包导入导出。Sharing 的 Review 只批准固定整包，最终由 Import Selected 统一安装；未 Review 页面需额外明确确认。Agent 的人工批准仍直接安装，不继承 Sharing 的跳过 Review 例外。

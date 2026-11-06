@@ -238,14 +238,17 @@ async def rpc_event(event, waiting_for: str) -> dict:
 
 
 @asynccontextmanager
-async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *, startup=None):
+async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *, startup=None, pool=None):
     """就绪前允许一次程序回退；清理、取消及调用者主体异常永不重试。"""
+    restarted = False
     while True:
         failure = None
         buffered = deque()
+        reused = pool is not None and pool.process is not None and pool.process.poll() is None
         async with AsyncExitStack() as stack:
             try:
-                send, event = await stack.enter_async_context(_rpc_session(command, env, cwd, show))
+                transport = pool.session(command, env, cwd, show) if pool is not None else _rpc_session(command, env, cwd, show)
+                send, event = await stack.enter_async_context(transport)
                 if startup is not None and not startup.request_started:
                     while True:
                         item = await rpc_event(event, "就绪事件 lalc_ready")
@@ -266,6 +269,9 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *
                 yield tracked_send, buffered_event
                 return
         # 离开进程作用域后再切换，避免遗留两个活动 pi；清理失败不会走到这里。
+        if reused and isinstance(failure, PiExited) and not restarted and not (startup and startup.request_started):
+            restarted = True
+            continue
         if startup is None or not startup.retry(command, env, cwd, failure):
             raise failure
 

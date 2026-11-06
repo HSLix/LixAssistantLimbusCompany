@@ -1,5 +1,7 @@
 # pi 最小接入验证：历史记录（命令已移除）
 
+2026-11-05 正式 Agent 已接入宿主持有的 pi 进程管道：按需启动、跨轮复用，new_session 显式更新轮次权限／历史／提示；中途退出结束本轮，不重放，下轮按需重建；取消或异常后丢弃不安全进程。下文独立探针及按轮退出描述均为历史。见[当前用法](external-code-search.md)。
+
 2026-11-01：开发者确认不再需要此冒烟入口，已删除独立 `lalc pi-probe` 命令及专用循环。下文为原阶段用法与验收记录，不是当前可执行命令。共享 pi 启动 / RPC / 工具扩展保留；正式 Agent 每轮强制推理预检已取消，设置页手动检查保留，见[当前决定](agent-raw-output-decisions.md)。当前按需集成测试选择 `tests/test_agent_repair_agent.py`、`tests/test_developer_session_agent.py` 并显式添加 `--run-agent-tests`；仅使用本机 HTTP 替身的通过不等于真实模型、Windows 成品或游戏验收。普通回归不启用 Agent 测试，跳过不得报告为通过。游戏版本历史见[当前用法](game-version-history.md)。
 
 # pi 最小接入验证（#324）

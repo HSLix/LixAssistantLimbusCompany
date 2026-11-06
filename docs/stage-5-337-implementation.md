@@ -1,5 +1,7 @@
 # #337 — 外部知识库与受控 Git 本地实施
 
+2026-11-05 后续设计已本地接入：当前工具为 knowledge_search_literal／knowledge_search_hybrid，参考文件与索引按完整版本切换，更新失败保留旧版。以下 #337 原实现及旧测试数字保留为历史，不代表新行为；当前用法见[外部搜索](external-code-search.md)。
+
 2026-11-01。开发者确认[关键决定](stage-5-337-decisions.md)及[影响评审](stage-5-337-design-impact-review.md)后授权实施。开发者已人工验收通过并明确要求关闭，#337 已按 completed 关闭。
 
 ## 使用

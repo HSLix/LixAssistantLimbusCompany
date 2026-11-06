@@ -1,5 +1,7 @@
 # Stage 2 Minimum Implementation Slices
 
+2026-11-05 状态修订：[#317 已由开发者取消并关闭](https://github.com/HSLix/LixAssistantLimbusCompany/issues/317#issuecomment-6652564769)，不再保留独立邮箱 Workflow 验收任务；当前验收由 #340 推进。下文 #317 延期／待恢复的清单保留为原时点记录，取消不表示这些检查已通过。
+
 Status: accepted baseline.
 
 Workflow 2.0 starts from a clean orphan branch in this repository. The old branch remains intact as historical reference and emergency rollback; the new branch does not run beside, wrap, or remain compatible with the legacy runtime. This plan implements the accepted Stage 2 contract without reopening storage formats, exhaustively designing failure codes, or generalizing game-specific termination. The original dependency order is retained; ADR 0026 revises the final completion gate below.

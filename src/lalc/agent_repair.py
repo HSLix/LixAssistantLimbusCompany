@@ -132,7 +132,8 @@ class RepairLog:
         for relative, content in files.items():
             path = directory / relative
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(content)
+            from .file_content import write_content
+            write_content(path, content)
 
 
 def final_answer(message):
@@ -373,7 +374,8 @@ class RepairConversation:
                     env["LALC_PI_ALLOWED_TOOLS"] = json.dumps(expected)
                     command[command.index("--tools") + 1] = ",".join(expected)
                     stage = "pi_start"
-                    async with rpc_session(command, env, temporary, self.log.record, startup=startup) as (send, event):
+                    async with rpc_session(command, env, temporary, self.log.record, startup=startup,
+                                           pool=self.host.service.pi_process) as (send, event):
                         input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
                         context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
                         self.log.save_json(f"{prefix}/input.json", input_record)
@@ -531,3 +533,5 @@ def run_repair(args, manager):
         service.logger.error("Agent Repair 错误：%s", details)
         print(json.dumps({"status": "incomplete", "error": details["message"], "diagnostics": details}, ensure_ascii=False))
         return 1
+    finally:
+        service.shutdown()

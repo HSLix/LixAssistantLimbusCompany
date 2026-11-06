@@ -14,6 +14,7 @@ import uuid
 from typing import Any
 
 from .runtime import _strict_json, atomic_write_json
+from .page_packages import page_entries, page_entry, resource_path
 
 
 class UserSettings:
@@ -49,8 +50,8 @@ class UserSettings:
 class PageContext:
     """供可信页面读取/保存自身配置；业务校验仍由页面负责。"""
 
-    def __init__(self, store: UserSettings, page_id: str):
-        self.store, self.page_id = store, page_id
+    def __init__(self, store: UserSettings, page_id: str, package_root: Path | None = None):
+        self.store, self.page_id, self.package_root = store, page_id, package_root
         from .i18n import current_language
         self.language = current_language()
 
@@ -65,6 +66,12 @@ class PageContext:
         if type(config) is not dict:
             raise ValueError("页面必须提交 JSON 对象。")
         self.store.save("pages", self.page_id, config)
+
+    def resource_path(self, relative: str) -> Path:
+        """定位当前页面目录内资源；旧配置仍由 load/save 独立管理。"""
+        if self.package_root is None:
+            raise ValueError("当前页面没有资源目录。")
+        return resource_path(self.package_root, relative)
 
 
 @dataclass
@@ -100,7 +107,7 @@ def create_business_page(path, module, page_id, name, task_id, store):
     """按共享契约创建页面；检查 submit 存在但不主动调用。"""
     from PySide6.QtWidgets import QWidget
     from qfluentwidgets import FluentIcon
-    context = PageContext(store, page_id)
+    context = PageContext(store, page_id, Path(path).parent)
     names = getattr(module, "PAGE_NAMES", {})
     if (type(names) is not dict or any(key not in {"zh_CN", "en_US"} or
             type(value) is not str or not value.strip() for key, value in names.items())):
@@ -118,17 +125,21 @@ def create_business_page(path, module, page_id, name, task_id, store):
 
 def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessPage], list[str]]:
     """普通导入/创建异常只隔离单页，所有冲突注册均不进入可执行列表。"""
+    directory = Path(directory).absolute()
     modules, errors, pages = [], [], []
     if not directory.exists():
         return pages, errors
-    for path in sorted(directory.glob("*.py")):
-        if path.name.startswith("_"):
-            continue
+    try:
+        entries = page_entries(directory)
+    except (OSError, ValueError) as error:
+        return [], [f"{directory}：{type(error).__name__}: {error}"]
+    for path in entries:
         try:
+            path = page_entry(path)
             module, page_id, name, task_id = load_page_module(path, path.read_bytes())
             modules.append((path, module, page_id, name, task_id))
         except Exception as error:
-            errors.append(f"{path.name}：{type(error).__name__}: {error}")
+            errors.append(f"{path.relative_to(directory)}：{type(error).__name__}: {error}")
     ids = Counter(item[2] for item in modules)
     tasks = Counter(item[4] for item in modules if item[4] is not None)
     for path, module, page_id, name, task_id in modules:
@@ -137,8 +148,22 @@ def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessP
                 raise ValueError(f"页面或任务 ID 冲突：{page_id} / {task_id}")
             pages.append(create_business_page(path, module, page_id, name, task_id, store))
         except Exception as error:
-            errors.append(f"{path.name}：{type(error).__name__}: {error}")
+            errors.append(f"{path.relative_to(directory)}：{type(error).__name__}: {error}")
     return pages, errors
+
+
+def check_page_registration(directory, target, page_id, task_id):
+    """运行式预览专用注册检查；普通包检查不能调用会加载模块的此函数。"""
+    for path in page_entries(directory):
+        if path == target:
+            continue
+        checked = page_entry(path)
+        try:
+            _, other_id, _, other_task = load_page_module(checked, checked.read_bytes())
+        except Exception:
+            continue
+        if page_id == other_id or task_id is not None and task_id == other_task:
+            raise ValueError(f"页面或任务 ID 冲突：{path} / {page_id} / {task_id}")
 
 
 def task_inputs(pages: list[BusinessPage], supported: tuple[str, ...], store: UserSettings):

@@ -114,11 +114,12 @@ class LogStore:
         content = _json_bytes(packed)
         return self._put(content, "json") if not inline and len(content) >= 1024 else packed
 
-    def unpack(self, value, *, _active=None, image_handler=None):
-        """完整展开并验哈希；缺失、损坏、循环或越界引用一律明确失败。"""
+    def unpack(self, value, *, _active=None, image_handler=None, max_bytes=None, _remaining=None):
+        """完整展开并验哈希；可限制累计引用字节，不可信历史须传入上限。"""
         active = set() if _active is None else _active
+        remaining = [max_bytes] if _remaining is None and max_bytes is not None else _remaining
         if isinstance(value, list):
-            return [self.unpack(item, _active=active, image_handler=image_handler) for item in value]
+            return [self.unpack(item, _active=active, image_handler=image_handler, _remaining=remaining) for item in value]
         if not isinstance(value, dict):
             return value
         if set(value) == {MARKER}:
@@ -131,7 +132,7 @@ class LogStore:
                         or not isinstance(pair[0], str) for pair in pairs)
                         or len({pair[0] for pair in pairs}) != len(pairs)):
                     raise ValueError("日志字面量转义格式错误。")
-                return {key: self.unpack(item, _active=active, image_handler=image_handler) for key, item in pairs}
+                return {key: self.unpack(item, _active=active, image_handler=image_handler, _remaining=remaining) for key, item in pairs}
             path = self._path(reference.get("path"))
             if path in active:
                 raise ValueError("日志存在循环引用。")
@@ -140,6 +141,12 @@ class LogStore:
                     raise ValueError("日志图片哈希格式错误。")
                 return image_handler(reference)
             try:
+                if remaining is not None:
+                    # 每次引用都计入，阻止小型引用图在不可信历史导入时指数展开。
+                    size = path.stat().st_size
+                    if size > remaining[0]:
+                        raise ValueError("日志引用展开超过大小限制。")
+                    remaining[0] -= size
                 content = path.read_bytes()
             except OSError as error:
                 raise ValueError(f"日志引用不可用：{reference.get('path')}") from error
@@ -154,9 +161,9 @@ class LogStore:
             if kind == "txt":
                 return content.decode("utf-8")
             if kind == "json":
-                return self.unpack(json.loads(content), _active=active | {path}, image_handler=image_handler)
+                return self.unpack(json.loads(content), _active=active | {path}, image_handler=image_handler, _remaining=remaining)
             raise ValueError("未知日志引用类型。")
-        return {key: self.unpack(item, _active=active, image_handler=image_handler) for key, item in value.items()}
+        return {key: self.unpack(item, _active=active, image_handler=image_handler, _remaining=remaining) for key, item in value.items()}
 
     def write_json(self, path, value):
         """原子替换日志文档；内容对象失败时不发布新的引用文档。"""

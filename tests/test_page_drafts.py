@@ -132,8 +132,8 @@ def test_install_snapshot_no_clobber_conflict_and_failed_replace(drafts, monkeyp
     snapshot = drafts.snapshot("sample.py")
     drafts.update("sample.py", SOURCE.replace('"Sample"', '"Changed"'))
     installed = drafts.install(snapshot, "sample.page", "sample.task")
-    assert installed["sha256"] == hashlib.sha256(SOURCE.encode()).hexdigest()
-    target = drafts.installed / "sample.py"
+    assert installed["sha256"] == snapshot["sha256"]
+    target = drafts.path("sample.py", "installed")
     assert target.read_bytes() == SOURCE.encode()
     with pytest.raises(ValueError, match="已存在"):
         drafts.install(snapshot, "sample.page", "sample.task")
@@ -147,12 +147,12 @@ def test_install_snapshot_no_clobber_conflict_and_failed_replace(drafts, monkeyp
     replacement = PageDrafts(session)
     replacement.create("sample.py", copy_from="sample.py")
     replacement.update("sample.py", SOURCE.replace('"Sample"', '"Changed"'))
-    original_replace = Path.replace
+    original_rename = Path.rename
     def failed_replace(path, dest):
-        if dest == target:
+        if path.name == "new" and dest == target.parent:
             raise OSError("replace failed")
-        return original_replace(path, dest)
-    monkeypatch.setattr(Path, "replace", failed_replace)
+        return original_rename(path, dest)
+    monkeypatch.setattr(Path, "rename", failed_replace)
     with pytest.raises(OSError):
         replacement.install(replacement.snapshot("sample.py"), "sample.page", "sample.task")
     assert target.read_bytes() == SOURCE.encode()
@@ -212,7 +212,7 @@ def test_preview_independent_memory_no_submit_and_install_exact_version(gui, dra
         drafts.update("sample.py", SOURCE.replace('"Sample"', '"Future"'))
         dialog.install_button.click()
         assert request.result["status"] == "installed"
-        assert (drafts.installed / "sample.py").read_text() == SOURCE
+        assert drafts.path("sample.py", "installed").read_text() == SOURCE
         assert store.path.read_bytes() == config
     finally:
         dialog.close()

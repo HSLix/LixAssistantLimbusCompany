@@ -2,7 +2,7 @@
 
 2026-10-30：本文 uv 命令针对源码项目；Windows 成品通过 `LALC-console.exe` 使用同一 CLI，Candidate 固定在用户数据目录，不随终端工作目录改变。构建输入、独立示例准备与验收见[Windows 说明](windows-packaging.md)。
 
-2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。外置页面及共享 Agent 配置已在 #332 本地实现，#333 双语与语言重载也已完成本地实现、已获开发者人工验收确认并关闭 #333（[使用与证据](stage-4-333-implementation.md)）；#334 Windows 打包验收仍待完成。
+2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。外置页面及共享 Agent 配置已在 #332 本地实现，#333 双语与语言重载也已完成本地实现、已获开发者人工验收确认并关闭 #333（[使用与证据](stage-4-333-implementation.md)）；#334 已由开发者决定关闭，未执行项不计通过；当前验收由 #340 推进，阶段状态见[集中入口](current-state.md)。
 
 正式 Run 要求唯一可用的 Windows 游戏窗口。运行开始时连接、聚焦并启动物理输入监听，结束时清理；自动化测试提供平台替身。
 
@@ -21,7 +21,7 @@ uv run lalc --developer
 
 常规使用按 publish → set-default → run / run-plan 进行，后续省略 `--manifest`。每次发布并希望使用新代码版本时，再设置 Default；临时运行其他版本才用 `--manifest <id>`。
 
-Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。已有非空 Candidate 仅在明确使用 `init --replace` 或 GUI 确认后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。User Dashboard 与三页 Developer GUI、多文件连续修复见 [修复指南](agent-repair.md)。
+Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。手工已有非空 Candidate 仅在明确使用 `init --replace` 后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。Agent 使用独立 Developer Session，换来源须新建 Session，不接管手工 Candidate；工作台用法见 [修复指南](agent-repair.md)。
 
 初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其固定输入为 `task_repetitions: dict[str, int]` 与 `settings: dict[str, Any]`，由宿主规范化并复制；完整示例见[实施记录](stage-4-331-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
@@ -84,7 +84,7 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 
 [ADR 0027](adr/0027-resolve-assets-independently-with-optional-priority-tags.md) 取代旧专属库。旧 Asset 布局、Candidate 素材库及已发布专属库废弃，清理后重新准备，不做迁移或兼容；Component、Manifest、Default 和运行历史保留。相同 Manifest 的素材结果可随文件更新而变化。
 
-Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md) 收尾；邮箱和 Windows 集成/打包验收仍在 #317。Stage 3 不包含 Agent Asset 新增；未来 Stage 3.5 可新增素材，但仍不允许覆盖已有图片。
+Stage 2 已按 [ADR 0026](adr/0026-close-stage-2-without-a-real-game-workflow.md) 收尾；[#317 已由开发者取消](https://github.com/HSLix/LixAssistantLimbusCompany/issues/317#issuecomment-6652564769)，当前验收由 #340 推进，不保留独立邮箱门槛。开发 Agent 已按 ADR 0028–0031 提供专用裁剪新增与归档移除工具，仍不允许覆盖旧图像；Runtime 权限另按 Stage 6 决定。
 
 ## 外置业务页面与共享 Agent 设置
 
