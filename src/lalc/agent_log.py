@@ -197,12 +197,45 @@ def read_json(path):
     return store.unpack(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
-def read_events(path):
-    """逐条展开事件，保留每个重复事件的顺序与身份。"""
+def read_events(path, *, expand=True):
+    """逐条读取事件；索引与界面状态恢复可延后展开内容引用。"""
     store = _store_for(path)
     with Path(path).open(encoding="utf-8") as stream:
         for line in stream:
-            yield store.unpack(json.loads(line))
+            row = json.loads(line)
+            yield store.unpack(row) if expand else row
+
+
+class RoundEventReader:
+    """增量索引事件位置，只展开被请求轮次；不改写原始日志。"""
+
+    def __init__(self, path):
+        self.path = Path(path)
+        self.offset = 0
+        self.rounds = {}
+
+    def refresh(self):
+        """只扫描新增的紧凑事件，不读取历史内容对象。"""
+        if not self.path.exists():
+            return
+        _store_for(self.path)
+        with self.path.open('rb') as stream:
+            stream.seek(self.offset)
+            while line := stream.readline():
+                start = self.offset
+                row = json.loads(line)
+                self.offset = stream.tell()
+                self.rounds.setdefault(row.get('round', 0), []).append((start, len(line)))
+
+    def read(self, number):
+        """复用日志引用的路径及哈希校验，保留同轮事件的原始顺序。"""
+        store = _store_for(self.path)
+        rows = []
+        with self.path.open('rb') as stream:
+            for start, size in self.rounds[number]:
+                stream.seek(start)
+                rows.append(store.unpack(json.loads(stream.read(size))))
+        return rows
 
 
 def main():

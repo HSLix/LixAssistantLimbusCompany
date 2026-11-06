@@ -141,17 +141,17 @@ class DeveloperSession:
         candidate_files(self.host.candidate)
         return metadata
 
-    def conversation(self):
-        """打开只恢复已保存状态，不发模型请求或重做工具；执行前仍须再次读取。"""
+    def conversation(self, *, load_history=True):
+        """打开只恢复已保存状态；GUI 浏览可延后模型历史，执行前仍完整恢复。"""
         from .agent_repair import RepairConversation
         with self.host.candidate_lock():
             self.check()
             conversation = RepairConversation(self.host, session=self, entry=self.entry)
-            self.restore(conversation)
+            self.restore(conversation, load_history=load_history)
             self.host.conversation = conversation
             return conversation
 
-    def restore(self, conversation):
+    def restore(self, conversation, *, load_history=True):
         """调用方持有锁；保留不完整日志尾部，标记中断并恢复编号和协议有效历史。"""
         self.check()
         log = conversation.log
@@ -172,8 +172,9 @@ class DeveloperSession:
                 else:
                     with events_path.open("ab") as stream:
                         stream.write(b"\n")
-        events = list(read_events(events_path)) if events_path.exists() else []
-        conversation.history = restored_history(events)
+        events = list(read_events(events_path, expand=load_history)) if events_path.exists() else []
+        if load_history:
+            conversation.history = restored_history(events)
         rounds = sorted(int(path.name.removeprefix("round-")) for path in log.root.glob("round-*")
                         if re.fullmatch(r"round-[1-9][0-9]*", path.name) and path.is_dir())
         previous_group = log.group
@@ -186,10 +187,11 @@ class DeveloperSession:
             max((row["event"]["sequence"] for row in events if row["event"].get("type") == "tool_reserved"), default=0))
         if previous_group != log.group:
             conversation.tools.previews.clear()
-        for pattern in ("round-*/input-*", "tool-*.png"):
-            for path in log.root.glob(pattern):
-                if path.is_file():
-                    log.store.register_image(path)
+        if load_history:
+            for pattern in ("round-*/input-*", "tool-*.png"):
+                for path in log.root.glob(pattern):
+                    if path.is_file():
+                        log.store.register_image(path)
         for number in rounds:
             result_path = log.root / f"round-{number}/result.json"
             if result_path.exists():
@@ -202,4 +204,5 @@ class DeveloperSession:
             conversation.append_user({"role": "user", "content": [{"type": "text", "text":
                 f"宿主中断了第 {number} 轮；已保存的改动保留，未取得的结果未知。请检查文件和实际状态，自行判断如何继续；不要假定未执行或成功，不自动重放。重启前的现场裁剪预览 ID 已失效。"}],
                 "timestamp": 0})
-        log.save_json("context.json", conversation.history)
+        if load_history:
+            log.save_json("context.json", conversation.history)

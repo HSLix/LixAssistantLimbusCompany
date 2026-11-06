@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer, QSize
+from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer, QSize, QPoint
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -783,6 +783,8 @@ class RepairPage(QWidget):
         super().__init__()
         self.window, self.host = window, window.host
         self.session = None
+        self.history_reader = None
+        self.history_rounds = []
         self.images, self.manifest_references = [], []
         self.tool_errors, self.titles = {}, {}
         self._round_running = False
@@ -868,6 +870,7 @@ class RepairPage(QWidget):
         self.diagnostics.setParent(self)
         self.diagnostics.hide()
         self.chat = RepairChat()
+        self.chat.olderRequested.connect(self.load_older_history)
         self.chat.setMinimumSize(0, 80)
         self.chat.setStyleSheet('QTextBrowser { border: none; background: transparent; }')
         body.addWidget(self.chat, 1)
@@ -1196,6 +1199,8 @@ class RepairPage(QWidget):
             return
         self.clear_raw_output()
         self.session = None
+        self.history_reader = None
+        self.history_rounds = []
         self.host = self.window.host
         self.chat.clear()
         self.tool_errors.clear()
@@ -1221,13 +1226,20 @@ class RepairPage(QWidget):
         def operation():
             session = DeveloperSession(self.window.service, identity, entry='gui')
             session.host.secrets = self.window.host.secrets
-            session.conversation()
-            return session
-        self.window.launch(operation, self.activate_session)
+            session.conversation(load_history=False)
+            from .agent_log import RoundEventReader
+            reader = RoundEventReader(session.host.conversation.log.root / 'events.jsonl')
+            reader.refresh()
+            rows = reader.read(max(reader.rounds)) if reader.rounds else []
+            return session, reader, rows
+        self.window.launch(operation, lambda value: self.activate_session(
+            value[0], history_reader=value[1], history_rows=value[2]))
 
-    def activate_session(self, session, *, restore_history=True):
+    def activate_session(self, session, *, restore_history=True, history_reader=None, history_rows=None):
         self.clear_raw_output()
         self.session, self.host = session, session.host
+        self.history_reader = history_reader
+        self.history_rounds = []
         self.mode.setCurrentItem(session.mode)
         metadata = json.loads((session.path / 'session.json').read_text())
         self.set_manifests(self.host.manager.list_manifests())
@@ -1236,30 +1248,79 @@ class RepairPage(QWidget):
         self.mode_badge.setText(('🛠 Construct' if session.mode == 'Construct' else '🔧 Repair'))
         self.diagnostics.set_path(self.host.conversation.log.path)
         if restore_history:
-            self.reload_history()
+            self.reload_history(history_rows)
         self.refresh_sessions()
         self.render(bool(self.window.jobs))
 
-    def reload_history(self):
-        """从原始持久事件重建视图，保留工具关联，不触发模型或工具。"""
+    def reload_history(self, rows=None):
+        """优先呈现最新完整轮次；旧轮次上滚时读取，不重复恢复模型历史。"""
         if self.session is None:
             return
         self.clear_raw_output()
-        from .agent_log import read_events, read_json
-        from .agent_repair import final_answer, FORMAT_RETRY_PREFIX
-        from .agent_prompts import user_message_text
+        from .agent_log import RoundEventReader, read_json
         with self.host.candidate_lock():
-            self.session.restore(self.host.conversation)
             events_path = self.host.conversation.log.root / 'events.jsonl'
-            rows = list(read_events(events_path)) if events_path.exists() else []
+            if self.history_reader is None:
+                self.history_reader = RoundEventReader(events_path)
+            if rows is None:
+                self.history_reader.refresh()
+            self.history_rounds = sorted(self.history_reader.rounds)
+            latest = self.history_rounds.pop() if self.history_rounds else None
+            if rows is None:
+                rows = self.history_reader.read(latest) if latest is not None else []
             number = self.host.conversation.log.group
-            result = read_json(events_path.parent / f'round-{number}/result.json') if number else None
+            result_path = events_path.parent / f'round-{number}/result.json'
+            result = read_json(result_path) if result_path.exists() else None
             if result is not None:
                 result.setdefault('requests', self.host.conversation.log.requests)
+        self.chat.batch_render = True
         self.chat.clear()
         self.tool_errors.clear()
         self.diagnostics.errors.clear()
+        self.replay_history(rows)
+        self.chat.render()
+        self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
+        self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
+            self.host.conversation.log.group, self.host.conversation.log.requests,
+            load_settings(self.host.service.data_root)['max_requests']))
+        if not self.window.jobs and not self.window.closing:
+            if result is not None:
+                self.show_result_status(result)
+            else:
+                self.set_status('')
+                self.status.setToolTip('')
+        self.refresh_sessions()
+
+    def load_older_history(self):
+        """补载上一轮并补偿新增高度，保持原来正在阅读的内容位置。"""
+        if not self.history_rounds or self.chat.batch_render or self.window.jobs:
+            return
+        number = self.history_rounds[-1]
+        def operation():
+            with self.host.candidate_lock():
+                return self.history_reader.read(number)
+        def loaded(rows):
+            self.history_rounds.pop()
+            bar = self.chat.verticalScrollBar()
+            cursor = self.chat.cursorForPosition(QPoint(0, 0))
+            position = cursor.position()
+            top = self.chat.cursorRect(cursor).top()
+            characters = self.chat.document().characterCount()
+            count = len(self.chat.entries)
+            self.replay_history(rows)
+            self.chat.entries[:] = self.chat.entries[count:] + self.chat.entries[:count]
+            self.chat.render(follow=False)
+            cursor.setPosition(position + self.chat.document().characterCount() - characters)
+            bar.setValue(bar.value() + self.chat.cursorRect(cursor).top() - top)
+        self.window.launch(operation, loaded)
+
+    def replay_history(self, rows):
+        """批量合并持久事件，工具关联与原始输出沿用实时呈现逻辑。"""
+        from .agent_repair import final_answer, FORMAT_RETRY_PREFIX
+        from .agent_prompts import user_message_text
+        activity_round = self.chat.activity_round
         self._replaying = True
+        self.chat.batch_render = True
         try:
             for row in rows:
                 value, number = row['event'], row.get('round', 0)
@@ -1286,16 +1347,8 @@ class RepairPage(QWidget):
                     self.show_event(row)
         finally:
             self._replaying = False
-        self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
-            self.host.conversation.log.group, self.host.conversation.log.requests,
-            load_settings(self.host.service.data_root)['max_requests']))
-        if not self.window.jobs and not self.window.closing:
-            if result is not None:
-                self.show_result_status(result)
-            else:
-                self.set_status('')
-                self.status.setToolTip('')
-        self.refresh_sessions()
+            self.chat.batch_render = False
+            self.chat.activity_round = activity_round
 
     def open_pages(self):
         """打开正式页面目录，不把页面加入 Candidate 或自动重载。"""

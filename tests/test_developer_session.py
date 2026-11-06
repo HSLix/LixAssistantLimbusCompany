@@ -278,3 +278,30 @@ def test_cli_chat_releases_lock_while_waiting_and_reloads_other_entry(session, m
     source = json.loads((session.path / "session.json").read_text())["source_manifest_id"]
     assert cli.main(["repair", "--from", source, "--chat", "--problem", "first CLI message",
                      "--base-url", "http://localhost:1/v1", "--model", "test"]) == 0
+
+
+def test_history_browsing_defers_model_context_and_preserves_interruption(session, monkeypatch):
+    chat = session.conversation()
+    interrupted(chat, ('read',))
+    chat.log.record({'type': 'lalc_request', 'requests': 7})
+    chat.log.record({'type': 'tool_reserved', 'sequence': 12})
+    chat.log.save_json('context.json', chat.history)
+    context = (chat.log.root / 'context.json').read_bytes()
+    from lalc.agent_log import LogStore
+    unpack, register_image = LogStore.unpack, LogStore.register_image
+    (chat.log.root / 'tool-1.png').write_bytes(b'original image')
+    monkeypatch.setattr(LogStore, 'register_image', lambda *_: pytest.fail('浏览不得读取旧截图'))
+    monkeypatch.setattr(LogStore, 'unpack', lambda *_args, **_kwargs: pytest.fail('浏览不得展开完整历史'))
+    browsing = session.conversation(load_history=False)
+    assert browsing.log.group == 1 and browsing.log.requests == 7
+    assert browsing.tools.sequence == 12
+    assert (chat.log.root / 'context.json').read_bytes() == context
+    monkeypatch.setattr(LogStore, 'unpack', unpack)
+    monkeypatch.setattr(LogStore, 'register_image', register_image)
+    assert read_json(chat.log.root / 'round-1/result.json')['status'] == 'interrupted'
+    with session.host.candidate_lock():
+        session.restore(browsing)
+    assert browsing.history[0] == message('before crash')
+    tool_result = next(item for item in browsing.history if item['role'] == 'toolResult')
+    assert tool_result['isError'] and tool_result['details']['outcome'] == 'unknown'
+    assert read_json(chat.log.root / 'context.json') == browsing.history
