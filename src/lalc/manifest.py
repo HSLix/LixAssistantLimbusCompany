@@ -346,7 +346,9 @@ class ManifestManager:
             manifest = result.loaded.manifest
 
         target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = Path(tempfile.mkdtemp(prefix=f".{target.name}.", dir=target.parent))
+        temporary = target.parent / f".{target.name}.{uuid.uuid4()}"
+        # 永久 Candidate 不能沿用 tempfile 在 Windows 上设置的受限 DACL。
+        temporary.mkdir()
         try:
             candidate: dict[str, Any] = {
                 "schema_version": SCHEMA_VERSION,

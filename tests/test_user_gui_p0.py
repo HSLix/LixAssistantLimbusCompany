@@ -88,14 +88,25 @@ def key_dialog(page):
     return dialog, dialog.findChild(QDialogButtonBox)
 
 
-def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch):
+@pytest.fixture(params=["user", "developer"])
+def api_key_page(owner, request):
+    if request.param == "user":
+        owner.user.user_enabled.setChecked(True)
+        return owner.user.settings_page
+    return owner.open_window(True).settings_page
+
+
+def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_page):
     import lalc.agent_settings as settings
     monkeypatch.setattr(settings.sys, "platform", "darwin")
-    page = owner.user.settings_page
-    owner.user.user_enabled.setChecked(True)
+    page = api_key_page
+    assert page.key is None
     dialog, buttons = key_dialog(page)
     assert not buttons.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
     page.key.setText("cancel-key")
+    with pytest.raises(ValueError, match="确认或取消"):
+        page.submit()
+    assert not owner.host.secrets
     buttons.rejected.emit()
     app.processEvents()
     assert page.key is None and not owner.host.secrets
@@ -106,15 +117,21 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch):
     app.processEvents()
     assert page.key is None
     assert owner.host.secrets["llama.cpp"] == "saved-key"
+    assert page.secret_state.text() == "API Key：已设置"
     assert "saved-key" not in (owner.service.data_root / "agent-settings.json").read_text()
+    dialog, buttons = key_dialog(page)
+    assert page.key.text() == ""
+    buttons.rejected.emit()
+    app.processEvents()
+    assert owner.host.secrets["llama.cpp"] == "saved-key"
     page.clear_button.click()
     assert not owner.host.secrets
+    assert page.secret_state.text() == "API Key：未设置"
 
 
-def test_api_key_save_failure_preserves_dialog_and_redacts_error(owner, app, monkeypatch):
+def test_api_key_save_failure_preserves_dialog_and_redacts_error(owner, app, monkeypatch, api_key_page):
     import lalc.agent_settings as settings
-    owner.user.user_enabled.setChecked(True)
-    page = owner.user.settings_page
+    page = api_key_page
     dialog, buttons = key_dialog(page)
     page.key.setText("pending-key")
     def fail(*_):
@@ -123,7 +140,7 @@ def test_api_key_save_failure_preserves_dialog_and_redacts_error(owner, app, mon
     buttons.accepted.emit()
     app.processEvents()
     assert dialog.isVisible() and page.key.text() == "pending-key"
-    error = owner.user.findChildren(ErrorDialog)[-1]
+    error = page.window.findChildren(ErrorDialog)[-1]
     assert "pending-key" not in error.details.toPlainText()
     assert error.details.isHidden()
     error.close()

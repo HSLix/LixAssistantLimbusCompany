@@ -4,10 +4,13 @@ import hashlib
 import inspect
 import json
 import math
+import shutil
 import threading
 import time
 import traceback
 import types
+import uuid
+from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
@@ -937,6 +940,18 @@ def require_json(value: Any, name: str) -> None:
         json.dumps(value, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise ValueError(f"{name}_not_json_compatible") from error
+
+
+@contextmanager
+def staging_directory(parent: Path, *, prefix: str):
+    """创建继承父目录权限的提交暂存区，退出时清理尚未移出的内容。"""
+    path = parent / f"{prefix}{uuid.uuid4()}"
+    # tempfile 的 0700 在 Windows 上会留下随重命名保留的受限 DACL。
+    path.mkdir()
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path)
 
 
 def atomic_write_json(path: Path, value: dict[str, Any]) -> None:

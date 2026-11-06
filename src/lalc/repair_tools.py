@@ -163,7 +163,7 @@ class RepairTools:
         self.log.save_json(f"tool-{self.sequence}-page-preview.json", {
             "filename": filename, "sha256": request.snapshot["sha256"],
             "source": request.snapshot["source"].decode("utf-8"), "summary": summary,
-            "replace": request.snapshot["replace"], "package_path": evidence,
+            "package_path": evidence,
             "files": [{"path": path, "sha256": content_hash(content), "size": len(content)}
                       for path, content in sorted(request.snapshot["package"].files.items())]})
         try:

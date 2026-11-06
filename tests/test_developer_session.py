@@ -6,6 +6,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_developer_ses
 
 import asyncio
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -49,6 +51,30 @@ def test_sessions_isolate_candidate_and_preserve_manual_source(tmp_path):
     assert first.host.diff() and not second.host.diff()
     assert {path: path.read_bytes() for path in host.candidate.rglob("*") if path.is_file()} == before
     assert first.host.manager.default_manifest_id() == loaded.manifest_id
+
+
+@pytest.mark.parametrize("entry", ["session", "manual"])
+def test_workspace_staging_inherits_directory_permissions(tmp_path, monkeypatch, entry):
+    host, loaded = host_for(tmp_path)
+    mkdir = os.mkdir
+    created = []
+
+    def record(path, mode=0o777, *, dir_fd=None):
+        created.append((Path(path), mode))
+        return mkdir(path, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "mkdir", record)
+    if entry == "session":
+        session = DeveloperSession.create(host.service, loaded.manifest_id)
+        assert session.host.validate()["ok"]
+    else:
+        host.initialize(loaded.manifest_id, replace=True)
+        assert host.validate()["ok"]
+    staging = [(path, mode) for path, mode in created
+               if path.name.startswith((".pending-", ".candidate.", ".prepared.", ".lalc-candidate-"))]
+    assert staging
+    # Windows 对 0700 设置独立 DACL，重命名后普通 Explorer 仍可能无法访问。
+    assert all(mode != 0o700 for _, mode in staging)
 
 
 def test_failed_creation_has_no_visible_session_or_changes(session, monkeypatch):

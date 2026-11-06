@@ -6,13 +6,12 @@ import base64
 import json
 from pathlib import Path
 import re
-import tempfile
 import uuid
 
 from .agent_log import FORMAT, read_events
 from .agent_policy import allowed_tools
 from .developer import DeveloperHost, candidate_files
-from .runtime import atomic_write_json
+from .runtime import atomic_write_json, staging_directory
 
 
 def restored_history(events):
@@ -92,7 +91,7 @@ class DeveloperSession:
         if root.is_symlink():
             raise ValueError("Session 根目录不能是符号链接。")
         root.mkdir(parents=True, exist_ok=True)
-        with session.host.candidate_lock(), tempfile.TemporaryDirectory(dir=root, prefix=".pending-") as temporary:
+        with session.host.candidate_lock(), staging_directory(root, prefix=".pending-") as temporary:
             prepared = Path(temporary) / "session"
             prepared.mkdir()
             candidate = prepared / "candidate"

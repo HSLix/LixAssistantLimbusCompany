@@ -197,6 +197,8 @@ def test_more_menu_retains_actions_diagnostics_and_busy_gates(gui, monkeypatch):
     app, window = gui
     page = window.repair_page
     opened = []
+    assert page.logs_action.text() == tr('Open Agent log directory')
+    assert page.app_logs_action.text() == tr('Open LALC log directory')
     monkeypatch.setattr(QDesktopServices, 'openUrl', lambda url: opened.append(url.toLocalFile()) or True)
     page.workspace_action.trigger()
     page.pages_action.trigger()

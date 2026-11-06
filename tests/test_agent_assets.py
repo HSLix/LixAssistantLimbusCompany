@@ -73,6 +73,46 @@ def test_remove_archives_raw_image_tags_and_fresh_screenshot_preserving_other_na
     assert tools.library.match("ui/claim", bytes([0, 0, 0, 255]) * 4, (2, 2), run_id=1, observation=1, emit=lambda *args: None) == []
 
 
+@pytest.mark.parametrize("sync_fails", [False, True])
+def test_remove_record_sync_requires_write_access_and_preserves_asset_on_failure(tools, monkeypatch, sync_fails):
+    """模拟 Windows 刷盘写权限要求，并验证准备记录刷盘失败不移除素材。"""
+    import lalc.assets as assets
+    saved = invoke(tools, "crop_asset", preview_id=preview(tools)["details"]["preview_id"])["details"]
+    before = snapshot(tools.library.root)
+    original_open, original_fsync = Path.open, assets.os.fsync
+    records, synced = [], []
+
+    def record_open(path, *args, **kwargs):
+        stream = original_open(path, *args, **kwargs)
+        if path.name == "record.json":
+            records.append(stream)
+        return stream
+
+    def sync(descriptor):
+        for stream in records:
+            if not stream.closed and stream.fileno() == descriptor:
+                if not stream.writable():
+                    raise OSError(9, "Bad file descriptor")
+                synced.append(True)
+                if sync_fails:
+                    raise OSError("injected record sync failure")
+        return original_fsync(descriptor)
+
+    monkeypatch.setattr(Path, "open", record_open)
+    monkeypatch.setattr(assets.os, "fsync", sync)
+    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="刷盘回归")
+    assert synced == [True]
+    if sync_fails:
+        assert result["isError"]
+        assert snapshot(tools.library.root) == before
+    else:
+        assert not result.get("isError")
+        record = json.loads((Path(result["details"]["archive_path"]) / "record.json").read_text())
+        assert record["state"] == "completed" and record["sha256"] == saved["sha256"]
+        assert record["tags"] == ["en", "en"]
+        assert not tools.library.path(saved["path"]).exists()
+
+
 @pytest.mark.parametrize("fault", ["capture", "archive_image", "prepare", "tags", "unlink", "complete", "cancel"])
 def test_remove_failures_preserve_active_image_and_tags(tools, monkeypatch, fault):
     import lalc.assets as assets

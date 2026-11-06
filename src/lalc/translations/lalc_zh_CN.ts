@@ -675,6 +675,10 @@ Log: {1}</source>
       <translation>打开应用日志目录</translation>
     </message>
     <message>
+      <source>Open LALC log directory</source>
+      <translation>打开 LALC 日志目录</translation>
+    </message>
+    <message>
       <location filename="../developer_gui.py" line="754" />
       <source>Open external settings page directory</source>
       <translation>打开扩展配置页面文件夹</translation>
@@ -685,8 +689,8 @@ Log: {1}</source>
     </message>
     <message>
       <location filename="../developer_gui.py" line="420" />
-      <source>Open log directory</source>
-      <translation>打开日志目录</translation>
+      <source>Open Agent log directory</source>
+      <translation>打开 Agent 日志目录</translation>
     </message>
     <message>
       <location filename="../gui.py" line="50" />
@@ -1716,6 +1720,18 @@ Original pixel region: {2}</source>
     <message>
       <source>Processing: {0}</source>
       <translation>正在处理：{0}</translation>
+    </message>
+    <message>
+      <source>Page installation is complete. Restart LALC to apply the changes.</source>
+      <translation>页面安装完成，重启 LALC 以应用修改。</translation>
+    </message>
+    <message>
+      <source>Restart now</source>
+      <translation>现在重启</translation>
+    </message>
+    <message>
+      <source>Finishing current operations before restarting LALC…</source>
+      <translation>正在结束当前操作，随后重启 LALC…</translation>
     </message>
   </context>
 </TS>
