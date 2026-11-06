@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import AsyncExitStack
 import base64
 from datetime import datetime, timezone
 import json
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 import uuid
@@ -18,7 +20,8 @@ from .agent_settings import settings_snapshot
 from .developer import candidate_files, editable_files, file_diff
 from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 from .agent_log import LogStore
-from .agent_prompts import load_sop, system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
+from .agent_prompts import system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
+from .agent_skills import skill_snapshot
 
 
 class RepairLog:
@@ -83,6 +86,8 @@ class RepairLog:
             logging.getLogger(__name__).error("Agent 操作错误：%s", event)
         if self.on_event:
             self.on_event(event)
+        if value.get("type") == "skill_warning":
+            print("WARNING: " + self.clean(value["message"]), file=sys.stderr, flush=True)
 
     def stream(self, value):
         """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
@@ -190,6 +195,7 @@ async def configure_session(send, event, log, expected_tools):
         if item.get("type") == "lalc_ready":
             if item.get("tools") != expected_tools:
                 raise RuntimeError("Unexpected repair tools")
+            ready = item
             break
     for setting in ("set_auto_retry", "set_auto_compaction"):
         await send({"id": setting, "type": setting, "enabled": False})
@@ -200,6 +206,7 @@ async def configure_session(send, event, log, expected_tools):
                 if not item.get("success"):
                     raise RuntimeError(f"pi rejected {setting}")
                 break
+    return ready
 
 
 def image_attachments(paths, directory):
@@ -236,7 +243,7 @@ class RepairConversation:
         self.entry = entry
         self.mode = session.mode if session else "Repair"
         self.allowed = allowed_tools(self.mode, entry)
-        self.system_prompt = system_prompt(self.mode, {})
+        self.system_prompt = system_prompt(self.mode)
         self.log = RepairLog(host.service.data_root, path=session.path / "log" if session else None,
                              identity=session.identity if session else None)
         self.history = []
@@ -304,6 +311,7 @@ class RepairConversation:
             prior_history = list(self.history)
             stage = "attachments"
             submitted = False
+            skill_resources = AsyncExitStack()
             runtime_context = {"mode": self.mode, "entry": self.entry,
                                "game_version_observation": observation,
                                "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
@@ -322,9 +330,11 @@ class RepairConversation:
                 self.host.service.logger.error("Agent Repair 错误：%s", details)
                 return details
             try:
-                stage = "prompt"
-                sop = load_sop(self.mode)
-                self.system_prompt = system_prompt(self.mode, sop)
+                stage = "skills"
+                skills_root, diagnostics = await skill_resources.enter_async_context(skill_snapshot(self.host.service.data_root))
+                for diagnostic in diagnostics:
+                    self.log.record({"type": "skill_warning", "message": f"{diagnostic['path']}: {diagnostic['message']}"})
+                self.system_prompt = system_prompt(self.mode)
                 stage = "attachments"
                 attachments, attachment_records = image_attachments(images, round_path)
                 for attachment in attachment_records:
@@ -345,7 +355,7 @@ class RepairConversation:
                 input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
                                     "game_version_observation": observation,
                                     "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
-                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "sop": sop, "mode": self.mode, "entry": self.entry,
+                                    "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "mode": self.mode, "entry": self.entry,
                                     "manifest_references": references}
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
@@ -370,6 +380,8 @@ class RepairConversation:
                     history_path = Path(temporary) / "history.json"
                     history_path.write_text(json.dumps(self.log.clean(prior_history)), encoding="utf-8")
                     env["LALC_PI_HISTORY"] = str(history_path)
+                    env["LALC_PI_SKILLS_ROOT"] = str(skills_root)
+                    env["LALC_PI_SKILLS_SOURCE"] = str(self.host.service.data_root.resolve() / "skills")
                     expected = list(self.allowed)
                     env["LALC_PI_ALLOWED_TOOLS"] = json.dumps(expected)
                     command[command.index("--tools") + 1] = ",".join(expected)
@@ -379,7 +391,9 @@ class RepairConversation:
                         input_record.update(pi=env["LALC_PI_VERSION"], pi_path=command[0])
                         context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
                         self.log.save_json(f"{prefix}/input.json", input_record)
-                        await configure_session(send, event, self.log, expected)
+                        ready = await configure_session(send, event, self.log, expected)
+                        input_record["skills"] = ready.get("skills", [])
+                        self.log.save_json(f"{prefix}/input.json", input_record)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
                         # 原图经 context hook 注入，不进入 pi 的 RPC 图片转码流程。
@@ -471,6 +485,11 @@ class RepairConversation:
                 result = {"status": "incomplete", "reason": details.get("failure_code", "error"),
                           "error": details["message"], "diagnostics": details}
             finally:
+                try:
+                    await skill_resources.aclose()
+                except Exception as error:
+                    details = failed(error, "skills_cleanup")
+                    result.update(status="incomplete", reason="skills_cleanup", error=details["message"], diagnostics=details)
                 tools.on_feedback = None
                 tools.on_page_preview = None
                 if not submitted:

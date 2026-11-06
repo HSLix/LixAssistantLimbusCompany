@@ -1,5 +1,7 @@
 # pi 1.5.0 接入兼容记录
 
+2026-11-06 后续：SOP 已迁移为 Developer Skills，现行用法见 [Skills](agent-skills.md)，迁移验证见[实施记录](agent-skills-implementation.md)。下文保留原时点的实现及验证证据。
+
 2026-11-06，按开发者要求将正式 Agent 接入及 Windows 构建资源基线从 1.4.0 升至 1.5.0。SOP／Skills 迁移不属于此次改动。
 
 ## 变化与边界

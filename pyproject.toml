@@ -39,7 +39,7 @@ default-groups = ["dev"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-lalc = ["pi_probe.ts", "sop.md", "*.pyi", "py.typed", "translations/*.ts", "translations/*.qm"]
+lalc = ["pi_probe.ts", "skills/**/*", "*.pyi", "py.typed", "translations/*.ts", "translations/*.qm"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

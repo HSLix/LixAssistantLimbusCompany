@@ -52,7 +52,7 @@ def agent_resources(tmp_path, monkeypatch):
 
 def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
-    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
+    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                  "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
                  "_internal/UnityPy/resources/lzma.tpk",
@@ -78,8 +78,8 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
     assert all(build.digest(path) in sums for path in outputs)
     before = {path: build.digest(path) for path in outputs}
-    (app / "_internal/lalc/sop.md").unlink()
-    with pytest.raises(ValueError, match="sop.md"):
+    (app / "_internal/lalc/skills/workflow-development/SKILL.md").unlink()
+    with pytest.raises(ValueError, match="SKILL.md"):
         build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
     assert {path: build.digest(path) for path in outputs} == before
 
@@ -87,7 +87,7 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
 def test_tampered_ocr_model_prevents_replacing_archives(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
     resources = ["LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico",
-                 "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
+                 "_internal/lalc/pi_probe.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                  "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
                  "_internal/UnityPy/resources/lzma.tpk"]

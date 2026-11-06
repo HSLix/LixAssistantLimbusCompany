@@ -1,5 +1,9 @@
 # 当前状态与文档入口
 
+2026-11-06 Developer SOP 迁入数据目录 Skills，采用 pi 原生元数据发现、按需只读加载和每轮固定副本；原 SOP 已在内容承接后移除。用法见 [Developer Skills](agent-skills.md)，设计及验证见[实施记录](agent-skills-implementation.md)；不代表真实模型、Windows 成品或游戏验收。
+
+2026-11-06 Developer 在 Capture 下方新增模板匹配调试页：增量素材树、整组／单图选择、独立固定截图及真实参数匹配，不写运行使用索引。设计、影响审查与用法见[模板匹配调试页](template-match-lab.md)；Windows 与真实游戏待验收。
+
 2026-11-06 pi 接入及 Windows 打包资源基线更新为 1.5.0；具体兼容检查和默认回归的已知示例失败见 [pi 1.5.0 记录](pi-1.5-compatibility.md)。不代表 Windows 成品、真实模型或游戏验收。
 
 2026-11-06 Developer 新增 Capture 后的 OCR 测试页：独立截图、全图识别、鼠标选区自动重新识别及编号文字对照。设计、影响与验证见 [OCR 测试页记录](ocr-test-page-impact-review.md)，用法见 [OCR](ocr.md#developer-ocr-测试页)；不代表 Windows 或真实游戏验收。
@@ -32,7 +36,7 @@
 | Sharing／完整页面包 | 本地接入四类对象导入导出、页面资源及按可用资源检查 | [Sharing](sharing.md)、[ADR 0036](adr/0036-share-selected-objects-and-install-complete-page-packages.md)、[ADR 0037](adr/0037-budget-sharing-against-available-resources.md) | [实施记录](sharing-implementation-progress.md)；大文件、Windows、真实模型等边界按原记录分别验收 |
 | 外部搜索／进程复用 | 本地接入 literal／hybrid、A/B 文件与索引切换、宿主级 pi／codesearch 复用 | [外部搜索](external-code-search.md)、[ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md) | [实施记录](external-code-search-implementation.md)；Windows、真实远端／模型与大仓库待验 |
 | Windows 双包 | 构建逻辑已支持 with-agent／without-agent；不是成品现场通过 | [打包与验收](windows-packaging.md) | [#334 历史记录](stage-4-334-implementation.md)、[当前资源增量](external-code-search-implementation.md) |
-| OCR／版本历史／Prompt | 已本地接入，具体限制分别记录 | [OCR](ocr.md)、[版本历史](game-version-history.md)、[Prompt 与 SOP](agent-repair.md#prompt-与-sop) | [OCR 记录](ocr-integration-impact-review.md)、[版本记录](game-version-session-implementation.md)、[Prompt 记录](agent-prompt-implementation.md) |
+| OCR／版本历史／Prompt | 已本地接入，具体限制分别记录 | [OCR](ocr.md)、[版本历史](game-version-history.md)、[Prompt 与 Skills](agent-repair.md#prompt-与-skills) | [OCR 记录](ocr-integration-impact-review.md)、[版本记录](game-version-session-implementation.md)、[Skills 记录](agent-skills-implementation.md) |
 | Stage 6 Runtime | 接入及新增设计仍待推进，不继承 Workbench 权限 | [Runtime 契约与 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md) | 本次不宣称已实现 Runtime Agent 闭环 |
 
 ## 必须保留的边界

@@ -1,5 +1,7 @@
 # Construct / Repair Prompt 重构影响审查
 
+2026-11-06 后续：SOP 已迁移为 Developer Skills，现行用法见 [Skills](agent-skills.md)，迁移验证见[实施记录](agent-skills-implementation.md)。下文保留原时点的实现及验证证据。
+
 日期：2026-11-01。审查时状态：设计已逐项确认，影响审查完成，Prompt 重构尚未实施。
 
 后续实施已完成，见 [实施记录](agent-prompt-implementation.md)。下文保留审查时的差距证据，不代表实施后的现状。

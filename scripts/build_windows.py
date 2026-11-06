@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from lalc.ocr import MODEL_HASHES
 from lalc.codesearch import MODEL_REPO, MODEL_REVISION, MODEL_FILES
+from lalc.agent_skills import DEFAULT_SKILL_NAMES
 
 PI_VERSION = "1.5.0"
 PI_SHA256 = "12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3"
@@ -90,7 +91,8 @@ def check_codesearch(archive: Path, models: Path) -> None:
 def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
-    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/sop.md",
+    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts",
+                     *[f"_internal/lalc/skills/{name}/SKILL.md" for name in DEFAULT_SKILL_NAMES],
                      "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                      "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
                      "_internal/UnityPy/resources/lzma.tpk"):

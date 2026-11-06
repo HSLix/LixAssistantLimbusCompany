@@ -301,4 +301,6 @@ DeepSeek 的模型检查显示可用性，不要求本地服务的 loaded/archit
 
 ## 2026-11-01 开发 Prompt 与历史显示
 
-Construct / Repair 共享 Core，分别选择模式 SOP，并共用 Asset SOP；每条消息执行开始读取、轮内固定。工具概览来自实际注册定义与当前启用集合，预检和格式纠正时没有开发工具。详情及填写说明见 [Agent 指南](agent-repair.md#prompt-与-sop)。聊天标题和历史显示兼容旧包装与新的 Runtime Context / User Request 分区，只呈现原始用户需求，不把宿主上下文显示为需求；完整原始消息和实际请求仍留在日志。无需修改 Session 存储格式、权限或 GUI 配置页。
+2026-11-06 后续：详细流程和规范已迁入 Developer Skills，现行目录、只读加载及每轮固定语义见 [Skills 用法](agent-skills.md)，验证见[实施记录](agent-skills-implementation.md)。以下 SOP 描述保留历史时点。
+
+Construct / Repair 共享 Core，分别选择模式 SOP，并共用 Asset SOP；每条消息执行开始读取、轮内固定。工具概览来自实际注册定义与当前启用集合，预检和格式纠正时没有开发工具。详情及填写说明见 [Agent 指南](agent-repair.md#prompt-与-skills)。聊天标题和历史显示兼容旧包装与新的 Runtime Context / User Request 分区，只呈现原始用户需求，不把宿主上下文显示为需求；完整原始消息和实际请求仍留在日志。无需修改 Session 存储格式、权限或 GUI 配置页。

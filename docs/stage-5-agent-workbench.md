@@ -63,7 +63,9 @@ Asset Library、已发布 Manifest、正式页面、业务配置及外部知识�
 
 ## Prompt 与工具权限
 
-2026-11-01 Prompt 重构：Core / Mode / 模式 SOP 及实际启用工具概览分开组织，宿主上下文与用户需求通过用户消息中的独立标签区分。每条消息执行时读取随程序发布的单一 `sop.md`，按固定模式选择 Construct + Asset 或 Repair + Asset，轮内固定，下一轮及历史续聊读取新内容。SOP 是默认指导，不改变程序权限；空正文合法，缺失或损坏在发出模型请求前报错。填写方式及输出语义见 [Agent 指南](agent-repair.md#prompt-与-sop)，决定及影响见 [审查报告](agent-prompt-impact-review.md)，验证见 [实施记录](agent-prompt-implementation.md)。
+2026-11-06 后续：详细流程和规范已迁入 Developer Skills，现行目录、只读加载及每轮固定语义见 [Skills 用法](agent-skills.md)，验证见[实施记录](agent-skills-implementation.md)。以下 SOP 描述保留历史时点。
+
+2026-11-01 Prompt 重构：Core / Mode / 模式 SOP 及实际启用工具概览分开组织，宿主上下文与用户需求通过用户消息中的独立标签区分。每条消息执行时读取随程序发布的单一 `sop.md`，按固定模式选择 Construct + Asset 或 Repair + Asset，轮内固定，下一轮及历史续聊读取新内容。SOP 是默认指导，不改变程序权限；空正文合法，缺失或损坏在发出模型请求前报错。填写方式及输出语义见 [Agent 指南](agent-repair.md#prompt-与-skills)，决定及影响见 [审查报告](agent-prompt-impact-review.md)，验证见 [实施记录](agent-prompt-implementation.md)。
 
 
 每种模式有自己的初始 Prompt 和工具白名单：Construct 遵循开发者指示开发 Workflow 和页面，Repair 聚焦修复。实际权限取模式白名单与当前入口能力的交集；pi 工具声明和宿主实际分发都必须执行，不只在 Prompt 中限制。共享核心不意味着任意目录读写或共享全部工具。
