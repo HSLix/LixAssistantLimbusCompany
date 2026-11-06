@@ -215,7 +215,8 @@ class AssetLibrary:
                 stream.flush()
                 os.fsync(stream.fileno())
         atomic_write_json(directory / "record.json", record)
-        with (directory / "record.json").open("rb") as stream:
+        # Windows 刷盘要求可写句柄；r+b 保留已写好的归档记录。
+        with (directory / "record.json").open("r+b") as stream:
             os.fsync(stream.fileno())
         path = self.path(relative)
         tags_changed = removed = False
