@@ -2,6 +2,8 @@
 
 截至 2026-11-05；#317 取消及验收归属已按开发者本轮确认和关闭评论更新；本次核对源码 `7e4b309072e2a360f87b497d878340c4a936b25e` 的干净工作树及 GitHub Issues。本文集中记录状态与阅读入口，不替代规格或 ADR。后续状态变化在本页更新，实施过程和验证结果写入对应记录，不在每个入口追加同一份时间线。README 只负责基础介绍、部署和协议，不承担阶段状态维护。
 
+2026-11-06 本地增量：非 Session 开发操作日志改写入 `developer-operations/`，旧 `agent-interactions/` 保持可检索和导出；知识库更新跳过普通资料链接并报告 `excluded_links`，Git 元数据链接仍拒绝。当前用法见 [Agent 日志](agent-repair.md)与[外部搜索](external-code-search.md)；不代表 Windows 或真实远端／模型验收。
+
 ## 文档职责与权威
 
 - [CONTEXT](../CONTEXT.md)：统一术语与领域边界。

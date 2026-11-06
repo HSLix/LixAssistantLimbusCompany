@@ -250,6 +250,9 @@ class KnowledgeLibrary:
             for key in filters.get("stdout", "").split("\0"):
                 if key:
                     command += ["-c", key + ("=false" if key.endswith(".required") else "=")]
+        if args[0] == "reset":
+            # 参考副本不会使用链接；避免 Windows 检出要求创建链接的系统权限。
+            command += ["-c", "core.symlinks=false"]
         command += args
         with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
             process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=env,
@@ -361,6 +364,31 @@ class KnowledgeLibrary:
                           untracked_count=sum(line.startswith("??") for line in entries))
         return result
 
+    def reference_link(self, path, root, excluded):
+        """普通资料链接只登记不跟随；Git 元数据链接仍拒绝整个版本。"""
+        if not (path.is_symlink() or path.is_junction()):
+            return False
+        relative = path.relative_to(root)
+        if ".git" in relative.parts:
+            raise ValueError("Git 元数据不允许链接。")
+        excluded.add(relative.as_posix())
+        return True
+
+    def reference_files(self, root, excluded):
+        """遍历可复制的真实文件，提前剪掉目录链接和宿主索引。"""
+        def failed(error):
+            raise error
+        for directory, dirs, files in os.walk(root, followlinks=False, onerror=failed):
+            self.checkpoint()
+            parent = Path(directory)
+            dirs[:] = [name for name in dirs if name != ".codesearch.db"
+                       and not self.reference_link(parent / name, root, excluded)]
+            for name in files:
+                self.checkpoint()
+                path = parent / name
+                if name != ".codesearch-build.log" and not self.reference_link(path, root, excluded):
+                    yield path
+
     def synchronize(self, repo, *, explicit=False):
         """预检后独立构建 B，失败保留 A；空间及构建错误必须出现在结果和日志中。"""
         key = self.relative(repo)
@@ -382,43 +410,53 @@ class KnowledgeLibrary:
                 self.codesearch.prepare()
                 home = self.version_home(repo)
                 home.mkdir(parents=True, exist_ok=True)
-                size = 0
-                for entry in source.rglob("*"):
-                    self.checkpoint()
-                    if entry.is_symlink() or entry.is_junction():
-                        raise ValueError("参考仓库含链接，不能复制为受控版本。")
-                    if entry.is_file():
-                        size += entry.stat().st_size
+                excluded = set()
+                size = sum(entry.stat().st_size for entry in self.reference_files(source, excluded))
                 # 副本、重建索引与 Git 临时对象会并存；预检仍不能代替实际写入错误处理。
                 require_disk([(home, size * 3)])
                 candidate = home / uuid.uuid4().hex
                 def copy_file(source_file, destination):
                     self.checkpoint()
                     return shutil.copy2(source_file, destination)
-                shutil.copytree(source, candidate, copy_function=copy_file,
-                                ignore=shutil.ignore_patterns(".codesearch.db", ".codesearch-build.log"))
+                def ignore_links(directory, names):
+                    return [name for name in names if name in {".codesearch.db", ".codesearch-build.log"}
+                            or self.reference_link(Path(directory) / name, source, excluded)]
+                shutil.copytree(source, candidate, copy_function=copy_file, symlinks=True, ignore=ignore_links)
                 self._mapped[candidate] = repo
                 fetched = self.fetch(candidate)
                 result.update(fetched)
                 if not fetched["fetch"]["ok"] or not fetched.get("after"):
                     raise ValueError(fetched["fetch"].get("error") or fetched["fetch"].get("reason") or "fetch 失败。")
                 commit = fetched["after"]
-                if old and commit == old[1]["commit"] and all(
+                if old and "excluded_links" in old[1] and commit == old[1]["commit"] and all(
                         (source / name).is_file() and digest(source / name) == expected
                         for name, expected in old[1]["files"].items()):
                     result.update(available_commit=commit, head=commit, update={"ok": True, "unchanged": True})
+                    result["excluded_links"] = old[1].get("excluded_links", [])
                     return result
                 reset = self._run(candidate, ["reset", "--hard", "--no-recurse-submodules", commit])
                 if not reset["ok"]:
                     raise ValueError(reset["error"] or "reset 失败。")
+                # Windows 可将 Git 链接检出为普通文本，必须以索引模式识别后排除。
+                tracked = self._run(candidate, ["ls-files", "--stage", "-z"], binary=True)
+                if not tracked["ok"]:
+                    raise ValueError(tracked["error"] or "无法识别 Git 链接。")
+                excluded = {name for name in excluded if not (candidate / name).exists()}
+                for record in tracked["bytes"].decode("utf-8").split("\0"):
+                    if record.startswith("120000 "):
+                        excluded.add(record.split("\t", 1)[1])
                 hashes = {}
-                for entry in candidate.rglob("*"):
-                    self.checkpoint()
-                    if entry.is_symlink() or entry.is_junction():
-                        raise ValueError("更新后的参考仓库含链接。")
+                for entry in self.reference_files(candidate, excluded):
                     relative = entry.relative_to(candidate)
-                    if entry.is_file() and ".git" not in relative.parts:
+                    if ".git" not in relative.parts and relative.as_posix() not in excluded:
                         hashes[relative.as_posix()] = digest(entry)
+                for name in sorted(excluded):
+                    entry = candidate / name
+                    if entry.is_junction():
+                        entry.rmdir()
+                    else:
+                        entry.unlink(missing_ok=True)
+                result["excluded_links"] = sorted(excluded)
                 require_disk([(home, sum((candidate / name).stat().st_size for name in hashes) * 2)])
                 excludes = candidate / ".git/info/exclude"
                 excludes.parent.mkdir(exist_ok=True)
@@ -433,7 +471,8 @@ class KnowledgeLibrary:
                 alias = hashlib.sha256(key.encode()).hexdigest()[:24]
                 queried = True
                 self.codesearch.search({alias: candidate}, "code", 1, self.checkpoint)
-                record = {"generation": candidate.name, "commit": commit, "files": hashes}
+                record = {"generation": candidate.name, "commit": commit, "files": hashes,
+                          "excluded_links": sorted(excluded)}
                 temporary = home / "active-next.json"
                 temporary.write_text(json.dumps(record), encoding="utf-8")
                 self.checkpoint()

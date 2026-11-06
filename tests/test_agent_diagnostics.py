@@ -42,6 +42,7 @@ def test_status_check_is_read_only_and_records_unknown_state(tmp_path, monkeypat
     assert calls == [("http://host/custom/api", "test-secret")]
     assert not (tmp_path / "agent-settings.json").exists()
     assert not (tmp_path / "agent-interactions").exists()
+    assert not (tmp_path / "developer-operations").exists()
     assert not (tmp_path / "candidate").exists()
     assert len(list(tmp_path.rglob("result.json"))) == 1
     assert "test-secret" not in "".join(p.read_text() for p in tmp_path.rglob("*.json*"))

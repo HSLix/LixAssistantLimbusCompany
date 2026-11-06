@@ -102,6 +102,8 @@ GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停
 - `round-N/original/`、`final/`、`cumulative.diff`、`result.json`：真实候选快照、相对固定基线的累计 Diff、请求次数及结束原因。
 - `context.json`、`tool-N.json` 和图片：保留消息、图片及工具结果；工具序号跨轮递增，不覆盖旧产物。
 
+非 Session 的手工 Candidate 开发操作（例如 `lalc init` 初始化所创建的留证）使用 `developer-operations/<UTC日期>/<UUID4>/`，不再新建 `agent-interactions/`。旧目录仍支持历史索引重建及 Sharing 导出，不自动改名或迁移。Settings 检查继续使用 `agent-diagnostics/`；`asset-provenance/` 是素材来源元数据，修改裁剪标签需要读取，不应当作普通日志清理。
+
 2026-10-28 起新对话采用 [ADR 0033](adr/0033-deduplicate-agent-logs-with-conversation-local-references.md) 的去重表示：log-format.json 标识格式，重复内容通过对话内相对路径和 SHA-256 引用保存，图片优先引用本对话已留存的原图。上述请求、事件、上下文和工具 JSON 可包含引用，完整信息、事件顺序、模型实际接收内容与 GUI 实时事件不变。复制整个对话目录即可按需展开；旧日志不迁移、不重写。该去重增量本身未提供历史加载／展示；后续 Session 工作台已支持历史恢复，见 [Stage 5](stage-5-agent-workbench.md)。诊断命令与验证见[日志设计](agent-interaction-log-design.md)。
 
 宿主持有 pi 进程并跨轮复用；每轮 new_session 和 context hook 显式配置权限、此前消息、图片及工具结果，不沿用旧轮授权。进程中途退出结束本轮，不重放工具；取消或异常后丢弃不安全进程，宿主退出时关闭，见 [ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md)。最终回答必须是严格 JSON，不剥离说明或代码块；解析或字段错误自动反馈具体错误，要求在同一会话重新生成 JSON，同时禁用剩余工具，避免重复修改。纠正请求计入本轮共享上限；合法回答、超限、服务错误或取消结束本轮，不自动开启下一轮。最终 JSON 中 `revise_success` 是模型报告，不能代替 Validator、人工审阅或游戏验收。

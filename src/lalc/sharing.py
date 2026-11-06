@@ -192,7 +192,8 @@ def catalog(manager):
     pages = real_directory(root / "pages")
     handles = [path.name if path.parent == pages else path.parent.name + ".py" for path in page_entries(pages)]
     histories = []
-    for pattern in ("developer-sessions/*/log/events.jsonl", "agent-interactions/*/*/events.jsonl"):
+    for pattern in ("developer-sessions/*/log/events.jsonl", "developer-operations/*/*/events.jsonl",
+                    "agent-interactions/*/*/events.jsonl"):
         for path in sorted(root.glob(pattern)):
             real_directory(path.parent)
             histories.append(path.parent.parent.relative_to(root).as_posix() if path.parent.name == "log"
@@ -212,7 +213,7 @@ def history_files(root, identity):
     _relative(identity)
     parts = identity.split("/")
     if not ((len(parts) == 2 and parts[0] == "developer-sessions") or
-            (len(parts) == 3 and parts[0] == "agent-interactions")):
+            (len(parts) == 3 and parts[0] in {"developer-operations", "agent-interactions"})):
         raise ValueError("对话不在支持的本地来源中。")
     folder = real_directory(root / identity)
     if parts[0] == "developer-sessions":

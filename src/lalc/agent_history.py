@@ -54,7 +54,7 @@ def _safe_path(data_root, relative):
         raise ValueError("Invalid history path")
     parts = Path(relative).parts
     if not ((len(parts) == 3 and parts[0] == "developer-sessions" and parts[2] == "log")
-            or (len(parts) == 3 and parts[0] in {"agent-interactions", "agent-diagnostics"})):
+            or (len(parts) == 3 and parts[0] in {"developer-operations", "agent-interactions", "agent-diagnostics"})):
         raise ValueError("Unknown history directory category")
     _uuid(parts[1] if parts[0] == "developer-sessions" else parts[2])
     path = root
@@ -212,6 +212,7 @@ class AgentHistory:
             with self.connection(write=True, path=target) as connection:
                 assert connection is not None
                 for pattern in ("developer-sessions/*/log/version-observations/*.json",
+                                "developer-operations/*/*/version-observations/*.json",
                                 "agent-interactions/*/*/version-observations/*.json",
                                 "agent-diagnostics/*/*/version-observations/*.json"):
                     for path in sorted(self.root.glob(pattern)):

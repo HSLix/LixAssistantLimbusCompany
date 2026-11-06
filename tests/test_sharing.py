@@ -73,6 +73,18 @@ def source(tmp_path, monkeypatch):
     return manager, marker
 
 
+@pytest.mark.parametrize('category', ['developer-operations', 'agent-interactions'])
+def test_operation_logs_remain_discoverable_and_exportable(source, category):
+    manager, _ = source
+    log = RepairLog(manager.data_root, category=category)
+    log.record({'type': 'candidate_initialized'})
+    identity = log.path.relative_to(manager.data_root).as_posix()
+    assert identity in catalog(manager)['history']
+    objects = build_export(manager, {'history': [identity]})
+    assert len(objects) == 1 and objects[0]['id'] == identity
+    assert 'log/events.jsonl' in objects[0]['files']
+
+
 def test_four_type_roundtrip_without_execution_or_session_restore(source, tmp_path):
     manager, marker = source
     selected = catalog(manager)
