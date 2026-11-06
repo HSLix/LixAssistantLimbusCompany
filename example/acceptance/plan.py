@@ -13,4 +13,9 @@ def execute(ctx: RunContext, *, task_repetitions: dict[str, int], settings: dict
         for index in range(task_repetitions.get(identity, 0)):
             if message == "plan-fail" and index == 1:
                 raise ValueError("acceptance: intentional Plan failure")
-            ctx.call("tasks.acceptance", message=message, fail=message == "task-fail" and index == 1)
+            result = ctx.call("tasks.acceptance", message=message, fail=message == "task-fail" and index == 1)
+            ctx.log(f"tasks.acceptance ({identity}) 第 {index + 1}/{task_repetitions[identity]} 次 status={result['status']}")
+            if result["status"] == "failure":
+                ctx.log(f"failure_code={result['failure_code']} failure_message={result['failure_message']}")
+            else:
+                ctx.log(f"output={result['output']}")

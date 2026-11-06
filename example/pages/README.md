@@ -47,6 +47,8 @@ def create_page(context):
 
 页面 ID、任务 ID 各自唯一；冲突注册全部排除，普通导入或创建失败只跳过本页。配置保存在数据目录 `user-settings.json`，切换 Manifest 不删除配置。页面改动需整应用重载。Plan 的 `SUPPORTED_TASK_IDS` 必须是模块级字面量字符串列表；Dashboard 只提供页面与 Plan 的任务 ID 交集，缺项会提示。纯设置页可省略 `TASK_ID`，其配置仍传入 Plan。
 
+新增循环任务时同步修改 Plan 支持列表，使用页面 `TASK_ID`；页面配置始终属于 `settings[PAGE_ID]`，次数属于 `task_repetitions[TASK_ID]`，两种 ID 不必相同。安装页面不发布 Workflow，Publish 不切换 Default；由用户选择新发布版本为 Default 后才使用新的支持声明，重载本身不能修复缺失声明，Agent 不设置 Default。
+
 
 ## GUI 语言与旧页面兼容
 

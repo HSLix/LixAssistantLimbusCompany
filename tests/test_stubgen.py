@@ -32,6 +32,8 @@ def test_generated_stub_matches_registration_and_all_public_members():
         name for name in vars(RunContext) if not name.startswith('_') or name == '__init__'
     }
     actions = [node for node in methods if node.name == 'action']
+    clicks = [node for node in actions if node.args.args[1].annotation.slice.value == 'control.click']
+    assert [[arg.arg for arg in node.args.kwonlyargs] for node in clicks] == [['centerxy'], ['x', 'y']]
     assert [node.args.args[1].annotation.slice.value for node in actions] == [
         'control.click', *sorted(application_actions())]
     for node in actions:
