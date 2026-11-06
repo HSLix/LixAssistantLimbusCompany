@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBar, InfoBarIcon, InfoBarPosition,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton,
-    TransparentToolButton, IconWidget, MessageBox,
+    TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
@@ -50,7 +50,7 @@ class ErrorDialog(QDialog):
         self.setWindowTitle(tr('Fatal error') if fatal else tr('Operation failed'))
         self.resize(600, 180)
         layout = QVBoxLayout(self)
-        label = QLabel(message)
+        label = QLabel(message + '\n' + tr('No screenshot is needed. Use “Copy error details” below to report the error.'))
         label.setWordWrap(True)
         label.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(label)
@@ -67,7 +67,8 @@ class ErrorDialog(QDialog):
             self.resize(760 if expanded else 600, 520 if expanded else 180)
         self.details_button.toggled.connect(toggle_details)
         layout.addWidget(self.details_button)
-        copy = QPushButton(tr('Copy error'))
+        copy = QPushButton(tr('Copy error details'))
+        setCustomStyleSheet(copy, 'QPushButton { color: #c42b1c; }', 'QPushButton { color: #ff99a4; }')
         copy.clicked.connect(lambda: QApplication.clipboard().setText(message + "\n\n" + details))
         layout.addWidget(copy)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

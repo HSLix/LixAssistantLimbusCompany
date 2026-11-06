@@ -118,7 +118,7 @@ def test_gui_interaction_logs_error_and_dialog_copies_original_traceback(tmp_pat
         window._interact(fail)
     dialog = window.findChild(ErrorDialog)
     assert dialog is not None
-    copy = next(button for button in dialog.findChildren(QPushButton) if "复制错误信息" in button.text())
+    copy = next(button for button in dialog.findChildren(QPushButton) if "复制错误详情" in button.text())
     copy.click()
     assert "OSError: interaction failed" in app.clipboard().text()
     assert "ValueError: interaction cause" in app.clipboard().text()
@@ -126,6 +126,63 @@ def test_gui_interaction_logs_error_and_dialog_copies_original_traceback(tmp_pat
     assert dialog.details.isReadOnly()
     window.close()
     app.processEvents()
+
+
+@pytest.mark.parametrize('fatal', [False, True])
+def test_error_dialog_prompts_copy_and_uses_red_button(fatal):
+    from PySide6.QtGui import QPalette
+    from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+    from qfluentwidgets import Theme, qconfig, setTheme
+    from lalc.gui import ErrorDialog
+
+    app = QApplication.instance() or QApplication([])
+    original_theme = qconfig.get(qconfig.themeMode)
+    dialog = ErrorDialog('错误摘要', '完整详情', fatal=fatal)
+    try:
+        dialog.show()
+        assert any('不用截图' in label.text() for label in dialog.findChildren(QLabel))
+        copy = next(button for button in dialog.findChildren(QPushButton) if button.text() == '复制错误详情')
+        for theme, color in [(Theme.LIGHT, '#c42b1c'), (Theme.DARK, '#ff99a4')]:
+            setTheme(theme)
+            app.processEvents()
+            assert copy.palette().color(QPalette.ColorRole.ButtonText).name() == color
+        copy.click()
+        assert '错误摘要' in app.clipboard().text() and '完整详情' in app.clipboard().text()
+    finally:
+        dialog.close()
+        setTheme(original_theme)
+        app.processEvents()
+
+
+def test_subprocess_decode_failure_reports_program_encoding_and_caller(caplog):
+    """模拟 Windows 读取线程，确认复制详情能找到启动调用且不暴露命令参数。"""
+    import subprocess
+    from lalc.lifecycle import ApplicationLifecycle
+
+    lifecycle = ApplicationLifecycle()
+    received = []
+    lifecycle.dispatch_fatal = received.append
+    def _readerthread(self):
+        try:
+            self.stdout.read()
+        except UnicodeDecodeError as error:
+            lifecycle.report_fatal(type(error), error, error.__traceback__)
+    def _communicate(self):
+        reader = threading.Thread(target=_readerthread, args=(self,))
+        reader.start()
+        reader.join(timeout=5)
+        assert not reader.is_alive()
+        self.wait(timeout=5)
+    with subprocess.Popen([sys.executable, '-c', "import os; os.write(1, b'\\x95')", 'private-argument'],
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='gbk') as process:
+        _communicate(process)
+    assert lifecycle.failed and len(received) == 1
+    details = received[0]
+    assert 'UnicodeDecodeError' in details and 'encoding=gbk' in details
+    assert 'Subprocess: ' + Path(sys.executable).name in details
+    assert 'Subprocess caller:' in details and '_communicate(process)' in details
+    assert 'private-argument' not in details
+    assert 'Subprocess caller:' in caplog.text
 
 
 def test_gui_fatal_error_shows_localized_copyable_message_and_exits(tmp_path: Path, monkeypatch) -> None:

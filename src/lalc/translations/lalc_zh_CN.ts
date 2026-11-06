@@ -324,8 +324,12 @@ Log: {1}</source>
     </message>
     <message>
       <location filename="../gui.py" line="70" />
-      <source>Copy error</source>
-      <translation>复制错误信息</translation>
+      <source>Copy error details</source>
+      <translation>复制错误详情</translation>
+    </message>
+    <message>
+      <source>No screenshot is needed. Use “Copy error details” below to report the error.</source>
+      <translation>不用截图，请使用下方的“复制错误详情”报告错误。</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="942" />

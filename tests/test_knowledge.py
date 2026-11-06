@@ -416,6 +416,87 @@ def test_unchanged_version_reuses_index(library, repository, monkeypatch):
     assert result['update']['unchanged'] and library.active(repo)[0] == active
 
 
+@pytest.mark.parametrize('placeholder', [False, True])
+def test_reference_links_are_excluded_before_indexing(library, repository, monkeypatch, tmp_path, placeholder):
+    repo, ids = repository
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    (outside / 'secret.md').write_text('must not index')
+    (repo / 'icon').symlink_to('guide.md')
+    (repo / 'broken').symlink_to('missing.md')
+    (repo / 'external').symlink_to(outside, target_is_directory=True)
+    git(repo, 'add', '.')
+    git(repo, 'commit', '-m', 'reference links')
+    ids[2] = git(repo, 'rev-parse', 'HEAD')
+    if placeholder:
+        git(repo, 'config', 'core.symlinks', 'false')
+        for name in ('icon', 'broken', 'external'):
+            link = repo / name
+            target = os.readlink(link)
+            link.unlink()
+            link.write_text(target)
+    (repo / 'untracked').symlink_to(outside, target_is_directory=True)
+    def build(candidate, checkpoint):
+        assert not any(path.is_symlink() or path.is_junction() for path in candidate.rglob('*'))
+        assert all(not (candidate / name).exists() for name in ('icon', 'broken', 'external', 'untracked'))
+        assert (candidate / 'guide.md').is_file()
+    monkeypatch.setattr(library.codesearch, 'build', build)
+    prepare_version(library, repository, monkeypatch)
+    sync = library.attempted['repo']
+    assert sync['excluded_links'] == ['broken', 'external', 'icon', 'untracked']
+    active, record = library.active(repo)
+    assert record['excluded_links'] == sync['excluded_links']
+    assert set(record['files']) == {'guide.md'}
+    assert (repo / 'icon').exists() and (outside / 'secret.md').read_text() == 'must not index'
+    assert library.read('repo/guide.md')[0]['text'].startswith('version 2')
+    assert library.search('must not index')['total'] == 0
+    again = library.synchronize(repo, explicit=True)
+    assert again['update']['unchanged'] and again['excluded_links'] == sync['excluded_links']
+    assert library.active(repo)[0] == active
+
+
+def test_link_replaced_by_regular_file_is_included(library, repository, monkeypatch):
+    repo, ids = repository
+    (repo / 'icon').symlink_to('guide.md')
+    git(repo, 'add', 'icon')
+    git(repo, 'commit', '-m', 'link')
+    (repo / 'icon').unlink()
+    (repo / 'icon').write_text('regular content')
+    git(repo, 'add', 'icon')
+    git(repo, 'commit', '-m', 'regular file')
+    ids[2] = git(repo, 'rev-parse', 'HEAD')
+    (repo / 'icon').unlink()
+    (repo / 'icon').symlink_to('guide.md')
+    prepare_version(library, repository, monkeypatch)
+    active, record = library.active(repo)
+    assert (active / 'icon').read_text() == 'regular content'
+    assert 'icon' in record['files'] and 'icon' not in record['excluded_links']
+
+
+def test_metadata_link_update_failure_preserves_a(library, repository, monkeypatch, tmp_path):
+    repo = prepare_version(library, repository, monkeypatch)
+    active, record = library.active(repo)
+    pointer = (library.version_home(repo) / 'active.json').read_bytes()
+    outside = tmp_path / 'metadata'
+    outside.write_text('private')
+    (active / '.git/unsafe').symlink_to(outside)
+    result = library.synchronize(repo, explicit=True)
+    assert not result['update']['ok'] and 'Git 元数据' in result['error']
+    assert (library.version_home(repo) / 'active.json').read_bytes() == pointer
+    assert result['available_commit'] == record['commit']
+
+
+def test_legacy_version_is_rebuilt_with_link_exclusions(library, repository, monkeypatch):
+    repo = prepare_version(library, repository, monkeypatch)
+    active, record = library.active(repo)
+    del record['excluded_links']
+    (library.version_home(repo) / 'active.json').write_text(json.dumps(record))
+    result = library.synchronize(repo, explicit=True)
+    assert result['update']['ok'] and not result['update'].get('unchanged')
+    assert library.active(repo)[0] != active
+    assert library.active(repo)[1]['excluded_links'] == []
+
+
 def test_reserved_and_nested_repositories_are_rejected(library, repository):
     repo, _ = repository
     nested = repo / 'nested'

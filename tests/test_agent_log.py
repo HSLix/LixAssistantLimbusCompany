@@ -17,6 +17,7 @@ from lalc.agent_repair import RepairLog
 
 def test_complete_round_trip_reuses_images_and_structured_history(tmp_path):
     log = RepairLog(tmp_path)
+    assert log.path.relative_to(tmp_path).parts[0] == "developer-operations"
     image = bytes(range(256)) * 100
     path = log.path / "original.png"
     path.write_bytes(image)

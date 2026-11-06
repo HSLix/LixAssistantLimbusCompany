@@ -49,10 +49,11 @@ def test_incremental_groups_update_only_current_pair_and_deduplicate(tmp_path, m
         index.add(record, log.root)
 
 
-def test_unknown_partial_pairs_and_no_automatic_history_scan(tmp_path, monkeypatch):
+@pytest.mark.parametrize("category", ["developer-operations", "agent-interactions"])
+def test_unknown_partial_pairs_and_no_automatic_history_scan(tmp_path, monkeypatch, category):
     old = RepairLog(tmp_path)
     old.record({"type": "old"})
-    log = RepairLog(tmp_path)
+    log = RepairLog(tmp_path, category=category)
     add(log, tmp_path, 1, monkeypatch, game=None, build=None)
     add(log, tmp_path, 2, monkeypatch, build=None)
     add(log, tmp_path, 3, monkeypatch, game=None)

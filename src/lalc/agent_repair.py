@@ -22,9 +22,9 @@ from .agent_prompts import load_sop, system_prompt, FORMAT_RETRY_PREFIX, FORMAT_
 
 
 class RepairLog:
-    """每对话一个交互目录；逐轮保留原始事件，认证值统一脱敏。"""
+    """Session、开发操作或诊断各自留证；逐轮保留原始事件并脱敏认证值。"""
 
-    def __init__(self, data_root: Path, key: str = "lalc-no-key", on_event=None, *, category="agent-interactions", path=None, identity=None):
+    def __init__(self, data_root: Path, key: str = "lalc-no-key", on_event=None, *, category="developer-operations", path=None, identity=None):
         self.path = Path(path) if path is not None else data_root / category / datetime.now(timezone.utc).strftime("%Y-%m-%d") / str(uuid.uuid4())
         existing = self.path.exists()
         self.path.mkdir(parents=True, exist_ok=path is not None)

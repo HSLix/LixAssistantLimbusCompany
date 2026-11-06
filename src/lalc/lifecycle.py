@@ -4,13 +4,34 @@ from __future__ import annotations
 
 import logging
 import signal
+import subprocess
 import sys
 import threading
+import traceback
 from pathlib import Path
 from typing import Callable
 
 from .errors import FATAL_MESSAGE, configure_logging
 from .runtime import _exception_fields
+
+
+def subprocess_decode_context(tb) -> str:
+    """补齐 Windows 管道线程缺失的调用位置；不记录参数、输出或环境密钥。"""
+    while tb is not None:
+        process = tb.tb_frame.f_locals.get('self')
+        if tb.tb_frame.f_code.co_name == '_readerthread' and isinstance(process, subprocess.Popen):
+            args = process.args
+            program = str(args[0]).replace('\\', '/').rsplit('/', 1)[-1] if isinstance(args, (list, tuple)) and args else '(shell command)'
+            context = f'\n\nSubprocess: {program}; pid={process.pid}; encoding={getattr(process, "encoding", None)}'
+            # communicate 仍在调用线程等待读取线程；从同一个 Popen 找回原始调用栈。
+            for frame in sys._current_frames().values():
+                while frame is not None:
+                    if frame.f_locals.get('self') is process and frame.f_code.co_name in {'communicate', '_communicate'}:
+                        return context + '\nSubprocess caller:\n' + ''.join(traceback.format_stack(frame))
+                    frame = frame.f_back
+            return context
+        tb = tb.tb_next
+    return ''
 
 
 class ApplicationLifecycle:
@@ -41,8 +62,10 @@ class ApplicationLifecycle:
         """供主线程和后台线程的异常钩子共用，保留完整原始错误链。"""
 
         self.failed = True
-        logging.getLogger(__name__).critical("Unhandled fatal error", exc_info=(error_type, error, tb))
         details = _exception_fields(error.with_traceback(tb))["traceback"]
+        context = subprocess_decode_context(tb) if isinstance(error, UnicodeDecodeError) else ''
+        details += context
+        logging.getLogger(__name__).critical("Unhandled fatal error%s", context, exc_info=(error_type, error, tb))
         self.pending_details = details
         if self.dispatch_fatal is not None:
             self.dispatch_fatal(details)
