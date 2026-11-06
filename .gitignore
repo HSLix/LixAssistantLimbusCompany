@@ -11,6 +11,8 @@ dist/
 candidate/
 .candidate-baseline.json
 /pages/
-pi_resources/
+pi_resources/*
+!pi_resources/check_version.py
+!pi_resources/check_version.cmd
 .scratch/
 codesearch_resources/

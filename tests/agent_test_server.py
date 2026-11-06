@@ -63,7 +63,8 @@ def agent_server(tmp_path):
                 else:
                     delta = {"role": "assistant", "content": "Source inspected; image received."}
                     finish = "stop"
-                for change, reason in ((delta, None), ({}, finish)):
+                changes = delta if isinstance(delta, list) else [delta]
+                for change, reason in [*((change, None) for change in changes), ({}, finish)]:
                     chunk = {"id": "test", "model": "gemma4-test", "choices": [
                         {"index": 0, "delta": change, "finish_reason": reason}]}
                     self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())

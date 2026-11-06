@@ -16,13 +16,15 @@
 
 ## 构建输入与两个输出
 
-在 Windows x64 安装 uv，准备同一源码快照和锁文件。把官方 **pi 1.4.0 Windows x64 原始 ZIP** 放到源码根目录：
+在 Windows x64 安装 uv，准备同一源码快照和锁文件。把官方 **pi 1.5.0 Windows x64 原始 ZIP** 放到源码根目录：
 
 ```text
 pi_resources/pi-windows-x64.zip
 ```
 
-`pi_resources/` 已由 `.gitignore` 排除。无需手动解压；不要将 macOS pi、重新压缩的归档或本机已安装 pi 目录替代它。当前开发者提供的原始 ZIP 已核对版本及 SHA-256：`0f7256ea8bdac3af20012b94fdc1252a31cc6dc0d2f9b9eb539555d22e3e321b`。Windows 构建需把这个 ZIP 复制到 Windows 源码的同名目录。
+`pi_resources/` 已由 `.gitignore` 排除。无需手动解压；不要将 macOS pi、重新压缩的归档或本机已安装 pi 目录替代它。使用[官方 1.5.0 原始 ZIP](https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-windows-x64.zip)，SHA-256 为 `12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3`。Windows 构建需把这个 ZIP 复制到 Windows 源码的同名目录；旧版 1.4.0 归档不再通过校验。
+
+快速查看 ZIP 实际版本：Windows 双击 `pi_resources/check_version.cmd`（使用构建所需的 uv），或运行 `python pi_resources/check_version.py`。可在命令末尾指定其他 ZIP 路径；默认读取脚本同目录的 ZIP，不依赖当前工作目录。检查脚本纳入 Git，ZIP 等资源仍忽略。此工具只读包内版本并检查 `pi.exe` 存在，不证明归档来自官方；构建脚本仍负责固定 SHA-256 校验。
 
 在源码根目录运行：
 

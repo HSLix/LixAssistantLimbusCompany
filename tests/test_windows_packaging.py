@@ -25,7 +25,7 @@ def archive(tmp_path, monkeypatch):
     path = tmp_path / "pi.zip"
     with zipfile.ZipFile(path, "w") as bundle:
         bundle.writestr("pi.exe", b"test-only-binary")
-        bundle.writestr("package.json", json.dumps({"version": "1.4.0"}))
+        bundle.writestr("package.json", json.dumps({"version": build.PI_VERSION}))
         bundle.writestr("native/win32/prebuilds/win32-x64/helper.dll", b"test-runtime")
     monkeypatch.setattr(build, "PI_SHA256", build.digest(path))
     return path

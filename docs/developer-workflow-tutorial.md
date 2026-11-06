@@ -33,7 +33,7 @@ Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败�
 
 开发者从根包导入 `RunContext`，给 execute、condition 或 detect/recover 的 ctx 参数添加注解。IDE 使用项目的 Python 环境，即可补全 Action 名称、对应关键字参数和返回类型；其他 Context 成员（例如 `ctx.call()` 和 `ctx.game_language`）也保留类型信息。
 
-Agent 编写代码前读取 `action_contracts` 和已有 Component 签名。点击优先使用 `ctx.action("control.click", centerxy=target["centerxy"])`，复用匹配返回的中心点；也支持完整 `x/y`，两种形式不可混用。不要裁掉返回字段后重新计算中心。`ctx.call("steps.click", ...)` 的参数以该 Step 自身签名为准，不自动继承 Action 参数。以下独立动作样例展示直接坐标形式，不是完成业务检查的示例。
+Agent 编写代码前读取 `action_contracts` 和已有 Component 签名。点击优先使用 `ctx.action("control.click", centerxy=target["centerxy"])`，复用匹配返回的中心点；也支持完整 `x/y`，两种形式不可混用。不要裁掉返回字段后重新计算中心。合并示例通过 `ctx.call("steps.actions", operation="click", x=x, y=y)` 调用，其参数以 Step 自身签名为准，不自动继承 Action 参数。以下独立动作样例展示直接坐标形式，不是完成业务检查的示例。
 
 ```python
 from lalc import RunContext, step

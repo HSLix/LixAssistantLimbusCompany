@@ -20,14 +20,14 @@ sys.path.insert(0, str(ROOT / "src"))
 from lalc.ocr import MODEL_HASHES
 from lalc.codesearch import MODEL_REPO, MODEL_REVISION, MODEL_FILES
 
-PI_VERSION = "1.4.0"
-PI_SHA256 = "0f7256ea8bdac3af20012b94fdc1252a31cc6dc0d2f9b9eb539555d22e3e321b"
+PI_VERSION = "1.5.0"
+PI_SHA256 = "12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3"
 CODESEARCH_VERSION = "1.7.9"
 CODESEARCH_SHA256 = "235d47228f53b6cc822a6cf924f83011aefc0f098fd8fb9f8f8c8f9091e20f6a"
 CODESEARCH_ARCHIVE = ROOT / "codesearch_resources/codesearch-windows-x86_64.zip"
 MODEL_ROOT = ROOT / "codesearch_resources/models"
 
-PI_URL = "https://github.com/earendil-works/pi/releases/download/v1.4.0/pi-windows-x64.zip"
+PI_URL = f"https://github.com/earendil-works/pi/releases/download/v{PI_VERSION}/pi-windows-x64.zip"
 
 
 def digest(path: Path) -> str:
@@ -38,7 +38,7 @@ def digest(path: Path) -> str:
 def check_pi(archive: Path) -> None:
     """只接受固定官方归档；校验所有路径后才允许解压。"""
     if digest(archive) != PI_SHA256:
-        raise ValueError("pi ZIP 与官方 1.4.0 Windows x64 摘要不一致，请勿重压缩或替换内容。")
+        raise ValueError(f"pi ZIP 与官方 {PI_VERSION} Windows x64 摘要不一致，请勿重压缩或替换内容。")
     with zipfile.ZipFile(archive) as bundle:
         for item in bundle.infolist():
             path = PurePosixPath(item.filename)
@@ -47,7 +47,7 @@ def check_pi(archive: Path) -> None:
                 raise ValueError(f"Unsafe pi archive path: {item.filename}")
         metadata = json.loads(bundle.read("package.json"))
         if metadata.get("version") != PI_VERSION or "pi.exe" not in bundle.namelist():
-            raise ValueError("Expected pi 1.4.0 Windows binary and metadata")
+            raise ValueError(f"Expected pi {PI_VERSION} Windows binary and metadata")
 
 
 def file_manifest(directory: Path, *, exclude_pi=False) -> dict[str, str]:

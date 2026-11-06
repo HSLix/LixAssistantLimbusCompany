@@ -88,6 +88,10 @@ _Avoid_: Runtime Agent Session, model request, global Candidate
 A message-level pointer to one or more published Manifests suggested as reference material, with optional focus described in the message. It is contextual information rather than a read-access grant, a Candidate source selection, or an execution request.
 _Avoid_: Manifest access whitelist, Candidate initialization, trial selection
 
+**Developer Skill**:
+A reusable set of procedural guidance and read-only reference material for LALC developer work. It grants no authority or independent execution capability; operations remain governed by Developer Policy and the available tools.
+_Avoid_: Executable plugin, permission grant, Workflow Component
+
 **External Knowledge Library**:
 The collection of reference repositories, documents and images readable by permitted developer Agent modes without permission to edit the reference content. Git reference repositories are replaceable copies of their upstream versions; synchronization may replace their local content, while user-authored material belongs outside those repositories.
 _Avoid_: Developer Candidate, editable project source, runtime state

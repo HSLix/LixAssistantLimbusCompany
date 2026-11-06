@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-06 pi 接入及 Windows 打包资源基线更新为 1.5.0；具体兼容检查和默认回归的已知示例失败见 [pi 1.5.0 记录](pi-1.5-compatibility.md)。不代表 Windows 成品、真实模型或游戏验收。
+
 2026-11-06 Developer 新增 Capture 后的 OCR 测试页：独立截图、全图识别、鼠标选区自动重新识别及编号文字对照。设计、影响与验证见 [OCR 测试页记录](ocr-test-page-impact-review.md)，用法见 [OCR](ocr.md#developer-ocr-测试页)；不代表 Windows 或真实游戏验收。
 
 2026-11-06 Agent 指导修订：明确业务 Step 完成确认、完整匹配返回及歧义处理、centerxy 优先调用、页面与 Plan 支持任务接线、Task 详细成败日志；通用指导与示例更新，不新增 Validator 业务检查。决策、影响及本轮验证见[审查记录](agent-step-guidance-impact-review.md)，不代表真实模型或游戏验收。
