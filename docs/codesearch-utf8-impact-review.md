@@ -38,3 +38,15 @@
 - 默认回归：`QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q` → **887 passed, 98 skipped**；未开启 Agent 测试，跳过项不算通过。
 - 首次定向执行因新测试把程序文件放到宿主保留的 codesearch 目录位置而失败，修正测试路径后通过。首次默认回归未设置 offscreen，在 macOS qframelesswindow 原生窗口初始化处段错误退出；使用项目既有 offscreen 设置后完成回归，不将前次中断计为通过。
 - `git diff --check` 通过。未执行 Windows 原生、打包版、真实模型或游戏验收；未改全局异常钩子，未删除或迁移用户知识库。
+
+## 后续复现与错误证据补充
+
+开发者随后确认更新并完全重启后，混合搜索仍出现相同 GBK 读取线程异常。新提供的堆栈仅含 threading／subprocess 内部帧，没有具体命令或业务调用位置，不能据此认定仍由已经改为二进制管道的两个 codesearch 调用触发。当前源码检查中，codesearch 输出为字节／二进制文件，knowledge 的 Git 输出为二进制文件；pi 版本探测显式 UTF-8，另一个隐式文本调用仅用于 macOS vm_stat。这些检查不能证明 Windows 实际运行的所有依赖与动态页面均无其它文本管道。
+
+为取得可归因证据，`ApplicationLifecycle.report_fatal` 对 UnicodeDecodeError 检查 traceback 中的真实 Popen 读取线程对象：补充程序文件名、PID、实际编码，并从正在等待同一个对象的 communicate 调用线程找回业务调用栈。该上下文同时写入日志和可复制详情，不转储 Popen 参数、输出、环境或其它线程，不吞掉异常，也不改变致命错误策略。调用线程已退出时只能提供程序与编码，不承诺重建所有已结束操作的历史。
+
+通用 ErrorDialog 顶部增加“不用截图，请使用下方的‘复制错误详情’报告错误”；复制按钮更名并在浅／深主题中显示红色，翻译源码和编译资源一起更新。复制内容保持原摘要与完整详情，不混入操作提示。
+
+补充定向测试 **102 passed**，包括模拟 Windows 读取线程、还原等待线程调用位置、命令参数不进入详情，以及普通／致命弹窗在两种主题下的文字颜色与复制行为；已查看无界面渲染截图。新的实际 Windows 触发来源仍需开发者用更新后的复制详情定位，不能将这次证据增强称为已修复再次出现的根因。
+
+最终普通回归 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q` → **890 passed, 98 skipped**。过程中的旧按钮文字断言已同步；另一次页面导航选中状态断言失败，独立复跑该用例及相关弹窗／语言测试 **62 passed**，新主题测试改为恢复原主题后完成最终回归。跳过项不算通过，未开启 Agent 测试。附加生命周期类型检查仍报告原有线程钩子的 `exc_value` 可空参数问题；本次未扩展修改该接口。`git diff --check` 通过。
