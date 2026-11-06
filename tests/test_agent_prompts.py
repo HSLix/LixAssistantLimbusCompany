@@ -1,4 +1,4 @@
-"""覆盖 SOP 校验、模式隔离、请求前失败与新旧消息原文提取，不启动 pi。
+"""覆盖精简 Prompt 契约、Skill 请求前失败与新旧消息原文提取，不启动 pi。
 
 项目根目录运行：.venv/bin/python -m pytest -q tests/test_agent_prompts.py
 """
@@ -11,45 +11,43 @@ from lalc import agent_prompts as prompts
 from test_agent_repair import host_for
 
 
-def sop_text(construct="", repair="", asset="", page=""):
-    return ("# SOP\n填写说明不发送给模型\n"
-            f"<construct_sop>{construct}</construct_sop>\n"
-            f"<repair_sop>{repair}</repair_sop>\n<asset_sop>{asset}</asset_sop>\n<page_sop>{page}</page_sop>")
+@pytest.mark.parametrize("mode", ["Construct", "Repair"])
+def test_prompt_keeps_contract_and_domain_knowledge_at_end(mode):
+    text = prompts.system_prompt(mode)
+    assert text.endswith(prompts.DOMAIN_KNOWLEDGE)
+    assert text.index("# 领域知识") > text.index("# Mode:")
+    assert "revise_success" in text and "不绕过工具" in text
+    assert "本轮使用某个 Skill 前必须读取" in text
+    assert "<construct_sop>" not in text and "Step 承担" not in text
 
 
-def test_sop_selects_only_mode_and_asset_and_accepts_empty(tmp_path, monkeypatch):
-    path = tmp_path / "sop.md"
-    monkeypatch.setattr(prompts, "SOP_PATH", path)
-    path.write_text(sop_text("构建步骤", "修复步骤", "素材步骤"))
-    selected = prompts.load_sop("Repair")
-    assert selected == {"repair": "修复步骤", "asset": "素材步骤", "page": ""}
-    built = prompts.system_prompt("Repair", selected)
-    assert "构建步骤" not in built and "填写说明不发送给模型" not in built
-    assert "<repair_sop>\n修复步骤" in built
-    assert prompts.load_sop("Construct") == {"construct": "构建步骤", "asset": "素材步骤", "page": ""}
-    path.write_text(sop_text())
-    assert prompts.load_sop("Repair") == {"repair": "", "asset": "", "page": ""}
-
-
-@pytest.mark.parametrize("text", ["", sop_text() + "<asset_sop></asset_sop>",
-    sop_text().replace("</repair_sop>", ""),
-    "<construct_sop><repair_sop></construct_sop></repair_sop><asset_sop></asset_sop>"])
-def test_bad_sop_stops_before_model_request(tmp_path, monkeypatch, text):
-    path = tmp_path / "sop.md"
-    path.write_text(text)
-    monkeypatch.setattr(prompts, "SOP_PATH", path)
+def test_invalid_skills_root_stops_before_model_request(tmp_path):
     host, _ = host_for(tmp_path / "project")
+    path = host.service.data_root / "skills"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("occupied")
     chat = host.new_conversation()
     result = asyncio.run(chat.run("修复", object()))
     assert result["status"] == "incomplete" and result["requests"] == 0
-    assert result["diagnostics"]["stage"] == "prompt"
+    assert result["diagnostics"]["stage"] == "skills"
+    assert path.read_text() == "occupied"
     assert prompts.user_message_text(chat.history[-1]["content"][0]["text"]) == "修复"
 
 
-def test_missing_sop_has_explicit_file_error(tmp_path, monkeypatch):
-    monkeypatch.setattr(prompts, "SOP_PATH", tmp_path / "missing.md")
-    with pytest.raises(FileNotFoundError):
-        prompts.load_sop("Repair")
+def test_skill_cleanup_failure_keeps_result_and_history(tmp_path, monkeypatch):
+    from contextlib import asynccontextmanager
+    from lalc.agent_log import read_json
+    host, _ = host_for(tmp_path / "project")
+    @asynccontextmanager
+    async def broken_cleanup(data_root):
+        yield tmp_path, []
+        raise OSError("cannot remove snapshot")
+    monkeypatch.setattr("lalc.agent_repair.skill_snapshot", broken_cleanup)
+    chat = host.new_conversation()
+    result = asyncio.run(chat.run("保留错误证据", object()))
+    assert result["reason"] == "skills_cleanup"
+    assert read_json(chat.log.root / "result.json")["reason"] == "skills_cleanup"
+    assert "保留错误证据" in str(read_json(chat.log.root / "context.json"))
 
 
 def test_user_text_preserves_embedded_tags_and_legacy_attachment_marker():

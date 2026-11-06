@@ -211,7 +211,8 @@ def test_required_pages_ocr_after_capture_scaled_crop_and_no_implicit_selection(
     app, window = gui
     pages = [window.pages.widget(i).objectName() for i in range(window.pages.count())]
     assert {"developer-capture", "developer-ocr", "developer-settings", "developer-workbench"} <= set(pages)
-    assert pages.index("developer-ocr") == pages.index("developer-capture") + 1
+    assert pages.index("developer-template-match") == pages.index("developer-capture") + 1
+    assert pages.index("developer-ocr") > pages.index("developer-capture")
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
@@ -327,11 +328,12 @@ def test_rebuild_log_creation_failure_preserves_draft_and_conversation(tmp_path,
     assert host.metadata.read_bytes() == metadata
 
 
-def test_gui_pi_version_warning_stays_visible_after_progress_events(gui):
+@pytest.mark.parametrize("kind", ["pi_version_warning", "skill_warning"])
+def test_gui_warning_stays_visible_after_progress_events(gui, kind):
     app, window = gui
     page = window.repair_page
     message = "pi 版本不匹配：已验证 0.86.1，实际 1.4.0；继续启动，但兼容性尚未验证。"
-    page.show_event({"event": {"type": "pi_version_warning", "message": message}})
+    page.show_event({"event": {"type": kind, "message": message}})
     page.show_event({"event": {"type": "lalc_request", "requests": 1}})
     assert "WARNING: " + message in page.chat.toPlainText()
 

@@ -1673,7 +1673,7 @@ class RepairPage(QWidget):
         elif kind == "final_answer_retry":
             self.chat.format_retry(number)
             status = tr('Invalid final response format; requesting a new response. Remaining requests: {0}.').format(value['requests_remaining'])
-        elif kind == "pi_version_warning":
+        elif kind in {"pi_version_warning", "skill_warning"}:
             self.chat.add_message("系统", "WARNING: " + value["message"], number)
         elif kind in {"tool_execution_start", "tool_execution_end", "repair_tool", "validation"}:
             if kind == "validation" and value.get("source") == "manual" and not getattr(self, "_replaying", False):

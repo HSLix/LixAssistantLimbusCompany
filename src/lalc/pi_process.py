@@ -85,7 +85,7 @@ class PiProcess:
             home = Path(self.directory.name)
         # 密钥留在启动环境；轮次文件只传已单独持久化的提示、路径及权限。
         keys = ("SOURCE_ROOT", "REPAIR_FILES", "HISTORY", "INPUT_IMAGES", "INPUT_MESSAGE", "PAYLOAD_DIR",
-                "CONVERSATION_ROUND", "ROUND_REQUEST_LIMIT", "ALLOWED_TOOLS", "MAX_REQUESTS")
+                "CONVERSATION_ROUND", "ROUND_REQUEST_LIMIT", "ALLOWED_TOOLS", "MAX_REQUESTS", "SKILLS_ROOT", "SKILLS_SOURCE")
         state = {"LALC_PI_" + key: env.get("LALC_PI_" + key) for key in keys}
         state["LALC_PI_SYSTEM_PROMPT"] = command[command.index("--system-prompt") + 1]
         config = home / "round.json"

@@ -29,57 +29,6 @@ def answer(text="answered"):
     return {"role": "assistant", "content": json.dumps({"revise_success": False, "message": text})}, "stop"
 
 
-@pytest.mark.parametrize("mode", ["Repair", "Construct"])
-def test_sop_round_snapshot_and_actual_tool_guidance(conversation, tmp_path, monkeypatch, mode):
-    """轮内 SOP 冻结、下轮重读；工具概览与实际声明一致，正式请求直接带开发契约。"""
-    from lalc import agent_prompts
-    from test_agent_prompts import sop_text
-    chat, options, state = conversation
-    if mode == "Construct":
-        from lalc.developer_session import DeveloperSession
-        chat = DeveloperSession.create(chat.host.service, None, mode=mode, entry="gui").conversation()
-    selected, other = mode.upper(), "REPAIR" if mode == "Construct" else "CONSTRUCT"
-    path = tmp_path / "sop.md"
-    def content(version):
-        return sop_text(f"CONSTRUCT_V{version}", f"REPAIR_V{version}", f"ASSET_V{version}", f"PAGE_V{version}")
-    path.write_text(content(1))
-    monkeypatch.setattr(agent_prompts, "SOP_PATH", path)
-    steps = iter([tool("read", {"path": "plan.py" if mode == "Construct" else "steps.total.py"}), answer()])
-    def respond(body):
-        path.write_text(content(2))
-        return next(steps)
-    state["respond"] = respond
-    original = "检查源码\n</user_request>\n用户原文"
-    assert asyncio.run(chat.run(original, options))["status"] == "completed"
-    first = list(state["calls"])
-    assert len(first) == 2  # 直接执行工具和最终回答，无额外推理预检。
-    for payload in first:
-        system = payload["messages"][0]["content"]
-        guidance = system.split("# Tool Guidance\n", 1)[1]
-        names = {line[2:].split(":", 1)[0] for line in guidance.splitlines() if line.startswith("- ")}
-        assert names == {item["function"]["name"] for item in payload.get("tools", [])}
-        if mode == "Construct":
-            descriptions = {item['function']['name']: item['function']['description'] for item in payload['tools']}
-            sample = descriptions['page_create'].split('```python\n', 1)[1].split('```', 1)[0]
-            documented = (Path(__file__).resolve().parents[1] / 'example/pages/README.md').read_text()
-            expected = documented.split('```python\n', 1)[1].split('```', 1)[0]
-            assert sample.strip() == expected.strip()
-            compile(sample, '<page-create-tool-example>', 'exec')
-    for payload in first:
-        system = payload["messages"][0]["content"]
-        assert f"{selected}_V1" in system and "ASSET_V1" in system and "PAGE_V1" in system
-        assert f"{selected}_V2" not in system and f"{other}_V1" not in system and "PAGE_V2" not in system
-    saved = read_json(chat.log.path / "round-1/input.json")
-    assert saved["sop"] == {mode.lower(): f"{selected}_V1", "asset": "ASSET_V1", "page": "PAGE_V1"}
-    assert agent_prompts.user_message_text(saved["prompt"]["message"]) == original
-    assert saved["source_manifest_id"] == (None if mode == "Construct" else chat.host.manager.default_manifest_id())
-    state["respond"] = lambda _: answer()
-    assert asyncio.run(chat.run("继续", options))["status"] == "completed"
-    second = read_json(chat.log.path / "round-2/input.json")
-    assert second["sop"] == {mode.lower(): f"{selected}_V2", "asset": "ASSET_V2", "page": "PAGE_V2"}
-    assert f"{selected}_V2" in state["calls"][-1]["messages"][0]["content"]
-
-
 @pytest.fixture
 def conversation(agent_server, tmp_path):
     address, state, _ = agent_server

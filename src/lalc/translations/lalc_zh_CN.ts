@@ -1761,5 +1761,73 @@ Original pixel region: {2}</source>
       <source>No matches.</source>
       <translation>未匹配到结果。</translation>
     </message>
+    <message>
+      <source>Template Match</source>
+      <translation>模板匹配</translation>
+    </message>
+    <message>
+      <source>Select an Asset or image. Capture once, adjust parameters, then run on the frozen screenshot.</source>
+      <translation>选择 Asset 或单图；截图后固定原图，调整参数并运行匹配。</translation>
+    </message>
+    <message>
+      <source>Assets / Templates</source>
+      <translation>Asset / 模板</translation>
+    </message>
+    <message>
+      <source>No template selected.</source>
+      <translation>尚未选择模板。</translation>
+    </message>
+    <message>
+      <source>Use full image</source>
+      <translation>使用全图</translation>
+    </message>
+    <message>
+      <source>Template match results</source>
+      <translation>模板匹配结果</translation>
+    </message>
+    <message>
+      <source>Match parameters</source>
+      <translation>匹配参数</translation>
+    </message>
+    <message>
+      <source>Suppress overlapping matches (NMS)</source>
+      <translation>抑制重叠匹配（NMS）</translation>
+    </message>
+    <message>
+      <source>Group only; comma-separated, empty for no priority</source>
+      <translation>仅整组使用；逗号分隔，留空表示无优先标签</translation>
+    </message>
+    <message>
+      <source>Threshold</source>
+      <translation>匹配阈值</translation>
+    </message>
+    <message>
+      <source>NMS IoU threshold</source>
+      <translation>NMS 重叠阈值</translation>
+    </message>
+    <message>
+      <source>Priority tags</source>
+      <translation>优先标签</translation>
+    </message>
+    <message>
+      <source>Run match</source>
+      <translation>运行匹配</translation>
+    </message>
+    <message>
+      <source>Single image: {0}</source>
+      <translation>单张图片：{0}</translation>
+    </message>
+    <message>
+      <source>Asset group: {0}</source>
+      <translation>Asset 整组：{0}</translation>
+    </message>
+    <message>
+      <source>Search region: {0}</source>
+      <translation>搜索范围：{0}</translation>
+    </message>
+    <message>
+      <source>Full image</source>
+      <translation>全图</translation>
+    </message>
   </context>
 </TS>

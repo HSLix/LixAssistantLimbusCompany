@@ -1,6 +1,8 @@
 # Construct / Repair Prompt 重构实施记录
 
-日期：2026-11-01。决定与影响范围见 [影响审查](agent-prompt-impact-review.md)，操作说明见 [Agent 指南](agent-repair.md#prompt-与-sop)。
+2026-11-06 后续：SOP 已迁移为 Developer Skills，现行用法见 [Skills](agent-skills.md)，迁移验证见[实施记录](agent-skills-implementation.md)。下文保留原时点的实现及验证证据。
+
+日期：2026-11-01。决定与影响范围见 [影响审查](agent-prompt-impact-review.md)，操作说明见 [Agent 指南](agent-repair.md#prompt-与-skills)。
 
 2026-11-04 页面整包工具修订：Construct 页面指导已涵盖目录页面、受控资源工具和整包版本审批。SOP 现有实现读取四段正文，选择当前模式＋Asset＋Page；本次同步原先仍只构造三段的测试夹具，并补 Page 标签嵌套校验，未改变既有四段加载行为。工具链实施与验证见[Sharing 接续记录](sharing-implementation-progress.md)。下文 2026-11-01 的预检及旧诊断入口描述为历史，不代表本次重新启用这些入口。
 

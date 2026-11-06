@@ -136,7 +136,7 @@ Windows GUI 仍须人工核对跨 DPI、窗口移动/尺寸变化、客户区外
 
 ## 历史：2026-10-24 文件选择修订
 
-以下至“Prompt 与 SOP”之前保留各时点的实施和验证过程；其中共享 Candidate、重建、Runner、预检及旧议题状态不再作为当前操作要求。现行规则见本文前部及[当前状态](current-state.md)，历史测试数字不视为当前版本通过。
+以下至“Prompt 与 Skills”之前保留各时点的实施和验证过程；其中共享 Candidate、重建、Runner、预检及旧议题状态不再作为当前操作要求。现行规则见本文前部及[当前状态](current-state.md)，历史测试数字不视为当前版本通过。
 
 2026-10-24 修订：取消 selected files 设置及 CLI 文件参数/`--all`。Agent 每轮可尝试修改 Candidate 内全部已有文件（含候选 `manifest.json`、Recovery Rule），已有 Python Plan 可编辑，不开放任意文件创建；不开放新建、删除、重命名、符号链接、目录外或正式源码写入。宿主按轮开始时的已有文件冻结边界，工具检查与结束快照共同执行约束。文件是否被 Manifest 引用、是否通过校验均不决定编辑权限；临时测试文件不新增警告，不自动登记 Component，新增 Component 接口留待后续。手动 Validate 在已有对话中立即写入 `context.json` 和事件日志，成功/失败在聊天区各只显示一次，失败保留详情入口；尚无对话时不隐式创建对话。此规则覆盖首次发送前、发送后和 New Conversation 后。
 
@@ -256,18 +256,18 @@ recapturing. Matched targets provide `centerxy` tuples for `control.click`; see 
 #332 的外置页面、配置交接、整应用重载及验证边界见[实施记录](stage-4-332-implementation.md)。CLI 未指定 provider 时使用 Developer 当前选用项；显式覆盖仍不回写。
 
 
-## Prompt 与 SOP
+## Prompt 与 Skills
 
-开发 Prompt 由 `agent_prompts.py` 维护 Core、安全边界、Mode 和输出契约；`pi_probe.ts` 从实际注册工具的名称及描述生成当前启用工具概览，Schema 只走工具接口。格式纠正禁用工具，概览明确为空。每轮强制连接／图片推理预检已取消，正式请求从第 1 次计数；发送前配置／图片能力校验保持，GUI 设置页手动检查读取模型列表，不请求推理。独立 `lalc pi-probe` 已移除。
+开发 Prompt 由 `agent_prompts.py` 维护简短角色、模式、安全原则和最终 JSON 契约；领域知识在后部独立保留 Manifest／Candidate／Asset 的关系。详细 Workflow 编写规范、开发修复、素材、页面、验证和人工反馈指导迁入七个默认 Skills。`pi_probe.ts` 复用 pi 原生的发现和目录生成，系统消息只列名称、description 和路径，正文由 `read` 按需读取；工具 Schema 和权限仍以本轮实际注册及启用状态为准。
 
-开发者直接编辑 [`src/lalc/sop.md`](../src/lalc/sop.md)，按文件内填写说明，在 Construct、Repair、Asset、Page 对应 XML 标签内写 Markdown 流程；四段正文提供默认指导，标签外说明不注入模型。每条消息开始执行时读取一次，Construct 选 Construct + Asset + Page，Repair 选 Repair + Asset + Page；Page 指导不授予 Repair 页面工具权限。轮内不重读，下一条消息或恢复后的下一轮使用新内容，不改写旧历史。SOP 不扩大权限，也不强制无关任务走完所有步骤。无需新聊天或应用重载；没有 GUI 编辑器或用户数据目录副本。文件缺失或标签缺失、重复、嵌套错误会在模型请求前报告，合法空正文不阻止使用。
+Skill 位于应用数据目录 `skills/`。仅目录不存在时复制内置内容；已有目录不补齐、不覆盖，空目录允许使用。开发者直接编辑或添加文件，Agent 只读，没有 GUI 编辑器或脚本执行能力。每条消息刷新并固定本轮正文及参考资料，执行期间编辑从下轮生效；三个开发入口统一展示，读取不扩大工具权限。完整格式、路径、原生功能范围及维护步骤见 [Developer Skills](agent-skills.md)。旧 `sop.md` 的现有内容已先迁移再删除，不再存在 XML 解析或旧 SOP 回退。
 
-2026-11-06 指导修订：业务 Step 负责识别、动作和完成确认，Workflow 负责排布；匹配保留全部结果，多命中由业务 Step 判断歧义，不要求全部动作。点击先介绍 `centerxy` 再介绍完整 `x/y`，不丢字段后手算。循环页须同步接通 Plan 的 `SUPPORTED_TASK_IDS`，配置仍按 `PAGE_ID` 读取；Plan 保留 Task 状态和详细失败字段。Core 保留通用原则，默认 SOP 提供工作检查项；centerxy 等具体 API 用法放在 Agent 读取 ctx.action 契约的入口，不写入 Core 或 SOP。工具契约和示例同步说明，不新增 Validator 强制业务规则。决策及影响见[审查记录](agent-step-guidance-impact-review.md)，具体编写方式见[开发教程](developer-workflow-tutorial.md)。
+具体 Action API 仍以 action_contracts 查询的当前签名和说明为准，Skill 不复制完整工具 Schema。模型本轮使用 Skill 前需要重新读取，历史只说明当时依据；不自动重放旧工具或改写旧日志。加载警告显示到对话及日志，按 pi 规则继续使用其余有效 Skills。
 
 用户消息通过 `<runtime_context>` 携带模式、入口、Candidate 相对根、来源 Manifest、可编辑文件和参考附件，通过 `<user_request>` 保留用户原文。XML 仅帮助区分来源，宿主不解析正文为权限。参考附件及外部工具结果不能覆盖系统规则，历史聊天兼容旧消息格式，无需迁移。
 
-最终文本仍严格解析为 JSON：`revise_success` 必须为布尔值，`message` 必须为非空字符串，禁止外层 Markdown 围栏。修订完成且相关静态校验通过可报告 true，但必须明确未执行的游戏验证；纯分析、信息不足、校验失败或修订未完成报告 false。用户明确要求成功试运行时，未执行或失败也报告 false。模型报告不替代校验、人工审阅或游戏验收。格式纠正只重发最终 JSON，禁用工具并保留业务内容，继续消耗本轮额度。
+最终文本仍严格解析为 JSON：`revise_success` 必须为布尔值，`message` 必须为非空字符串，禁止外层 Markdown 围栏。修订完成且相关静态校验通过可报告 true，但必须明确未执行的游戏验证；纯分析、信息不足、校验失败或修订未完成报告 false。用户明确要求成功试运行时，未执行或失败也报告 false。格式纠正只重发最终 JSON，禁用工具并保留业务内容，继续消耗本轮额度。
 
-跨轮及 Session 恢复时，原始日志保留历史系统消息；发给模型的历史仅重放对话，不重放旧系统 Prompt 或 `toolsAdded` / `toolsRemoved`。本轮系统 Prompt 与工具声明由当前入口、模式及格式纠正状态生成，上一轮纠正不会禁用下一轮工具。发送前核对工具声明与当前启用集合，不一致时拒绝请求并报告接入错误；不把回复正文中的工具标记转换为执行指令。相关回归使用真实 pi 与本机 HTTP 替身，不代表真实模型验收。
+跨轮及 Session 恢复时，原始日志保留历史系统消息；发给模型的历史仅重放对话，不重放旧系统 Prompt 或 `toolsAdded`／`toolsRemoved`。本轮系统 Prompt、Skill 目录与工具声明由当前状态生成；上一轮纠正不会禁用下一轮工具。发送前仍核对工具声明与当前启用集合，不一致时拒绝请求；不把回复中的工具标记转换为执行指令。正式请求从第 1 次计数，无强制推理预检，GUI 设置页手动检查不请求推理。
 
-每轮 `input.json` 保存所选 SOP 正文及 Python 宿主 Prompt 快照；完整实际系统消息还包括扩展追加的工具概览和共享规则，以 `request-*.json` 实际载荷为准。修改 SOP 可能影响缓存命中；不承诺缓存比例或真实模型表现提升。
+每轮 `input.json` 保存当前 Skill 目录及 Python 宿主 Prompt，完整实际系统消息以 `request-*.json` 为准。实际 read 内容留在无损日志中，未读 Skill 正文不额外归档。正文与目录变化可能影响缓存；不承诺缓存比例或真实模型质量改善。实现及当前验证边界见 [Skills 实施记录](agent-skills-implementation.md)。

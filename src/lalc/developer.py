@@ -256,6 +256,56 @@ class DeveloperHost:
             matches = detect_template(client_image(pixels, size), decode_image(content), threshold=0.8)
             return content, matches
 
+    def template_catalog(self):
+        """只扫描目录和文件状态，不读图片；不跟随素材库内的符号链接。"""
+        import os
+        root = self.service.asset_library.root
+        if root.is_symlink():
+            raise ValueError("Asset Library 不允许符号链接。")
+        signature, images = [], []
+        def failed(error):
+            raise error
+        if not root.exists():
+            return (), []
+        for directory, folders, files in os.walk(root, followlinks=False, onerror=failed):
+            folder_names, file_names = set(folders), set(files)
+            for name in ["", *sorted(folders), *sorted(files)]:
+                path = Path(directory) / name
+                if name and path.suffix != ".png" and name != "asset-tag.json" and name not in folder_names:
+                    continue
+                if path.is_symlink():
+                    raise ValueError(f"Asset Library 不允许符号链接：{path.name}")
+                stat = path.stat()
+                relative = path.relative_to(root).as_posix()
+                signature.append((relative, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns, stat.st_ino))
+                if name in file_names and path.suffix == ".png":
+                    images.append(relative)
+        return tuple(sorted(signature)), sorted(images)
+
+    def template_preview(self, name, digest):
+        """按需验哈希读取单图，不能借模板选择访问库外路径。"""
+        from .assets import asset_name
+        return self.service.asset_library.read({"path": f"{asset_name(name)}/{digest}.png", "sha256": digest})
+
+    def match_template_preview(self, snapshot, name, digest=None, *, priority_tags=None,
+                               region=None, threshold=0.9, nms=True, nms_iou_threshold=0.5):
+        """只在固定截图上运行正式算法；不连接窗口，不写使用索引或 Trace。"""
+        from .recognition import client_image, decode_image, detect_template
+        from .assets import asset_name
+        asset_name(name)
+        with self.service.activity("Template Match"):
+            pixels, size, observation = snapshot
+            options = dict(region=region, threshold=threshold, nms=nms, nms_iou_threshold=nms_iou_threshold)
+            if digest is None:
+                return self.service.asset_library.match(name, pixels, size, run_id=None,
+                    observation=observation, emit=lambda *_: None, priority_tags=priority_tags,
+                    record_usage=False, **options)
+            content = self.template_preview(name, digest)
+            matches = detect_template(client_image(pixels, size), decode_image(content), **options)
+            return [{**match, "path": f"{name}/{digest}.png", "sha256": digest,
+                     "centerxy": (match["x"] + match["width"] // 2,
+                                  match["y"] + match["height"] // 2)} for match in matches]
+
     def resize_window(self, width=1280, height=720):
         """人工尺寸调整与 Run/Agent 互斥；不重截或替换已固定的预览。"""
         with self.service.activity("Capture 调整窗口尺寸"):

@@ -241,12 +241,13 @@ class AssetLibrary:
         return record
 
     def match(
-        self, name: str, pixels: bytes, size: tuple[int, int], *, run_id: int,
+        self, name: str, pixels: bytes, size: tuple[int, int], *, run_id: int | None,
         observation: int, emit: Callable[[str, dict[str, Any]], None],
         priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
+        record_usage: bool = True,
     ) -> list[dict[str, Any]]:
-        """每次读取目录及标签；优先组命中则短路，否则匹配剩余模板。"""
+        """每次读取目录及标签；调试可关闭使用索引写入，正式调用默认保留。"""
         import math
         from .recognition import checked_region, client_image, decode_image, detect_template, suppress_overlaps
         asset_name(name)
@@ -256,6 +257,8 @@ class AssetLibrary:
                 raise ValueError("Detection thresholds must be finite and between 0 and 1.")
         if type(nms) is not bool:
             raise ValueError("nms must be bool.")
+        if type(record_usage) is not bool:
+            raise ValueError("record_usage must be bool.")
         directory = self.path(name)
         if not directory.is_dir():
             raise FileNotFoundError(f"Asset logical name does not exist: {name}")
@@ -299,7 +302,7 @@ class AssetLibrary:
                  "priority_tags": preferred_tags, "matched_batch": batch,
                  "templates": attempted, "detections": output}
         emit("asset_matched", event)
-        if output:
+        if output and record_usage:
             index_path = self.data_root / "asset-usage.json"
             index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
             index[name] = {**event, "last_used_at": datetime.now(UTC).isoformat()}
