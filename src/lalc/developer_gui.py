@@ -541,24 +541,14 @@ class SettingsPage(QWidget):
         self.limit = QSpinBox()
         self.limit.setRange(2, 2147483647)
         self.key = None
-        if side == "developer":
-            self.key = QLineEdit()
-            self.key.setEchoMode(QLineEdit.EchoMode.Password)
-            self.key.setPlaceholderText(tr('API Key: leave empty to keep the existing key'))
         for label, control in ((tr('Base URL'), self.url), (tr('Model'), self.model)):
             layout.addWidget(QLabel(label))
             layout.addWidget(control)
         self.secret_state = QLabel()
-        if self.key is not None:
-            layout.addWidget(self.secret_state)
-            layout.addWidget(QLabel("API Key"))
-            layout.addWidget(self.key)
-            key_layout = layout
-        else:
-            key_layout = QHBoxLayout()
-            key_layout.addWidget(self.secret_state, 1)
-            self.key_button = button(tr('Set API key'), self.set_api_key, key_layout)
-            layout.addLayout(key_layout)
+        key_layout = QHBoxLayout()
+        key_layout.addWidget(self.secret_state, 1)
+        self.key_button = button(tr('Set API key'), self.set_api_key, key_layout)
+        layout.addLayout(key_layout)
         self.clear_button = button(tr('Clear API key'), lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
         self.advanced = QWidget()
         advanced = QVBoxLayout(self.advanced)
@@ -608,15 +598,13 @@ class SettingsPage(QWidget):
         self.notice.setWordWrap(True)
         layout.addWidget(self.notice)
         layout.addStretch()
-        for control in (self.url, self.model, self.key):
-            if control is not None:
-                control.textChanged.connect(self.invalidate)
+        for control in (self.url, self.model):
+            control.textChanged.connect(self.invalidate)
         self.provider.currentIndexChanged.connect(self.switch_provider)
         self.limit.valueChanged.connect(self.invalidate)
         self.window._interact(self.reload)
-        for control in (self.url, self.model, self.key):
-            if control is not None:
-                control.editingFinished.connect(self.auto_save)
+        for control in (self.url, self.model):
+            control.editingFinished.connect(self.auto_save)
         self.limit.valueChanged.connect(self.auto_save)
         for control in (self.effort, self.output_limit):
             control.currentIndexChanged.connect(self.auto_save)
@@ -675,7 +663,7 @@ class SettingsPage(QWidget):
 
     def submit(self):
         """交接/重载前提交尚未失焦的输入；禁用表单不回写旧配置。"""
-        if self.side == "user" and self.key is not None:
+        if self.key is not None:
             raise ValueError(tr('Confirm or cancel API key entry first'))
         if self.dirty and self.isEnabled():
             self.save()
@@ -770,8 +758,6 @@ class SettingsPage(QWidget):
                               side=self.side, temporary_keys=self.host.secrets)
         self.loading = True
         try:
-            if self.side == "developer":
-                self.key.clear()
             self.dirty = False
             self.show_secret(saved)
         finally:

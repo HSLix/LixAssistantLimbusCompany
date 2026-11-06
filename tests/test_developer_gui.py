@@ -360,6 +360,7 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     monkeypatch.setattr("lalc.pi_probe._models", models)
     page.url.setText("http://host/custom/api")
     page.model.setText("Gemma4")
+    page.set_api_key()
     page.key.setText("gui-secret")
     page.check(True)
     assert entered.wait(1)
@@ -375,7 +376,7 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     assert "未加载" in page.check_status.text()
     assert page.diagnostics.path.is_dir()
     assert "gui-secret" not in (page.diagnostics.path / "result.json").read_text()
-    page.key.setText("another-secret")
+    page.url.setText("http://host/another/api")
     assert "设置已变更" in page.check_status.text()
 
 
@@ -389,6 +390,7 @@ def test_settings_error_can_reopen_copy_and_open_logs(gui, monkeypatch):
     def fail(request, **kwargs):
         raise HTTPError(request.full_url, 502, "bad gateway", {}, io.BytesIO(b"upstream gui-secret"))
     monkeypatch.setattr("lalc.pi_probe.urlopen", fail)
+    page.set_api_key()
     page.key.setText("gui-secret")
     page.check(False)
     wait_jobs(app, window)
@@ -424,6 +426,7 @@ def test_repair_error_is_not_agent_reply_and_normal_answer_stays_reply(gui, monk
 def test_interaction_error_uses_redacted_details_and_keeps_log_entry(gui, caplog):
     app, window = gui
     window.switchTo(window.settings_view)
+    window.settings_page.set_api_key()
     window.settings_page.key.setText("gui-secret")
     def fail():
         raise ValueError("gui-secret failed")
@@ -499,8 +502,7 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     assert page.deepseek_options.isHidden()
     page.url.setText('http://local/custom/api')
     page.model.setText('local-model')
-    page.key.setText('local-temporary-key')
-    page.save()
+    page.save(secret='local-temporary-key')
     wait_jobs(app, window)
     assert window.host.secret == 'local-temporary-key'
     page.provider.setCurrentIndex(page.provider.findData('deepseek'))
@@ -508,11 +510,10 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     assert page.model.text() == 'deepseek-flash' and page.model.isReadOnly()
     assert page.url.text() == 'https://api.deepseek.com'
     assert page.thinking.isChecked() and page.effort.currentData() == 'high'
-    assert page.key.text() == '' and page.secret_state.text() == 'API Key：未设置'
+    assert page.key is None and page.secret_state.text() == 'API Key：未设置'
     page.thinking.setChecked(False)
     assert not page.effort.isEnabled()
-    page.key.setText('cloud-temporary-key')
-    page.save()
+    page.save(secret='cloud-temporary-key')
     wait_jobs(app, window)
     assert window.host.secret == 'cloud-temporary-key'
     saved = json.loads((window.service.data_root / 'agent-settings.json').read_text())
