@@ -1753,5 +1753,13 @@ Original pixel region: {2}</source>
       <source>Capture to recognize all text. Drag on the image to recognize a region; results replace the previous ones. Korean is not supported.</source>
       <translation>截图后自动识别全图。拖选范围后自动识别选区，并替换上次结果。暂不支持韩文。</translation>
     </message>
+    <message>
+      <source>Template match scores (threshold: 0.8)</source>
+      <translation>模板匹配分数（阈值：0.8）</translation>
+    </message>
+    <message>
+      <source>No matches.</source>
+      <translation>未匹配到结果。</translation>
+    </message>
   </context>
 </TS>

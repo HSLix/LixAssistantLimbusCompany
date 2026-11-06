@@ -247,6 +247,15 @@ class DeveloperHost:
             pixels, size, _ = snapshot
             return ocr_service.recognize(client_image(pixels, size), region=region, checkpoint=lambda: None)
 
+    def match_crop_preview(self, snapshot, region):
+        """以固定截图裁剪模板并同图匹配；不截图、不写入素材库。"""
+        from .recognition import client_image, decode_image, detect_template
+        with self.service.activity("Capture"):
+            pixels, size, _ = snapshot
+            content, _ = self.service.asset_library.crop_content(pixels, size, region)
+            matches = detect_template(client_image(pixels, size), decode_image(content), threshold=0.8)
+            return content, matches
+
     def resize_window(self, width=1280, height=720):
         """人工尺寸调整与 Run/Agent 互斥；不重截或替换已固定的预览。"""
         with self.service.activity("Capture 调整窗口尺寸"):
