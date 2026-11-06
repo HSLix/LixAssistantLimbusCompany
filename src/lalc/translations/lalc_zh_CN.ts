@@ -1733,5 +1733,25 @@ Original pixel region: {2}</source>
       <source>Finishing current operations before restarting LALC…</source>
       <translation>正在结束当前操作，随后重启 LALC…</translation>
     </message>
+    <message>
+      <source>OCR Test</source>
+      <translation>OCR 测试</translation>
+    </message>
+    <message>
+      <source>Recognize full image</source>
+      <translation>识别全图</translation>
+    </message>
+    <message>
+      <source>OCR results</source>
+      <translation>OCR 识别结果</translation>
+    </message>
+    <message>
+      <source>No text recognized.</source>
+      <translation>未识别到文字。</translation>
+    </message>
+    <message>
+      <source>Capture to recognize all text. Drag on the image to recognize a region; results replace the previous ones. Korean is not supported.</source>
+      <translation>截图后自动识别全图。拖选范围后自动识别选区，并替换上次结果。暂不支持韩文。</translation>
+    </message>
   </context>
 </TS>

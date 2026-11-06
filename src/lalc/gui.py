@@ -96,7 +96,7 @@ class MainWindow(FluentWindow):
         self._fatal_reported = False
         self.trial_dialog = None
         from .developer import DeveloperHost
-        from .developer_gui import CapturePage, SettingsPage, RepairPage
+        from .developer_gui import CapturePage, OcrPage, SettingsPage, RepairPage
         self.host = host or DeveloperHost(service, default_candidate_root(service.data_root))
         self.jobs = []
         self.owns_run = False
@@ -113,6 +113,7 @@ class MainWindow(FluentWindow):
         self.pages = self.stackedWidget
         self.pages.setAnimationEnabled(False)
         self.capture_page = CapturePage(self)
+        self.ocr_page = OcrPage(self)
         self.settings_page = SettingsPage(self)
         self.repair_page = RepairPage(self)
         self.settings_view = QScrollArea()
@@ -126,6 +127,7 @@ class MainWindow(FluentWindow):
         self.page_preview_requested.connect(self.repair_page.show_page_preview)
         for page, identity, name, icon in (
             (self.capture_page, "developer-capture", tr('Capture'), FluentIcon.CAMERA),
+            (self.ocr_page, "developer-ocr", tr('OCR Test'), FluentIcon.SEARCH),
             (self.settings_view, "developer-settings", tr('Agent Settings'), FluentIcon.SETTING),
             (self.repair_page, "developer-workbench", tr('Agent Workbench'), FluentIcon.CHAT),
         ):
@@ -278,7 +280,7 @@ class MainWindow(FluentWindow):
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
-        for page in (self.capture_page, self.settings_page, self.repair_page):
+        for page in (self.capture_page, self.ocr_page, self.settings_page, self.repair_page):
             page.render(busy)
 
 
