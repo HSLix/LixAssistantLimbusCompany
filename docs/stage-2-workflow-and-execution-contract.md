@@ -484,7 +484,7 @@ Task Workflow input/result annotations retain their directly JSON-compatible con
 Steps that return matching results include `tuple[int, int]` in their result value annotation;
 public Run Results and persisted Trace still encode tuples as arrays.
 
-`ctx.log(message: str, *, screenshot: bool = False) -> None` appends a `component_log` event to
+`ctx.log(message: str, *, level: str = "info", screenshot: bool = False) -> None` appends a `component_log` event to
 Execution Trace during a formal Component invocation, including condition/detect/recover. It includes
 current logical name, Component ID, call ID, role, phase, Manifest ID, Run ID and timestamp. Logging
 neither determines task success nor adds Ledger records. `screenshot=True` saves the existing valid
@@ -493,11 +493,19 @@ references; it never captures again. Multiple references to one observation use 
 or invalid screenshots and evidence/Trace write failures propagate through the existing failure boundary.
 Plain text logs require no screenshot. Direct entry and all tasks in a Plan share their Run Trace.
 
+`level` accepts only `debug`, `info`, `warning`, and `error`, case-insensitively, and is stored
+as lowercase in the event's `level` field. Omitting it records `info`. Other values (including
+non-strings, aliases such as `warn`, and strings with surrounding whitespace) raise `ValueError`
+through the existing execution failure boundary, before saving evidence or emitting a log event.
+All four levels are recorded, including `debug`; `error` does not itself fail the task. This
+metadata adds no GUI filtering or coloring and does not route logs through Python logging.
+Historical Trace records remain unchanged and may have no `level` field.
+
 ```python
 ctx.action("observe.capture_screen")
 if matches := ctx.action("observe.match_asset", asset="main/drive_unselected"):
     ctx.action("control.click", centerxy=matches[0]["centerxy"])
     ctx.log("已点击 Drive")
 else:
-    ctx.log("未找到未选中的 Drive 标识", screenshot=True)
+    ctx.log("未找到未选中的 Drive 标识", level="warning", screenshot=True)
 ```

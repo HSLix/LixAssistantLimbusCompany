@@ -1,4 +1,4 @@
-"""覆盖中心元组、互斥点击参数及正式 Run/Plan 的语义日志和已有截图证据。
+"""覆盖中心元组、互斥点击参数及正式 Run/Plan 的日志级别和已有截图证据。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_workflow_observability.py
@@ -71,7 +71,7 @@ def make_service(tmp_path, source):
 def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     service, window, manifest = make_service(tmp_path,
         '    ctx.action("observe.capture_screen")\n'
-        '    ctx.log("已选中 Drive", screenshot=True)\n'
+        '    ctx.log("已选中 Drive", level="WARNING", screenshot=True)\n'
         '    ctx.log("无需点击", screenshot=True)\n')
     if plan:
         run = service.start_plan(manifest_id=manifest)
@@ -82,6 +82,7 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     assert window.captures == 1
     logs = [event for event in state['trace'] if event['event'] == 'component_log']
     assert [event['message'] for event in logs] == ['开始选择 Drive', '已选中 Drive', '无需点击']
+    assert [event['level'] for event in logs] == ['info', 'warning', 'info']
     assert 'evidence_path' not in logs[0]
     assert logs[1]['call_id'] == logs[2]['call_id'] != logs[0]['call_id']
     assert logs[1]['logical_name'] == 'steps.drive' and logs[0]['logical_name'] == 'tasks.drive'
@@ -92,6 +93,31 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     assert len(list((tmp_path / 'evidence' / str(run)).glob('*.png'))) == 1
     persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
     assert [event for event in persisted if event['event'] == 'component_log'] == logs
+
+
+@pytest.mark.parametrize('level', ['debug', 'info', 'warning', 'error', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'WaRnInG'])
+def test_log_levels_are_normalized_and_persisted_without_failing_task(tmp_path, level):
+    service, window, manifest = make_service(tmp_path, f'    ctx.log("日志", level={level!r})\n')
+    run = service.start('steps.drive', {}, manifest_id=manifest)
+    state = finish(service, run)
+    assert state['result']['status'] == 'success'
+    logs = [event for event in state['trace'] if event['event'] == 'component_log']
+    assert len(logs) == 1 and logs[0]['level'] == level.lower()
+    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
+    assert [event for event in persisted if event['event'] == 'component_log'] == logs
+    assert window.captures == 0
+
+
+@pytest.mark.parametrize('level', ['warn', ' info ', '', 'critical', None, 1, True, [], {}])
+def test_invalid_log_level_fails_before_screenshot_or_trace_write(tmp_path, level):
+    service, window, manifest = make_service(tmp_path,
+        f'    ctx.log("日志", level={level!r}, screenshot=True)\n')
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    assert state['result']['status'] == 'failure'
+    assert 'ValueError: log level must be' in state['result']['traceback']
+    assert not [event for event in state['trace'] if event['event'] == 'component_log']
+    assert not list((tmp_path / 'evidence').rglob('*.png'))
+    assert window.captures == 0
 
 
 def test_log_with_missing_screenshot_fails_without_capture(tmp_path):

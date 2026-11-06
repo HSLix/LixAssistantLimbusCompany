@@ -680,17 +680,19 @@ class WorkflowExecutor:
                 fields = {**fields, "call_id": self._allocate_call_id()}
 
 
-    def log(self, message: str, *, screenshot: bool = False) -> None:
-        """将语义和可选截图引用写入当前正式调用的 Trace。"""
+    def log(self, message: str, *, level: str = "info", screenshot: bool = False) -> None:
+        """校验并统一日志级别，将语义和可选截图引用写入当前调用的 Trace。"""
         if type(message) is not str or type(screenshot) is not bool:
             raise ValueError("log requires a string message and a bool screenshot")
+        if type(level) is not str or level.lower() not in {"debug", "info", "warning", "error"}:
+            raise ValueError("log level must be debug, info, warning or error (case-insensitive)")
         if not self._frames or self._active_action is not None:
             raise ExecutionFailure("execution_failed", "ctx.log requires a Component invocation")
         self.gate.checkpoint()
         frame = self._frames[-1]
         fields = {"logical_name": frame.logical_name, "component_id": frame.component_id,
                   "call_id": frame.call_id, "role": frame.role, "phase": frame.phase,
-                  "manifest_id": self.manifest.manifest_id, "message": message}
+                  "manifest_id": self.manifest.manifest_id, "message": message, "level": level.lower()}
         if screenshot:
             if self._save_screenshot is None:
                 raise ExecutionFailure("execution_failed", "No current screenshot to attach")

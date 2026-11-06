@@ -70,7 +70,7 @@ uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags zh event
 
 运行 `steps.actions` 的 match 操作，输入文件可为 `{"operation":"match","asset":"ui/claim","priority_tags":["zh"],"threshold":0.9}`。优先组内全部模板匹配，命中则不匹配其余组；未命中才尝试剩余全部模板。priority_tags 默认为 None，无优先条件时全部匹配。结果统一 NMS 和分数排序，标签是普通描述，不自动根据游戏语言选择。
 
-该 Step 保留完整命中及 centerxy、分数、来源等字段；多匹配不自动失败、不视为没有目标，也不要求全部动作。业务 Step 判断歧义并通过 `ctx.log` 记录 warning 语义，按业务需要选择目标，再确认动作结果。
+该 Step 保留完整命中及 centerxy、分数、来源等字段；多匹配不自动失败、不视为没有目标，也不要求全部动作。业务 Step 判断歧义并通过 `ctx.log(message, level="warning")` 记录歧义，按业务需要选择目标，再确认动作结果。
 
 crop-asset CLI 可现场裁剪并配置 tags；observe.crop_asset 也能传 tags。每次匹配重新读取目录及标签，同一个 Run 内新增图片或改标签从下一次匹配生效，Manifest 切换不切换素材。
 

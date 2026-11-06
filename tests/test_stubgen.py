@@ -120,6 +120,7 @@ def execute(ctx: RunContext) -> None:
     assert_type(ctx.action("control.click", x=1, y=2), None)
     assert_type(ctx.action("control.click", centerxy=(1, 2)), None)
     ctx.log("已到达 Drive", screenshot=True)
+    ctx.log("候选存在歧义", level="WARNING", screenshot=True)
     assert_type(ctx.action("observe.capture_screen"), dict[str, int | str])
     ctx.action("observe.ocr", region={"x": 1, "y": 2, "width": 3, "height": 4}, min_score=0.9)
     assert_type(ctx.action("observe.match_asset", asset="ui/claim"), list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]])
