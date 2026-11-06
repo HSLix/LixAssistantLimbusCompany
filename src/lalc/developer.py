@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from .process_lock import ProcessLock
 
 from .focused import FocusedAutomationSession, WindowError
-from .runtime import atomic_write_json
+from .runtime import atomic_write_json, staging_directory
 
 
 def candidate_files(candidate: Path) -> dict[str, bytes]:
@@ -101,7 +101,7 @@ class DeveloperHost:
             if self.candidate.exists() and any(self.candidate.iterdir()) and not replace:
                 raise ValueError("替换非空 Candidate 需要明确确认；使用 lalc init --replace，或先执行 lalc clear。")
             self.candidate.parent.mkdir(parents=True, exist_ok=True)
-            with tempfile.TemporaryDirectory(dir=self.candidate.parent, prefix=".lalc-candidate-") as directory:
+            with staging_directory(self.candidate.parent, prefix=".lalc-candidate-") as directory:
                 prepared, backup = Path(directory) / "prepared", Path(directory) / "previous"
                 errors = self.manager.initialize_candidate(prepared, manifest_id=manifest_id)
                 if errors:
