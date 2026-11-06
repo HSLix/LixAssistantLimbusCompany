@@ -327,6 +327,87 @@ def capture_tags(text: str) -> list[str]:
     return AssetLibrary.tags(tags)
 
 
+class OcrView(CropView):
+    """在原图展示识别框；标注不写回截图像素或影响框选。"""
+
+    def __init__(self):
+        super().__init__()
+        self.items = []
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        rect = self.image_rect()
+        if rect.isEmpty():
+            return
+        painter = QPainter(self)
+        painter.setPen(QPen(Qt.GlobalColor.green, 2))
+        sx, sy = rect.width() / self.image.width(), rect.height() / self.image.height()
+        for number, item in enumerate(self.items, 1):
+            box = item["box"]
+            outline = QRect(rect.x() + round(box["x"] * sx), rect.y() + round(box["y"] * sy),
+                            max(1, round(box["width"] * sx)), max(1, round(box["height"] * sy)))
+            painter.drawRect(outline)
+            label = QRect(outline.x(), max(rect.y(), outline.y() - 22), 24 + len(str(number)) * 8, 22)
+            painter.fillRect(label, Qt.GlobalColor.black)
+            painter.drawText(label, Qt.AlignmentFlag.AlignCenter, str(number))
+
+
+class OcrPage(QWidget):
+    """独立静态截图的 OCR 测试；框选结束自动替换本次结果。"""
+
+    def __init__(self, window):
+        super().__init__()
+        self.window, self.host = window, window.host
+        self.snapshot = None
+        layout = QVBoxLayout(self)
+        controls = QHBoxLayout()
+        self.capture_button = button(tr('Capture screenshot'), self.capture, controls)
+        self.full_button = button(tr('Recognize full image'), lambda: self.recognize(), controls)
+        layout.addLayout(controls)
+        instructions = QLabel(tr('Capture to recognize all text. Drag on the image to recognize a region; results replace the previous ones. Korean is not supported.'))
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+        self.view = OcrView()
+        self.view.selected.connect(lambda region: self.recognize(region) if region else None)
+        layout.addWidget(self.view, 3)
+        self.results = QPlainTextEdit()
+        self.results.setReadOnly(True)
+        self.results.setAccessibleName(tr('OCR results'))
+        layout.addWidget(self.results, 1)
+
+    def clear_results(self):
+        self.view.items = []
+        self.view.update()
+        self.results.clear()
+
+    def capture(self):
+        self.clear_results()
+        def shown(snapshot):
+            self.snapshot = snapshot
+            self.view.set_image(snapshot[0], snapshot[1])
+            self.recognize()
+        self.window.launch(lambda: self.host.capture(update_preview=False), shown)
+
+    def recognize(self, region=None):
+        """松开框选后才启动后台识别；出错保留原图但不保留旧结果。"""
+        if self.snapshot is None:
+            return
+        self.clear_results()
+        self.view.region = dict(region) if region else None
+        snapshot = self.snapshot
+        def shown(result):
+            self.view.items = result["items"]
+            self.view.update()
+            self.results.setPlainText("\n".join(f'{number}. {item["text"]}'
+                for number, item in enumerate(result["items"], 1)) or tr('No text recognized.'))
+        self.window.launch(lambda: self.host.recognize_preview(snapshot, region), shown)
+
+    def render(self, busy):
+        self.capture_button.setEnabled(not busy)
+        self.full_button.setEnabled(not busy and self.snapshot is not None)
+        self.view.setEnabled(not busy)
+
+
 class CapturePage(QWidget):
     """明确截图、预览确认后保存同一图；坐标监测不抢焦点。"""
 

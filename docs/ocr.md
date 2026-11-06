@@ -27,6 +27,14 @@ ctx.action("control.click", centerxy=matches[0]["centerxy"])
 - 文字保留 SDK 输出，不额外纠错、合并、摘要或重新排序。识别成功且无达标文字时返回空 items；资源或推理故障明确抛错。
 - OCR 为应用注册的 observe Trusted Action，不由 Manifest 选择实现，也不能由 Agent 修改。原始像素不穿过 Action 返回边界。
 
+## Developer OCR 测试页
+
+Developer 导航中 Capture 后的 **OCR 测试**页用于查看现有模型的识别效果。点击“截取图片”后自动识别全图，在整张原图上显示矩形框与编号；下方按相同编号显示原始识别文字，可选中复制。
+
+用鼠标左键拖选，松开后自动对当前截图的选区重新 OCR，不获取新画面；本次框、编号与文字替换旧结果。点击“识别全图”恢复全图识别，每次编号按模型原顺序从 1 开始。本页截图独立于 Capture 的素材预览，识别不保存素材或结果。操作期间禁用本页截图、识别和框选，失败清除旧结果并显示错误。暂不支持韩文。
+
+设计及影响审查见 [OCR 测试页记录](ocr-test-page-impact-review.md)。
+
 ## Agent 截图工具
 
 `game_screenshot` 保持无参数，同时返回同一次截图的原图、40px 网格图及 `ocr`。`ocr` 就是上述完整结果，默认全图、min_score=0.0；它同时进入工具文本 content 和 details，随原有交互日志留存。网格不参与 OCR。

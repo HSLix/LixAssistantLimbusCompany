@@ -229,13 +229,23 @@ class DeveloperHost:
             self.conversation = RepairConversation(self)
             return self.conversation
 
-    def capture(self):
-        """固定预览原始像素；不写 Asset，失败不展示为新截图。"""
+    def capture(self, *, update_preview=True):
+        """固定原始截图；默认更新素材预览，OCR 可独立取图，不写 Asset。"""
         with self.service.activity("Capture 截图"):
             session = FocusedAutomationSession(self.service._window_platform(), lambda *_: None)
             session.capture()
-            self.preview = (session.image, session.size, session.observation)
-            return self.preview
+            snapshot = (session.image, session.size, session.observation)
+            if update_preview:
+                self.preview = snapshot
+            return snapshot
+
+    def recognize_preview(self, snapshot, region=None):
+        """只识别已固定的截图；不连接窗口，不替换 Capture 预览。"""
+        from .ocr import ocr_service
+        from .recognition import client_image
+        with self.service.activity("OCR"):
+            pixels, size, _ = snapshot
+            return ocr_service.recognize(client_image(pixels, size), region=region, checkpoint=lambda: None)
 
     def resize_window(self, width=1280, height=720):
         """人工尺寸调整与 Run/Agent 互斥；不重截或替换已固定的预览。"""

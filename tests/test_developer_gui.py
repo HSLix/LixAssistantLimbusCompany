@@ -1,4 +1,4 @@
-"""覆盖三页 Developer GUI、共享活动互斥、截图原图保存、Runner 持久选择和凭据边界。
+"""覆盖 Developer GUI、OCR 框选、共享活动互斥、截图保存和凭据边界。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_developer_gui.py
@@ -20,6 +20,7 @@ def test_activity_blocks_runner_capture_rebuild_publish_and_clears_on_failure(tm
     host, loaded = host_for(tmp_path)
     with host.service.activity("Agent"):
         for operation in (lambda: host.service.start("steps.total", {}), host.capture,
+                          lambda: host.recognize_preview((bytes(16), (2, 2), 1)),
                           lambda: host.initialize(loaded.manifest_id, replace=True), host.publish):
             with pytest.raises(StartError):
                 operation()
@@ -135,10 +136,82 @@ def wait_jobs(app, window):
     app.processEvents()
 
 
-def test_three_pages_scaled_crop_and_no_implicit_selection(gui):
+def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
+    """真实后台任务使用替身 OCR；验证原始像素、框选、空结果及错误清理。"""
+    from types import SimpleNamespace
+    from PySide6.QtCore import QPointF, Qt
+    from lalc.gui import ErrorDialog
+    from lalc.ocr import OcrService
+    from lalc.developer_gui import OcrView
+    app, window = gui
+    page = window.ocr_page
+    pixels = bytes([1, 2, 3, 255]) * 200 * 100
+    captures = []
+    class Session:
+        def __init__(self, *_):
+            self.image, self.size, self.observation = pixels, (200, 100), 1
+        def capture(self):
+            captures.append(True)
+    monkeypatch.setattr('lalc.developer.FocusedAutomationSession', Session)
+    window.host.preview = original = (bytes(16), (2, 2), 7)
+    calls = []
+    item = {"text": "<文字>&", "box": {"x": 50, "y": 20, "width": 30, "height": 10}}
+    def recognize(self, image, *, region, checkpoint):
+        checkpoint()
+        assert image.shape == (100, 200, 3)
+        assert image[0, 0].tolist() == [1, 2, 3]
+        calls.append(region)
+        return {"items": [item] if region is None else []}
+    monkeypatch.setattr(OcrService, 'recognize', recognize)
+    page.capture()
+    assert not page.capture_button.isEnabled() and not page.view.isEnabled()
+    wait_jobs(app, window)
+    assert window.host.preview is original
+    assert page.results.toPlainText() == '1. <文字>&'
+    assert page.view.items == [item]
+    assert page.full_button.isEnabled()
+    # 通过鼠标处理路径验证等比缩放、释放时识别和区域偏移传递。
+    view = page.view
+    view.resize(400, 200)
+    def event(x, y):
+        return SimpleNamespace(button=lambda: Qt.MouseButton.LeftButton, position=lambda: QPointF(x, y))
+    view.mousePressEvent(event(100, 40))
+    assert calls == [None]
+    view.mouseMoveEvent(event(200, 100))
+    assert calls == [None]
+    view.mouseReleaseEvent(event(200, 100))
+    wait_jobs(app, window)
+    assert calls[-1] == {"x": 50, "y": 20, "width": 50, "height": 30}
+    assert not view.items and page.results.toPlainText()
+    page.full_button.click()
+    wait_jobs(app, window)
+    assert calls[-1] is None and view.region is None and view.items == [item]
+    assert len(captures) == 1
+    # 标注只改变绘制结果，不修改原图像素。
+    plain = OcrView()
+    plain.resize(view.size())
+    plain.set_image(pixels, (200, 100))
+    assert view.grab().toImage() != plain.grab().toImage()
+    assert view.image == plain.image
+    errors = []
+    monkeypatch.setattr(ErrorDialog, 'open', lambda dialog: errors.append(dialog.details.toPlainText()))
+    def fail(*_, **__):
+        raise RuntimeError('OCR test failure')
+    monkeypatch.setattr(OcrService, 'recognize', fail)
+    page.recognize()
+    wait_jobs(app, window)
+    assert not view.items and not page.results.toPlainText()
+    assert errors and 'OCR test failure' in errors[-1]
+    assert page.capture_button.isEnabled() and view.isEnabled()
+    plain.close()
+
+
+def test_required_pages_ocr_after_capture_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
-    assert [window.pages.widget(i).objectName() for i in range(3)] == ["developer-capture", "developer-settings", "developer-workbench"]
+    pages = [window.pages.widget(i).objectName() for i in range(window.pages.count())]
+    assert {"developer-capture", "developer-ocr", "developer-settings", "developer-workbench"} <= set(pages)
+    assert pages.index("developer-ocr") == pages.index("developer-capture") + 1
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view
