@@ -73,7 +73,8 @@ def test_trial_log_starts_with_component_and_level_without_changing_trace(gui):
     _, window = gui
     record = {"sequence": 1, "event": "component_log", "logical_name": "steps.drive",
               "component_id": "sha256:" + "a" * 64, "level": "warning", "message": "存在多个候选",
-              "evidence_path": "evidence/1/1.png"}
+              "evidence_path": "evidence/1/1.png",
+              "recorded_at": "2026-11-07T12:34:56.789"}
     legacy = {"sequence": 2, "event": "component_log", "logical_name": "tasks.drive",
               "component_id": "sha256:" + "b" * 64, "message": "旧日志"}
     other = {"sequence": 3, "event": "run_finished"}
@@ -84,9 +85,9 @@ def test_trial_log_starts_with_component_and_level_without_changing_trace(gui):
     assert "全局快捷键：Ctrl Alt P" in [label.text() for label in dialog.findChildren(QLabel)]
     dialog.render(state)
     text = dialog.logs.toPlainText()
-    assert 'WARNING · steps.drive\n存在多个候选' in text
+    assert 'WARNING · steps.drive · 2026-11-07 12:34:56\n存在多个候选' in text
     assert "evidence_path" not in text
-    assert 'INFO · tasks.drive\n旧日志' in text
+    assert 'INFO · tasks.drive · —\n旧日志' in text
     from lalc.i18n import tr
     assert tr("Execution interrupted") in text
     dialog.render(state)
