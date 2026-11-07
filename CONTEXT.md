@@ -62,6 +62,7 @@ _Avoid_: Manifest Component, Runtime Agent, automatic task replay
 
 **Trusted Action**:
 A shipped or human-approved low-level Python operation registered by the application once as `observe` or `control` and shared by all Manifests. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed permission matrix, validation, timing, and Trace; the Agent cannot create, replace, or reclassify it, and a Manifest does not select its implementation.
+Observation includes cooperative waiting without game input; it does not imply an immediate return.
 _Avoid_: Step, Agent-generated function, unrestricted Python call
 
 **Asset**:

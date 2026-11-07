@@ -56,6 +56,6 @@ class RunContext:
         return self._executor.crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, **arguments: Any) -> None:
-        """仅供 control Trusted Action 进入应用拥有的输入会话。"""
+        """供 control Action 进入输入会话；observe Action 仅可调用无输入的 wait。"""
 
         self._executor.control_input(operation, arguments)

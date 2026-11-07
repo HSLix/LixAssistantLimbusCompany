@@ -125,7 +125,7 @@ def execute(ctx: RunContext) -> None:
     ctx.action("observe.ocr", region={"x": 1, "y": 2, "width": 3, "height": 4}, min_score=0.9)
     assert_type(ctx.action("observe.match_asset", asset="ui/claim"), list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]])
     ctx.action("control.drag", x=1, y=2, end_x=3, end_y=4)
-    ctx.action(logical_name="control.wait", seconds=0.1)
+    ctx.action(logical_name="observe.wait", seconds=0.1)
     assert_type(ctx.call("steps.example", value=1), Any)
     assert_type(ctx.game_language, str)
     assert_type(ctx.capture_screen(), dict[str, Any])

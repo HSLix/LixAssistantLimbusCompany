@@ -17,7 +17,7 @@ def execute(ctx, *, operation: str = "key_press", key: str = "esc", x: int = 100
     elif operation == "drag":
         ctx.action("control.drag", x=x, y=y, end_x=end_x, end_y=end_y, seconds=seconds)
     elif operation == "wait":
-        ctx.action("control.wait", seconds=seconds)
+        ctx.action("observe.wait", seconds=seconds)
     else:
         raise ValueError("Unknown acceptance operation")
     ctx.action("observe.capture_screen", save=True)

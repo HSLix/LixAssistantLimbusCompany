@@ -118,7 +118,7 @@ def test_exp_mirror_pages_feed_plan_and_shared_actions(tmp_path, fail_exp):
         else:
             assert f"output={item['output']}" in messages
     assert {event["logical_name"] for event in state["trace"] if event["event"] == "trusted_action_started"} == {
-        "observe.capture_screen", "control.wait"}
+        "observe.capture_screen", "observe.wait"}
     for page in pages:
         page.widget.close()
     app.processEvents()

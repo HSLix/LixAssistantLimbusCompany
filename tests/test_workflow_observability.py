@@ -152,7 +152,7 @@ def test_action_debug_records_reuse_capture_and_keep_matching_results(tmp_path):
         '    ctx.action("observe.capture_screen")\n'
         '    matches = ctx.action("observe.match_asset", asset="ui/claim", threshold=0.999)\n'
         '    ctx.action("control.click", centerxy=matches[0]["centerxy"])\n'
-        '    ctx.action("control.wait", seconds=0)\n')
+        '    ctx.action("observe.wait", seconds=0)\n')
     entry(tmp_path, 'ui/claim')
     state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
     assert state['result']['status'] == 'success'

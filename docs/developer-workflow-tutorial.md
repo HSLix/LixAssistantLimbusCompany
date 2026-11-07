@@ -31,6 +31,8 @@ Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败�
 
 ## Trusted Action 类型补全
 
+`ctx.action("observe.wait", seconds=1.0)` 协作等待 0–60 秒，不注入游戏输入；所有允许 observe 的阶段都可使用，包括 Task Workflow、Subworkflow、Step condition 和 Recovery Rule detect。期间保留暂停、接管与取消检查；Workflow 遭接管后手动恢复会重新等待完整时长，不重放已完成 Step。Plan 不能调用 Action。旧 `control.wait` 已移除；已有源码需在 Candidate 中改名并重新发布，不改写已发布源码或旧 Trace。
+
 `ctx.action("control.restart_game")` 可由 Step 或 Recovery Rule 的 recover 阶段调用，无参数。应用先验证已保存的 Steam 客户端路径及唯一安装，正常关闭原游戏，5 秒未退出则只强制终止原进程并再等待 5 秒，随后启动 `LimbusCompany.exe`，最多等待 60 秒完成新窗口绑定及置前。返回只证明窗口可用，不证明完成登录、更新或进入业务页面。等待、关闭、启动、绑定、失败及取消过程均记录 Info／Warning／Error 日志，在 User Logs 默认可见；暂停和物理接管后须手动恢复，继续原重启阶段，避免重复启动。
 
 运行中确认绑定进程退出时，应用内置 `builtin.game_crash` 规则优先处理并重新调用当前 Step，保留 Task／Subworkflow 的调用栈和局部结果。每个 Run 最多自动重启一次，显式调用不占此额度；再次退出或重启失败会终止整个 Run／Plan。失焦、最小化、进程仍在但窗口消失，以及用户接管仍走人工恢复。初次运行前没有游戏窗口仍拒绝启动；Step 外不新增自动恢复边界。见[重启契约与验证](game-restart-design.md)。

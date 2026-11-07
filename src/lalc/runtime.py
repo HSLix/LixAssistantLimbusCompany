@@ -786,9 +786,10 @@ class WorkflowExecutor:
         return self._crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
-        """运行角色校验之外，再约束原生输入只能由 control Trusted Action 发起。"""
+        """原生输入仅允许 control Action；observe Action 只可复用无输入的等待。"""
 
-        if self._active_action != "control" or self._control_input is None:
+        allowed = self._active_action == "control" or (self._active_action == "observe" and operation == "wait")
+        if not allowed or self._control_input is None:
             raise ExecutionFailure("execution_failed", "Input requires a control Trusted Action.")
         self._control_input(operation, arguments)
 
