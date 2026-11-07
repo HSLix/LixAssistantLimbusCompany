@@ -19,7 +19,7 @@
 | Asset、截图、裁剪与归档 | ADR 0027–0031、[Agent 素材用法](../agent-repair.md#agent-素材预览与归档) |
 | Sharing、页面资源、容量与暂存 | [Sharing](../sharing.md)、ADR 0036／0037 |
 | 外部参考搜索、版本同步、pi／codesearch 生命周期 | [外部搜索](../external-code-search.md)、ADR 0038 |
-| 日志与游戏版本历史 | [日志设计](../agent-interaction-log-design.md)、[版本历史](../game-version-history.md)、ADR 0033／0035 |
+| 日志与游戏版本历史 | [运行日志页](../user-run-logs.md)、[日志设计](../agent-interaction-log-design.md)、[版本历史](../game-version-history.md)、ADR 0033／0035 |
 | Windows 构建与验收 | [打包说明](../windows-packaging.md)、[当前状态](../current-state.md) |
 
 ## 跨范围边界

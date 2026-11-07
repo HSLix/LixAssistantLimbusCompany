@@ -1,4 +1,4 @@
-"""覆盖中心元组、互斥点击参数及正式 Run/Plan 的语义日志和已有截图证据。
+"""覆盖中心元组、互斥点击参数及正式 Run/Plan 的日志级别和已有截图证据。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_workflow_observability.py
@@ -71,7 +71,7 @@ def make_service(tmp_path, source):
 def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     service, window, manifest = make_service(tmp_path,
         '    ctx.action("observe.capture_screen")\n'
-        '    ctx.log("已选中 Drive", screenshot=True)\n'
+        '    ctx.log("已选中 Drive", level="WARNING", screenshot=True)\n'
         '    ctx.log("无需点击", screenshot=True)\n')
     if plan:
         run = service.start_plan(manifest_id=manifest)
@@ -82,6 +82,7 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     assert window.captures == 1
     logs = [event for event in state['trace'] if event['event'] == 'component_log']
     assert [event['message'] for event in logs] == ['开始选择 Drive', '已选中 Drive', '无需点击']
+    assert [event['level'] for event in logs] == ['info', 'warning', 'info']
     assert 'evidence_path' not in logs[0]
     assert logs[1]['call_id'] == logs[2]['call_id'] != logs[0]['call_id']
     assert logs[1]['logical_name'] == 'steps.drive' and logs[0]['logical_name'] == 'tasks.drive'
@@ -92,6 +93,31 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     assert len(list((tmp_path / 'evidence' / str(run)).glob('*.png'))) == 1
     persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
     assert [event for event in persisted if event['event'] == 'component_log'] == logs
+
+
+@pytest.mark.parametrize('level', ['debug', 'info', 'warning', 'error', 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'WaRnInG'])
+def test_log_levels_are_normalized_and_persisted_without_failing_task(tmp_path, level):
+    service, window, manifest = make_service(tmp_path, f'    ctx.log("日志", level={level!r})\n')
+    run = service.start('steps.drive', {}, manifest_id=manifest)
+    state = finish(service, run)
+    assert state['result']['status'] == 'success'
+    logs = [event for event in state['trace'] if event['event'] == 'component_log']
+    assert len(logs) == 1 and logs[0]['level'] == level.lower()
+    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
+    assert [event for event in persisted if event['event'] == 'component_log'] == logs
+    assert window.captures == 0
+
+
+@pytest.mark.parametrize('level', ['warn', ' info ', '', 'critical', None, 1, True, [], {}])
+def test_invalid_log_level_fails_before_screenshot_or_trace_write(tmp_path, level):
+    service, window, manifest = make_service(tmp_path,
+        f'    ctx.log("日志", level={level!r}, screenshot=True)\n')
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    assert state['result']['status'] == 'failure'
+    assert 'ValueError: log level must be' in state['result']['traceback']
+    assert not [event for event in state['trace'] if event['event'] == 'component_log']
+    assert not list((tmp_path / 'evidence').rglob('*.png'))
+    assert window.captures == 0
 
 
 def test_log_with_missing_screenshot_fails_without_capture(tmp_path):
@@ -118,3 +144,42 @@ def test_formal_match_center_passes_through_action_validation_as_tuple(tmp_path)
     assert type(matched['detections'][0]['centerxy']) is list
     clicked = next(e for e in state['trace'] if e['event'] == 'trusted_action_started' and e['logical_name'] == 'control.click')
     assert clicked['inputs']['centerxy'] == list(matched['detections'][0]['centerxy'])
+
+
+def test_action_debug_records_reuse_capture_and_keep_matching_results(tmp_path):
+    """动作自动 Debug 与业务日志分开，识别和输入共用原始证据帧。"""
+    service, window, manifest = make_service(tmp_path,
+        '    ctx.action("observe.capture_screen")\n'
+        '    matches = ctx.action("observe.match_asset", asset="ui/claim", threshold=0.999)\n'
+        '    ctx.action("control.click", centerxy=matches[0]["centerxy"])\n'
+        '    ctx.action("observe.wait", seconds=0)\n')
+    entry(tmp_path, 'ui/claim')
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    assert state['result']['status'] == 'success'
+    ended = [e for e in state['trace'] if e['event'] == 'trusted_action_returned']
+    assert len(ended) == 4 and all(e['level'] == 'debug' for e in ended)
+    matched, clicked = ended[1:3]
+    assert len(matched['return_value']) == 2
+    assert matched['debug_image'] == clicked['debug_image']
+    assert matched['debug_image']['captured_at'] <= clicked['recorded_at']
+    assert window.captures == 1
+    assert sum(e['event'] == 'screenshot_saved' for e in state['trace']) == 1
+
+
+@pytest.mark.parametrize('outcome', ['failed', 'interrupted'])
+def test_action_debug_preserves_failure_or_interruption(tmp_path, monkeypatch, outcome):
+    """动作异常仍沿原边界传播，失败／取消记录保留尝试坐标和已有截图。"""
+    from lalc.runtime import UserInterruption
+    service, window, manifest = make_service(tmp_path,
+        '    ctx.action("observe.capture_screen")\n'
+        '    ctx.action("control.click", x=3, y=2)\n')
+    error = ValueError('test click failed') if outcome == 'failed' else UserInterruption('cancel')
+    def fail(*_):
+        raise error
+    monkeypatch.setattr(service, '_control_input', fail)
+    state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
+    event = next(e for e in state['trace'] if e['event'] == f'trusted_action_{outcome}')
+    assert event['level'] == 'debug'
+    assert event['inputs']['x'] == 3 and event['inputs']['y'] == 2
+    assert event['debug_image']['observation'] == 1
+    assert state['result']['status'] != 'success'

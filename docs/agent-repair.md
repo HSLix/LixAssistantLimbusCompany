@@ -239,7 +239,9 @@ without a separate inference preflight. pi explicitly uses DeepSeek's thinking f
 request caps, cancellation, disabled automatic retry and candidate review/Publish boundaries remain.
 
 Workflow source may use `ctx.log("语义说明", screenshot=True)` to attach its current screenshot without
-recapturing. Matched targets provide `centerxy` tuples for `control.click`; see the execution contract.
+recapturing. Its keyword-only `level` defaults to `"info"`; `debug`, `info`, `warning`, and `error`
+are accepted case-insensitively and stored lowercase. Invalid levels raise `ValueError`; all four
+levels are recorded and `error` alone does not fail a task. Matched targets provide `centerxy` tuples for `control.click`; see the execution contract.
 
 本次增量自动化验证（2026-10-24）：普通回归
 `QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q -x` 为 **381 passed, 40 skipped**；

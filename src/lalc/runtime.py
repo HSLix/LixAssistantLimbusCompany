@@ -67,6 +67,13 @@ class EnvironmentFailure(ExecutionFailure):
     """游戏环境无法继续；不得降为可继续的 Task 失败。"""
 
 
+class GameProcessExited(EnvironmentFailure):
+    """输入会话已确认原游戏进程退出，可由内置规则恢复当前 Step。"""
+
+    def __init__(self) -> None:
+        super().__init__("game_process_exited", "Limbus Company process exited.")
+
+
 class InputReleaseFailure(EnvironmentFailure):
     """无法确认输入释放，必须终止整个 Run，不能再恢复控制。"""
 
@@ -175,6 +182,7 @@ class WorkflowExecutor:
         capture_screen: Callable[[bool], dict[str, Any]] | None = None,
         control_input: Callable[[str, dict[str, Any]], None] | None = None,
         check_input: Callable[[], None] | None = None,
+        game_process_exited: Callable[[], bool] | None = None,
         prepare_resume: Callable[[], None] | None = None,
         manifest_manager: ManifestManager | None = None,
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
@@ -184,6 +192,7 @@ class WorkflowExecutor:
         ocr: Callable[..., dict[str, Any]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
+        debug_screenshot: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
     ) -> None:
         self.task_results: list[dict[str, Any]] = []
@@ -192,9 +201,12 @@ class WorkflowExecutor:
         self.gate = gate
         self.emit = emit
         self._save_screenshot = save_screenshot
+        self._debug_screenshot = debug_screenshot
         self._capture_screen = capture_screen
         self._control_input = control_input
         self._check_input = check_input
+        self._game_process_exited = game_process_exited
+        self._automatic_restarts = 0
         self._prepare_resume = prepare_resume
         self._active_action: str | None = None
         self.context = RunContext(self)
@@ -346,24 +358,72 @@ class WorkflowExecutor:
         parent_call_id: int | None,
     ) -> Any:
         """只在当前 Step 调用边界恢复，保留仍在栈上的 Workflow 调用帧。"""
-
         inputs = _bind_and_normalize(component.module.execute, arguments)
-        try:
+        restarted = False
+        while True:
             try:
-                return self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
-            except UserInterruption:
-                raise
-            except EnvironmentFailure:
-                raise
-            except ExecutionFailure as error:
+                try:
+                    try:
+                        result = self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
+                    except (UserInterruption, EnvironmentFailure):
+                        raise
+                    except ExecutionFailure as error:
+                        self.emit("step_interrupted", {"logical_name": logical_name,
+                                  "component_id": component.component_id, **_exception_fields(error)})
+                        result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
+                except UserInterruption as error:
+                    if error.reason == "cancel":
+                        raise
+                    current = self.manifest.components[logical_name]
+                    result = self._resume_step(logical_name, current, inputs, parent_call_id, error)
+            except GameProcessExited as error:
+                if restarted:
+                    self.emit("step_reinvocation_failed", {"logical_name": logical_name,
+                              "reason": "game_restart", **_exception_fields(error)})
                 self.emit("step_interrupted", {"logical_name": logical_name,
                           "component_id": component.component_id, **_exception_fields(error)})
-                return self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
-        except UserInterruption as error:
-            if error.reason == "cancel":
+                self._recover_game(logical_name, parent_call_id)
+                component = self.manifest.components[logical_name]
+                restarted = True
+                continue
+            except (ExecutionFailure, UserInterruption) as error:
+                if restarted:
+                    self.emit("step_reinvocation_failed", {"logical_name": logical_name,
+                              "reason": "game_restart", **_exception_fields(error)})
                 raise
-            current = self.manifest.components[logical_name]
-            return self._resume_step(logical_name, current, inputs, parent_call_id, error)
+            if restarted:
+                self.emit("step_reinvocation_returned", {"logical_name": logical_name,
+                          "component_id": component.component_id, "reason": "game_restart"})
+            return result
+
+    def _recover_game(self, step_name: str, parent_call_id: int | None) -> None:
+        """优先执行应用内置崩溃规则；每个顶层执行最多一次，不检测无窗口业务规则。"""
+        fields = {"logical_name": "builtin.game_crash", "role": "recovery_rule",
+                  "parent_call_id": parent_call_id, "step": step_name}
+
+        def recover():
+            if self._automatic_restarts >= 1:
+                self.log("本次运行已自动重启过游戏，再次退出，终止运行。", level="error")
+                raise EnvironmentFailure("game_restart_limit", "Automatic game restart limit reached.")
+            self._automatic_restarts += 1
+            self.log("已确认游戏进程退出，执行内置崩溃恢复（本次运行 1/1）。", level="warning")
+            self.trusted_action("control.restart_game", {})
+            self.log("游戏已重启并重新绑定窗口，重新调用当前 Step。")
+
+        try:
+            detected = self._invoke(
+                lambda: self._game_process_exited is not None and self._game_process_exited(),
+                {**fields, "call_id": self._allocate_call_id()}, phase="detect", event="recovery_rule",
+            )
+            if not detected:
+                raise EnvironmentFailure("game_restart_failed", "Game exit could not be confirmed.")
+            self._invoke(recover, {**fields, "call_id": self._allocate_call_id()},
+                         phase="recover", event="recovery_rule")
+        except (UserInterruption, TraceWriteError, EnvironmentFailure):
+            raise
+        except Exception as error:
+            raise EnvironmentFailure("game_restart_failed", str(error), cause=error) from error
+        self.emit("step_reinvocation_started", {"logical_name": step_name, "reason": "game_restart"})
 
     def _wait_manual_resume(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
@@ -634,7 +694,7 @@ class WorkflowExecutor:
             )
 
         self.gate.checkpoint()
-        if self._check_input is not None:
+        if self._check_input is not None and logical_name != "control.restart_game":
             try:
                 self._check_input()
             except UserInterruption as error:
@@ -669,6 +729,9 @@ class WorkflowExecutor:
         while True:
             self.gate.checkpoint()
             try:
+                if logical_name in {"control.click", "control.drag", "observe.ocr", "observe.match_asset"}:
+                    fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
+                              else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")
             except UserInterruption as error:
                 if (error.reason == "cancel" or caller.role == "recovery_rule"
@@ -680,17 +743,19 @@ class WorkflowExecutor:
                 fields = {**fields, "call_id": self._allocate_call_id()}
 
 
-    def log(self, message: str, *, screenshot: bool = False) -> None:
-        """将语义和可选截图引用写入当前正式调用的 Trace。"""
+    def log(self, message: str, *, level: str = "info", screenshot: bool = False) -> None:
+        """校验并统一日志级别，将语义和可选截图引用写入当前调用的 Trace。"""
         if type(message) is not str or type(screenshot) is not bool:
             raise ValueError("log requires a string message and a bool screenshot")
+        if type(level) is not str or level.lower() not in {"debug", "info", "warning", "error"}:
+            raise ValueError("log level must be debug, info, warning or error (case-insensitive)")
         if not self._frames or self._active_action is not None:
             raise ExecutionFailure("execution_failed", "ctx.log requires a Component invocation")
         self.gate.checkpoint()
         frame = self._frames[-1]
         fields = {"logical_name": frame.logical_name, "component_id": frame.component_id,
                   "call_id": frame.call_id, "role": frame.role, "phase": frame.phase,
-                  "manifest_id": self.manifest.manifest_id, "message": message}
+                  "manifest_id": self.manifest.manifest_id, "message": message, "level": level.lower()}
         if screenshot:
             if self._save_screenshot is None:
                 raise ExecutionFailure("execution_failed", "No current screenshot to attach")
@@ -721,9 +786,10 @@ class WorkflowExecutor:
         return self._crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
-        """运行角色校验之外，再约束原生输入只能由 control Trusted Action 发起。"""
+        """原生输入仅允许 control Action；observe Action 只可复用无输入的等待。"""
 
-        if self._active_action != "control" or self._control_input is None:
+        allowed = self._active_action == "control" or (self._active_action == "observe" and operation == "wait")
+        if not allowed or self._control_input is None:
             raise ExecutionFailure("execution_failed", "Input requires a control Trusted Action.")
         self._control_input(operation, arguments)
 
@@ -791,6 +857,8 @@ class WorkflowExecutor:
         """统一记录调用、耗时和完整异常；保留已归一错误，只有原始错误需包装。"""
 
         fields = {"manifest_id": self.manifest.manifest_id, "inputs": {}, **fields, "phase": phase}
+        if event == "trusted_action":
+            fields = {**fields, "level": "debug"}
         self.emit(f"{event}_started", fields)
         started = time.monotonic()
         self._frames.append(_Frame(

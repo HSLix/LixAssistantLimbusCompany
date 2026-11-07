@@ -21,7 +21,7 @@ ctx.action("control.click", centerxy=matches[0]["centerxy"])
 
 - `region=None` 默认全客户区；非空区域必须含整数 x/y/width/height，且完整位于截图内。无效区域报错，不自动裁边。
 - `min_score=0.0` 默认不过滤识别分数；必须是 0–1 的有限数值。
-- Action 只读取当前有效内存截图，不隐式刷新或保存；没有有效截图就报错。需要新画面或操作后再次判断时，显式调用 capture_screen。
+- Action 只读取当前有效内存截图，不隐式刷新；没有有效截图就报错。需要新画面或操作后再次判断时，显式调用 capture_screen。2026-11-06 起，共用执行器为该动作自动记录 Debug 并保存所用帧的证据，不额外截图；独立 Developer OCR 测试页不受此运行日志行为影响，见[运行日志页](user-run-logs.md)。
 - 默认模型的检测阈值与检测候选数限制仍然生效。“完整结果”表示统一 OCR 接口的全部结果，不代表能发现每个文字像素。
 - 返回 `observation`、实际 `region` 和 `items`。每项有 `text`、`score`、`box`（x/y/width/height）、四点 `polygon` 和整数 `centerxy`。所有坐标均为原客户区像素，已还原区域偏移及 SDK 缩放。矩形包住四点坐标，宽高包含端点像素。
 - 文字保留 SDK 输出，不额外纠错、合并、摘要或重新排序。识别成功且无达标文字时返回空 items；资源或推理故障明确抛错。

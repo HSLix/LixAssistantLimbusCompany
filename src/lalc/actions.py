@@ -71,8 +71,13 @@ def drag(ctx, *, x: int, y: int, end_x: int, end_y: int, seconds: float = 2.5) -
 
 
 def wait(ctx, *, seconds: float) -> None:
-    """协作等待指定时长，期间继续检查接管与取消。"""
+    """协作等待 0–60 秒，不注入输入；期间响应暂停、接管与取消，Workflow 接管恢复后重新等待完整时长。"""
     ctx.control_input("wait", seconds=seconds)
+
+
+def restart_game(ctx) -> None:
+    """从保存的 Steam 安装重启游戏：正常关闭超时强制终止，等待新窗口绑定置前；不保证登录或业务就绪，失败终止运行。"""
+    ctx.control_input("restart_game")
 
 
 def application_actions() -> dict[str, TrustedAction]:
@@ -85,5 +90,6 @@ def application_actions() -> dict[str, TrustedAction]:
         "control.click": TrustedAction(click, "control"),
         "control.key_press": TrustedAction(key_press, "control"),
         "control.drag": TrustedAction(drag, "control"),
-        "control.wait": TrustedAction(wait, "control"),
+        "observe.wait": TrustedAction(wait, "observe"),
+        "control.restart_game": TrustedAction(restart_game, "control"),
     }

@@ -1829,5 +1829,57 @@ Original pixel region: {2}</source>
       <source>Full image</source>
       <translation>全图</translation>
     </message>
+    <message>
+      <source>Logs</source>
+      <translation>日志</translation>
+    </message>
+    <message>
+      <source>Collapse details</source>
+      <translation>收起详情</translation>
+    </message>
+    <message>
+      <source>Expand details</source>
+      <translation>展开详情</translation>
+    </message>
+    <message>
+      <source>Screenshot</source>
+      <translation>截图</translation>
+    </message>
+    <message>
+      <source>Loading image…</source>
+      <translation>正在加载图片…</translation>
+    </message>
+    <message>
+      <source>Search messages and components</source>
+      <translation>搜索消息和组件名称</translation>
+    </message>
+    <message>
+      <source>Images only</source>
+      <translation>仅图片</translation>
+    </message>
+    <message>
+      <source>New logs · Go to latest</source>
+      <translation>有新日志 · 回到最新</translation>
+    </message>
+    <message>
+      <source>Log unavailable</source>
+      <translation>日志不可用</translation>
+    </message>
+    <message>
+      <source>No run logs</source>
+      <translation>暂无运行日志</translation>
+    </message>
+    <message>
+      <source>Loading logs…</source>
+      <translation>正在加载日志…</translation>
+    </message>
+    <message>
+      <source>Damaged log records skipped</source>
+      <translation>已跳过损坏的日志记录</translation>
+    </message>
+    <message>
+      <source>No matching logs</source>
+      <translation>没有符合条件的日志</translation>
+    </message>
   </context>
 </TS>

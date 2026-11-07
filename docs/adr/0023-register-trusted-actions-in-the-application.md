@@ -18,3 +18,5 @@ This supersedes per-Manifest Trusted Action registration, source-Component loadi
 
 
 2026-10-24 接口增量：control.click 支持互斥的 centerxy 整数二元组或完整 x/y，并保持现有输入权限/边界检查。ctx.log 是 Run Context 的语义记录入口，默认仅文字，可附已有内存截图，不新增 Action 注册或截图动作。点击的互斥形式由生成的 overload 表达；运行时仍按注册签名及互斥校验执行。
+
+2026-11-07 分类修订：开发者确认等待改为 `observe.wait`，开放给所有既有 observe 调用阶段，删除 `control.wait` 且不保留别名。等待仍经应用输入会话检查，不注入输入，不放宽其他 control 操作；既有暂停、接管、取消、Trace 和恢复边界保持。取舍、迁移影响及验证见[专项记录](../observe-wait-design-impact-review.md)。

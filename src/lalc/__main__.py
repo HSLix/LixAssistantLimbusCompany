@@ -176,6 +176,7 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
                     "没有 condition，恢复后将从头执行当前 Step。"
                 if not info.get("restart_step", True):
                     instruction = "恢复后继续 Workflow 的观察与调度。"
+                instruction = info.get("resume_description", instruction)
                 print(instruction, file=sys.stderr)
                 if info.get("traceback"):
                     sys.stderr.write(info["traceback"])

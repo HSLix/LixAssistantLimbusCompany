@@ -22,9 +22,9 @@ class RunContext:
     def action(self, logical_name: str, **arguments: Any) -> Any:
         return self._executor.trusted_action(logical_name, arguments)
 
-    def log(self, message: str, *, screenshot: bool = False) -> None:
-        """记录当前调用的语义日志；可附上已有截图，不重新截图。"""
-        self._executor.log(message, screenshot=screenshot)
+    def log(self, message: str, *, level: str = "info", screenshot: bool = False) -> None:
+        """记录带级别的语义日志；可附上已有截图，不重新截图。"""
+        self._executor.log(message, level=level, screenshot=screenshot)
 
     def capture_screen(self, *, save: bool = False) -> dict[str, Any]:
         """只供正在执行的 observe Trusted Action 刷新本次 Run 的截图。"""
@@ -56,6 +56,6 @@ class RunContext:
         return self._executor.crop_asset(logical_name, region, tags)
 
     def control_input(self, operation: str, **arguments: Any) -> None:
-        """仅供 control Trusted Action 进入应用拥有的输入会话。"""
+        """供 control Action 进入输入会话；observe Action 仅可调用无输入的 wait。"""
 
         self._executor.control_input(operation, arguments)

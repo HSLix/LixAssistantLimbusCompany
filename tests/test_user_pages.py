@@ -76,7 +76,7 @@ def owner(tmp_path, app, monkeypatch):
 
 def test_pages_run_real_plan_with_pure_settings_and_independent_snapshot(owner, app, monkeypatch):
     user = owner.user
-    assert user.pages.count() == 4
+    assert user.pages.count() == 5
     assert len(user.business_pages) == 2 and not user.warning_history
     assert list(user.task_rows) == ["sample.loop"]
     enabled, count = user.task_rows["sample.loop"]
@@ -156,13 +156,13 @@ def test_business_navigation_keeps_all_pages_and_uses_registered_icon(owner, app
     panel = user.navigationInterface.panel
     widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
     assert isinstance(widgets[0], NavigationItemHeader) and widgets[0].text() == "通用"
-    assert [widget.property("routeKey") for widget in widgets[1:3]] == ["dashboard", "general-settings"]
-    assert isinstance(widgets[3], NavigationSeparator)
-    assert isinstance(widgets[4], NavigationItemHeader) and widgets[4].text() == "业务设置"
-    assert [widget.property("routeKey") for widget in widgets[5:]] == [page.page_id for page in user.business_pages]
+    assert [widget.property("routeKey") for widget in widgets[1:4]] == ["dashboard", "run-logs", "general-settings"]
+    assert isinstance(widgets[4], NavigationSeparator)
+    assert isinstance(widgets[5], NavigationItemHeader) and widgets[5].text() == "业务设置"
+    assert [widget.property("routeKey") for widget in widgets[6:]] == [page.page_id for page in user.business_pages]
     assert panel.widget(user.business_pages[0].page_id)._icon == FluentIcon.EDUCATION
     assert panel.widget(user.business_pages[1].page_id)._icon == FluentIcon.APPLICATION
-    assert user.pages.count() == 4 and list(user.task_rows) == ["sample.loop"]
+    assert user.pages.count() == 5 and list(user.task_rows) == ["sample.loop"]
     for page in user.business_pages:
         user.switchTo(page.widget)
         QTest.qWait(700)

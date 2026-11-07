@@ -66,7 +66,7 @@ def test_legacy_saved_manifest_and_arbitrary_path_are_rejected_without_run(tmp_p
 @pytest.mark.parametrize('body', [
     '    ctx.call("steps.double", value=1)\n',
     '    ctx.call("plans.default", task_repetitions={}, settings={})\n',
-    '    ctx.action("control.wait", seconds=0)\n',
+    '    ctx.action("observe.wait", seconds=0)\n',
     '    ctx.action("observe.capture_screen")\n',
     '    name = "tasks.double"\n    ctx.call(name, value=1)\n',
 ])

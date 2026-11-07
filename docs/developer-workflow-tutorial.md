@@ -31,6 +31,12 @@ Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败�
 
 ## Trusted Action 类型补全
 
+`ctx.action("observe.wait", seconds=1.0)` 协作等待 0–60 秒，不注入游戏输入；所有允许 observe 的阶段都可使用，包括 Task Workflow、Subworkflow、Step condition 和 Recovery Rule detect。期间保留暂停、接管与取消检查；Workflow 遭接管后手动恢复会重新等待完整时长，不重放已完成 Step。Plan 不能调用 Action。旧 `control.wait` 已移除；已有源码需在 Candidate 中改名并重新发布，不改写已发布源码或旧 Trace。
+
+`ctx.action("control.restart_game")` 可由 Step 或 Recovery Rule 的 recover 阶段调用，无参数。应用先验证已保存的 Steam 客户端路径及唯一安装，正常关闭原游戏，5 秒未退出则只强制终止原进程并再等待 5 秒，随后启动 `LimbusCompany.exe`，最多等待 60 秒完成新窗口绑定及置前。返回只证明窗口可用，不证明完成登录、更新或进入业务页面。等待、关闭、启动、绑定、失败及取消过程均记录 Info／Warning／Error 日志，在 User Logs 默认可见；暂停和物理接管后须手动恢复，继续原重启阶段，避免重复启动。
+
+运行中确认绑定进程退出时，应用内置 `builtin.game_crash` 规则优先处理并重新调用当前 Step，保留 Task／Subworkflow 的调用栈和局部结果。每个 Run 最多自动重启一次，显式调用不占此额度；再次退出或重启失败会终止整个 Run／Plan。失焦、最小化、进程仍在但窗口消失，以及用户接管仍走人工恢复。初次运行前没有游戏窗口仍拒绝启动；Step 外不新增自动恢复边界。见[重启契约与验证](game-restart-design.md)。
+
 开发者从根包导入 `RunContext`，给 execute、condition 或 detect/recover 的 ctx 参数添加注解。IDE 使用项目的 Python 环境，即可补全 Action 名称、对应关键字参数和返回类型；其他 Context 成员（例如 `ctx.call()` 和 `ctx.game_language`）也保留类型信息。
 
 Agent 编写代码前读取 `action_contracts` 和已有 Component 签名。点击优先使用 `ctx.action("control.click", centerxy=target["centerxy"])`，复用匹配返回的中心点；也支持完整 `x/y`，两种形式不可混用。不要裁掉返回字段后重新计算中心。合并示例通过 `ctx.call("steps.actions", operation="click", x=x, y=y)` 调用，其参数以 Step 自身签名为准，不自动继承 Action 参数。以下独立动作样例展示直接坐标形式，不是完成业务检查的示例。
@@ -80,7 +86,9 @@ priority_tags 默认 None，空列表也表示全部匹配。包含任一优先 
 
 选定批次统一 NMS（默认启用、IoU 阈值 0.5），按分数降序、同分按稳定位置和哈希返回；关闭 NMS 保留所有达标结果。结果包含模板路径、完整哈希、tag、客户区坐标、分数、归一化区域和观察 ID。未知逻辑名是错误，存在但无命中的目录返回 `[]`；哈希、解码或标签文件格式错误保留原始异常，不伪装成未找到。
 
-匹配 Step 保留全部返回结果及 `centerxy` 等字段。多匹配只代表多个候选，不自动失败、不视为没有目标，也不要求全部点击；业务 Step 根据界面含义决定如何使用，有歧义时用 `ctx.log` 记录 warning 语义和依据。不能仅靠“没有匹配到关闭按钮／角标”认定已回到主界面，应确认可靠的完成标识。
+匹配 Step 保留全部返回结果及 `centerxy` 等字段。多匹配只代表多个候选，不自动失败、不视为没有目标，也不要求全部点击；业务 Step 根据界面含义决定如何使用，有歧义时用 `ctx.log(message, level="warning")` 记录歧义和依据。不能仅靠“没有匹配到关闭按钮／角标”认定已回到主界面，应确认可靠的完成标识。
+
+User GUI 的 Logs 可按 Run 查看这些日志。Trusted Action 由执行器自动记录 Debug，匹配结果、OCR、点击和拖动可关联已有截图及预览标注，无需业务代码再写重复动作日志；不会额外触发截图。Debug 默认不显示但仍落盘，完整交互见[运行日志页](user-run-logs.md)。
 
 每次匹配重新读取该逻辑名目录和标签，并固定本次候选/标签。新增图片或改标签从下一次匹配生效，包括同一 Run；不需要 publish 或 set-default，也不建立跨调用缓存。observe.crop_asset 同样可传 tags，始终重新截图，保存后立即可被后续匹配发现。
 

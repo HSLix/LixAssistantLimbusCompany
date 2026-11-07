@@ -282,8 +282,19 @@ class ApplicationService:
         observation = session.observation
         path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
         evidence_id = f"{run_id}/{observation}"
-        saved = session.save(path, evidence_id=evidence_id)
-        return {"observation": observation, "evidence_path": saved["path"], "evidence_id": evidence_id}
+        session.check()
+        if path.is_symlink() or (path.exists() and not path.is_file()):
+            raise WindowError("Screenshot evidence path is not a regular file.")
+        if not path.exists():
+            session.save(path, evidence_id=evidence_id)
+        return {"observation": observation, "evidence_path": str(path), "evidence_id": evidence_id,
+                "captured_at": session.captured_at}
+
+    def _debug_screenshot(self) -> dict[str, Any]:
+        """关联动作已有帧；无图不截图，有图则沿用正式证据写入边界。"""
+        if self._focused_session is None or self._focused_session.image is None:
+            return {"image_unavailable": True}
+        return self._save_screenshot()
 
     def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]]:
         """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
@@ -337,13 +348,17 @@ class ApplicationService:
         return {"observation": session.observation, **result}
 
     def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
-        """按需建立本次 Run 的输入监测，与观察共用唯一的前台窗口。"""
+        """输入和游戏重启共用本次 Run 的输入所有权与目标窗口。"""
 
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
         self._ensure_input_session()
         assert self._input_session is not None
-        self._input_session.execute(operation, arguments)
+        if operation == "restart_game":
+            from .game_restart import restart_game
+            restart_game(self.data_root, self._input_session)
+        else:
+            self._input_session.execute(operation, arguments)
 
     def _start_session(self) -> None:
         """正式执行前连接并聚焦游戏窗口，随后启动本次 Run 的输入监听。"""
@@ -370,6 +385,12 @@ class ApplicationService:
     def _check_input(self) -> None:
         if self._input_session is not None:
             self._input_session.check()
+
+    def _game_process_exited(self) -> bool:
+        """内置规则无窗口检测；不改变用户的暂停或接管状态。"""
+        if self._input_session is None:
+            return False
+        return self._input_session.process.exited()
 
     def _prepare_input_resume(self) -> None:
         assert self._input_session is not None
@@ -558,7 +579,9 @@ class ApplicationService:
         executor = WorkflowExecutor(
             manifest, gate, self._emit,
             capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
+            debug_screenshot=self._debug_screenshot,
             control_input=self._control_input, check_input=self._check_input,
+            game_process_exited=self._game_process_exited,
             prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,

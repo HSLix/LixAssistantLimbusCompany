@@ -419,6 +419,9 @@ class UserWindow(MainWindow):
         dash.addLayout(information, 1)
         self.navigationInterface.addItemHeader(tr('GENERAL'))
         self.addSubInterface(dashboard, FluentIcon.HOME, tr('Dashboard'))
+        from .run_log_gui import RunLogPage
+        self.log_page = RunLogPage(service.data_root, self)
+        self.addSubInterface(self.log_page, FluentIcon.DOCUMENT, tr('Logs'))
         settings = QWidget()
         settings.setObjectName("general-settings-content")
         options = QVBoxLayout(settings)

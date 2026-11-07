@@ -15,7 +15,7 @@ Status: accepted and complete. Implementation details do not reopen this contrac
 - A Task Workflow is a user-startable Python root function that completes one supported objective and owns the final task outcome.
 - A Subworkflow is a reusable Python function that combines Steps for one local flow responsibility. It cannot call another Subworkflow.
 - A Step is the smallest independently observable Python execution boundary, marked by plain `@step`. It may combine several Trusted Actions such as screenshot, template matching, click, and verification.
-- Trusted Actions are immutable shipped or human-approved low-level operations registered once as `observe` or `control`. Screenshots, template matching, OCR, and state reads are `observe`; click, keyboard input, and execution waits are `control`. They are registered separately from Steps and cannot be created or replaced by the Agent during a Top-level Execution.
+- Trusted Actions are immutable shipped or human-approved low-level operations registered once as `observe` or `control`. Screenshots, template matching, OCR, state reads, and cooperative waits are `observe`; click and keyboard input are `control`. They are registered separately from Steps and cannot be created or replaced by the Agent during a Top-level Execution.
 - A Task Workflow is not called by another Workflow. Automation Plan composes complete Task Workflows.
 - Workflow remains only the collective term for Task Workflow and Subworkflow.
 - First-version Automation Plans execute Task Workflows sequentially using one best-effort policy: each listed task receives at most one fresh call, its result never blocks later items, and parallel Task Workflow execution and concurrent Working Manifest modification are unsupported.
@@ -82,7 +82,7 @@ Recovery Rule detect                 → observe
 Recovery Rule recover                → observe or control
 ```
 
-`wait` is classified as `control` even though it does not directly mutate the game, because arbitrary Workflow waiting would bypass the Trusted Action's cancellation boundary and the Step's observation and recovery boundary. There are no component-specific action lists, user-defined permissions, allow/deny rules, independent permission objects, inheritance, or repeated per-Workflow configuration.
+`observe.wait` is an observe Trusted Action because it injects no game input. Every observe-permitted phase may call it, including Task/Subworkflow execute, Step condition and Recovery Rule detect. It retains the application input-session checks, finite 0–60 second duration, pause/takeover/cancellation handling and Trace; a Workflow takeover resumes by repeating the full wait without replaying completed Steps. Step and Recovery Rule interruptions retain their existing boundaries. `control.wait` is removed without an alias; old immutable sources must be edited in a Candidate and republished. See [the accepted change and impact review](observe-wait-design-impact-review.md). There are no component-specific action lists, user-defined permissions, allow/deny rules, independent permission objects, inheritance, or repeated per-Workflow configuration.
 
 Load-time Trusted Action checking is intentionally incomplete and only catches obvious direct violations. A private function has no architectural role of its own, so the loader neither propagates permissions through private calls nor rejects a candidate merely because it cannot prove every indirect path safe. If a restricted entrypoint reaches a disallowed action through such a function, the Trusted Action wrapper deterministically rejects the call before performing the action. This does not create a separate permission or helper model.
 
@@ -242,7 +242,7 @@ Takeover, release, pause, Resume checks, and fresh invocation belong in Trace. E
 
 Steps decide when to acquire and refresh screenshots for their business decisions. The input layer checks input ownership, Target Window identity, usable client area, and actual foreground focus before each control action; it imposes neither a screenshot age limit nor mandatory recapture after every input. Screenshots invalidated by takeover, focus loss, or window changes cannot be reused. Resume still refreshes observation before Step re-entry, while avoiding stale business decisions during ordinary execution remains the Step's responsibility.
 
-The initial control scope is `click`, `key_press`, `drag`, and `wait`. Click and drag use synthetic touch without moving the physical mouse cursor; key press uses ordinary foreground key down/up and supports at least Esc, P, and Enter. Drag supplies the long-action takeover acceptance path. Wait remains responsive to takeover, pause, and cancellation. These operations share input-ownership checks and held-input release handling; text entry, key combinations, and a separate long-press operation are outside this slice.
+The initial input-session scope is control `click`, `key_press`, `drag`, and observe `wait`. Click and drag use synthetic touch without moving the physical mouse cursor; key press uses ordinary foreground key down/up and supports at least Esc, P, and Enter. Drag supplies the long-action takeover acceptance path. Wait remains responsive to takeover, pause, and cancellation. These operations share input-ownership checks and held-input release handling; text entry, key combinations, and a separate long-press operation are outside this slice.
 
 A held-input release failure prohibits further control and terminates the Run, including later Automation Plan items. The application reports `input_release_failed` with the complete exception chain and traceback; it never claims successful release or completed safe termination, and Resume cannot reuse that session.
 
@@ -484,7 +484,7 @@ Task Workflow input/result annotations retain their directly JSON-compatible con
 Steps that return matching results include `tuple[int, int]` in their result value annotation;
 public Run Results and persisted Trace still encode tuples as arrays.
 
-`ctx.log(message: str, *, screenshot: bool = False) -> None` appends a `component_log` event to
+`ctx.log(message: str, *, level: str = "info", screenshot: bool = False) -> None` appends a `component_log` event to
 Execution Trace during a formal Component invocation, including condition/detect/recover. It includes
 current logical name, Component ID, call ID, role, phase, Manifest ID, Run ID and timestamp. Logging
 neither determines task success nor adds Ledger records. `screenshot=True` saves the existing valid
@@ -493,11 +493,28 @@ references; it never captures again. Multiple references to one observation use 
 or invalid screenshots and evidence/Trace write failures propagate through the existing failure boundary.
 Plain text logs require no screenshot. Direct entry and all tasks in a Plan share their Run Trace.
 
+2026-11-06: Trusted Action invocation events additionally carry `level=debug`; the terminal
+returned/failed/interrupted event is one visible automatic Debug log item. Click/Drag associate the
+existing pre-action frame, OCR/Match Asset the frame actually used, via optional `debug_image` evidence
+and capture time. No extra capture is triggered; no frame is marked unavailable without blocking the
+action. Evidence writes retain the existing failure boundary and reuse an already saved observation.
+Original images remain unchanged; viewers draw annotations from action inputs/results. This applies to
+all executor-backed runs and trials, not independent GUI diagnostics; `ctx.log` remains unavailable
+inside a Trusted Action. See [Run Logs](user-run-logs.md).
+
+`level` accepts only `debug`, `info`, `warning`, and `error`, case-insensitively, and is stored
+as lowercase in the event's `level` field. Omitting it records `info`. Other values (including
+non-strings, aliases such as `warn`, and strings with surrounding whitespace) raise `ValueError`
+through the existing execution failure boundary, before saving evidence or emitting a log event.
+All four levels are recorded, including `debug`; `error` does not itself fail the task. This
+metadata adds no GUI filtering or coloring and does not route logs through Python logging.
+Historical Trace records remain unchanged and may have no `level` field.
+
 ```python
 ctx.action("observe.capture_screen")
 if matches := ctx.action("observe.match_asset", asset="main/drive_unselected"):
     ctx.action("control.click", centerxy=matches[0]["centerxy"])
     ctx.log("已点击 Drive")
 else:
-    ctx.log("未找到未选中的 Drive 标识", screenshot=True)
+    ctx.log("未找到未选中的 Drive 标识", level="warning", screenshot=True)
 ```
