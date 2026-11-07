@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-07 Component 说明改为 execute docstring 优先、模块 docstring 兼容回退；Recovery Rule 保留模块说明要求。影响和验证见[专项记录](component-description-impact-review.md)。
+
 2026-11-07 输入所有权策略修订：游戏前台的客户区点击／滚轮及键盘按下才触发接管，Ctrl+Alt+P 全局暂停。失焦／最小化改为其他应用连续空闲十秒后自动聚焦；明确开始运行与手动恢复免等十秒。等待写入 Info 日志，长动作失焦先释放后重入当前 Step。设计、影响和验证见[专项记录](input-ownership-design-impact-review.md)；Windows 与真实游戏尚未验收。
 
 2026-11-07 `control.wait` 改为 `observe.wait`，所有允许 observe 的调用阶段均可使用；旧名称不保留兼容别名，旧源码需通过 Candidate 改名并重新发布。设计、影响与验证见[专项记录](observe-wait-design-impact-review.md)。

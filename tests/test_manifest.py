@@ -488,3 +488,39 @@ def test_changed_formal_source_is_rejected_before_loading(tmp_path: Path) -> Non
     assert "component_id_mismatch" in _codes(reloaded)
     assert "component_id_mismatch" in _codes(reselected)
     assert reloaded.loaded is None
+
+
+@pytest.mark.parametrize("filename", ["task.py", "sub.py", "step.py", "plan.py"])
+@pytest.mark.parametrize("has_doc", [True, False])
+def test_execute_docstring_replaces_module_docstring(tmp_path, filename, has_doc):
+    """各可执行角色允许仅入口说明，且继续拒绝完全缺少说明的源码。"""
+    import ast
+
+    candidate = _write_candidate(tmp_path / "candidate")
+    path = candidate.parent / filename
+    source = path.read_text()
+    tree = ast.parse(source)
+    lines = source.splitlines(keepends=True)
+    if has_doc:
+        execute = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "execute")
+        lines.insert(execute.body[0].lineno - 1, '    """入口说明。"""\n')
+    del lines[:tree.body[0].end_lineno]
+    path.write_text("".join(lines))
+    manager = ManifestManager(tmp_path / "formal")
+    result = manager.publish(candidate)
+    if has_doc:
+        assert result.ok, result.errors
+        assert manager.load(result.loaded.manifest_id).ok
+    else:
+        assert "component_docstring_missing" in _codes(result)
+
+
+def test_recovery_still_requires_module_docstring(tmp_path):
+    """Recovery Rule 不从额外 execute 函数取得模块说明。"""
+    sources = dict(SOURCES)
+    sources["recovery.py"] = SOURCES["recovery.py"].split("\n", 1)[1] + (
+        '\ndef execute(ctx) -> None:\n    """不能代替规则说明。"""\n    return None\n'
+    )
+    candidate = _write_candidate(tmp_path / "candidate", sources=sources)
+    result = ManifestManager(tmp_path / "formal").publish(candidate)
+    assert "module_docstring_missing" in _codes(result)

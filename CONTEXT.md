@@ -37,7 +37,7 @@ An automation path for officially supported game content that can complete witho
 _Avoid_: Basic workflow, non-AI workflow
 
 **Workflow**:
-The collective name for Python-first Task Workflows and Subworkflows. Each has a module docstring, a typed execute entrypoint, and verified immutable source; normal Python calls through Steps provide business behavior and recovery.
+The collective name for Python-first Task Workflows and Subworkflows. Each has an execute docstring (falling back to a module docstring), a typed execute entrypoint, and verified immutable source; normal Python calls through Steps provide business behavior and recovery.
 _Avoid_: Global node pool, workflow component
 
 **Task Workflow**:

@@ -439,8 +439,9 @@ class WorkflowExecutor:
             self.gate.pause()
             self.emit("paused_by_user", {
                 "logical_name": logical_name,
-                "description": (inspect.getdoc(component.module) or logical_name) if restart_step else
-                    "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。",
+                "description": (
+                    inspect.getdoc(component.module.execute) or inspect.getdoc(component.module) or logical_name
+                ) if restart_step else "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。",
                 "has_condition": callable(condition), "restart_step": restart_step,
                 "reason": reason, **diagnostic,
             })

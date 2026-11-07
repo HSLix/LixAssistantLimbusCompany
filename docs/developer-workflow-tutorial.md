@@ -111,3 +111,5 @@ Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打
 #332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/workflow/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。
 
 注册循环任务必须同时在页面声明 `TASK_ID`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[TASK_ID]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
+
+Component 说明优先读取 execute 函数的 docstring，缺失时兼容回退到模块 docstring；两者至少提供一处。Recovery Rule 没有 execute 入口，仍必须提供模块 docstring。只写 # 注释不构成 docstring。

@@ -745,8 +745,19 @@ class ManifestManager:
         errors: list[ValidationError],
     ) -> None:
         logical_name = references[0][1] if references else None
-        if not ast.get_docstring(tree, clean=False):
-            errors.append(ValidationError("module_docstring_missing", "Component needs a module docstring.", logical_name))
+        module_doc = ast.get_docstring(tree, clean=False)
+        execute = self._top_functions(tree).get("execute", [])
+        execute_doc = ast.get_docstring(execute[0], clean=False) if len(execute) == 1 else None
+        for section, name in references:
+            if section == "recovery_rules":
+                if not module_doc:
+                    errors.append(ValidationError(
+                        "module_docstring_missing", "Recovery Rule needs a module docstring.", name
+                    ))
+            elif not (execute_doc or module_doc):
+                errors.append(ValidationError(
+                    "component_docstring_missing", "Component needs an execute or module docstring.", name
+                ))
         for node in ast.walk(tree):
             if isinstance(node, ast.ExceptHandler):
                 errors.append(
