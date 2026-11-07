@@ -132,6 +132,7 @@ class FakeWindow:
 @pytest.fixture(autouse=True)
 def fast_quiet(monkeypatch):
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0.001)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
 
 def service_for(tmp_path: Path, *, condition: str = "", repetitions: int = 1):
@@ -319,17 +320,16 @@ def test_quiet_resume_waits_for_released_input_without_another_resume(tmp_path, 
     assert finished(service)["result"]["status"] == "success"
 
 
-def test_focus_loss_pauses_without_automatic_refocus_and_clears_image():
+def test_focus_loss_automatically_refocuses_before_input():
     window = FakeWindow()
-    events = []
-    focused = FocusedAutomationSession(window, lambda event, fields: events.append(event))
+    focused = FocusedAutomationSession(window, lambda event, fields: None)
     focused.capture()
-    session = InputSession(focused, window.backend, RunGate(), lambda event, fields: events.append(event))
+    session = InputSession(focused, window.backend, RunGate(), lambda event, fields: None)
     window.foreground = False
-    with pytest.raises(UserInterruption):
-        session.execute("key_press", {"key": "esc"})
-    assert focused.image is None and window.focus_calls == 1
-    assert not window.backend.events
+    session.execute("key_press", {"key": "esc"})
+    assert window.focus_calls == 2
+    assert window.backend.events == [("key", 0x1B, False), ("key", 0x1B, True)]
+    assert not session.paused
 
 
 def test_cancellation_during_held_key_releases_once():
@@ -408,7 +408,7 @@ def test_cli_release_failure_shows_full_original_stack(tmp_path, monkeypatch, ca
     assert "UserInterruption" in output.err
 
 
-def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path, monkeypatch):
+def test_gui_notice_comes_forward_once_and_keeps_traceback_in_details(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
     from PySide6.QtWidgets import QApplication
@@ -425,6 +425,7 @@ def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path,
         "reason": "检测到用户接管", "description": "请回到邮箱页面", "has_condition": False,
         "traceback": "Traceback (most recent call last):\n  original_function\nOSError: denied\n",
     })
+    state["trace"] = [{"sequence": 1, "event": "paused_by_user", **state["pause_info"]}]
     window.owns_run = True
     window.render_state(state)
     window.render_state(state)
@@ -433,7 +434,13 @@ def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path,
     assert calls == ["raise", "activate"]
     assert "请回到邮箱页面" in window.trial_dialog.pause_notice.text()
     assert "从头执行" in window.trial_dialog.pause_notice.text()
-    assert "\n  original_function\n" in window.trial_dialog.logs.toPlainText()
+    assert "original_function" not in window.trial_dialog.logs.toPlainText()
+    from PySide6.QtCore import QUrl
+    from lalc.gui import ErrorDialog
+    window.trial_dialog.show_log_details(QUrl("1"))
+    details = window.trial_dialog.findChild(ErrorDialog)
+    assert json.loads(details.details.toPlainText())["traceback"] == state["pause_info"]["traceback"]
+    details.close()
     assert not window.trial_dialog.pause.isEnabled()
     window.render_state({**state, "phase": "finished", "pause_info": None})
     window.close()
@@ -571,10 +578,11 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         service.start_plan()
     else:
         service.start("tasks.control", {})
-    state = paused(service)
-    assert state["pause_info"]["restart_step"] is False
-    assert state["result"] is None and not service._gate.stopped
-    service.resume()
+    if problem == "takeover":
+        state = paused(service)
+        assert state["pause_info"]["restart_step"] is False
+        assert state["result"] is None and not service._gate.stopped
+        service.resume()
     state = finished(service)
     if plan:
         assert state["result"]["status"] == "completed"
@@ -583,7 +591,8 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         assert state["result"]["output"] == "finished"
     assert entries == ["entered"]
     attempts = [event["call_id"] for event in state["trace"] if event["event"] == "trusted_action_started"]
-    assert len(attempts) == 2 and len(set(attempts)) == 2
+    assert len(attempts) == (2 if problem == "takeover" else 1)
+    assert len(set(attempts)) == len(attempts)
     assert window.backend.events == []
 
 

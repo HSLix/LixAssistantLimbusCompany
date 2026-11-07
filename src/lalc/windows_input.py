@@ -155,6 +155,7 @@ class WindowsInputBackend:
         self._thread_id = 0
         self._ready = threading.Event()
         self._closing = False
+        self._physical_keys: set[int] = set()
         self._configure()
         self._thread = threading.Thread(target=self._listen, name="lalc-input-monitor", daemon=True)
         self._thread.start()
@@ -178,6 +179,8 @@ class WindowsInputBackend:
             "PeekMessageW": ([ctypes.POINTER(MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT], wintypes.BOOL),
             "PostThreadMessageW": ([wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM], wintypes.BOOL),
             "GetAsyncKeyState": ([ctypes.c_int], wintypes.SHORT),
+            "WindowFromPoint": ([wintypes.POINT], wintypes.HWND),
+            "GetAncestor": ([wintypes.HWND, wintypes.UINT], wintypes.HWND),
             "MapVirtualKeyW": ([wintypes.UINT, wintypes.UINT], wintypes.UINT),
             "SendInput": ([wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int], wintypes.UINT),
             "CreateSyntheticPointerDevice": ([ctypes.c_uint32, wintypes.ULONG, ctypes.c_uint32], ctypes.c_void_p),
@@ -197,14 +200,20 @@ class WindowsInputBackend:
 
         def mouse(code, message, data):
             if code == 0:
-                event = ctypes.cast(data, ctypes.POINTER(MSLLHOOKSTRUCT)).contents
-                self.monitor.record("鼠标", bool(event.flags & 0x1))
+                try:
+                    self._mouse_event(message, ctypes.cast(data, ctypes.POINTER(MSLLHOOKSTRUCT)).contents)
+                except BaseException as error:
+                    with self.monitor.lock:
+                        self.monitor.error = error
             return self.user32.CallNextHookEx(None, code, message, data)
 
         def keyboard(code, message, data):
             if code == 0:
-                event = ctypes.cast(data, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents
-                self.monitor.record("键盘", bool(event.flags & 0x10))
+                try:
+                    self._keyboard_event(message, ctypes.cast(data, ctypes.POINTER(KBDLLHOOKSTRUCT)).contents)
+                except BaseException as error:
+                    with self.monitor.lock:
+                        self.monitor.error = error
             return self.user32.CallNextHookEx(None, code, message, data)
 
         # 回调对象必须保留到卸载，防止 ctypes 回调地址被回收。
@@ -235,6 +244,41 @@ class WindowsInputBackend:
             for hook in hooks:
                 self.user32.UnhookWindowsHookEx(hook)
             self._ready.set()
+
+    def _mouse_event(self, message: int, event: MSLLHOOKSTRUCT) -> None:
+        """仅前台游戏客户区的按钮按下和滚轮构成接管，移动仅记录活动。"""
+        if event.flags & 0x1:
+            return
+        hwnd = self.monitor.target_hwnd
+        foreground = bool(hwnd and self.user32.GetForegroundWindow() == hwnd)
+        inside = False
+        if foreground and message in {0x201, 0x204, 0x207, 0x20B, 0x20A, 0x20E}:
+            point = wintypes.POINT(event.pt.x, event.pt.y)
+            rect = wintypes.RECT()
+            if not self.user32.ScreenToClient(hwnd, ctypes.byref(point)) or not self.user32.GetClientRect(hwnd, ctypes.byref(rect)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            hit = self.user32.WindowFromPoint(event.pt)
+            inside = (self.user32.GetAncestor(hit, 2) == hwnd
+                      and rect.left <= point.x < rect.right and rect.top <= point.y < rect.bottom)
+        self.monitor.record("鼠标", False, takeover=foreground and inside,
+                            other_application=not foreground)
+
+    def _keyboard_event(self, message: int, event: KBDLLHOOKSTRUCT) -> None:
+        """物理按键按前台判定；Ctrl Alt P 不依赖游戏焦点且只暂停。"""
+        if event.flags & 0x10:
+            return
+        down = message in {0x100, 0x104}
+        if down:
+            self._physical_keys.add(event.vkCode)
+        else:
+            self._physical_keys.discard(event.vkCode)
+        hotkey = (down and event.vkCode == 0x50
+                  and bool(self._physical_keys & {0x11, 0xA2, 0xA3})
+                  and bool(self._physical_keys & {0x12, 0xA4, 0xA5}))
+        foreground = bool(self.monitor.target_hwnd and
+                          self.user32.GetForegroundWindow() == self.monitor.target_hwnd)
+        self.monitor.record("键盘", False, takeover=down and foreground and not hotkey,
+                            other_application=not foreground, pause=hotkey)
 
     def any_pressed(self) -> bool:
         """避免用户仍按住按键、修饰键或鼠标时恢复自动化。"""

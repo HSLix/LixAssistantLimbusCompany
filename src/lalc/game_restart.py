@@ -31,8 +31,6 @@ def restart_game(data_root: Path, inputs) -> None:
         while True:
             try:
                 inputs.check_ownership()
-                if inputs.backend.any_pressed():
-                    inputs._interrupt("用户仍按住输入，请释放后再恢复。", "physical_input")
                 return
             except UserInterruption as error:
                 if error.reason == "cancel":
@@ -46,25 +44,36 @@ def restart_game(data_root: Path, inputs) -> None:
                     "resume_description": "恢复后继续当前重启阶段，不会再次启动游戏。",
                 })
                 inputs.gate.checkpoint()
-                inputs.owned_generation = inputs.wait_quiet()
+                with inputs.monitor.lock:
+                    inputs.monitor.pause_requested = False
+                try:
+                    inputs.owned_generation = inputs.wait_quiet()
+                except UserInterruption as pause_error:
+                    paused_seconds += time.monotonic() - started
+                    if pause_error.reason == "cancel":
+                        raise
+                    continue
+                inputs.resume_focus = True
                 inputs.paused = False
                 paused_seconds += time.monotonic() - started
                 inputs.emit("input_resumed", {"logical_name": "control.restart_game"})
                 log("手动恢复游戏重启，继续当前阶段。")
 
     def wait_until(predicate, seconds, description):
-        started = time.monotonic() - paused_seconds
+        started = time.monotonic() - paused_seconds - (inputs.focus_wait_seconds if stage == "bind" else 0)
         log(f"等待{description}，最多 {seconds:g} 秒。", timeout_seconds=seconds)
         while True:
             checkpoint()
             if predicate():
                 log(f"等待结束：{description}。")
                 return True
-            if time.monotonic() - paused_seconds - started >= seconds:
+            if time.monotonic() - paused_seconds - started - (inputs.focus_wait_seconds if stage == "bind" else 0) >= seconds:
                 log(f"等待超时：{description}。", level="warning")
                 return False
             time.sleep(POLL_SECONDS)
 
+    previous_checkpoint = inputs.focus_checkpoint
+    inputs.focus_checkpoint = checkpoint
     try:
         checkpoint()
         log("验证已保存的 Steam 路径与 Limbus 可执行文件。")
@@ -111,11 +120,11 @@ def restart_game(data_root: Path, inputs) -> None:
         launched = platform.start_game(executable)
         log("已发起游戏启动。", process_id=launched.pid)
         stage = "bind"
-        started = time.monotonic() - paused_seconds
+        started = time.monotonic() - paused_seconds - inputs.focus_wait_seconds
 
         def bind_checkpoint():
             checkpoint()
-            if time.monotonic() - paused_seconds - started >= START_SECONDS:
+            if time.monotonic() - paused_seconds - inputs.focus_wait_seconds - started >= START_SECONDS:
                 raise TimeoutError("Timed out waiting for the new game window and foreground focus.")
 
         def bind():
@@ -160,3 +169,5 @@ def restart_game(data_root: Path, inputs) -> None:
     except Exception as error:
         log(f"游戏重启失败：{error}", level="error", **_exception_fields(error))
         raise EnvironmentFailure("game_restart_failed", str(error), cause=error) from error
+    finally:
+        inputs.focus_checkpoint = previous_checkpoint
