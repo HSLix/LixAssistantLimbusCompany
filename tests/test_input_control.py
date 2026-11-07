@@ -408,7 +408,7 @@ def test_cli_release_failure_shows_full_original_stack(tmp_path, monkeypatch, ca
     assert "UserInterruption" in output.err
 
 
-def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path, monkeypatch):
+def test_gui_notice_comes_forward_once_and_keeps_traceback_in_details(tmp_path, monkeypatch):
     monkeypatch.setenv("QT_QPA_PLATFORM", "offscreen")
     pytest.importorskip("PySide6")
     from PySide6.QtWidgets import QApplication
@@ -425,6 +425,7 @@ def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path,
         "reason": "检测到用户接管", "description": "请回到邮箱页面", "has_condition": False,
         "traceback": "Traceback (most recent call last):\n  original_function\nOSError: denied\n",
     })
+    state["trace"] = [{"sequence": 1, "event": "paused_by_user", **state["pause_info"]}]
     window.owns_run = True
     window.render_state(state)
     window.render_state(state)
@@ -433,7 +434,13 @@ def test_gui_notice_comes_forward_once_and_displays_original_traceback(tmp_path,
     assert calls == ["raise", "activate"]
     assert "请回到邮箱页面" in window.trial_dialog.pause_notice.text()
     assert "从头执行" in window.trial_dialog.pause_notice.text()
-    assert "\n  original_function\n" in window.trial_dialog.logs.toPlainText()
+    assert "original_function" not in window.trial_dialog.logs.toPlainText()
+    from PySide6.QtCore import QUrl
+    from lalc.gui import ErrorDialog
+    window.trial_dialog.show_log_details(QUrl("1"))
+    details = window.trial_dialog.findChild(ErrorDialog)
+    assert json.loads(details.details.toPlainText())["traceback"] == state["pause_info"]["traceback"]
+    details.close()
     assert not window.trial_dialog.pause.isEnabled()
     window.render_state({**state, "phase": "finished", "pause_info": None})
     window.close()

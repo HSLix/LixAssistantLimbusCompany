@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from html import escape
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -20,7 +21,7 @@ from qfluentwidgets import (
     BodyLabel as QLabel, PushButton as QPushButton, LineEdit as QLineEdit,
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
-    TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action,
+    TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser, isDarkTheme,
 )
 
 from .i18n import tr
@@ -124,6 +125,39 @@ class FeedbackDialog(QDialog):
             self.close()
 
 
+def _run_log_entry(record):
+    """仅投影业务日志与用户可见运行状态，不改写原始 Trace。"""
+    event = record.get("event")
+    if event == "component_log":
+        level = record.get("level", "info").lower()
+        return (level, str(record.get("message", ""))) if level in {"info", "warning", "error"} else None
+    states = {
+        "run_started": ("info", tr("Run started")),
+        "run_paused": ("warning", tr("Run paused")),
+        "paused_by_user": ("warning", tr("Run paused")),
+        "run_resumed": ("info", tr("Run resumed")),
+        "input_resumed": ("info", tr("Run resumed")),
+        "input_resume_requested": ("info", tr("Resume requested")),
+        "input_resume_rejected": ("warning", tr("Resume rejected")),
+        "run_cancel_requested": ("warning", tr("Stop requested")),
+        "component_failed": ("error", tr("Execution failed")),
+        "execution_anomaly": ("error", tr("Execution failed")),
+        "safe_task_termination": ("warning", tr("Task terminated")),
+        "step_reinvocation_failed": ("error", tr("Execution failed")),
+    }
+    if event == "run_finished":
+        result = record.get("result", {})
+        if result.get("status") in {"success", "completed"} and result.get("all_tasks_succeeded", True):
+            return "info", tr("Execution completed")
+        reason = result.get("failure_message") or result.get("reason", "")
+        return "error", tr("Execution interrupted") + (f": {reason}" if reason else "")
+    if event not in states:
+        return None
+    level, message = states[event]
+    reason = record.get("failure_message") or record.get("reason", "")
+    return level, message + (f": {reason}" if reason else "")
+
+
 class TrialDialog(QDialog):
     """试运行的模态日志窗口；阻止主界面操作，显示时不抢游戏焦点。"""
 
@@ -136,8 +170,11 @@ class TrialDialog(QDialog):
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         self.resize(760, 480)
         layout = QVBoxLayout(self)
-        self.logs = QPlainTextEdit()
-        self.logs.setReadOnly(True)
+        self.logs = TextBrowser()
+        self.logs.setOpenLinks(False)
+        self.logs.setOpenExternalLinks(False)
+        self.logs.anchorClicked.connect(self.show_log_details)
+        self.log_records = {}
         layout.addWidget(self.logs)
         controls = QHBoxLayout()
         self.pause = button(tr('Pause'), lambda: service.resume() if service.state["paused"] else service.pause(), controls)
@@ -151,13 +188,12 @@ class TrialDialog(QDialog):
 
     def render(self, state):
         for record in state["trace"]:
-            if record["sequence"] > self.sequence:
-                text = json.dumps(record, ensure_ascii=False)
-                if record["event"] == "component_log":
-                    text = (f"[{record['logical_name']}] [{record.get('level', 'info')}] "
-                            f"{record['message']}\n{text}")
-                self.logs.appendPlainText(text)
-                self.sequence = record["sequence"]
+            if record["sequence"] <= self.sequence:
+                continue
+            self.sequence = record["sequence"]
+            entry = _run_log_entry(record)
+            if entry is not None:
+                self.append_log(record, *entry)
         info = state.get("pause_info")
         if info:
             instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
@@ -167,7 +203,6 @@ class TrialDialog(QDialog):
             self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
             if not self._pause_notice_shown:
                 self._pause_notice_shown = True
-                self.logs.appendPlainText(info.get("traceback", ""))
                 self.parentWidget().showNormal()
                 self.parentWidget().raise_()
                 self.parentWidget().activateWindow()
@@ -176,6 +211,41 @@ class TrialDialog(QDialog):
             self.pause_notice.clear()
         self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
         self.pause.setEnabled(not state.get("resume_pending", False))
+
+    def append_log(self, record, level, message):
+        """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
+        dark = isDarkTheme()
+        background, foreground = {
+            "info": ("#17334a", "#d5eaff") if dark else ("#eaf4ff", "#163b60"),
+            "warning": ("#493919", "#ffe3a1") if dark else ("#fff4d6", "#604600"),
+            "error": ("#4b2529", "#ffd8dd") if dark else ("#fde9eb", "#861b2b"),
+        }[level]
+        sequence = record["sequence"]
+        self.log_records[sequence] = record
+        name = escape(str(record.get("logical_name") or tr("Run")))
+        body = escape(message).replace("\n", "<br>")
+        bar = self.logs.verticalScrollBar()
+        following = bar.value() >= bar.maximum() - 4
+        position = bar.value()
+        self.logs.append(
+            f'<table width="100%" cellspacing="0" cellpadding="8" bgcolor="{background}">'
+            f'<tr><td style="color:{foreground}"><b>{level.upper()} · {name}</b><br>{body}<br>'
+            f'<a style="color:{foreground}" href="{sequence}">{escape(tr("View details"))}</a>'
+            '</td></tr></table><br>'
+        )
+        bar.setValue(bar.maximum() if following else position)
+
+    def show_log_details(self, url):
+        """沿用现有详情弹窗，原始字段与异常栈仅在用户请求时显示。"""
+        record = self.log_records.get(int(url.toString()))
+        if record is None:
+            return
+        from .gui import ErrorDialog
+        _, message = _run_log_entry(record)
+        dialog = ErrorDialog(message, json.dumps(record, ensure_ascii=False, indent=2), parent=self)
+        dialog.setWindowTitle(tr("View details"))
+        dialog.details_button.setChecked(True)
+        dialog.open()
 
     def reject(self):
         """Escape 不关闭运行窗口；停止通过执行器完成。"""

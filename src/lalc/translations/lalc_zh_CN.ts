@@ -1881,5 +1881,41 @@ Original pixel region: {2}</source>
       <source>No matching logs</source>
       <translation>没有符合条件的日志</translation>
     </message>
+    <message>
+      <source>Run started</source>
+      <translation>运行开始</translation>
+    </message>
+    <message>
+      <source>Run paused</source>
+      <translation>运行已暂停</translation>
+    </message>
+    <message>
+      <source>Run resumed</source>
+      <translation>运行已恢复</translation>
+    </message>
+    <message>
+      <source>Resume requested</source>
+      <translation>正在请求恢复</translation>
+    </message>
+    <message>
+      <source>Resume rejected</source>
+      <translation>恢复被拒绝</translation>
+    </message>
+    <message>
+      <source>Stop requested</source>
+      <translation>正在请求停止</translation>
+    </message>
+    <message>
+      <source>Execution failed</source>
+      <translation>执行异常</translation>
+    </message>
+    <message>
+      <source>Task terminated</source>
+      <translation>任务已终止</translation>
+    </message>
+    <message>
+      <source>View details</source>
+      <translation>查看详情</translation>
+    </message>
   </context>
 </TS>

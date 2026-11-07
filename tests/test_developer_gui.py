@@ -49,7 +49,8 @@ def test_trial_modal_blocks_main_window_without_topmost_and_closes_on_result(gui
     assert dialog.testAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
     assert not dialog.windowFlags() & Qt.WindowType.WindowStaysOnTopHint
     assert app.activeModalWidget() is dialog
-    assert "run_started" in dialog.logs.toPlainText()
+    from lalc.i18n import tr
+    assert tr("Run started") in dialog.logs.toPlainText()
     dialog.pause.click()
     state["paused"] = True
     window.render_state(state)
@@ -81,14 +82,65 @@ def test_trial_log_starts_with_component_and_level_without_changing_trace(gui):
     dialog = TrialDialog(window.service, window)
     dialog.render(state)
     text = dialog.logs.toPlainText()
-    assert text.startswith('[steps.drive] [warning] 存在多个候选\n')
-    assert json.dumps(record, ensure_ascii=False) in text
-    assert '[tasks.drive] [info] 旧日志\n' in text
-    assert text.endswith(json.dumps(other, ensure_ascii=False))
+    assert 'WARNING · steps.drive\n存在多个候选' in text
+    assert "evidence_path" not in text
+    assert 'INFO · tasks.drive\n旧日志' in text
+    from lalc.i18n import tr
+    assert tr("Execution interrupted") in text
     dialog.render(state)
     assert dialog.logs.toPlainText() == text
     assert state == before
     dialog.deleteLater()
+
+
+def test_trial_filters_debug_and_internal_events_and_opens_full_details(gui):
+    from PySide6.QtCore import QUrl
+    from lalc.developer_gui import TrialDialog
+    from lalc.gui import ErrorDialog
+
+    _, window = gui
+    dialog = TrialDialog(window.service, window)
+    records = [
+        {"sequence": 1, "event": "target_window_checked", "hwnd": 123},
+        {"sequence": 2, "event": "component_log", "level": "debug", "message": "hidden"},
+        {"sequence": 3, "event": "trusted_action_failed", "logical_name": "observe.wait"},
+        {"sequence": 4, "event": "paused_by_user", "logical_name": "steps.wait",
+         "reason": "lost <focus> & paused", "traceback": "full original stack"},
+        {"sequence": 5, "event": "component_log", "level": "error",
+         "logical_name": "steps.wait", "message": '<a href="https://example.com">raw</a>'},
+    ]
+    state = {**window.service.state, "trace": records}
+    dialog.render(state)
+    text = dialog.logs.toPlainText()
+    assert "WARNING · steps.wait" in text
+    assert "lost <focus> & paused" in text
+    assert '<a href="https://example.com">raw</a>' in text
+    assert "hidden" not in text and "observe.wait" not in text and "hwnd" not in text
+    assert "full original stack" not in text
+    assert set(dialog.log_records) == {4, 5}
+    assert dialog.sequence == 5
+    assert "#fff4d6" in dialog.logs.toHtml() or "#493919" in dialog.logs.toHtml()
+    dialog.show_log_details(QUrl("4"))
+    details = dialog.findChild(ErrorDialog)
+    assert json.loads(details.details.toPlainText()) == records[3]
+    details.close()
+    dialog.render(state)
+    assert dialog.logs.toPlainText() == text
+    dialog.deleteLater()
+
+
+def test_run_log_state_projection():
+    from lalc.developer_gui import _run_log_entry
+
+    for event in ("run_started", "run_paused", "run_resumed", "input_resumed",
+                  "input_resume_requested", "input_resume_rejected", "run_cancel_requested",
+                  "component_failed", "execution_anomaly", "safe_task_termination",
+                  "step_reinvocation_failed"):
+        assert _run_log_entry({"event": event}) is not None
+    assert _run_log_entry({"event": "run_finished", "result": {"status": "success"}})[0] == "info"
+    assert _run_log_entry({"event": "run_finished", "result": {
+        "status": "completed", "all_tasks_succeeded": False}})[0] == "error"
+    assert _run_log_entry({"event": "component_started"}) is None
 
 
 def test_capture_preview_saves_exact_original_without_recapture(tmp_path):

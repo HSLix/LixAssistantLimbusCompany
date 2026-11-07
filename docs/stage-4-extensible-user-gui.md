@@ -1,5 +1,7 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
+2026-11-07 增量：正式运行／Agent 试运行的共用窗口改为按等级色块显示业务日志和运行状态，不展示 Debug，原始字段及异常栈按需查看；完整设计与影响审查见[运行窗口日志](running-window-logs.md)。
+
 2026-11-06 增量：General Settings 上方增加内置 Logs，按 Run 选择、倒序分块加载、全文及图片筛选、保留阅读锚点、文字折叠与截图标注。文件变化只在选择时检查，无自动刷新或刷新按钮；当前运行有新增时由用户点击提示接受并置顶。完整交互、影响和限制见[运行日志页](user-run-logs.md)。
 
 2026-10-31 Stage 5 已接受后续工作台边界，尚未实现：统一 Agent 工作台、每 Session 独立 Candidate；GUI Construct 可构建页面草稿，经同进程应用级模态窗口对照当前正式页与拟安装页，由人确认安装，预览期间锁住其他 LALC 窗口。试填配置仅内存，正式页面仍主动整应用重载生效。该增量不扩大 Stage 4 历史验收范围，见 [Stage 5 规格](stage-5-agent-workbench.md)。
