@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-07 输入所有权策略修订：游戏前台的客户区点击／滚轮及键盘按下才触发接管，Ctrl+Alt+P 全局暂停。失焦／最小化改为其他应用连续空闲十秒后自动聚焦；明确开始运行与手动恢复免等十秒。等待写入 Info 日志，长动作失焦先释放后重入当前 Step。设计、影响和验证见[专项记录](input-ownership-design-impact-review.md)；Windows 与真实游戏尚未验收。
+
 2026-11-07 `control.wait` 改为 `observe.wait`，所有允许 observe 的调用阶段均可使用；旧名称不保留兼容别名，旧源码需通过 Candidate 改名并重新发布。设计、影响与验证见[专项记录](observe-wait-design-impact-review.md)。
 
 2026-11-07 新增 `control.restart_game` 与对所有 Manifest 生效的内置游戏崩溃恢复规则：确认绑定进程退出后，在当前 Step 边界每次 Run 最多自动重启一次，保留调用者并重新绑定窗口；关闭、等待、启动及绑定过程进入用户运行日志。设计、影响和本地验证见[游戏重启记录](game-restart-design.md)、[ADR 0039](adr/0039-recover-game-process-exit-with-a-built-in-rule.md)。Windows 与真实游戏尚未验收；不代表 Stage 6 Agent 闭环实现。

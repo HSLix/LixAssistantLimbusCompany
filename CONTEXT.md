@@ -20,6 +20,10 @@ _Avoid_: Emulator, virtual device
 The supported interaction mode in which the Target Window remains restored and owns Windows foreground focus while automation is acting. Physical user takeover suspends automation until the user explicitly resumes it.
 _Avoid_: Background operation, headless operation, foreground simulation
 
+**User Activity Wait**:
+A temporary yield to physical user activity in another application before automation acquires the Target Window's foreground focus. It continues automatically when focus is available or the required idle interval has elapsed, independently of a manual pause.
+_Avoid_: User takeover, manual pause, background operation
+
 **Architecture Demo**:
 The minimum runnable evidence that established the approximate Agent interaction flow, supervision states, and reusable application skeleton before the formal Stage 2 runtime. Its hard-coded Example execution is a replaceable placeholder, not a parallel product runtime that later slices must preserve.
 _Avoid_: Disposable prototype, Stage completion, production application, compatibility runtime

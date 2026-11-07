@@ -96,6 +96,7 @@ def environment(tmp_path, monkeypatch):
     window.connect()
     inputs = InputSession(window, platform.backend, RunGate(), emit)
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
     monkeypatch.setattr(game_restart, "CLOSE_SECONDS", 0.01)
     monkeypatch.setattr(game_restart, "TERMINATE_SECONDS", 0.01)
     monkeypatch.setattr(game_restart, "START_SECONDS", 0.02)
@@ -414,3 +415,59 @@ def test_win32_process_uses_retained_handle_and_waits_for_async_termination(tmp_
     with pytest.raises(WindowError, match="not Limbus"):
         WindowsGameProcess(SimpleNamespace(kernel32=kernel, EXECUTABLE="another.exe"), 7)
     assert calls.count(("close", 101)) == 2
+
+
+def test_user_activity_wait_does_not_consume_restart_timeout(environment, monkeypatch):
+    from test_input_activity import Clock
+    from lalc import control
+    env = environment
+    clock = Clock()
+    monkeypatch.setattr(control.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(control.time, "sleep", clock.sleep)
+    env.inputs.POLL_SECONDS = 1
+    env.inputs.ACTIVITY_SECONDS = 10
+    def start():
+        env.platform.foreground = False
+        env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+    env.platform.on_start = start
+    restart_game(env.root, env.inputs)
+    assert env.platform.launches == 1
+    assert clock.now == 110
+    assert env.inputs.focus_wait_seconds == 10
+    assert any(e.get("outcome") == "idle" for e in env.events)
+
+
+def test_pause_during_focus_activity_wait_resumes_without_relaunch(environment, monkeypatch):
+    import threading
+    env = environment
+    env.inputs.ACTIVITY_SECONDS = 999
+    env.inputs.POLL_SECONDS = 0.001
+    waiting = threading.Event()
+    original_emit = env.inputs.emit
+    def emit(event, fields):
+        original_emit(event, fields)
+        if event == "component_log" and fields.get("message", "").startswith("等待其他应用"):
+            env.inputs.monitor.record("键盘", False, takeover=False, pause=True)
+        if event == "paused_by_user":
+            waiting.set()
+    monkeypatch.setattr(env.inputs, "emit", emit)
+    env.platform.on_start = lambda: setattr(env.platform, "foreground", False)
+    errors = []
+    def run():
+        try:
+            restart_game(env.root, env.inputs)
+        except BaseException as error:
+            errors.append(error)
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert waiting.wait(2)
+        env.inputs.gate.resume()
+        worker.join(2)
+        assert not worker.is_alive()
+        assert not errors
+        assert env.platform.launches == 1
+        assert any(e.get("outcome") == "manual_resume" for e in env.events)
+    finally:
+        env.inputs.gate.stop()
+        worker.join(2)

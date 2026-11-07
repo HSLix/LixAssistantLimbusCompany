@@ -82,6 +82,7 @@ class FakeWindowPlatform:
     def capture(self, hwnd: int, width: int, height: int) -> bytes:
         self.captures += 1
         if self.blur_during_capture:
+            self.blur_during_capture = False
             self.foreground = False
         return bytes([self.captures, 2, 3, 255]) * (width * height)
 
@@ -271,20 +272,19 @@ def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) ->
     assert not (tmp_path / "evidence" / str(next_run)).exists()
 
 
-def test_focus_loss_during_run_capture_never_saves_image(tmp_path: Path) -> None:
+def test_focus_loss_during_run_capture_retries_before_saving(tmp_path: Path, monkeypatch) -> None:
     manager = ManifestManager(tmp_path)
     published = manager.publish(FIXTURE / "manifest.json")
     assert published.ok, published.errors
     platform = FakeWindowPlatform()
+    from lalc.control import InputSession
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
     platform.blur_during_capture = True
     service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=platform)
     run_id = service.start("steps.capture_screen", {"save": True}, manifest_id=published.loaded.manifest_id)
-    service.wait_for(lambda current: current["paused"])
-    service.stop()
     state = service.wait_for(lambda current: current["run_id"] == run_id and current["phase"] == "finished")
-    assert state["result"]["status"] == "failure"
-    events = [item["event"] for item in state["trace"]]
-    assert "target_window_invalid" in events
-    assert "screenshot_refresh_failed" in events
-    assert "screenshot_saved" not in events
-    assert not (tmp_path / "evidence" / str(run_id)).exists()
+    assert state["result"]["status"] == "success"
+    assert platform.captures == 2
+    assert platform.focus_calls == 2
+    assert not any(item["event"] == "paused_by_user" for item in state["trace"])
+    assert (tmp_path / "evidence" / str(run_id)).exists()

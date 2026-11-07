@@ -132,6 +132,7 @@ class FakeWindow:
 @pytest.fixture(autouse=True)
 def fast_quiet(monkeypatch):
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0.001)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
 
 def service_for(tmp_path: Path, *, condition: str = "", repetitions: int = 1):
@@ -319,17 +320,16 @@ def test_quiet_resume_waits_for_released_input_without_another_resume(tmp_path, 
     assert finished(service)["result"]["status"] == "success"
 
 
-def test_focus_loss_pauses_without_automatic_refocus_and_clears_image():
+def test_focus_loss_automatically_refocuses_before_input():
     window = FakeWindow()
-    events = []
-    focused = FocusedAutomationSession(window, lambda event, fields: events.append(event))
+    focused = FocusedAutomationSession(window, lambda event, fields: None)
     focused.capture()
-    session = InputSession(focused, window.backend, RunGate(), lambda event, fields: events.append(event))
+    session = InputSession(focused, window.backend, RunGate(), lambda event, fields: None)
     window.foreground = False
-    with pytest.raises(UserInterruption):
-        session.execute("key_press", {"key": "esc"})
-    assert focused.image is None and window.focus_calls == 1
-    assert not window.backend.events
+    session.execute("key_press", {"key": "esc"})
+    assert window.focus_calls == 2
+    assert window.backend.events == [("key", 0x1B, False), ("key", 0x1B, True)]
+    assert not session.paused
 
 
 def test_cancellation_during_held_key_releases_once():
@@ -578,10 +578,11 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         service.start_plan()
     else:
         service.start("tasks.control", {})
-    state = paused(service)
-    assert state["pause_info"]["restart_step"] is False
-    assert state["result"] is None and not service._gate.stopped
-    service.resume()
+    if problem == "takeover":
+        state = paused(service)
+        assert state["pause_info"]["restart_step"] is False
+        assert state["result"] is None and not service._gate.stopped
+        service.resume()
     state = finished(service)
     if plan:
         assert state["result"]["status"] == "completed"
@@ -590,7 +591,8 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         assert state["result"]["output"] == "finished"
     assert entries == ["entered"]
     attempts = [event["call_id"] for event in state["trace"] if event["event"] == "trusted_action_started"]
-    assert len(attempts) == 2 and len(set(attempts)) == 2
+    assert len(attempts) == (2 if problem == "takeover" else 1)
+    assert len(set(attempts)) == len(attempts)
     assert window.backend.events == []
 
 

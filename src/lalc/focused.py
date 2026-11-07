@@ -28,7 +28,10 @@ class FocusedAutomationSession:
         self.image: bytes | None = None
         self.size: tuple[int, int] | None = None
         self.observation = 0
+        self.focus_revision = 0
         self.captured_at: str | None = None
+        self.before_check: Callable[[], None] | None = None
+        self.before_focus: Callable[[int], None] | None = None
 
     def connect(self, *, checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
         """唯一匹配后只恢复并置前一次，随后核验真实前台状态。"""
@@ -37,6 +40,8 @@ class FocusedAutomationSession:
         if len(matches) != 1:
             raise WindowError(f"Expected one Limbus Company window, found {len(matches)}.")
         hwnd = matches[0]
+        if self.before_focus is not None:
+            self.before_focus(hwnd)
         if checkpoint is None:
             self.platform.focus(hwnd)
         else:
@@ -53,6 +58,8 @@ class FocusedAutomationSession:
 
         if self.hwnd is None:
             return self.connect()
+        if self.before_check is not None:
+            self.before_check()
         info = self.platform.window_info(self.hwnd)
         try:
             self._require_window(info)
@@ -88,14 +95,18 @@ class FocusedAutomationSession:
         self.image = None
         self.size = None
         try:
-            info = self.check()
-            pixels = self.platform.capture(info["hwnd"], info["width"], info["height"])
-            if type(pixels) is not bytes or len(pixels) != info["width"] * info["height"] * 4:
-                raise WindowError("Captured image has an invalid size.")
-            # PrintWindow 期间也可能丢失焦点，复核后才公开本次图像。
-            current = self.check()
-            if (current["width"], current["height"]) != (info["width"], info["height"]):
-                raise WindowError("Target Window client area changed during capture.")
+            while True:
+                info = self.check()
+                revision = self.focus_revision
+                pixels = self.platform.capture(info["hwnd"], info["width"], info["height"])
+                if type(pixels) is not bytes or len(pixels) != info["width"] * info["height"] * 4:
+                    raise WindowError("Captured image has an invalid size.")
+                # PrintWindow 期间也可能丢失焦点，复核后才公开本次图像。
+                current = self.check()
+                if (current["width"], current["height"]) != (info["width"], info["height"]):
+                    raise WindowError("Target Window client area changed during capture.")
+                if self.focus_revision == revision:
+                    break
         except Exception as error:
             self.emit("screenshot_refresh_failed", {"reason": str(error)})
             raise
@@ -110,7 +121,10 @@ class FocusedAutomationSession:
     def save(self, path: Path, *, evidence_id: str | None = None) -> dict[str, Any]:
         """将当前有效截图保存为 PNG，不再调用截图 API。"""
 
+        observation = self.observation
         self.check()
+        if evidence_id is not None and observation != self.observation:
+            raise WindowError("Screenshot changed while preparing evidence; retry with the new observation.")
         if self.image is None or self.size is None:
             raise WindowError("No current screenshot to save.")
         width, height = self.size

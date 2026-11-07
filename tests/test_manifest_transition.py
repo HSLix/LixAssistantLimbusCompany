@@ -85,7 +85,7 @@ def execute(ctx) -> int:
     startups = []
     original_backend = window.create_input_backend
     def backend():
-        assert window.foreground and window.focus_calls == 1
+        assert not window.foreground and window.focus_calls == 0
         startups.append(True)
         return original_backend()
     window.create_input_backend = backend

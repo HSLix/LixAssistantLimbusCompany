@@ -3,6 +3,10 @@
   <context>
     <name>LALC</name>
     <message>
+        <source>Global shortcut: Ctrl Alt P</source>
+        <translation>全局快捷键：Ctrl Alt P</translation>
+    </message>
+    <message>
       <source>Raw output</source>
       <translation>原始输出</translation>
     </message>

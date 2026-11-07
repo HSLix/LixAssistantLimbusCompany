@@ -27,7 +27,7 @@ class UserInterruption(Exception):
 
     def __init__(
         self, message: str = "Run cancelled by user.", *,
-        reason: Literal["cancel", "pause", "takeover"] = "cancel",
+        reason: Literal["cancel", "pause", "takeover", "focus"] = "cancel",
     ) -> None:
         super().__init__(message)
         self.reason = reason
@@ -455,7 +455,13 @@ class WorkflowExecutor:
                         "role": "step", "call_id": self._allocate_call_id(),
                         "parent_call_id": parent_call_id, "inputs": _json_copy(inputs),
                     }, inputs)
-            except (UserInterruption, TraceWriteError, EnvironmentFailure):
+            except UserInterruption as pause_error:
+                if pause_error.reason == "cancel":
+                    raise
+                reason = str(pause_error)
+                diagnostic = _exception_fields(pause_error)
+                continue
+            except (TraceWriteError, EnvironmentFailure):
                 raise
             except Exception as check_error:
                 reason = str(check_error)
@@ -474,13 +480,24 @@ class WorkflowExecutor:
         while True:
             self.emit("step_interrupted", {"logical_name": logical_name,
                       "component_id": component.component_id, "outcome": "unknown", **_exception_fields(error)})
-            self._wait_manual_resume(logical_name, component, inputs, parent_call_id, error)
+            automatic = error.reason == "focus"
+            try:
+                if automatic:
+                    if self._check_input is not None:
+                        self._check_input()
+                else:
+                    self._wait_manual_resume(logical_name, component, inputs, parent_call_id, error)
+            except UserInterruption as next_error:
+                if next_error.reason == "cancel":
+                    raise
+                error = next_error
+                continue
             self.emit("step_reinvocation_started", {"logical_name": logical_name,
-                      "component_id": component.component_id, "reason": "manual_resume"})
+                      "component_id": component.component_id, "reason": "focus" if automatic else "manual_resume"})
             try:
                 try:
                     result = self._invoke_component(logical_name, component, inputs,
-                                                    parent_call_id=parent_call_id, skip_condition=True)
+                                                    parent_call_id=parent_call_id, skip_condition=not automatic)
                 except UserInterruption:
                     raise
                 except EnvironmentFailure:
@@ -495,7 +512,7 @@ class WorkflowExecutor:
                 error = next_error
                 continue
             self.emit("step_reinvocation_returned", {"logical_name": logical_name,
-                      "component_id": component.component_id, "reason": "manual_resume"})
+                      "component_id": component.component_id, "reason": "focus" if automatic else "manual_resume"})
             return result
 
     def _invoke_step_recovery(self, logical_name: str, component: LoadedComponent,

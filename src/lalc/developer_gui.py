@@ -178,6 +178,7 @@ class TrialDialog(QDialog):
         layout.addWidget(self.logs)
         controls = QHBoxLayout()
         self.pause = button(tr('Pause'), lambda: service.resume() if service.state["paused"] else service.pause(), controls)
+        controls.addWidget(QLabel(tr('Global shortcut: Ctrl Alt P')))
         self.stop = button(tr('Stop'), service.stop, controls)
         layout.addLayout(controls)
         self.sequence = 0

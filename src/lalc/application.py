@@ -254,8 +254,16 @@ class ApplicationService:
 
     def _window_platform(self) -> Any:
         return self.window_platform if self.window_platform is not None else WindowsWindowPlatform(
-            checkpoint=self._gate.checkpoint if self._gate is not None else None,
+            checkpoint=self._input_checkpoint if self._gate is not None else None,
         )
+
+    def _input_checkpoint(self) -> None:
+        """原生聚焦等待也响应全局暂停与取消，不递归检查窗口焦点。"""
+        if self._input_session is not None:
+            checkpoint = self._input_session.focus_checkpoint or self._input_session.check_ownership
+            checkpoint()
+        elif self._gate is not None:
+            self._gate.checkpoint()
 
     def _capture_screen(self, save: bool) -> dict[str, Any]:
         """Trusted Action 入口：刷新本次 Run 的内存图像并可显式保存。"""
@@ -277,18 +285,24 @@ class ApplicationService:
         session = self._focused_session
         if session is None or session.image is None:
             raise WindowError("No current screenshot to attach; capture explicitly first.")
-        run_id = self._state["run_id"]
-        assert run_id is not None
-        observation = session.observation
-        path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
-        evidence_id = f"{run_id}/{observation}"
-        session.check()
-        if path.is_symlink() or (path.exists() and not path.is_file()):
-            raise WindowError("Screenshot evidence path is not a regular file.")
-        if not path.exists():
-            session.save(path, evidence_id=evidence_id)
-        return {"observation": observation, "evidence_path": str(path), "evidence_id": evidence_id,
-                "captured_at": session.captured_at}
+        while True:
+            session.check()
+            run_id = self._state["run_id"]
+            assert run_id is not None
+            observation = session.observation
+            path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
+            evidence_id = f"{run_id}/{observation}"
+            if path.is_symlink() or (path.exists() and not path.is_file()):
+                raise WindowError("Screenshot evidence path is not a regular file.")
+            try:
+                if not path.exists():
+                    session.save(path, evidence_id=evidence_id)
+            except WindowError:
+                if session.observation != observation:
+                    continue
+                raise
+            return {"observation": observation, "evidence_path": str(path), "evidence_id": evidence_id,
+                    "captured_at": session.captured_at}
 
     def _debug_screenshot(self) -> dict[str, Any]:
         """关联动作已有帧；无图不截图，有图则沿用正式证据写入边界。"""
@@ -341,11 +355,14 @@ class ApplicationService:
                 self._gate.checkpoint()
             session.check(record=False)
 
-        checkpoint()
-        result = self.ocr_service.recognize(client_image(session.image, session.size), region=region,
-                                            min_score=min_score, checkpoint=checkpoint)
-        checkpoint()
-        return {"observation": session.observation, **result}
+        while True:
+            checkpoint()
+            observation = session.observation
+            result = self.ocr_service.recognize(client_image(session.image, session.size), region=region,
+                                                min_score=min_score, checkpoint=checkpoint)
+            checkpoint()
+            if session.observation == observation:
+                return {"observation": observation, **result}
 
     def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
         """输入和游戏重启共用本次 Run 的输入所有权与目标窗口。"""
@@ -361,13 +378,40 @@ class ApplicationService:
             self._input_session.execute(operation, arguments)
 
     def _start_session(self) -> None:
-        """正式执行前连接并聚焦游戏窗口，随后启动本次 Run 的输入监听。"""
+        """先监听再首次立即聚焦；明确开始运行豁免十秒活动等待。"""
 
         assert self._gate is not None
         self._gate.checkpoint()
         self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
-        self._focused_session.connect()
-        self._ensure_input_session()
+        platform = self._focused_session.platform
+        backend = platform.create_input_backend()
+        self._focused_session.before_focus = lambda hwnd: setattr(backend.monitor, "target_hwnd", hwnd)
+        previous_checkpoint = getattr(platform, "checkpoint", None)
+
+        startup_generation = 0
+
+        def startup_checkpoint():
+            nonlocal startup_generation
+            # 首次聚焦尚无 InputSession，仍在运行线程处理全局暂停。
+            backend.monitor.snapshot()
+            if backend.monitor.pause_requested:
+                with backend.monitor.lock:
+                    backend.monitor.pause_requested = False
+                self.pause()
+                self._gate.checkpoint()
+                startup_generation = backend.monitor.snapshot()[0]
+            self._gate.checkpoint()
+
+        platform.checkpoint = startup_checkpoint
+        try:
+            self._focused_session.connect()
+            self._input_session = InputSession(self._focused_session, backend, self._gate, self._emit)
+            self._input_session.owned_generation = startup_generation
+        except BaseException:
+            backend.close()
+            raise
+        finally:
+            platform.checkpoint = previous_checkpoint
 
     def _ensure_input_session(self) -> None:
         """每个 Run 开始时建立输入监测，生命周期由 worker 统一清理。"""
@@ -486,6 +530,8 @@ class ApplicationService:
             else:
                 self._state["paused"] = False
                 self._record_locked("run_resumed", {})
+            if self._input_session is not None:
+                self._input_session.resume_focus = True
             self._gate.resume()
 
     def stop(self) -> None:

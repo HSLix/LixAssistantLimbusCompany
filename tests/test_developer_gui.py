@@ -80,6 +80,8 @@ def test_trial_log_starts_with_component_and_level_without_changing_trace(gui):
     state = {**window.service.state, "trace": [record, legacy, other]}
     before = deepcopy(state)
     dialog = TrialDialog(window.service, window)
+    from PySide6.QtWidgets import QLabel
+    assert "全局快捷键：Ctrl Alt P" in [label.text() for label in dialog.findChildren(QLabel)]
     dialog.render(state)
     text = dialog.logs.toPlainText()
     assert 'WARNING · steps.drive\n存在多个候选' in text
