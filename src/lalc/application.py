@@ -348,13 +348,17 @@ class ApplicationService:
         return {"observation": session.observation, **result}
 
     def _control_input(self, operation: str, arguments: dict[str, Any]) -> None:
-        """按需建立本次 Run 的输入监测，与观察共用唯一的前台窗口。"""
+        """输入和游戏重启共用本次 Run 的输入所有权与目标窗口。"""
 
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
         self._ensure_input_session()
         assert self._input_session is not None
-        self._input_session.execute(operation, arguments)
+        if operation == "restart_game":
+            from .game_restart import restart_game
+            restart_game(self.data_root, self._input_session)
+        else:
+            self._input_session.execute(operation, arguments)
 
     def _start_session(self) -> None:
         """正式执行前连接并聚焦游戏窗口，随后启动本次 Run 的输入监听。"""
@@ -381,6 +385,12 @@ class ApplicationService:
     def _check_input(self) -> None:
         if self._input_session is not None:
             self._input_session.check()
+
+    def _game_process_exited(self) -> bool:
+        """内置规则无窗口检测；不改变用户的暂停或接管状态。"""
+        if self._input_session is None:
+            return False
+        return self._input_session.process.exited()
 
     def _prepare_input_resume(self) -> None:
         assert self._input_session is not None
@@ -571,6 +581,7 @@ class ApplicationService:
             capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
             debug_screenshot=self._debug_screenshot,
             control_input=self._control_input, check_input=self._check_input,
+            game_process_exited=self._game_process_exited,
             prepare_resume=self._prepare_input_resume,
             manifest_manager=self.manifest_manager,
             choose_manifest=self.recovery_choice,

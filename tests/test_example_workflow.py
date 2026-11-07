@@ -17,7 +17,7 @@ from lalc.manifest import ManifestManager
 from test_assets import Window
 
 
-def test_three_level_example_and_all_production_actions(tmp_path):
+def test_three_level_example_and_production_observation_and_input_actions(tmp_path):
     """使用生产注册动作，替换 Windows 平台和 OCR 模型，证明样例走统一应用入口。"""
     candidate = tmp_path / "candidate"
     shutil.copytree(Path(__file__).resolve().parents[1] / "example" / "workflow", candidate)
@@ -62,7 +62,9 @@ def test_three_level_example_and_all_production_actions(tmp_path):
     detections = run("steps.actions", {"operation": "match", "asset": "ui/claim", "threshold": 0.999})["result"]["output"]
     assert [(d["x"], d["y"]) for d in detections] == [(2, 1), (8, 5)]
     assert run("steps.actions", {"operation": "ocr", "min_score": 0.9})["result"]["output"]["items"][0]["text"] == "战斗开始"
-    assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == set(application_actions())
+    # 重启属于游戏生命周期，由专项测试覆盖，教学样例不重启用户游戏。
+    assert {e["logical_name"] for e in traces if e["event"] == "trusted_action_started"} == (
+        set(application_actions()) - {"control.restart_game"})
 
 
 @pytest.mark.parametrize("fail_exp", [False, True])

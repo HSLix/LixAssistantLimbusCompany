@@ -1,5 +1,7 @@
 # Stage 6（原 Stage 3.5）: Agent Runtime Step Recovery and Maintenance
 
+2026-11-07 局部新增已接受契约：[ADR 0039](adr/0039-recover-game-process-exit-with-a-built-in-rule.md) 规定应用内置游戏崩溃恢复规则，在当前 Step 内确认绑定进程退出时优先调用 `control.restart_game` 并重新调用该 Step，每个 Run 最多一次；再次退出或重启失败终止整个 Run/Plan。失焦、最小化、未知窗口故障和用户接管仍走人工处理，Step 外不新增恢复边界。此增量不接受下文尚待讨论的通用循环、预算或 Runtime Agent 提案。过程日志及验证见[实施记录](game-restart-design.md)。
+
 2026-10-30 追加边界：Runtime Repair 不提供删除工具或删除权限，包括开发 Repair 的 remove_asset；不因复用 Repair 继承其完整工具集。Recovery Rule 修改范围、生效与运行时修复接口等变更保留为 [Stage 6 TODO](#stage-6-todo-repair-integration)，本阶段不据此改写下文原有执行基线或放宽源码检查。
 
 2026-10-27 Stage 4 grill 已结束：[ADR 0032](adr/0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受 Python Plan 的身份、开发编辑和执行入口迁移，将这些基础工作提前纳入 Stage 4；下文 Python Plan TODO 的这部分不再待定。Plan 自身故障后的 Agent 评估/修复及试运行仍属 Stage 6，仅在 User Agent 启用时触发；续接/副作用/预算仍待讨论。其他 Stage 6 新提案不因本次同步自动接受。

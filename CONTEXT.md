@@ -49,12 +49,16 @@ The smallest independently observable and recoverable Python execution boundary,
 _Avoid_: Every low-level action, YAML node
 
 **Deterministic Recovery**:
-Executor-controlled handling inside an interrupted `@step` wrapper: inspect public Recovery Rules, run one uniquely matching recovery when available, then resolve the current Step through the latest Working Manifest and invoke it again. Failure produces an Execution Anomaly. It never restarts a Subworkflow or Task Workflow.
+Executor-controlled handling inside an interrupted `@step` wrapper: inspect applicable Recovery Rules, run one uniquely matching recovery when available, then resolve the current Step through the latest Working Manifest and invoke it again. Unrecovered business failure produces an Execution Anomaly; an unrecoverable environment ends execution. It never restarts a Subworkflow or Task Workflow.
 _Avoid_: Agent recovery, implicit error jump
 
 **Recovery Rule**:
-A formal immutable Python Component that identifies one cross-Workflow external interruption through a read-only `detect(ctx) -> bool` entrypoint and handles it through a `recover(ctx) -> None` entrypoint. It has a stable logical name and Component ID but no role decorator; neither entrypoint invokes another formal Component.
+A deterministic rule that identifies one cross-Workflow external interruption through a read-only detection phase and handles it through a recovery phase. Manifest-defined rules are immutable Python Components with `detect(ctx) -> bool` and `recover(ctx) -> None`, a stable logical name and Component ID but no role decorator; neither entrypoint invokes another formal Component.
 _Avoid_: Error node, task-specific branch, global exception plugin
+
+**Built-in Recovery Rule**:
+An application-owned Recovery Rule shared by every Manifest. The game-crash rule handles a confirmed exit of the bound game process before business recovery, while preserving the current Step as the only continuation boundary and respecting user takeover.
+_Avoid_: Manifest Component, Runtime Agent, automatic task replay
 
 **Trusted Action**:
 A shipped or human-approved low-level Python operation registered by the application once as `observe` or `control` and shared by all Manifests. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed permission matrix, validation, timing, and Trace; the Agent cannot create, replace, or reclassify it, and a Manifest does not select its implementation.

@@ -59,6 +59,10 @@ class FakeWindowPlatform:
         from test_input_control import FakeInput
         return FakeInput()
 
+    def open_game_process(self, pid):
+        from test_input_control import FakeProcess
+        return FakeProcess(pid)
+
     def find_windows(self) -> list[int]:
         return self.windows
 

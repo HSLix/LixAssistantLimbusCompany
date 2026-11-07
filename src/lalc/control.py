@@ -8,7 +8,7 @@ import time
 from typing import Any, Callable
 
 from .focused import FocusedAutomationSession, WindowError
-from .runtime import InputReleaseFailure, UserInterruption, RunGate, _exception_fields
+from .runtime import GameProcessExited, InputReleaseFailure, UserInterruption, RunGate, _exception_fields
 
 
 class PhysicalInputMonitor:
@@ -50,9 +50,14 @@ class InputSession:
         self.owned_generation = self.monitor.snapshot()[0]
         self.paused = False
         self.failed = False
+        try:
+            self.process = window.platform.open_game_process(window.process_id)
+        except BaseException:
+            backend.close()
+            raise
 
-    def check(self, *, record: bool = True) -> None:
-        """不抢焦点；所有权或窗口失效时丢弃图像，交给 Step 等待用户。"""
+    def check_ownership(self) -> None:
+        """无窗口过渡期仍检查输入所有权、暂停、取消和释放失败。"""
 
         if self.failed:
             raise InputReleaseFailure("Input session was disabled after release failure.")
@@ -63,6 +68,14 @@ class InputSession:
             self._interrupt(f"检测到用户{kind}输入，当前 Step 已中断。", "physical_input")
         if self.paused or self.gate.paused:
             self._interrupt("自动化已暂停，当前 Step 将在手动恢复后重新进入。", "pause")
+
+    def check(self, *, record: bool = True) -> None:
+        """先保留用户控制权；仅确认进程退出交内置规则，其余窗口异常等待人工。"""
+        self.check_ownership()
+        if self.process.exited():
+            self.window.image = None
+            self.window.size = None
+            raise GameProcessExited()
         try:
             self.window.check(record=record)
         except WindowError as error:
@@ -84,6 +97,23 @@ class InputSession:
     def prepare_resume(self) -> None:
         """安静且无按住的物理输入后只聚焦一次；失败仍需再次手动恢复。"""
 
+        generation = self.wait_quiet()
+        if self.process.exited():
+            self.owned_generation = generation
+            self.paused = False
+            self.window.image = None
+            self.window.size = None
+            raise GameProcessExited()
+        assert self.window.hwnd is not None
+        self.window.platform.focus(self.window.hwnd)
+        self.window.capture()
+        if self.monitor.snapshot()[0] != generation or self.backend.any_pressed():
+            raise WindowError("恢复检查期间仍有用户输入，请再次恢复。")
+        self.owned_generation = generation
+        self.paused = False
+
+    def wait_quiet(self) -> int:
+        """等待物理输入释放且安静，供普通恢复与重启过渡期共用。"""
         while True:
             if self.gate.stopped:
                 raise UserInterruption
@@ -92,13 +122,7 @@ class InputSession:
                 break
             time.sleep(self.POLL_SECONDS)
         self.emit("input_quiet", {"quiet_seconds": self.QUIET_SECONDS})
-        assert self.window.hwnd is not None
-        self.window.platform.focus(self.window.hwnd)
-        self.window.capture()
-        if self.monitor.snapshot()[0] != generation or self.backend.any_pressed():
-            raise WindowError("恢复检查期间仍有用户输入，请再次恢复。")
-        self.owned_generation = generation
-        self.paused = False
+        return generation
 
     def _wait(self, duration: float, update: Callable[[float], None] | None = None) -> None:
         started = time.monotonic()
@@ -197,4 +221,7 @@ class InputSession:
     def close(self) -> None:
         """运行结束时卸载只读钩子；长动作的释放已由各自 finally 完成。"""
 
-        self.backend.close()
+        try:
+            self.backend.close()
+        finally:
+            self.process.close()

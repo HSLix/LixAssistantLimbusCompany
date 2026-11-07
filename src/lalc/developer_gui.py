@@ -159,6 +159,7 @@ class TrialDialog(QDialog):
             instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
             if not info.get("restart_step", True):
                 instruction = tr('Resuming continues Workflow observation and scheduling.')
+            instruction = info.get("resume_description", instruction)
             self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
             if not self._pause_notice_shown:
                 self._pause_notice_shown = True

@@ -59,7 +59,7 @@ def test_production_action_registration_is_shared_and_not_manifest_owned(tmp_pat
     actions = application_actions()
     manager = ManifestManager(tmp_path, actions=actions)
     assert set(actions) == {"observe.capture_screen", "observe.match_asset", "observe.crop_asset", "observe.ocr",
-                            "control.click", "control.key_press", "control.drag", "control.wait"}
+                            "control.click", "control.key_press", "control.drag", "control.wait", "control.restart_game"}
     actions.clear()
     assert manager.actions["control.wait"].classification == "control"
     with pytest.raises(TypeError):

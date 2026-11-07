@@ -75,6 +75,11 @@ def wait(ctx, *, seconds: float) -> None:
     ctx.control_input("wait", seconds=seconds)
 
 
+def restart_game(ctx) -> None:
+    """从保存的 Steam 安装重启游戏：正常关闭超时强制终止，等待新窗口绑定置前；不保证登录或业务就绪，失败终止运行。"""
+    ctx.control_input("restart_game")
+
+
 def application_actions() -> dict[str, TrustedAction]:
     """构建应用唯一动作表；测试可由应用层提供替身表。"""
     return {
@@ -86,4 +91,5 @@ def application_actions() -> dict[str, TrustedAction]:
         "control.key_press": TrustedAction(key_press, "control"),
         "control.drag": TrustedAction(drag, "control"),
         "control.wait": TrustedAction(wait, "control"),
+        "control.restart_game": TrustedAction(restart_game, "control"),
     }

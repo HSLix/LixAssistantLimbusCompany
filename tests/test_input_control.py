@@ -73,6 +73,24 @@ class FakeInput:
         self.closed = True
 
 
+class FakeProcess:
+    """记录进程身份与退出状态，不访问操作系统进程。"""
+
+    def __init__(self, pid=7, path="C:/Games/LimbusCompany.exe"):
+        self.pid, self.path = pid, Path(path)
+        self.dead = False
+        self.closed = False
+
+    def exited(self):
+        return self.dead
+
+    def terminate(self):
+        self.dead = True
+
+    def close(self):
+        self.closed = True
+
+
 class FakeWindow:
     """复用应用服务的真实会话，仅替换 Windows 窗口和输入 API。"""
 
@@ -88,6 +106,9 @@ class FakeWindow:
 
     def find_windows(self):
         return [42]
+
+    def open_game_process(self, pid):
+        return FakeProcess(pid)
 
     def focus(self, hwnd):
         self.focus_calls += 1

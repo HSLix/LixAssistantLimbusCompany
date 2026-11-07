@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import struct
+import subprocess
 import time
 import zlib
 from datetime import UTC, datetime
@@ -29,14 +30,17 @@ class FocusedAutomationSession:
         self.observation = 0
         self.captured_at: str | None = None
 
-    def connect(self) -> dict[str, Any]:
+    def connect(self, *, checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
         """唯一匹配后只恢复并置前一次，随后核验真实前台状态。"""
 
         matches = self.platform.find_windows()
         if len(matches) != 1:
             raise WindowError(f"Expected one Limbus Company window, found {len(matches)}.")
         hwnd = matches[0]
-        self.platform.focus(hwnd)
+        if checkpoint is None:
+            self.platform.focus(hwnd)
+        else:
+            self.platform.focus(hwnd, checkpoint=checkpoint)
         info = self.platform.window_info(hwnd)
         self._require_window(info)
         self.hwnd = hwnd
@@ -134,8 +138,48 @@ class FocusedAutomationSession:
         return result
 
 
+class WindowsGameProcess:
+    """持有已核验游戏进程的句柄，避免 PID 重用造成误判或误杀。"""
+
+    def __init__(self, platform, pid: int) -> None:
+        self.kernel32 = platform.kernel32
+        self.pid = pid
+        self.handle = self.kernel32.OpenProcess(0x101001, False, pid)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            buffer = ctypes.create_unicode_buffer(32768)
+            length = wintypes.DWORD(len(buffer))
+            if not self.kernel32.QueryFullProcessImageNameW(self.handle, 0, buffer, ctypes.byref(length)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            self.path = Path(buffer.value)
+            if self.path.name.lower() != platform.EXECUTABLE:
+                raise WindowError("Target process is not LimbusCompany.exe.")
+        except BaseException:
+            self.close()
+            raise
+
+    def exited(self) -> bool:
+        """零等待查询原进程退出信号，API 失败不得当作退出。"""
+        result = self.kernel32.WaitForSingleObject(self.handle, 0)
+        if result not in (0, 258):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return result == 0
+
+    def terminate(self) -> None:
+        """只终止持有句柄指向的游戏；调用者仍须确认异步退出完成。"""
+        if not self.exited() and not self.kernel32.TerminateProcess(self.handle, 1):
+            if not self.exited():
+                raise ctypes.WinError(ctypes.get_last_error())
+
+    def close(self) -> None:
+        if self.handle:
+            self.kernel32.CloseHandle(self.handle)
+            self.handle = None
+
+
 class WindowsWindowPlatform:
-    """用 Win32 查找 Unity 游戏窗口并抓取客户区像素。"""
+    """用 Win32 管理目标游戏窗口、进程身份并抓取客户区像素。"""
 
     TITLE = "LimbusCompany"
     CLASS = "UnityWndClass"
@@ -183,6 +227,8 @@ class WindowsWindowPlatform:
         u.ShowWindow.restype = wintypes.BOOL
         u.SetForegroundWindow.argtypes = [wintypes.HWND]
         u.SetForegroundWindow.restype = wintypes.BOOL
+        u.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        u.PostMessageW.restype = wintypes.BOOL
         u.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
         u.ClientToScreen.restype = wintypes.BOOL
         u.ScreenToClient.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
@@ -197,6 +243,10 @@ class WindowsWindowPlatform:
         k.QueryFullProcessImageNameW.restype = wintypes.BOOL
         k.CloseHandle.argtypes = [wintypes.HANDLE]
         k.CloseHandle.restype = wintypes.BOOL
+        k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k.WaitForSingleObject.restype = wintypes.DWORD
+        k.TerminateProcess.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        k.TerminateProcess.restype = wintypes.BOOL
         g.CreateCompatibleDC.argtypes = [wintypes.HDC]
         g.CreateCompatibleDC.restype = wintypes.HDC
         g.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.c_void_p, wintypes.UINT, ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD]
@@ -311,7 +361,24 @@ class WindowsWindowPlatform:
                 raise WindowError(f"窗口尺寸未达到目标 {width} × {height}；实际 {after['width']} × {after['height']} px。")
             time.sleep(.05)
 
-    def focus(self, hwnd: int) -> None:
+    def open_game_process(self, pid: int) -> WindowsGameProcess:
+        """在输入会话生命周期内保留目标进程身份与退出信号。"""
+        return WindowsGameProcess(self, pid)
+
+    def request_close(self, hwnd: int, pid: int) -> None:
+        """复核窗口仍属于原进程，再异步发送正常关闭请求。"""
+        info = self.window_info(hwnd)
+        if not info["valid"] or info["process_id"] != pid:
+            raise WindowError("Target Window changed before close.")
+        if not self.user32.PostMessageW(hwnd, 0x0010, 0, 0):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    @staticmethod
+    def start_game(executable: Path):
+        """以固定可执行文件及其目录启动游戏，不经过 shell。"""
+        return subprocess.Popen([str(executable)], cwd=str(executable.parent))
+
+    def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None) -> None:
         """只请求置前一次，等待异步激活；不以等待时长报错，允许用户取消。"""
 
         if self.user32.GetForegroundWindow() == hwnd:
@@ -321,6 +388,8 @@ class WindowsWindowPlatform:
         self.user32.SetForegroundWindow(hwnd)
         # 跨线程激活可能尚未完成；等待真实焦点，不重复抢占前台。
         while True:
+            if checkpoint is not None:
+                checkpoint()
             if self.checkpoint is not None:
                 self.checkpoint()
             foreground_hwnd = self.user32.GetForegroundWindow()
