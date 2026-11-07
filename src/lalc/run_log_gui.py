@@ -73,16 +73,16 @@ class LogDelegate(QStyledItemDelegate):
             line = layout.createLine()
             if not line.isValid():
                 break
-            if count == 3 and not row.get("expanded"):
-                more = True
-                break
             line.setLineWidth(width)
             from PySide6.QtCore import QPointF
             line.setPosition(QPointF(0, height))
+            if count == 3 and not row.get("expanded"):
+                more = True
+                break
             height += line.height()
             count += 1
         layout.endLayout()
-        # 未布局的第四行不参与绘制，避免覆盖展开链接和图片。
+        # 溢出行必须定位到可见高度之外，否则默认位置会使它叠在首行。
         image_height = min(520, max(36, width * row["dimensions"][1] / max(1, row["dimensions"][0]))) if row["image"] else 0
         toggle = more or row.get("expanded", False)
         return layout, height, toggle, image_height
