@@ -65,6 +65,32 @@ def test_trial_modal_blocks_main_window_without_topmost_and_closes_on_result(gui
     assert window.trial_dialog is None and not dialog.isVisible()
 
 
+def test_trial_log_starts_with_component_and_level_without_changing_trace(gui):
+    from copy import deepcopy
+    from lalc.developer_gui import TrialDialog
+
+    _, window = gui
+    record = {"sequence": 1, "event": "component_log", "logical_name": "steps.drive",
+              "component_id": "sha256:" + "a" * 64, "level": "warning", "message": "存在多个候选",
+              "evidence_path": "evidence/1/1.png"}
+    legacy = {"sequence": 2, "event": "component_log", "logical_name": "tasks.drive",
+              "component_id": "sha256:" + "b" * 64, "message": "旧日志"}
+    other = {"sequence": 3, "event": "run_finished"}
+    state = {**window.service.state, "trace": [record, legacy, other]}
+    before = deepcopy(state)
+    dialog = TrialDialog(window.service, window)
+    dialog.render(state)
+    text = dialog.logs.toPlainText()
+    assert text.startswith('[steps.drive] [warning] 存在多个候选\n')
+    assert json.dumps(record, ensure_ascii=False) in text
+    assert '[tasks.drive] [info] 旧日志\n' in text
+    assert text.endswith(json.dumps(other, ensure_ascii=False))
+    dialog.render(state)
+    assert dialog.logs.toPlainText() == text
+    assert state == before
+    dialog.deleteLater()
+
+
 def test_capture_preview_saves_exact_original_without_recapture(tmp_path):
     from lalc.assets import AssetLibrary
     host, _ = host_for(tmp_path)
