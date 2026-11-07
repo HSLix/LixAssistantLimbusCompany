@@ -231,3 +231,43 @@ def test_collapsing_partially_visible_long_entry_keeps_entry_visible(log_page):
     page.toggle_details(page.model.index(0))
     app.processEvents()
     assert page.anchor()[0] == row['offset']
+
+
+@pytest.mark.parametrize('text', [
+    'VISIBLE ONE\nVISIBLE TWO\nVISIBLE THREE\nHIDDEN FOUR\nHIDDEN FIVE',
+    'VISIBLE ' * 100,
+], ids=['explicit-newlines', 'automatic-wrap'])
+def test_collapsed_paint_matches_first_three_expanded_lines(log_page, text):
+    """比较真实绘制像素，隐藏内容不得重叠到前三行；覆盖换行与自动折行。"""
+    from math import ceil
+    from PySide6.QtCore import QRect, Qt
+    from PySide6.QtGui import QImage, QPainter
+    from PySide6.QtWidgets import QStyleOptionViewItem
+    app, page, path, until = log_page
+    row = {**page.model.rows[0], 'text': text, 'image': None, 'expanded': True}
+    page.model.replace([row])
+    option = QStyleOptionViewItem()
+    option.initFrom(page.view)
+    option.font = page.font()
+
+    def painted():
+        _, height, _, _ = page.delegate.geometry(row, 500, option.font)
+        option.rect = QRect(0, 0, 500, ceil(height) + 100)
+        image = QImage(option.rect.size(), QImage.Format.Format_RGB32)
+        image.fill(Qt.GlobalColor.white)
+        painter = QPainter(image)
+        page.delegate.paint(painter, option, page.model.index(0))
+        painter.end()
+        return image
+
+    expanded = painted()
+    page.toggle_details(page.model.index(0))
+    _, visible_height, toggle, _ = page.delegate.geometry(row, 500, option.font)
+    assert toggle and not row['expanded']
+    body = QRect(12, 32, 476, ceil(visible_height))
+    assert painted().copy(body) == expanded.copy(body)
+    page.toggle_details(page.model.index(0))
+    assert row['expanded']
+    assert painted() == expanded
+    page.toggle_details(page.model.index(0))
+    assert painted().copy(body) == expanded.copy(body)

@@ -152,7 +152,11 @@ class TrialDialog(QDialog):
     def render(self, state):
         for record in state["trace"]:
             if record["sequence"] > self.sequence:
-                self.logs.appendPlainText(json.dumps(record, ensure_ascii=False))
+                text = json.dumps(record, ensure_ascii=False)
+                if record["event"] == "component_log":
+                    text = (f"[{record['logical_name']}] [{record.get('level', 'info')}] "
+                            f"{record['message']}\n{text}")
+                self.logs.appendPlainText(text)
                 self.sequence = record["sequence"]
         info = state.get("pause_info")
         if info:
