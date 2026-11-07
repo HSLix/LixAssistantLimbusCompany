@@ -1,6 +1,7 @@
 """User GUI 运行日志页：固定读取快照、虚拟列表、按视口解码与稳定标注。"""
 
 from collections import OrderedDict
+from datetime import datetime
 from threading import Event
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable, QRectF,
@@ -8,12 +9,33 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable,
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QStyledItemDelegate, QVBoxLayout, QWidget)
-from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton
+from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, isDarkTheme
 
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
 from .run_logs import read_page, snapshot
+
+
+def log_colors(level: str) -> tuple[str, str]:
+    """运行窗口和历史日志共用等级色块，保持深浅主题文字可读。"""
+    dark = isDarkTheme()
+    return {
+        "info": ("#17334a", "#d5eaff") if dark else ("#eaf4ff", "#163b60"),
+        "warning": ("#493919", "#ffe3a1") if dark else ("#fff4d6", "#604600"),
+        "error": ("#4b2529", "#ffd8dd") if dark else ("#fde9eb", "#861b2b"),
+        "debug": ("#303030", "#dedede") if dark else ("#f0f0f0", "#404040"),
+    }[level]
+
+
+def log_time(value: str | None) -> str:
+    """将事件时间按本机时区显示到秒；旧记录缺失或损坏时不虚构时间。"""
+    if not isinstance(value, str):
+        return "—"
+    try:
+        return datetime.fromisoformat(value).astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    except (ValueError, OverflowError):
+        return "—"
 
 
 class _Signals(QObject):
@@ -97,10 +119,12 @@ class LogDelegate(QStyledItemDelegate):
         rect = option.rect.adjusted(12, 8, -12, -8)
         painter.save()
         painter.setClipRect(option.rect)
-        painter.setPen(option.palette.text().color())
+        background, foreground = log_colors(row["level"])
+        painter.fillRect(option.rect.adjusted(4, 4, -4, -4), QColor(background))
+        painter.setPen(QColor(foreground))
         record = row["record"]
         painter.drawText(rect.x(), rect.y() + 14,
-                         f"{record.get('recorded_at', '')}  [{row['level'].upper()}]  {record.get('logical_name', '')}")
+                         f"{log_time(record.get('recorded_at'))}  [{row['level'].upper()}]  {record.get('logical_name', '')}")
         layout, height, toggle, image_height = self.geometry(row, option.rect.width(), option.font)
         painter.save()
         painter.setClipRect(QRectF(rect.x(), rect.y() + 24, rect.width(), height))
@@ -113,7 +137,7 @@ class LogDelegate(QStyledItemDelegate):
             painter.drawText(rect.x(), int(y + 18), tr("Collapse details") if row.get("expanded") else tr("Expand details"))
             y += 26
         if row["image"]:
-            painter.setPen(option.palette.text().color())
+            painter.setPen(QColor(foreground))
             painter.drawText(rect.x(), int(y + 16), tr("Screenshot") + ": " + str(record.get("debug_image", record).get("captured_at") or "—"))
             target = QRectF(rect.x(), y + 24, rect.width(), image_height)
             image = self.page.images.get(str(row["image"]), "pending")

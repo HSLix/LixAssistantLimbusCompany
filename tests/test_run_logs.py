@@ -271,3 +271,40 @@ def test_collapsed_paint_matches_first_three_expanded_lines(log_page, text):
     assert painted() == expanded
     page.toggle_details(page.model.index(0))
     assert painted().copy(body) == expanded.copy(body)
+
+
+@pytest.mark.parametrize('value,expected', [
+    ('2026-11-07T12:34:56.789', '2026-11-07 12:34:56'),
+    (None, '—'), ('invalid', '—'),
+])
+def test_log_time_displays_seconds_without_inventing_missing_time(value, expected):
+    from lalc.run_log_gui import log_time
+    assert log_time(value) == expected
+
+
+@pytest.mark.parametrize('dark', [False, True])
+@pytest.mark.parametrize('level', ['info', 'warning', 'error', 'debug'])
+def test_log_delegate_paints_shared_level_background(log_page, monkeypatch, dark, level):
+    """检查实际绘制的色块像素；两种主题的四个等级均复用运行窗口配色。"""
+    from PySide6.QtCore import QRect
+    from PySide6.QtGui import QColor, QImage, QPainter
+    from PySide6.QtWidgets import QStyleOptionViewItem
+    import lalc.run_log_gui as gui
+    app, page, path, until = log_page
+    monkeypatch.setattr(gui, 'isDarkTheme', lambda: dark)
+    row = {**page.model.rows[0], 'level': level, 'image': None}
+    page.model.replace([row])
+    option = QStyleOptionViewItem()
+    option.initFrom(page.view)
+    option.font = page.font()
+    option.rect = QRect(0, 0, 800, 160)
+    image = QImage(option.rect.size(), QImage.Format.Format_RGB32)
+    image.fill(QColor('white'))
+    painter = QPainter(image)
+    try:
+        page.delegate.paint(painter, option, page.model.index(0))
+    finally:
+        painter.end()
+    background, foreground = gui.log_colors(level)
+    assert image.pixelColor(6, 6) == QColor(background)
+    assert QColor(background) != QColor(foreground)

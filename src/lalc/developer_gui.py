@@ -21,10 +21,11 @@ from qfluentwidgets import (
     BodyLabel as QLabel, PushButton as QPushButton, LineEdit as QLineEdit,
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
-    TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser, isDarkTheme,
+    TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
 )
 
 from .i18n import tr
+from .run_log_gui import log_colors, log_time
 
 from .repair_chat import RepairChat, chat_title, raw_output_text
 from .chat_input import ChatInput
@@ -215,22 +216,18 @@ class TrialDialog(QDialog):
 
     def append_log(self, record, level, message):
         """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
-        dark = isDarkTheme()
-        background, foreground = {
-            "info": ("#17334a", "#d5eaff") if dark else ("#eaf4ff", "#163b60"),
-            "warning": ("#493919", "#ffe3a1") if dark else ("#fff4d6", "#604600"),
-            "error": ("#4b2529", "#ffd8dd") if dark else ("#fde9eb", "#861b2b"),
-        }[level]
+        background, foreground = log_colors(level)
         sequence = record["sequence"]
         self.log_records[sequence] = record
         name = escape(str(record.get("logical_name") or tr("Run")))
+        timestamp = escape(log_time(record.get("recorded_at")))
         body = escape(message).replace("\n", "<br>")
         bar = self.logs.verticalScrollBar()
         following = bar.value() >= bar.maximum() - 4
         position = bar.value()
         self.logs.append(
             f'<table width="100%" cellspacing="0" cellpadding="8" bgcolor="{background}">'
-            f'<tr><td style="color:{foreground}"><b>{level.upper()} · {name}</b><br>{body}<br>'
+            f'<tr><td style="color:{foreground}"><b>{level.upper()} · {name}</b> · {timestamp}<br>{body}<br>'
             f'<a style="color:{foreground}" href="{sequence}">{escape(tr("View details"))}</a>'
             '</td></tr></table><br>'
         )
