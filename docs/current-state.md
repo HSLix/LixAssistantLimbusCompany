@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-08 本地 GUI 增量：工作流版本卡片、固定发布时间与说明、历史选择和任务次数限宽，见[接受设计、影响审查与验证](gui-workflow-versions.md)。未完成 Windows 原生验收。
+
 2026-11-07 Component 说明改为 execute docstring 优先、模块 docstring 兼容回退；Recovery Rule 保留模块说明要求。影响和验证见[专项记录](component-description-impact-review.md)。
 
 2026-11-07 输入所有权策略修订：游戏前台的客户区点击／滚轮及键盘按下才触发接管，Ctrl+Alt+P 全局暂停。失焦／最小化改为其他应用连续空闲十秒后自动聚焦；明确开始运行与手动恢复免等十秒。等待写入 Info 日志，长动作失焦先释放后重入当前 Step。设计、影响和验证见[专项记录](input-ownership-design-impact-review.md)；Windows 与真实游戏尚未验收。

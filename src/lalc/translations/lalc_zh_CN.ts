@@ -216,17 +216,17 @@ You can copy the original error information and report it to the developer.</sou
     <message>
       <location filename="../gui.py" line="591" />
       <source>Choose Default Manifest</source>
-      <translation>选择 Default Manifest</translation>
+      <translation>选择 Default 工作流版本</translation>
     </message>
     <message>
       <location filename="../gui.py" line="413" />
       <source>Choose Manifest</source>
-      <translation>选择 Manifest</translation>
+      <translation>选择 工作流版本</translation>
     </message>
     <message>
       <location filename="../gui.py" line="694" />
       <source>Choose a Manifest first.</source>
-      <translation>请先选择 Manifest。</translation>
+      <translation>请先选择 工作流版本。</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="848" />
@@ -363,7 +363,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="123" />
       <source>Developer Selected Manifest (does not change Default or Candidate source)</source>
-      <translation>Developer Selected Manifest（不修改 Default 或 Candidate 来源）</translation>
+      <translation>Developer Selected 工作流版本（不修改 Default 或 Candidate 来源）</translation>
     </message>
     <message>
       <location filename="../gui.py" line="516" />
@@ -564,12 +564,12 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="408" />
       <source>Manifest</source>
-      <translation>Manifest</translation>
+      <translation>工作流版本</translation>
     </message>
     <message>
       <location filename="../gui.py" line="657" />
       <source>Manifest failed to load</source>
-      <translation>Manifest 加载失败</translation>
+      <translation>工作流版本 加载失败</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="514" />
@@ -610,7 +610,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="755" />
       <source>No Manifest selected</source>
-      <translation>未选择 Manifest</translation>
+      <translation>未选择 工作流版本</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="950" />
@@ -635,7 +635,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="695" />
       <source>No tasks match the current Manifest and loaded settings pages.</source>
-      <translation>当前 Manifest 与已加载的配置页没有匹配任务。</translation>
+      <translation>当前 工作流版本 与已加载的配置页没有匹配任务。</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="542" />
@@ -735,7 +735,7 @@ Log: {1}</source>
     <message>
       <location filename="../developer_gui.py" line="967" />
       <source>Published new Manifest: </source>
-      <translation>已发布新 Manifest：</translation>
+      <translation>已发布新 工作流版本：</translation>
     </message>
     <message>
       <location filename="../i18n.py" line="81" />
@@ -756,12 +756,12 @@ Log: {1}</source>
       <location filename="../gui.py" line="128" />
       <location filename="../developer_gui.py" line="748" />
       <source>Refresh Manifests</source>
-      <translation>刷新 Manifest</translation>
+      <translation>刷新 工作流版本</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="818" />
       <source>Refresh and select a base Manifest first.</source>
-      <translation>请先刷新并选择基础 Manifest。</translation>
+      <translation>请先刷新并选择基础 工作流版本。</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="281" />
@@ -919,7 +919,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="462" />
       <source>Start Plan</source>
-      <translation>开始运行 Plan</translation>
+      <translation>开始运行</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="667" />
@@ -1143,7 +1143,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Source Manifest</source>
-      <translation>来源 Manifest</translation>
+      <translation>来源 工作流版本</translation>
     </message>
     <message>
       <source>Send the first message to start and fix mode and source.</source>
@@ -1151,11 +1151,11 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Attach Manifests</source>
-      <translation>附加 Manifest</translation>
+      <translation>附加 工作流版本</translation>
     </message>
     <message>
       <source>Manifest references: {0}</source>
-      <translation>参考 Manifest：{0}</translation>
+      <translation>参考 工作流版本：{0}</translation>
     </message>
     <message>
       <source>Blank (Construct only)</source>
@@ -1163,7 +1163,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Select a published Manifest</source>
-      <translation>选择已发布 Manifest</translation>
+      <translation>选择已发布 工作流版本</translation>
     </message>
     <message>
       <source>Invalid Session directory</source>
@@ -1179,7 +1179,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Repair requires a published source Manifest.</source>
-      <translation>Repair 必须选择已发布来源 Manifest。</translation>
+      <translation>Repair 必须选择已发布来源 工作流版本。</translation>
     </message>
     <message>
       <source>Agent Workbench</source>
@@ -1243,7 +1243,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>{0} images · {1} Manifest references</source>
-      <translation>{0} 张图片 · {1} 个 Manifest 参考</translation>
+      <translation>{0} 张图片 · {1} 个 工作流版本 参考</translation>
     </message>
     <message>
       <source>Round complete</source>
@@ -1423,7 +1423,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Import this Manifest</source>
-      <translation>导入此 Manifest</translation>
+      <translation>导入此 工作流版本</translation>
     </message>
     <message>
       <source>Select an Asset to inspect conflicts.</source>
@@ -1587,11 +1587,11 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Manifest UUID {0} is already occupied and cannot be overwritten. New UUID {1} has been allocated for this import. Continue?</source>
-      <translation>要导入的 Manifest UUID {0} 已被占用，不可直接覆盖。已为本次导入分配新 UUID {1}，是否继续？</translation>
+      <translation>要导入的 工作流版本 UUID {0} 已被占用，不可直接覆盖。已为本次导入分配新 UUID {1}，是否继续？</translation>
     </message>
     <message>
       <source>Manifest UUID already used</source>
-      <translation>Manifest UUID 已被占用</translation>
+      <translation>工作流版本 UUID 已被占用</translation>
     </message>
     <message>
       <source>Completed: {0}</source>
@@ -1920,6 +1920,26 @@ Original pixel region: {2}</source>
     <message>
       <source>View details</source>
       <translation>查看详情</translation>
+    </message>
+    <message>
+      <source>Version history…</source>
+      <translation>版本历史…</translation>
+    </message>
+    <message>
+      <source>Use latest version</source>
+      <translation>设为最新版本</translation>
+    </message>
+    <message>
+      <source>Current version</source>
+      <translation>当前版本</translation>
+    </message>
+    <message>
+      <source>New version available</source>
+      <translation>有新版本</translation>
+    </message>
+    <message>
+      <source>No additional information</source>
+      <translation>无附加信息</translation>
     </message>
   </context>
 </TS>

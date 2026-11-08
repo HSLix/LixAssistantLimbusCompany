@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
@@ -345,10 +346,22 @@ class UserWindow(MainWindow):
         self.manifest_label = QLabel()
         self.manifest_label.setMinimumWidth(0)
         manifest_row.addWidget(self.manifest_label, 1)
-        self.manifest_button = QPushButton(tr('Choose Manifest'))
+        self.manifest_button = QPushButton(tr('Version history…'))
         self.manifest_button.clicked.connect(self.choose_manifest)
         manifest_row.addWidget(self.manifest_button)
+        self.manifest_label.setTextFormat(Qt.TextFormat.PlainText)
+        self.manifest_label.setWordWrap(True)
         left.addLayout(manifest_row)
+        self.latest_card = CardWidget()
+        latest_layout = QVBoxLayout(self.latest_card)
+        self.latest_label = QLabel()
+        self.latest_label.setTextFormat(Qt.TextFormat.PlainText)
+        self.latest_label.setWordWrap(True)
+        latest_layout.addWidget(self.latest_label)
+        self.latest_button = QPushButton(tr('Use latest version'))
+        self.latest_button.clicked.connect(lambda: self._interact(self.select_latest_manifest))
+        latest_layout.addWidget(self.latest_button)
+        left.addWidget(self.latest_card)
         from .user_pages import UserSettings, discover_pages
         if coordinator.page_state is None:
             store = UserSettings(service.data_root)
@@ -530,6 +543,10 @@ class UserWindow(MainWindow):
         for error in self.page_errors:
             self.add_warning(error)
             self.notifications.notify(tr('External page failed to load'), self.clean_details(error))
+        self.manifest_timer = QTimer(self)
+        self.manifest_timer.setInterval(2000)
+        self.manifest_timer.timeout.connect(self.refresh_manifest_card)
+        self.manifest_timer.start()
         self.render_state(service.state)
 
     def show_agent_settings(self):
@@ -570,6 +587,33 @@ class UserWindow(MainWindow):
         QMessageBox.information(self, tr('Developer GUI'), tr('This interface is for developer observation, Candidate editing and trials.'))
         self.coordinator.open_window(True)
 
+    @staticmethod
+    def manifest_summary(item):
+        """展示完整身份、本地秒级时间与纯文本说明。"""
+        stamp = datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M:%S")
+        return f'{item["manifest_id"]}\n{stamp}\n{item["AdditionalMessage"].strip() or tr("No additional information")}'
+
+    def refresh_manifest_card(self):
+        """轮询留存版本，只提示而不自动修改默认版本。"""
+        versions = self.host.manager.list_manifests()
+        identity = self.host.manager.default_manifest_id()
+        current = next((item for item in versions if item["manifest_id"] == identity), None)
+        self.manifest_label.setText(tr('Current version') + "\n" + self.manifest_summary(current)
+                                    if current else identity or tr('Not selected'))
+        self.manifest_label.setToolTip(identity or tr('No Manifest selected'))
+        self.latest_manifest_id = versions[0]["manifest_id"] if versions else None
+        self.latest_card.setVisible(bool(versions and self.latest_manifest_id != identity))
+        if versions:
+            self.latest_label.setText(tr('New version available') + "\n" + self.manifest_summary(versions[0]))
+
+    def select_latest_manifest(self):
+        """显式选择卡片展示的版本，仅影响后续运行。"""
+        if self.latest_manifest_id:
+            result = self.host.manager.set_default(self.latest_manifest_id)
+            if not result.ok:
+                raise ValueError("; ".join(error.message for error in result.errors))
+            self.render_state(self.service.state)
+
     def choose_manifest(self):
         """每次打开重新枚举；选择只改变后续 Run 的 Default。"""
         dialog = QDialog(self)
@@ -577,7 +621,7 @@ class UserWindow(MainWindow):
         layout = QVBoxLayout(dialog)
         choices = QComboBox()
         for item in self.host.manager.list_manifests():
-            choices.addItem(item["manifest_id"], userData=item["manifest_id"])
+            choices.addItem(self.manifest_summary(item), userData=item["manifest_id"])
         choices.setCurrentIndex(max(0, choices.findData(self.host.manager.default_manifest_id())))
         layout.addWidget(choices)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -666,7 +710,8 @@ class UserWindow(MainWindow):
             count.setValue(saved["count"])
             jump = QPushButton(tr('Settings'))
             jump.clicked.connect(lambda _, widget=page.widget: self.switchTo(widget))
-            layout.addWidget(enabled)
+            count.setFixedWidth(count.fontMetrics().horizontalAdvance("000000") + 48)
+            layout.addWidget(enabled, 1)
             layout.addWidget(count)
             layout.addWidget(jump)
             self.task_rows[page.task_id] = (enabled, count)
@@ -742,8 +787,7 @@ class UserWindow(MainWindow):
         if hasattr(self, "reload_button"):
             self.reload_button.setEnabled(not busy and not self.jobs and not self.coordinator.reloading)
         identity = state["default_manifest_id"]
-        self.manifest_label.setText("Default · " + identity[:8] + "…" if identity else tr('Not selected'))
-        self.manifest_label.setToolTip(identity or tr('No Manifest selected'))
+        self.refresh_manifest_card()
         from .agent_settings import settings_document, load_settings, configuration_complete
         enabled = settings_document(self.service.data_root)["user_enabled"]
         complete = configuration_complete(load_settings(self.service.data_root, side="user", for_use=False),

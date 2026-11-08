@@ -4,8 +4,9 @@ import hashlib
 import json
 import re
 import uuid
+from datetime import datetime
 
-from .manifest import SAVED_TOP_LEVEL_FIELDS, SCHEMA_VERSION, SECTIONS
+from .manifest import OPTIONAL_FIELDS, SAVED_TOP_LEVEL_FIELDS, SCHEMA_VERSION, SECTIONS
 
 
 class ManifestReference:
@@ -31,10 +32,15 @@ class ManifestReference:
         if not isinstance(manifest_id, str) or str(uuid.UUID(manifest_id)) != manifest_id:
             raise ValueError("Manifest ID 必须是标准 UUID。")
         value = json.loads(self._file(self.manager.manifests_dir / f"{manifest_id}.json"))
-        if (not isinstance(value, dict) or set(value) != SAVED_TOP_LEVEL_FIELDS
+        if (not isinstance(value, dict) or not SAVED_TOP_LEVEL_FIELDS <= set(value) <= SAVED_TOP_LEVEL_FIELDS | OPTIONAL_FIELDS
                 or type(value.get("schema_version")) is not int or value["schema_version"] != SCHEMA_VERSION
                 or value.get("manifest_id") != manifest_id):
             raise ValueError("Manifest 结构或身份校验失败。")
+        if not isinstance(value.get("AdditionalMessage", ""), str):
+            raise ValueError("AdditionalMessage 必须是字符串。")
+        if "published_at" in value:
+            if not isinstance(value["published_at"], str) or datetime.fromisoformat(value["published_at"]).tzinfo is None:
+                raise ValueError("published_at 必须是带时区的时间。")
         for section in SECTIONS:
             if not isinstance(value[section], dict):
                 raise ValueError("Manifest 分区无效。")

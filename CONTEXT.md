@@ -292,7 +292,7 @@ _Avoid_: Component Revision, mutable component
 The stable dotted lookup key used by a Manifest, such as `steps.enter_stage`, to map one logical capability slot to one immutable Component ID. It is not a version object or a field embedded in Component source. Different retained Manifest IDs may point the same name to different Component IDs without a per-Component version chain.
 _Avoid_: Component ID, version chain
 
-**Component Manifest**:
+**Component Manifest** (中文界面：工作流版本):
 The saved version unit for formal Components: a validated complete document protected from Agent modification identified by a UUID whose executable mappings resolve stable logical names to exact Component IDs. Assets are resolved independently through the shared Asset Library, and Trusted Actions are registered by the application. Every Manifest used for an execution attempt is saved by Manifest ID; reusing that Manifest records another attempt in Trace under the same ID. Any saved Manifest, including an intermediate attempt, may be explicitly selected for a later execution regardless of its permanent approval status. Intermediate attempts are not separately offered for post-execution approval; the current Working Manifest is offered only when its ID has not already received permanent approval. Choosing whether to set an approved current Working Manifest as Default is a separate decision.
 _Avoid_: Approval history, mutable component list
 

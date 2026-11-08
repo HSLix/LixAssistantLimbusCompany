@@ -333,7 +333,9 @@ def test_ocr_retries_if_focus_wait_refreshes_source_image(tmp_path, monkeypatch)
         if len(calls) == 1:
             window.foreground = False
         return {"items": [len(calls)]}
-    monkeypatch.setattr(service.ocr_service, "recognize", recognize)
+    from types import SimpleNamespace
+    # 使用独立替身，避免在共享实例上恢复绑定方法后遮蔽其他测试的类替身。
+    service.ocr_service = SimpleNamespace(recognize=recognize)
     try:
         assert service._ocr() == {"observation": 2, "items": [2]}
         assert len(calls) == 2

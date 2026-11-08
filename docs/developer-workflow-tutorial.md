@@ -113,3 +113,11 @@ Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打
 注册循环任务必须同时在页面声明 `TASK_ID`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[TASK_ID]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
 
 Component 说明优先读取 execute 函数的 docstring，缺失时兼容回退到模块 docstring；两者至少提供一处。Recovery Rule 没有 execute 入口，仍必须提供模块 docstring。只写 # 注释不构成 docstring。
+
+## 工作流版本说明与时间
+
+候选 `manifest.json` 可填写字符串字段 `AdditionalMessage`，缺省为空；发布时保存说明并生成带时区的 `published_at`（ISO 8601，保留亚秒用于排序，界面显示到秒），已发布文件保持不可变。新候选从版本初始化时保留说明，重新发布生成新的发布时间。旧版本缺少这些字段仍可读取。
+
+UserGUI 显示完整 UUID、本地时间（到秒）和说明；空白说明显示“无附加信息”。旧版本的时间回退文件修改时间；导入导出保留已记录的发布时间和说明。最新版本按该时间排序，范围包含所有本地留存版本。首页每两秒检查一次，只在最新版本与默认版本不同时显示提示卡片，点击才设置默认版本；历史版本仍可选择。默认版本切换只影响后续运行。
+
+任务次数输入框按约六位数字限制宽度，不改变可输入次数范围；其余横向空间分配给任务名。

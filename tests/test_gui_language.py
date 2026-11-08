@@ -123,7 +123,7 @@ developer.close()
                             env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}, capture_output=True,
                             text=True, timeout=20, check=True)
     values = json.loads(result.stdout.splitlines()[-1])
-    assert values == [language, "开始运行 Plan" if language == "zh_CN" else "Start Plan",
+    assert values == [language, "开始运行" if language == "zh_CN" else "Start Plan",
                       "新建聊天" if language == "zh_CN" else "New Chat",
                       [language] * 3, "en"]
 

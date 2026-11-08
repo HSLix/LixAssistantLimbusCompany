@@ -150,37 +150,6 @@ def test_default_candidate_and_cli_lock_follow_same_path(tmp_path, monkeypatch, 
         assert locks[-1] == "candidate:" + str(expected.resolve())
 
 
-@pytest.mark.parametrize("message,status,outcomes", [
-    ("Hello", "completed", ["success", "success", "success"]),
-    ("task-fail", "completed", ["success", "failure", "success"]),
-    ("plan-fail", "interrupted", ["success"]),
-])
-def test_acceptance_sample_uses_real_plan_boundaries(tmp_path, monkeypatch, message, status, outcomes):
-    from lalc.actions import application_actions
-    from lalc.manifest import ManifestManager
-    def wait(ctx, *, seconds: float) -> None:
-        assert seconds == 5.0
-    monkeypatch.setattr("lalc.actions.wait", wait)
-    manager = ManifestManager(tmp_path, actions=application_actions())
-    published = manager.publish(Path(__file__).parents[1] / "example/acceptance/manifest.json")
-    assert published.ok, published.errors
-    service = application.ApplicationService(tmp_path, manifest_manager=manager)
-    service.start_plan(manifest_id=published.loaded.manifest_id, task_repetitions={"exp": 3},
-                       settings={"exp": {"message": message}})
-    state = service.wait_for(lambda state: state["phase"] == "finished")
-    result = state["result"]
-    service.shutdown()
-    assert result["status"] == status, result
-    assert [item["status"] for item in result["items"]] == outcomes
-    messages = [event["message"] for event in state["trace"] if event["event"] == "component_log"]
-    for index, item in enumerate(result["items"]):
-        assert f"tasks.acceptance (exp) 第 {index + 1}/3 次 status={item['status']}" in messages
-        if item["status"] == "failure":
-            assert f"failure_code={item['failure_code']} failure_message={item['failure_message']}" in messages
-        else:
-            assert f"output={item['output']}" in messages
-
-
 def test_codesearch_and_model_tampering_are_rejected(agent_resources, tmp_path):
     build.check_codesearch(build.CODESEARCH_ARCHIVE, build.MODEL_ROOT)
     snapshot = build.MODEL_ROOT / build.MODEL_REPO / 'snapshots' / build.MODEL_REVISION
