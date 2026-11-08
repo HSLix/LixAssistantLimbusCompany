@@ -78,8 +78,9 @@ class PageInstalledDialog(QDialog):
         if (any(window.closing for window in self.windows) or self.window.coordinator.reloading):
             self.reject()
             return
-        if (any(window.jobs for window in self.windows) or service.state.get('activity')
-                or service.state['phase'] == 'running'
+        state = service.status
+        if (any(window.jobs for window in self.windows) or state.get('activity')
+                or state['phase'] == 'running'
                 or service._thread is not None and service._thread.is_alive()):
             return
         self.timer.stop()

@@ -22,8 +22,10 @@ from qfluentwidgets import (
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
     TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
+    CustomStyleSheet, setStyleSheet as setFluentStyleSheet,
 )
 
+from .run_logs import LIVE_LOG_LIMIT
 from .i18n import tr
 from .run_log_gui import log_colors, log_time
 
@@ -165,12 +167,20 @@ class TrialDialog(QDialog):
     def __init__(self, service, parent):
         super().__init__(parent)
         self.service = service
+        self.setObjectName("running-dialog")
+        setFluentStyleSheet(self, CustomStyleSheet(self).setCustomStyleSheet(
+            'QDialog#running-dialog { background-color: #f3f3f3; }',
+            'QDialog#running-dialog { background-color: #202020; }'))
         self.setWindowTitle(tr('Agent trial'))
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         self.resize(760, 480)
         layout = QVBoxLayout(self)
+        self.history_notice = QLabel(tr("Showing the latest 300 entries. See Logs for earlier entries."))
+        self.history_notice.setWordWrap(True)
+        self.history_notice.hide()
+        layout.addWidget(self.history_notice)
         self.logs = TextBrowser()
         self.logs.setOpenLinks(False)
         self.logs.setOpenExternalLinks(False)
@@ -178,7 +188,7 @@ class TrialDialog(QDialog):
         self.log_records = {}
         layout.addWidget(self.logs)
         controls = QHBoxLayout()
-        self.pause = button(tr('Pause'), lambda: service.resume() if service.state["paused"] else service.pause(), controls)
+        self.pause = button(tr('Pause'), lambda: service.resume() if service.status["paused"] else service.pause(), controls)
         controls.addWidget(QLabel(tr('Global shortcut: Ctrl Alt P')))
         self.stop = button(tr('Stop'), service.stop, controls)
         layout.addLayout(controls)
@@ -189,13 +199,16 @@ class TrialDialog(QDialog):
         self._pause_notice_shown = False
 
     def render(self, state):
-        for record in state["trace"]:
+        for record in state.get("log_records", state.get("trace", ())):
             if record["sequence"] <= self.sequence:
                 continue
             self.sequence = record["sequence"]
             entry = _run_log_entry(record)
             if entry is not None:
                 self.append_log(record, *entry)
+        if state.get("logs_trimmed"):
+            self.history_notice.show()
+        self.trim_logs()
         info = state.get("pause_info")
         if info:
             instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
@@ -216,25 +229,61 @@ class TrialDialog(QDialog):
 
     def append_log(self, record, level, message):
         """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
-        background, foreground = log_colors(level)
         sequence = record["sequence"]
         self.log_records[sequence] = record
-        name = escape(str(record.get("logical_name") or tr("Run")))
-        timestamp = escape(log_time(record.get("recorded_at")))
-        body = escape(message).replace("\n", "<br>")
         bar = self.logs.verticalScrollBar()
         following = bar.value() >= bar.maximum() - 4
         position = bar.value()
-        self.logs.append(
+        self.logs.append(self.log_html(record, level, message))
+        bar.setValue(bar.maximum() if following else position)
+
+    @staticmethod
+    def log_html(record, level, message):
+        """将原始日志转义为色块，详情仅由保留的本地序号索引打开。"""
+        background, foreground = log_colors(level)
+        sequence = record["sequence"]
+        name = escape(str(record.get("logical_name") or tr("Run")))
+        timestamp = escape(log_time(record.get("recorded_at")))
+        body = escape(message).replace("\n", "<br>")
+        return (
             f'<table width="100%" cellspacing="0" cellpadding="8" bgcolor="{background}">'
             f'<tr><td style="color:{foreground}"><b>{level.upper()} · {name}</b> · {timestamp}<br>{body}<br>'
             f'<a style="color:{foreground}" href="{sequence}">{escape(tr("View details"))}</a>'
             '</td></tr></table><br>'
         )
-        bar.setValue(bar.maximum() if following else position)
+
+    def trim_logs(self):
+        """按整条色块裁剪到近期窗口；保留回看项偏移，已移除项退到最早记录。"""
+        if len(self.log_records) <= LIVE_LOG_LIMIT:
+            return
+        bar = self.logs.verticalScrollBar()
+        following = bar.value() >= bar.maximum() - 4
+        anchor, offset = None, 0
+        document = self.logs.document()
+        layout = document.documentLayout()
+        for sequence, frame in zip(self.log_records, document.rootFrame().childFrames()):
+            rect = layout.frameBoundingRect(frame)
+            if rect.bottom() > bar.value():
+                anchor, offset = sequence, bar.value() - rect.top()
+                break
+        self.log_records = dict(list(self.log_records.items())[-LIVE_LOG_LIMIT:])
+        self.logs.setHtml("".join(self.log_html(record, *_run_log_entry(record))
+                                  for record in self.log_records.values()))
+        self.history_notice.show()
+        document.documentLayout().documentSize()
+        if following:
+            bar.setValue(bar.maximum())
+        elif anchor in self.log_records:
+            index = list(self.log_records).index(anchor)
+            frames = document.rootFrame().childFrames()
+            bar.setValue(round(document.documentLayout().frameBoundingRect(frames[index]).top() + offset))
+        else:
+            bar.setValue(0)
 
     def show_log_details(self, url):
         """沿用现有详情弹窗，原始字段与异常栈仅在用户请求时显示。"""
+        if not url.toString().isdecimal():
+            return
         record = self.log_records.get(int(url.toString()))
         if record is None:
             return
@@ -1143,7 +1192,7 @@ class RepairPage(QWidget):
             self.raw_timer.start()
 
     def is_busy(self):
-        state = self.window.service.state
+        state = self.window.service.status
         return bool(self.window.jobs) or bool(state.get('activity')) or state['phase'] == 'running' or self.window.closing
 
     def build_menus(self):
@@ -1369,7 +1418,7 @@ class RepairPage(QWidget):
             self.set_manifests(self.window.host.manager.list_manifests())
 
     def new(self):
-        if self.window.jobs or self.window.service.state.get('activity') or self.window.service.state['phase'] == 'running':
+        if self.window.jobs or self.window.service.status.get('activity') or self.window.service.status['phase'] == 'running':
             return
         self.clear_raw_output()
         self.session = None
@@ -1393,7 +1442,7 @@ class RepairPage(QWidget):
         self.render(False)
 
     def open_session(self, item):
-        if self.window.jobs or self.window.service.state.get('activity') or self.window.service.state['phase'] == 'running':
+        if self.window.jobs or self.window.service.status.get('activity') or self.window.service.status['phase'] == 'running':
             return
         from .developer_session import DeveloperSession
         identity = item.data(Qt.ItemDataRole.UserRole)

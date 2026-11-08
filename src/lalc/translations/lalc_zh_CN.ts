@@ -3,6 +3,10 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Showing the latest 300 entries. See Logs for earlier entries.</source>
+      <translation>仅显示最近 300 条日志，更早记录请到 Logs 日志页查看。</translation>
+    </message>
+    <message>
         <source>Global shortcut: Ctrl Alt P</source>
         <translation>全局快捷键：Ctrl Alt P</translation>
     </message>

@@ -135,10 +135,9 @@ def test_trial_filters_debug_and_internal_events_and_opens_full_details(gui):
 def test_run_log_state_projection():
     from lalc.developer_gui import _run_log_entry
 
-    for event in ("run_started", "run_paused", "run_resumed", "input_resumed",
-                  "input_resume_requested", "input_resume_rejected", "run_cancel_requested",
-                  "component_failed", "execution_anomaly", "safe_task_termination",
-                  "step_reinvocation_failed"):
+    from lalc.run_logs import LIVE_STATE_EVENTS, is_live_log
+    for event in LIVE_STATE_EVENTS:
+        assert is_live_log({"event": event})
         assert _run_log_entry({"event": event}) is not None
     assert _run_log_entry({"event": "run_finished", "result": {"status": "success"}})[0] == "info"
     assert _run_log_entry({"event": "run_finished", "result": {
@@ -737,3 +736,81 @@ def test_capture_creates_asset_directory_before_opening(gui, monkeypatch, case):
         assert directory.is_dir() and opened == [str(directory.absolute())]
         if case == "existing":
             assert (directory / "keep.txt").read_text() == "keep"
+
+
+def test_trial_caps_logs_and_preserves_surviving_scroll_anchor(gui):
+    from PySide6.QtCore import QUrl
+    from lalc.developer_gui import TrialDialog
+    from lalc.gui import ErrorDialog
+    app, window = gui
+    dialog = TrialDialog(window.service, window)
+    dialog.show()
+    def records(start, end):
+        return [{"sequence": i, "event": "component_log", "message": f"entry-{i:04d}"}
+                for i in range(start, end)]
+    dialog.render({"paused": False, "log_records": records(1, 301)})
+    app.processEvents()
+    document = dialog.logs.document()
+    bar = dialog.logs.verticalScrollBar()
+    frames = document.rootFrame().childFrames()
+    bar.setValue(round(document.documentLayout().frameBoundingRect(frames[150]).top()) + 8)
+    dialog.render({"paused": False, "log_records": records(301, 302)})
+    frames = document.rootFrame().childFrames()
+    assert len(frames) == len(dialog.log_records) == 300
+    assert min(dialog.log_records) == 2 and max(dialog.log_records) == 301
+    expected = document.documentLayout().frameBoundingRect(frames[149]).top() + 8
+    assert abs(bar.value() - expected) <= 2
+    assert dialog.history_notice.isVisible()
+    assert "entry-0001" not in dialog.logs.toPlainText()
+    dialog.show_log_details(QUrl("1"))
+    assert dialog.findChild(ErrorDialog) is None
+    dialog.show_log_details(QUrl("301"))
+    details = dialog.findChild(ErrorDialog)
+    assert json.loads(details.details.toPlainText())["message"] == "entry-0301"
+    details.close()
+    dialog.render({"paused": False, "log_records": records(302, 602)})
+    assert bar.value() == 0  # 阅读项已被移出近期窗口。
+    bar.setValue(bar.maximum())
+    dialog.render({"paused": False, "log_records": records(602, 603)})
+    assert bar.value() == bar.maximum()
+    text = dialog.logs.toPlainText()
+    dialog.render({"paused": False, "log_records": records(602, 603)})
+    assert dialog.logs.toPlainText() == text
+    dialog.deleteLater()
+
+
+def test_trial_controls_use_light_status_without_full_trace(gui, monkeypatch):
+    from lalc.developer_gui import TrialDialog
+    _, window = gui
+    calls = []
+    for name in ("pause", "resume", "stop"):
+        monkeypatch.setattr(window.service, name, lambda *_, name=name: calls.append(name))
+    dialog = TrialDialog(window.service, window)
+    with monkeypatch.context() as patch:
+        patch.setattr(type(window.service), "state", property(lambda _: pytest.fail("Full Trace read")))
+        dialog.pause.click()
+        window.service._state["paused"] = True
+        dialog.pause.click()
+        dialog.stop.click()
+    assert calls == ["pause", "resume", "stop"]
+    dialog.deleteLater()
+
+
+@pytest.mark.parametrize("dark", [False, True])
+def test_trial_history_notice_has_theme_background(gui, dark):
+    from qfluentwidgets import Theme, qconfig, setTheme
+    from lalc.developer_gui import TrialDialog
+    app, window = gui
+    previous = qconfig.theme
+    try:
+        setTheme(Theme.DARK if dark else Theme.LIGHT)
+        dialog = TrialDialog(window.service, window)
+        dialog.render({"paused": False, "log_records": [], "logs_trimmed": True})
+        dialog.show()
+        app.processEvents()
+        background = dialog.grab().toImage().pixelColor(2, 2)
+        assert background.value() < 80 if dark else background.value() > 200
+        assert not dialog.history_notice.isHidden()
+        dialog.deleteLater()
+    finally:
+        setTheme(previous)

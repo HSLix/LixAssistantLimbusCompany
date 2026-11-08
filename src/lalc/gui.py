@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import asyncio
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -37,10 +38,44 @@ from .lifecycle import ApplicationLifecycle, run_application
 
 
 class StateBridge(QObject):
-    """把状态与未处理错误投递回 GUI 主线程。"""
+    """合并工作线程的变更通知，每百毫秒在主线程读取一次有界快照。"""
 
     changed = Signal(dict)
     fatal = Signal(str)
+
+    def __init__(self, service, receiver):
+        super().__init__(QApplication.instance())
+        self.service = service
+        self.closed = False
+        self.dirty = threading.Event()
+        self.run_id = None
+        self.sequence = 0
+        self.changed.connect(receiver)
+        self.service.on_change = self.dirty.set
+        self.timer = QTimer(self)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self.flush)
+        self.timer.start()
+        self.dirty.set()
+
+    def flush(self):
+        """只传新增日志；先清标记，读取期间的新事件留到下一批处理。"""
+        if self.closed or not self.dirty.is_set():
+            return
+        self.dirty.clear()
+        state = self.service.ui_snapshot(self.run_id, self.sequence)
+        self.run_id, self.sequence = state["run_id"], state["last_sequence"]
+        self.changed.emit(state)
+
+    def close(self):
+        """在主线程解除订阅并销毁定时器，避免退出时回调已关闭的窗口。"""
+        if self.closed:
+            return
+        self.closed = True
+        self.timer.stop()
+        self.service.on_change = None
+        self.changed.disconnect()
+        self.deleteLater()
 
 
 class ErrorDialog(QDialog):
@@ -198,7 +233,7 @@ class MainWindow(FluentWindow):
         self.notifications = NotificationList()
         layout.addWidget(self.notifications)
         self.widgetLayout.addWidget(root)
-        self.render_state(service.state)
+        self.render_state(service.status)
 
     def launch(self, operation, done=None):
         """后台服务完成清理后再恢复交互，错误保留原始异常链。"""
@@ -211,7 +246,7 @@ class MainWindow(FluentWindow):
         job.failed.connect(lambda error: outcome.update(error=error))
         def finished():
             self.jobs.remove(job)
-            self.render_state(self.service.state)
+            self.render_state(self.service.status)
             if "error" in outcome:
                 if not isinstance(outcome["error"], asyncio.CancelledError):
                     def fail():
@@ -222,17 +257,17 @@ class MainWindow(FluentWindow):
             job.deleteLater()
         job.finished.connect(finished)
         self.jobs.append(job)
-        self.render_state(self.service.state)
+        self.render_state(self.service.status)
         job.start()
 
     def cancel_operation(self):
         for job in self.jobs:
             job.cancel()
-        self.render_state(self.service.state)
+        self.render_state(self.service.status)
 
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
-        active = bool(self.jobs) or (self.owns_run and self.service.state["phase"] == "running")
+        active = bool(self.jobs) or (self.owns_run and self.service.status["phase"] == "running")
         if active:
             event.ignore()
             if not self.closing:
@@ -242,7 +277,7 @@ class MainWindow(FluentWindow):
                 self.closing = True
                 self.service.stop()
                 self.cancel_operation()
-                self.render_state(self.service.state)
+                self.render_state(self.service.status)
                 if hasattr(self, 'repair_page'):
                     self.repair_page.status.setText(tr('Stopping; waiting for input release, log saving and pi cleanup…'))
                 self.close_timer.start()
@@ -613,7 +648,7 @@ class UserWindow(MainWindow):
         self.manifest_timer.setInterval(2000)
         self.manifest_timer.timeout.connect(self.refresh_manifest_card)
         self.manifest_timer.start()
-        self.render_state(service.state)
+        self.render_state(service.status)
 
     def show_agent_settings(self):
         """从首页进入设置并定位到 Agent 卡片。"""
@@ -671,6 +706,8 @@ class UserWindow(MainWindow):
         """轮询留存版本，只提示而不自动修改默认版本。"""
         versions = self.host.manager.list_manifests()
         identity = self.host.manager.default_manifest_id()
+        if self.current_manifest_id != identity:
+            self.refresh_tasks()
         current = next((item for item in versions if item["manifest_id"] == identity), None)
         summary = self.manifest_summary(current) if current else identity[:8] if identity else tr('Not selected')
         self.manifest_label.setText(tr('Current version') + " · " + summary if current else summary)
@@ -682,6 +719,14 @@ class UserWindow(MainWindow):
             self.latest_label.setText(tr('New version available') + " · " + self.manifest_summary(versions[0]).replace(' · ', '\n'))
             self.latest_label.setToolTip(versions[0]['manifest_id'])
             self.show_manifest_notes(self.latest_notes, versions[0])
+        try:
+            stat = (self.service.data_root / "agent-settings.json").stat()
+            settings_stamp = (stat.st_ino, stat.st_mtime_ns, stat.st_size)
+        except FileNotFoundError:
+            settings_stamp = None
+        if getattr(self, "_agent_settings_stamp", None) != settings_stamp:
+            self._agent_settings_stamp = settings_stamp
+            self.coordinator.refresh_agent()
 
     def select_latest_manifest(self):
         """显式选择卡片展示的版本，仅影响后续运行。"""
@@ -689,7 +734,7 @@ class UserWindow(MainWindow):
             result = self.host.manager.set_default(self.latest_manifest_id)
             if not result.ok:
                 raise ValueError("; ".join(error.message for error in result.errors))
-            self.render_state(self.service.state)
+            self.render_state(self.service.status)
 
     def choose_manifest(self):
         """独立历史列表只更新 Default，校验失败时保留选择供修正。"""
@@ -743,7 +788,7 @@ class UserWindow(MainWindow):
             result = self.host.manager.set_default(item.data(Qt.ItemDataRole.UserRole)['manifest_id'])
             if not result.ok:
                 raise ValueError("; ".join(error.message for error in result.errors))
-            self.render_state(self.service.state)
+            self.render_state(self.service.status)
             dialog.accept()
         buttons.accepted.connect(lambda: self._interact(select))
         buttons.rejected.connect(dialog.reject)
@@ -892,7 +937,7 @@ class UserWindow(MainWindow):
         repetitions, settings, _ = task_inputs(self.business_pages, self.current_supported, self.page_store)
         self.service.start_plan(manifest_id=self.current_manifest_id, task_repetitions=repetitions, settings=settings)
         self.owns_run = True
-        self.render_state(self.service.state)
+        self.render_state(self.service.status)
 
     @Slot(dict)
     def render_state(self, state):
@@ -909,12 +954,10 @@ class UserWindow(MainWindow):
         if hasattr(self, "reload_button"):
             self.reload_button.setEnabled(not busy and not self.jobs and not self.coordinator.reloading)
         identity = state["default_manifest_id"]
-        self.refresh_manifest_card()
-        from .agent_settings import settings_document, load_settings, configuration_complete
-        enabled = settings_document(self.service.data_root)["user_enabled"]
-        complete = configuration_complete(load_settings(self.service.data_root, side="user", for_use=False),
-                                          temporary_keys=self.host.secrets)
-        ready = not enabled or complete
+        if getattr(self, "_rendered_manifest_id", None) != identity or not hasattr(self, "latest_manifest_id"):
+            self._rendered_manifest_id = identity
+            self.refresh_manifest_card()
+        ready = getattr(self, "_agent_ready", True)
         self.start_hint.setText("" if ready else tr('Complete the Agent settings or turn off User Agent'))
         self.start_hint.setVisible(not ready)
         self.start_button.setEnabled(not busy and ready)
@@ -958,6 +1001,7 @@ class GuiCoordinator:
         self.user = None
         self.developer = None
         self.reloading = False
+        self.bridge = StateBridge(service, self.render_state)
         self.warning_history = []
         self.page_state = None
 
@@ -974,6 +1018,7 @@ class GuiCoordinator:
                 self.service, self.lifecycle, host=self.host, coordinator=self)
             setattr(self, name, window)
         self.refresh_agent()
+        window.render_state(self.service.ui_snapshot())
         window.showNormal()
         window.raise_()
         window.activateWindow()
@@ -998,12 +1043,13 @@ class GuiCoordinator:
         status = (tr('Enabled') if document["user_enabled"] else tr('Disabled')) + " · " + (tr('Configured') if complete else tr('Needs configuration'))
         self.user.agent_status.setText(tr("User Agent: {0} · {1}").format(document['user_provider'], status))
         self.user.agent_summary.setText(status)
-        self.user.render_state(self.service.state)
+        self.user._agent_ready = not document["user_enabled"] or complete
+        self.user.render_state(self.service.status)
 
     def request_reload(self):
         """先保存并封闭所有入口，最终清理成功后才允许启动新进程。"""
         def check_idle():
-            state = self.service.state
+            state = self.service.status
             if (self.reloading or state["phase"] == "running" or state.get("activity") or
                     self.service._thread is not None and self.service._thread.is_alive() or
                     any(window.jobs or window.closing for window in (self.user, self.developer) if window)):
@@ -1058,6 +1104,7 @@ class GuiCoordinator:
             QApplication.instance().exit(0)
 
     def shutdown(self):
+        self.bridge.close()
         for window in (self.user, self.developer):
             if window is not None:
                 window.shutdown()
@@ -1077,9 +1124,9 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
     instance = GuiInstance()
     if instance.forward(developer):
         return 0
-    bridge = StateBridge()
-    service = ApplicationService(default_data_root(), on_change=bridge.changed.emit)
+    service = ApplicationService(default_data_root())
     coordinator = GuiCoordinator(service, lifecycle)
+    bridge = coordinator.bridge
     def open_requested(developer=False):
         try:
             coordinator.open_window(developer)
@@ -1092,14 +1139,13 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
             raise
     instance.listen(open_requested)
     app.setQuitOnLastWindowClosed(False)
-    bridge.changed.connect(coordinator.render_state)
     bridge.fatal.connect(lambda details: (coordinator.user or coordinator.developer).fatal_error(details)
                          if coordinator.user or coordinator.developer else lifecycle.present_fatal(details))
     lifecycle.dispatch_fatal = bridge.fatal.emit
     def shutdown():
         try:
             coordinator.shutdown()
-            result = service.state.get("result") or {}
+            result = service.status.get("result") or {}
             if result.get("fatal"):
                 lifecycle.present_fatal(result_diagnostics(result))
         finally:

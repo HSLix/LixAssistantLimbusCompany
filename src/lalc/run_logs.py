@@ -10,6 +10,21 @@ from .file_content import FileContent, open_image, require_memory
 
 
 ACTION_ENDS = {"trusted_action_returned", "trusted_action_failed", "trusted_action_interrupted"}
+LIVE_LOG_LIMIT = 300
+LIVE_STATE_EVENTS = {
+    "run_started", "run_paused", "paused_by_user", "run_resumed", "input_resumed",
+    "input_resume_requested", "input_resume_rejected", "run_cancel_requested",
+    "component_failed", "execution_anomaly", "safe_task_termination",
+    "step_reinvocation_failed", "run_finished",
+}
+
+
+def is_live_log(record: dict) -> bool:
+    """仅筛选运行弹窗可见事件，完整 Trace 的存储不受此过滤影响。"""
+    event = record.get("event")
+    if event == "component_log":
+        return record.get("level", "info").lower() in {"info", "warning", "error"}
+    return event in LIVE_STATE_EVENTS
 
 
 def trace_path(root: Path, run_id: int) -> Path:
