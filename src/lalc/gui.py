@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon
+from PySide6.QtGui import QColor, QIcon, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -17,13 +17,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox, QScrollArea, QFileDialog,
-    QGraphicsOpacityEffect,
+    QGraphicsOpacityEffect, QListWidgetItem, QSizePolicy, QFrame,
 )
 
 from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBar, InfoBarIcon, InfoBarPosition,
-    CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton,
-    TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet,
+    CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
+    TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet, CustomStyleSheet,
+    setStyleSheet as setFluentStyleSheet,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
@@ -77,6 +78,61 @@ class ErrorDialog(QDialog):
         layout.addWidget(buttons)
 
 
+
+
+class ElidedLabel(QLabel):
+    """单行纯文本按可用宽度省略，完整内容保留给辅助功能与提示。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTextFormat(Qt.TextFormat.PlainText)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
+        self.setMinimumWidth(0)
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(self.contentsRect(), Qt.AlignmentFlag.AlignVCenter,
+                         self.fontMetrics().elidedText(self.text(), Qt.TextElideMode.ElideRight, self.contentsRect().width()))
+
+
+class TaskCountSpinBox(QSpinBox):
+    """沿用次数输入与范围校验，将步进按钮分置数字两侧。"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        for button in (self.upButton, self.downButton):
+            self.hBoxLayout.removeWidget(button)
+            button.hide()
+            button.deleteLater()
+        self.downButton = TransparentToolButton(self)
+        self.downButton.setText("−")
+        self.downButton.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.upButton = TransparentToolButton(FluentIcon.ADD, self)
+        self.downButton.setAccessibleName(tr('Decrease repetitions'))
+        self.upButton.setAccessibleName(tr('Increase repetitions'))
+        for button in (self.downButton, self.upButton):
+            button.setFixedSize(28, 25)
+        font = self.downButton.font()
+        font.setPointSize(16)
+        self.downButton.setFont(font)
+        self.hBoxLayout.setContentsMargins(4, 4, 4, 4)
+        self.hBoxLayout.addWidget(self.downButton)
+        self.hBoxLayout.addStretch()
+        self.hBoxLayout.addWidget(self.upButton)
+        self.downButton.clicked.connect(self.stepDown)
+        self.upButton.clicked.connect(self.stepUp)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        style = 'QSpinBox { padding-left: 36px; padding-right: 36px; }'
+        setCustomStyleSheet(self, style, style)
+        self.setRange(1, 2147483647)
+        self.setFixedWidth(self.fontMetrics().horizontalAdvance('2147483647') + 80)
+        self.valueChanged.connect(self.refresh_buttons)
+        self.refresh_buttons()
+
+    def refresh_buttons(self):
+        self.downButton.setEnabled(self.value() > self.minimum())
+        self.upButton.setEnabled(self.value() < self.maximum())
 
 
 class MainWindow(FluentWindow):
@@ -341,23 +397,33 @@ class UserWindow(MainWindow):
         left.setSpacing(12)
         dash.addWidget(execution, 1)
         left.addWidget(TitleLabel(tr('Execution')))
-        left.addWidget(QLabel(tr('Manifest')))
-        manifest_row = QHBoxLayout()
-        self.manifest_label = QLabel()
-        self.manifest_label.setMinimumWidth(0)
-        manifest_row.addWidget(self.manifest_label, 1)
+        manifest_heading = QHBoxLayout()
+        manifest_heading.addWidget(QLabel(tr('Manifest')), 1)
         self.manifest_button = QPushButton(tr('Version history…'))
         self.manifest_button.clicked.connect(self.choose_manifest)
-        manifest_row.addWidget(self.manifest_button)
-        self.manifest_label.setTextFormat(Qt.TextFormat.PlainText)
-        self.manifest_label.setWordWrap(True)
-        left.addLayout(manifest_row)
-        self.latest_card = CardWidget()
-        latest_layout = QVBoxLayout(self.latest_card)
+        manifest_heading.addWidget(self.manifest_button)
+        left.addLayout(manifest_heading)
+        self.manifest_label = ElidedLabel()
+        left.addWidget(self.manifest_label)
+        self.manifest_notes = ElidedLabel()
+        left.addWidget(self.manifest_notes)
+        self.latest_card = QFrame()
+        self.latest_card.setObjectName('manifest-update')
+        setFluentStyleSheet(self.latest_card, CustomStyleSheet(self.latest_card).setCustomStyleSheet(
+            'QFrame#manifest-update { background-color: #f3f3f3; border-radius: 6px; }',
+            'QFrame#manifest-update { background-color: #333333; border-radius: 6px; }'))
+        latest_layout = QHBoxLayout(self.latest_card)
+        latest_layout.setContentsMargins(12, 8, 12, 8)
+        latest_text = QVBoxLayout()
+        latest_text.setSpacing(2)
         self.latest_label = QLabel()
         self.latest_label.setTextFormat(Qt.TextFormat.PlainText)
         self.latest_label.setWordWrap(True)
-        latest_layout.addWidget(self.latest_label)
+        self.latest_label.setMinimumWidth(0)
+        self.latest_notes = ElidedLabel()
+        latest_text.addWidget(self.latest_label)
+        latest_text.addWidget(self.latest_notes)
+        latest_layout.addLayout(latest_text, 1)
         self.latest_button = QPushButton(tr('Use latest version'))
         self.latest_button.clicked.connect(lambda: self._interact(self.select_latest_manifest))
         latest_layout.addWidget(self.latest_button)
@@ -589,22 +655,33 @@ class UserWindow(MainWindow):
 
     @staticmethod
     def manifest_summary(item):
-        """展示完整身份、本地秒级时间与纯文本说明。"""
-        stamp = datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M:%S")
-        return f'{item["manifest_id"]}\n{stamp}\n{item["AdditionalMessage"].strip() or tr("No additional information")}'
+        """Dashboard 只显示短身份与本地分钟级时间。"""
+        stamp = datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M")
+        return f'{item["manifest_id"][:8]} · {stamp}'
+
+    @staticmethod
+    def show_manifest_notes(label, item):
+        """空说明不占空间；长说明单行省略，悬停可读全文。"""
+        notes = item["AdditionalMessage"].strip() if item else ""
+        label.setText(" ".join(notes.split()))
+        label.setToolTip(notes)
+        label.setVisible(bool(notes))
 
     def refresh_manifest_card(self):
         """轮询留存版本，只提示而不自动修改默认版本。"""
         versions = self.host.manager.list_manifests()
         identity = self.host.manager.default_manifest_id()
         current = next((item for item in versions if item["manifest_id"] == identity), None)
-        self.manifest_label.setText(tr('Current version') + "\n" + self.manifest_summary(current)
-                                    if current else identity or tr('Not selected'))
+        summary = self.manifest_summary(current) if current else identity[:8] if identity else tr('Not selected')
+        self.manifest_label.setText(tr('Current version') + " · " + summary if current else summary)
         self.manifest_label.setToolTip(identity or tr('No Manifest selected'))
+        self.show_manifest_notes(self.manifest_notes, current)
         self.latest_manifest_id = versions[0]["manifest_id"] if versions else None
         self.latest_card.setVisible(bool(versions and self.latest_manifest_id != identity))
         if versions:
-            self.latest_label.setText(tr('New version available') + "\n" + self.manifest_summary(versions[0]))
+            self.latest_label.setText(tr('New version available') + " · " + self.manifest_summary(versions[0]).replace(' · ', '\n'))
+            self.latest_label.setToolTip(versions[0]['manifest_id'])
+            self.show_manifest_notes(self.latest_notes, versions[0])
 
     def select_latest_manifest(self):
         """显式选择卡片展示的版本，仅影响后续运行。"""
@@ -615,26 +692,62 @@ class UserWindow(MainWindow):
             self.render_state(self.service.state)
 
     def choose_manifest(self):
-        """每次打开重新枚举；选择只改变后续 Run 的 Default。"""
+        """独立历史列表只更新 Default，校验失败时保留选择供修正。"""
         dialog = QDialog(self)
         dialog.setWindowTitle(tr('Choose Default Manifest'))
+        dialog.resize(580, 460)
         layout = QVBoxLayout(dialog)
-        choices = QComboBox()
-        for item in self.host.manager.list_manifests():
-            choices.addItem(self.manifest_summary(item), userData=item["manifest_id"])
-        choices.setCurrentIndex(max(0, choices.findData(self.host.manager.default_manifest_id())))
-        layout.addWidget(choices)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        notice = QLabel(tr('Select the default version for future runs. Started runs keep their version.'))
+        notice.setWordWrap(True)
+        layout.addWidget(notice)
+        choices = ListWidget()
+        choices.setObjectName('manifest-history')
+        versions = self.host.manager.list_manifests()
+        current = self.host.manager.default_manifest_id()
+        latest = versions[0]['manifest_id'] if versions else None
+        for version in versions:
+            identity = version['manifest_id']
+            marks = []
+            if identity == current:
+                marks.append(tr('Current version'))
+            if identity == latest:
+                marks.append(tr('Latest version'))
+            item = QListWidgetItem(self.manifest_summary(version) + (' · ' + ' / '.join(marks) if marks else ''))
+            item.setData(Qt.ItemDataRole.UserRole, version)
+            item.setToolTip(identity)
+            choices.addItem(item)
+            if identity == current:
+                choices.setCurrentItem(item)
+        layout.addWidget(choices, 1)
+        details = QPlainTextEdit()
+        details.setObjectName('manifest-details')
+        details.setReadOnly(True)
+        details.setFixedHeight(110)
+        layout.addWidget(details)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        select_button = QPushButton(tr('Set as default version'))
+        buttons.addButton(select_button, QDialogButtonBox.ButtonRole.AcceptRole)
         layout.addWidget(buttons)
-        buttons.accepted.connect(dialog.accept)
+        def selection_changed():
+            item = choices.currentItem()
+            version = item.data(Qt.ItemDataRole.UserRole) if item else None
+            select_button.setEnabled(bool(version and version['manifest_id'] != self.host.manager.default_manifest_id()))
+            details.setPlainText(version['manifest_id'] + ('\n\n' + version['AdditionalMessage'].strip()
+                                 if version['AdditionalMessage'].strip() else '') if version else '')
+        choices.currentItemChanged.connect(selection_changed)
+        selection_changed()
+        def select():
+            item = choices.currentItem()
+            if item is None:
+                return
+            result = self.host.manager.set_default(item.data(Qt.ItemDataRole.UserRole)['manifest_id'])
+            if not result.ok:
+                raise ValueError("; ".join(error.message for error in result.errors))
+            self.render_state(self.service.state)
+            dialog.accept()
+        buttons.accepted.connect(lambda: self._interact(select))
         buttons.rejected.connect(dialog.reject)
-        if dialog.exec() == QDialog.DialogCode.Accepted and choices.currentData():
-            def select():
-                result = self.host.manager.set_default(choices.currentData())
-                if not result.ok:
-                    raise ValueError("; ".join(error.message for error in result.errors))
-                self.render_state(self.service.state)
-            self._interact(select)
+        dialog.exec()
 
     def open_sharing(self, exporting):
         from .sharing_gui import open_sharing
@@ -703,20 +816,28 @@ class UserWindow(MainWindow):
                 continue
             saved = self.page_store.value["tasks"].get(page.task_id, {"enabled": False, "count": 1})
             row = QWidget()
-            layout = QHBoxLayout(row)
-            enabled, count = QCheckBox(page.name), QSpinBox()
+            layout = FlowLayout(row)
+            layout.setContentsMargins(9, 9, 9, 9)
+            enabled = QCheckBox(page.name)
+            enabled.setToolTip(page.name)
+            count = TaskCountSpinBox() if page.show_task_count else None
             enabled.setChecked(saved["enabled"])
-            count.setRange(1, 2147483647)
-            count.setValue(saved["count"])
+            if count is not None:
+                count.setValue(saved["count"])
             jump = QPushButton(tr('Settings'))
             jump.clicked.connect(lambda _, widget=page.widget: self.switchTo(widget))
-            count.setFixedWidth(count.fontMetrics().horizontalAdvance("000000") + 48)
-            layout.addWidget(enabled, 1)
-            layout.addWidget(count)
-            layout.addWidget(jump)
+            layout.addWidget(enabled)
+            controls = QWidget()
+            controls_layout = QHBoxLayout(controls)
+            controls_layout.setContentsMargins(0, 0, 0, 0)
+            if count is not None:
+                controls_layout.addWidget(count)
+            controls_layout.addWidget(jump)
+            layout.addWidget(controls)
             self.task_rows[page.task_id] = (enabled, count)
             enabled.toggled.connect(lambda _, identity=page.task_id: self._interact(lambda: self.save_task(identity)))
-            count.editingFinished.connect(lambda identity=page.task_id: self._interact(lambda: self.save_task(identity)))
+            if count is not None:
+                count.valueChanged.connect(lambda _, identity=page.task_id: self._interact(lambda: self.save_task(identity)))
             self.task_layout.addWidget(row)
         if not self.task_rows and (not self.current_manifest_id or result.ok):
             empty_state = QWidget()
@@ -746,7 +867,8 @@ class UserWindow(MainWindow):
 
     def save_task(self, identity):
         enabled, count = self.task_rows[identity]
-        self.page_store.save_task(identity, enabled.isChecked(), count.value())
+        saved = self.page_store.value["tasks"].get(identity, {"count": 1})
+        self.page_store.save_task(identity, enabled.isChecked(), count.value() if count is not None else saved["count"])
 
     def save_user_enabled(self):
         from .agent_settings import settings_document, save_selection

@@ -324,7 +324,7 @@ def test_cli_developer_entry_selects_developer_window(tmp_path, monkeypatch):
 
 
 def test_latest_version_card_requires_explicit_selection(windows):
-    """新版本自动提示但不切换；卡片显示说明、秒级时间并支持显式选择。"""
+    """新版本自动提示但不切换；卡片只显示短身份、分钟时间与限高说明，并支持显式选择。"""
     from test_manifest import _write_candidate
     app, owner, user, developer = windows
     manager = user.host.manager
@@ -338,10 +338,65 @@ def test_latest_version_card_requires_explicit_selection(windows):
     user.refresh_manifest_card()
     assert manager.default_manifest_id() == original
     assert not user.latest_card.isHidden()
-    assert result.loaded.manifest_id in user.latest_label.text()
-    assert "<b>战斗改进</b>" in user.latest_label.text()
+    assert result.loaded.manifest_id[:8] in user.latest_label.text()
+    assert result.loaded.manifest_id not in user.latest_label.text()
+    assert user.latest_label.text().count("\n") == 1
+    assert "<b>战斗改进</b>" in user.latest_notes.text()
     user.latest_button.click()
     assert manager.default_manifest_id() == result.loaded.manifest_id
     assert user.latest_card.isHidden()
-    assert "<b>战斗改进</b>" in user.manifest_label.text()
+    assert "<b>战斗改进</b>" in user.manifest_notes.text()
     assert user.manifest_timer.isActive()
+
+
+def test_manifest_summary_is_short_and_empty_notes_are_hidden(windows):
+    from datetime import datetime
+    _, _, user, _ = windows
+    item = user.host.manager.list_manifests()[0]
+    assert user.manifest_summary(item) == item['manifest_id'][:8] + ' · ' + datetime.fromtimestamp(item['saved_at']).strftime('%Y-%m-%d %H:%M')
+    user.show_manifest_notes(user.manifest_notes, dict(item, AdditionalMessage='  \n '))
+    assert user.manifest_notes.isHidden() and not user.manifest_notes.text()
+    user.show_manifest_notes(user.manifest_notes, dict(item, AdditionalMessage='长说明\n' * 500))
+    assert not user.manifest_notes.isHidden()
+    assert '\n' not in user.manifest_notes.text()
+    assert user.manifest_notes.toolTip().startswith('长说明\n')
+    assert user.manifest_notes.sizeHint().height() == user.manifest_label.sizeHint().height()
+
+
+@pytest.mark.parametrize('apply', [False, True])
+def test_history_marks_versions_and_only_applies_explicit_selection(windows, monkeypatch, apply):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QDialog, QDialogButtonBox
+    from qfluentwidgets import ListWidget, PlainTextEdit
+    from lalc.i18n import tr
+    from test_manifest import _write_candidate
+    _, _, user, _ = windows
+    manager = user.host.manager
+    original = manager.default_manifest_id()
+    result = manager.publish(_write_candidate(manager.data_root / 'history-candidate'))
+    assert result.ok
+    latest = result.loaded.manifest_id
+    def inspect(dialog):
+        choices = dialog.findChild(ListWidget, 'manifest-history')
+        buttons = dialog.findChild(QDialogButtonBox)
+        select = next(button for button in buttons.buttons() if buttons.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole)
+        assert not select.isEnabled()
+        assert tr('Current version') in choices.currentItem().text()
+        assert choices.item(0).data(Qt.ItemDataRole.UserRole)['manifest_id'] == latest
+        assert tr('Latest version') in choices.item(0).text()
+        choices.setCurrentRow(0)
+        assert select.isEnabled()
+        assert latest in dialog.findChild(PlainTextEdit, 'manifest-details').toPlainText()
+        assert manager.default_manifest_id() == original
+        if apply:
+            select.click()
+        else:
+            buttons.rejected.emit()
+        return dialog.result()
+    monkeypatch.setattr(QDialog, 'exec', inspect)
+    monkeypatch.setattr(manager, 'publish', lambda *_: pytest.fail('选择不能发布'))
+    monkeypatch.setattr(user.service, 'start_plan', lambda **_: pytest.fail('选择不能运行'))
+    before = {path.name for path in manager.manifests_dir.glob('*.json')}
+    user.choose_manifest()
+    assert manager.default_manifest_id() == (latest if apply else original)
+    assert {path.name for path in manager.manifests_dir.glob('*.json')} == before

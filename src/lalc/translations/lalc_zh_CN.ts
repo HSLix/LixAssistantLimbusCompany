@@ -1927,7 +1927,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Use latest version</source>
-      <translation>设为最新版本</translation>
+      <translation>使用最新</translation>
     </message>
     <message>
       <source>Current version</source>
@@ -1976,6 +1976,26 @@ Original pixel region: {2}</source>
     <message>
       <source>Export</source>
       <translation>导出</translation>
+    </message>
+    <message>
+      <source>Decrease repetitions</source>
+      <translation>减少次数</translation>
+    </message>
+    <message>
+      <source>Increase repetitions</source>
+      <translation>增加次数</translation>
+    </message>
+    <message>
+      <source>Select the default version for future runs. Started runs keep their version.</source>
+      <translation>选择之后运行的默认版本，已启动的运行保持原版本。</translation>
+    </message>
+    <message>
+      <source>Latest version</source>
+      <translation>最新版本</translation>
+    </message>
+    <message>
+      <source>Set as default version</source>
+      <translation>设为默认版本</translation>
     </message>
   </context>
 </TS>
