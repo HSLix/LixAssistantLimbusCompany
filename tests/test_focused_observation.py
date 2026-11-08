@@ -288,3 +288,77 @@ def test_focus_loss_during_run_capture_retries_before_saving(tmp_path: Path, mon
     assert platform.focus_calls == 2
     assert not any(item["event"] == "paused_by_user" for item in state["trace"])
     assert (tmp_path / "evidence" / str(run_id)).exists()
+
+
+@pytest.mark.parametrize("completion_error", [False, True])
+def test_cancelled_run_does_not_cancel_later_developer_observation(tmp_path, monkeypatch, completion_error):
+    """取消持续到收尾完成；后续人工取图与调整不继承旧取消状态。"""
+    import threading
+
+    from lalc.application import StartError
+    from lalc.developer import DeveloperHost
+
+    def platform_factory(*, checkpoint=None):
+        platform = FakeWindowPlatform()
+        focus = platform.focus
+
+        def checked_focus(hwnd):
+            if checkpoint is not None:
+                checkpoint()
+            focus(hwnd)
+
+        def resize(hwnd, width, height):
+            if checkpoint is not None:
+                checkpoint()
+            return {"width": width, "height": height}
+
+        platform.focus = checked_focus
+        platform.resize_client = resize
+        return platform
+
+    monkeypatch.setattr(application, "WindowsWindowPlatform", platform_factory)
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(FIXTURE / "manifest.json")
+    assert published.ok, published.errors
+    service = ApplicationService(tmp_path, manifest_manager=manager)
+    host = DeveloperHost(service, tmp_path / "candidate")
+    entered, release = threading.Event(), threading.Event()
+    start_session = service._start_session
+
+    def wait_before_start():
+        entered.set()
+        assert release.wait(5)
+        start_session()
+
+    monkeypatch.setattr(service, "_start_session", wait_before_start)
+    if completion_error:
+        def fail_completion(result):
+            raise OSError("completion failed")
+        monkeypatch.setattr(service, "_complete", fail_completion)
+
+    try:
+        service.start("steps.capture_screen", {}, manifest_id=published.loaded.manifest_id)
+        assert entered.wait(5)
+        service.stop()
+        with pytest.raises(UserInterruption):
+            service._window_platform().focus(42)
+        with pytest.raises(StartError, match="当前活动尚未结束"):
+            host.capture()
+    finally:
+        release.set()
+        service.shutdown()
+
+    result = service.state["result"]
+    if completion_error:
+        assert result["fatal"]
+        result = result["previous_result"]
+    assert result["failure_code"] == "user_cancelled"
+    assert service.state["phase"] == "finished"
+    trace = service.state["trace"]
+    assert host.capture()[1] == (2, 2)
+    preview = host.preview
+    assert host.capture(update_preview=False)[1] == (2, 2)
+    assert host.preview is preview
+    assert service.connect()["image"]["width"] == 2
+    assert host.resize_window(1280, 720) == {"width": 1280, "height": 720}
+    assert service.state["trace"] == trace

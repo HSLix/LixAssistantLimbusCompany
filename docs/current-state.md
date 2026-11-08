@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-08 修复取消 Run 后 Developer 截图与窗口调整被旧取消状态阻断：正常及异常收尾在输入清理后释放 Run gate，保留运行／暂停期间的排他与取消边界。设计、影响及本地回归见[专项记录](developer-capture-cancellation-impact-review.md)；Windows 与真实游戏尚未验收。
+
 2026-11-08 页面多任务、人工确认启停与 Session 来源显示已完成本地实施及相关回归；Windows、真实模型与游戏尚未验收，见[设计与影响审查](page-tasks-and-availability-design-impact-review.md)。
 
 
