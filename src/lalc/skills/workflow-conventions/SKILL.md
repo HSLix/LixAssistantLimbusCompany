@@ -11,5 +11,5 @@ description: LALC Workflow 的共用编写规范。创建、修改或审查 Plan
 - 先读 action_contracts 和已有 Component 签名，按实际参数与返回契约复用能力，避免重复实现；Action 参数不能直接套给签名不同的 Step 包装。
 - 匹配保留完整返回结果。多个命中不自动失败、不视为无目标，也不要求全部动作；业务 Step 决定选择和动作，有歧义时用 ctx.log(message, level="warning") 记录歧义及依据，不随意丢字段或认定完成。
 - Plan 调用 Task 后记录逻辑名、当前／总循环次数及 status；失败记录原始 failure_code、failure_message，成功记录有意义的 output，不统一降为 unknown。普通 Task 失败仍可继续调度；取消和不可恢复环境故障向外传播，不吞掉或改写为普通失败。
-- ctx.log(message, *, level="info", screenshot=False) 可记录语义日志并附已有截图，不重新截图。level 只接受 debug/info/warning/error，忽略大小写并以小写记录；非法值抛 ValueError。四级均写入 Trace，error 本身不改变任务结果。Python 模块和关键函数使用简洁中文 docstring。
+- ctx.log(message, *, level="info", screenshot=False) 可记录语义日志并附已有截图，不重新截图。level 只接受 debug/info/warning/error，忽略大小写并以小写记录；非法值抛 ValueError。四级均写入 Trace，error 本身不改变任务结果。Python 关键函数使用简洁中文 docstring。Component 说明优先读取 execute docstring，缺失时回退模块 docstring，两者至少有一处；Recovery Rule 仍必须提供模块 docstring。
 - 已发布 Manifest／源码及 Trusted Actions 不可修改。新增源码走专用创建工具，不自动登记未引用文件；不生成绕过 ctx 的文件操作、网络、子进程、顶层副作用或后台调用。

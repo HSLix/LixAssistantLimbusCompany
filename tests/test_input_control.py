@@ -135,12 +135,14 @@ def fast_quiet(monkeypatch):
     monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
 
-def service_for(tmp_path: Path, *, condition: str = "", repetitions: int = 1):
+def service_for(tmp_path: Path, *, condition: str = "", repetitions: int = 1, execute_doc: str | None = None):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     for path in FIXTURE.glob("*.py"):
         (candidate / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     step = (candidate / "steps.control.py").read_text(encoding="utf-8")
+    if execute_doc is not None:
+        step = step.replace('    ctx.action("observe.capture_screen")', f'    """{execute_doc}"""\n    ctx.action("observe.capture_screen")', 1)
     step += condition
     (candidate / "steps.control.py").write_text(step, encoding="utf-8")
     task = '''"""证明调用者只在当前 Step 正常返回后继续。"""
@@ -616,3 +618,21 @@ def test_application_shutdown_waits_for_input_release(tmp_path, monkeypatch):
     assert service.state["result"]["failure_code"] == "user_cancelled"
     assert window.backend.events.count(("key", 0x1B, True)) == 1
     assert window.backend.closed
+
+
+@pytest.mark.parametrize("execute_doc", [None, "入口说明优先于模块说明。"])
+def test_pause_description_prefers_execute_docstring(tmp_path, execute_doc):
+    """接管提示采用入口说明，并兼容旧模块说明。"""
+    service, window = service_for(tmp_path, execute_doc=execute_doc)
+    window.backend.takeovers = 1
+    service.start("tasks.control", {"operation": "drag"})
+    try:
+        state = paused(service)
+        description = state["pause_info"]["description"]
+        if execute_doc is not None:
+            assert description == execute_doc
+        else:
+            assert description.startswith("手动输入验收：")
+    finally:
+        service.resume()
+        finished(service)

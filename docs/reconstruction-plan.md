@@ -75,7 +75,7 @@ Agent runtime references below describe retained Stage 3.5 integration contracts
 - Task and Subworkflow prerequisites are expressed in ordinary Steps; no Workflow entry condition is evaluated;
 - Step condition checks before the first and every recovery-controlled fresh invocation; false, uncertainty, or exception produces `ExecutionFailure`, never reaches Workflow as a branch value, and only a later satisfied check permits Step invocation before repeated failure escalates to Agent or Safe Task Termination;
 - a Step `condition` accepts the whole observable responsibility range rather than one instantaneous action target, and every Step safely continues from actionable, expected transitional, or completed states using only current observation and original arguments;
-- each Python Component uses one module docstring as its sole natural-language description;
+- each executable Python Component uses its execute docstring, falling back to the module docstring, as its sole natural-language description; Recovery Rules require module docstrings;
 - Task Workflow has no final verification callback; result type validation remains mandatory and business checks belong in Steps;
 - Request Step Recheck resolves the paused current Step; its condition and execute own their observations and business checks;
 - plain `@step` marks the smallest independently observable Python boundary and records identity, arguments, conditions, timing, Trusted Actions, evidence, returns, and interruptions;
