@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+from datetime import datetime, timezone
 import os
 import shutil
 import sys
@@ -23,6 +24,7 @@ SECTIONS = ("components", "recovery_rules")
 ROLES = {"task_workflow", "sub_workflow", "step", "automation_plan"}
 TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS}
 SAVED_TOP_LEVEL_FIELDS = {*TOP_LEVEL_FIELDS, "manifest_id"}
+OPTIONAL_FIELDS = {"AdditionalMessage", "published_at"}
 COMPONENT_ID_PREFIX = "sha256:"
 EMPTY_PLAN = '"""空调度 Plan；由开发者填写 Task 调用。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:\n    return None\n'
 
@@ -156,6 +158,8 @@ class ManifestManager:
             manifest_id = str(uuid.uuid4())
             assert prepared.manifest is not None
             manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
+            manifest.update(AdditionalMessage=prepared.manifest.get("AdditionalMessage", ""),
+                            published_at=datetime.now(timezone.utc).isoformat())
             manifest.update({name: prepared.manifest[name] for name in SECTIONS})
             phase = "write_components"
             self.components_dir.mkdir(parents=True, exist_ok=True)
@@ -275,7 +279,7 @@ class ManifestManager:
         return manifest_id if manifest.get("manifest_id") == manifest_id else None
 
     def list_manifests(self) -> list[dict[str, Any]]:
-        """按文件时间倒序列出 retained Manifest，不导入 Component。"""
+        """按固定发布时间倒序列出版本；旧文件回退修改时间，不导入 Component。"""
 
         summaries: list[dict[str, Any]] = []
         for path in self.manifests_dir.glob("*.json"):
@@ -283,7 +287,7 @@ class ManifestManager:
                 continue
             data, errors = self._read_json(path)
             if (errors or not isinstance(data, dict)
-                    or set(data) != SAVED_TOP_LEVEL_FIELDS
+                    or not SAVED_TOP_LEVEL_FIELDS <= set(data) <= SAVED_TOP_LEVEL_FIELDS | OPTIONAL_FIELDS
                     or type(data.get("schema_version")) is not int
                     or data["schema_version"] != SCHEMA_VERSION):
                 continue
@@ -292,13 +296,19 @@ class ManifestManager:
                 for name in SECTIONS
             }
             try:
-                saved_at = path.stat().st_mtime
-            except OSError:
+                stamp = datetime.fromisoformat(data["published_at"]) if "published_at" in data else None
+                if stamp is not None and stamp.tzinfo is None:
+                    continue
+                saved_at = stamp.timestamp() if stamp is not None else path.stat().st_mtime
+                if not isinstance(data.get("AdditionalMessage", ""), str):
+                    continue
+            except (OSError, ValueError, TypeError):
                 continue
             summaries.append(
                 {
                     "manifest_id": data.get("manifest_id", path.stem),
                     "saved_at": saved_at,
+                    "AdditionalMessage": data.get("AdditionalMessage", ""),
                     **sections,
                 }
             )
@@ -355,6 +365,7 @@ class ManifestManager:
                 "components": {},
                 "recovery_rules": {},
             }
+            candidate["AdditionalMessage"] = manifest.get("AdditionalMessage", "")
             if not manifest["components"]:
                 (temporary / "plan.py").write_text(EMPTY_PLAN, encoding="utf-8")
                 candidate["components"]["plans.default"] = {"source_path": "plan.py"}
@@ -394,7 +405,16 @@ class ManifestManager:
 
         allowed = SAVED_TOP_LEVEL_FIELDS if saved else TOP_LEVEL_FIELDS
         required = allowed
-        self._check_fields(data, allowed, required, prepared.errors)
+        self._check_fields(data, allowed | (OPTIONAL_FIELDS if saved else {"AdditionalMessage"}), required, prepared.errors)
+        if not isinstance(data.get("AdditionalMessage", ""), str):
+            prepared.errors.append(ValidationError("manifest_field_type_invalid", "AdditionalMessage must be a string."))
+        if saved and "published_at" in data:
+            try:
+                stamp = datetime.fromisoformat(data["published_at"])
+                if stamp.tzinfo is None:
+                    raise ValueError("Timezone required")
+            except (ValueError, TypeError):
+                prepared.errors.append(ValidationError("manifest_field_type_invalid", "published_at must be an ISO timestamp with timezone."))
         if data.get("schema_version") != SCHEMA_VERSION or isinstance(data.get("schema_version"), bool):
             prepared.errors.append(
                 ValidationError("schema_version_unsupported", "schema_version must be integer 2; legacy formats are not supported.")
@@ -441,6 +461,9 @@ class ManifestManager:
             "components": {},
             "recovery_rules": {},
         }
+        for name in OPTIONAL_FIELDS:
+            if name in data:
+                normalized[name] = data[name]
         if saved and isinstance(data.get("manifest_id"), str):
             normalized["manifest_id"] = data["manifest_id"]
 

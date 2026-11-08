@@ -182,7 +182,7 @@ def test_empty_tasks_and_manifest_failure_dialog(owner, monkeypatch):
     user, manager = owner.user, owner.host.manager
     monkeypatch.setattr(manager, "default_manifest_id", lambda: None)
     user.refresh_tasks()
-    assert any(label.text() == "请先选择 Manifest。" for label in user.task_list.findChildren(BodyLabel))
+    assert any(label.text() == "请先选择 工作流版本。" for label in user.task_list.findChildren(BodyLabel))
     monkeypatch.setattr(manager, "default_manifest_id", lambda: "bad-manifest")
     monkeypatch.setattr(manager, "load", lambda _: SimpleNamespace(ok=False, errors=[SimpleNamespace(message="invalid source")]))
     errors = []
@@ -202,7 +202,7 @@ def test_task_list_uses_remaining_height_and_no_matching_tasks_message(owner, ap
     assert user.task_scroll.height() > before
     user.business_pages = []
     user.refresh_tasks()
-    assert any(label.text() == "当前 Manifest 与已加载的配置页没有匹配任务。"
+    assert any(label.text() == "当前 工作流版本 与已加载的配置页没有匹配任务。"
                for label in user.task_list.findChildren(BodyLabel))
 
 

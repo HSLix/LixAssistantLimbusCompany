@@ -199,6 +199,8 @@ def test_publish_loads_complete_manifest_and_uses_content_ids(tmp_path: Path) ->
     saved_path = manager.manifests_dir / f"{result.loaded.manifest_id}.json"
     saved = json.loads(saved_path.read_text(encoding="utf-8"))
     assert set(saved) == {
+        "AdditionalMessage",
+        "published_at",
         "schema_version",
         "manifest_id",
         "components",
@@ -524,3 +526,62 @@ def test_recovery_still_requires_module_docstring(tmp_path):
     candidate = _write_candidate(tmp_path / "candidate", sources=sources)
     result = ManifestManager(tmp_path / "formal").publish(candidate)
     assert "module_docstring_missing" in _codes(result)
+
+
+def test_version_metadata_roundtrip_and_legacy(tmp_path):
+    """说明和固定时间经过发布、候选及导入仍保留，旧版本回退文件时间。"""
+    import os
+    from datetime import datetime
+    from lalc.workflow_sharing import inspect_workflow_import, import_workflow
+    candidate = _write_candidate(tmp_path / "candidate")
+    data = json.loads(candidate.read_text())
+    data["AdditionalMessage"] = "优化战斗流程"
+    candidate.write_text(json.dumps(data))
+    manager = ManifestManager(tmp_path / "formal")
+    result = manager.publish(candidate)
+    assert result.ok
+    identity = result.loaded.manifest_id
+    from lalc.manifest_reference import ManifestReference
+    assert ManifestReference(manager).read(identity)["AdditionalMessage"] == "优化战斗流程"
+    item = manager.list_manifests()[0]
+    assert item["AdditionalMessage"] == "优化战斗流程"
+    assert datetime.fromisoformat(result.loaded.manifest["published_at"]).tzinfo is not None
+    path = manager.manifests_dir / f"{identity}.json"
+    os.utime(path, (1, 1))
+    assert manager.list_manifests()[0]["saved_at"] == item["saved_at"]
+    assert not manager.initialize_candidate(tmp_path / "next", manifest_id=identity)
+    assert json.loads((tmp_path / "next/manifest.json").read_text())["AdditionalMessage"] == "优化战斗流程"
+    target = ManifestManager(tmp_path / "imported")
+    check = inspect_workflow_import(target, manager.data_root, identity)
+    import_workflow(target, manager.data_root, identity, manifest_id=check["manifest_id"],
+                    manifest_sha256=check["manifest_sha256"])
+    assert target.list_manifests() == manager.list_manifests()
+    legacy = json.loads(path.read_text())
+    del legacy["published_at"]
+    del legacy["AdditionalMessage"]
+    path.write_text(json.dumps(legacy))
+    os.utime(path, (1, 1))
+    assert manager.load(identity).ok
+    assert manager.list_manifests()[0]["saved_at"] == 1
+    assert manager.list_manifests()[0]["AdditionalMessage"] == ""
+
+
+@pytest.mark.parametrize("message", [None, 1, [], {}])
+def test_version_message_rejects_non_string(tmp_path, message):
+    candidate = _write_candidate(tmp_path / "candidate")
+    data = json.loads(candidate.read_text())
+    data["AdditionalMessage"] = message
+    candidate.write_text(json.dumps(data))
+    assert "manifest_field_type_invalid" in _codes(ManifestManager(tmp_path / "formal").publish(candidate))
+
+
+@pytest.mark.parametrize("stamp", [None, 1, "bad", "2026-11-08T12:00:00"])
+def test_saved_version_rejects_invalid_publication_time(tmp_path, stamp):
+    manager = ManifestManager(tmp_path / "formal")
+    result = manager.publish(_write_candidate(tmp_path / "candidate"))
+    path = manager.manifests_dir / f"{result.loaded.manifest_id}.json"
+    data = json.loads(path.read_text())
+    data["published_at"] = stamp
+    path.write_text(json.dumps(data))
+    assert "manifest_field_type_invalid" in _codes(manager.load(result.loaded.manifest_id))
+    assert manager.list_manifests() == []

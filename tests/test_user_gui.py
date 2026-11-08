@@ -321,3 +321,27 @@ def test_cli_developer_entry_selects_developer_window(tmp_path, monkeypatch):
     monkeypatch.setattr(gui, "run_gui", lambda owner, *, developer=False: selected.append(developer) or 0)
     assert cli.main(["--developer"]) == 0
     assert selected == [True]
+
+
+def test_latest_version_card_requires_explicit_selection(windows):
+    """新版本自动提示但不切换；卡片显示说明、秒级时间并支持显式选择。"""
+    from test_manifest import _write_candidate
+    app, owner, user, developer = windows
+    manager = user.host.manager
+    original = manager.default_manifest_id()
+    candidate = _write_candidate(manager.data_root / "metadata-candidate")
+    data = json.loads(candidate.read_text())
+    data["AdditionalMessage"] = "<b>战斗改进</b>"
+    candidate.write_text(json.dumps(data))
+    result = manager.publish(candidate)
+    assert result.ok
+    user.refresh_manifest_card()
+    assert manager.default_manifest_id() == original
+    assert not user.latest_card.isHidden()
+    assert result.loaded.manifest_id in user.latest_label.text()
+    assert "<b>战斗改进</b>" in user.latest_label.text()
+    user.latest_button.click()
+    assert manager.default_manifest_id() == result.loaded.manifest_id
+    assert user.latest_card.isHidden()
+    assert "<b>战斗改进</b>" in user.manifest_label.text()
+    assert user.manifest_timer.isActive()
