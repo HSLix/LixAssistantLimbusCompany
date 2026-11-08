@@ -317,9 +317,9 @@ class ImportedPageReview:
     def package_path(self, filename, scope="installed"):
         return installed_page(self.root, filename)
 
-    def check_registration(self, snapshot, page_id, task_id):
+    def check_registration(self, snapshot, page_id, tasks):
         target = installed_page(self.root, snapshot["filename"])
-        check_page_registration(self.root / "pages", target if target.is_file() else target / "page.py", page_id, task_id)
+        check_page_registration(self.root / "pages", target if target.is_file() else target / "page.py", page_id, tasks)
 
 
 class ImportDialog(QDialog):

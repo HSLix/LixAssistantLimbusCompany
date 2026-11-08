@@ -2001,5 +2001,14 @@ Original pixel region: {2}</source>
       <source>Set as default version</source>
       <translation>设为默认版本</translation>
     </message>
-  </context>
+  <message><source>Based on Manifest: {0}</source><translation>基于 Manifest：{0}</translation></message>
+<message><source>None</source><translation>无</translation></message>
+<message><source>Enable page</source><translation>启用页面</translation></message>
+<message><source>Disable page</source><translation>停用页面</translation></message>
+<message><source>Source, resources and settings are preserved. Restart LALC to apply changes.</source><translation>保留源码、资源和所有配置。重启 LALC 后生效。</translation></message>
+<message><source>Pages changed</source><translation>页面已变更</translation></message>
+<message><source>Page changes are saved. Restart LALC to apply the changes.</source><translation>页面变更已保存。重启 LALC 后生效。</translation></message>
+<message><source>Proposed tasks: {0}</source><translation>拟安装任务：{0}</translation></message>
+<message><source>Current tasks: {0}</source><translation>当前任务：{0}</translation></message>
+</context>
 </TS>

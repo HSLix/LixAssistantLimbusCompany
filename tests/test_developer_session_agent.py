@@ -609,3 +609,31 @@ def test_gui_send_uses_actual_pi_events_and_cli_can_continue(conversation, gui):
     assert result['status'] == 'completed', result
     assert 'actual GUI message' in json.dumps(state['calls'][-1])
     assert source in json.dumps(state['calls'][-1])
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_page_availability_tool_roundtrip(conversation, enabled):
+    """真实 pi 转发启停工具并等待专用审批结果，不把更新当作启用。"""
+    from lalc.page_drafts import PageDrafts
+    from lalc.user_pages import PageAvailability
+    from test_page_drafts import SOURCE
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, None, mode='Construct', entry='gui')
+    chat = session.conversation()
+    drafts = PageDrafts(session)
+    drafts.installed.mkdir(parents=True, exist_ok=True)
+    (drafts.installed / 'sample.py').write_text(SOURCE)
+    PageAvailability(drafts.installed.parent).set_enabled('sample.py', not enabled)
+    seen = []
+    def confirm(request):
+        seen.append(request)
+        assert request.enabled is enabled
+        request.finish(action=lambda: request.drafts.set_enabled(request.snapshot, request.enabled))
+    script(state, [tool('page_list', {'scope': 'installed'}),
+                   tool('page_set_enabled', {'filename': 'sample.py', 'enabled': enabled, 'summary': '人工确认启停'}),
+                   answer('availability updated')])
+    result = asyncio.run(chat.run('修改页面启停状态', options, on_page_preview=confirm))
+    assert result['status'] == 'completed', result
+    assert len(seen) == 1 and seen[0].result['reload_required']
+    assert PageAvailability(drafts.installed.parent).enabled('sample.py') is enabled
+    assert chat.tools.on_page_preview is None

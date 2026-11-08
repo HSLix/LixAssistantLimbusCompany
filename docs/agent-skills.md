@@ -52,3 +52,5 @@ Skill 名遵循 pi 格式，用小写字母、数字和连字符；参考资料�
 加载警告在当前对话／CLI 及日志中显示；无效项按 pi 规则诊断，其余有效项继续使用，空目录可正常对话。`round-N/input.json` 保留本轮目录，实际模型请求及 read 工具结果保留当时文本／图片，复用现有无损日志。未读取的正文不额外长期归档，临时副本不进入 Sharing。历史 Skill／旧 SOP 消息保持不变，不重放旧操作，也不把历史路径作为当前访问授权。
 
 设计依据见[讨论](agent-skills-decisions.md)和[影响评审](agent-skills-impact-review.md)；实施证据和限制见[实施记录](agent-skills-implementation.md)。
+
+2026-11-08 内置 page-development 已同步 TASKS 多任务声明、逐任务次数开关及专用人工确认启停。已有数据目录的自定义 Skill 仍不自动覆盖；如已有该文件，需人工对照内置版本同步。Agent 工具声明同时包含新契约，旧页面级声明会被拒绝。

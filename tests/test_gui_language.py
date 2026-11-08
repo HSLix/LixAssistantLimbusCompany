@@ -177,7 +177,7 @@ def test_examples_translate_navigation_content_and_validation_but_legacy_does_no
         with pytest.raises(ValueError, match="消息不能为空" if language == "zh_CN" else "Message cannot be empty"):
             page.widget.submit()
     legacy = by_id["legacy-language-example"]
-    assert legacy.name == "固定语言兼容示例" and legacy.task_id is None
+    assert legacy.name == "固定语言兼容示例" and not legacy.tasks
     assert "不支持语言切换" in legacy.widget.findChildren(QLabel)[0].text()
     legacy.widget.note.setText("retained")
     legacy.context.save(legacy.widget.submit())

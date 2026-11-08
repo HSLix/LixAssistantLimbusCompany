@@ -147,7 +147,7 @@ def page_declarations(package):
     require_memory(len(source) * 12)
     tree = ast.parse(source)
     values = {}
-    for name in ("PAGE_ID", "PAGE_NAME", "TASK_ID"):
+    for name in ("PAGE_ID", "PAGE_NAME", "TASKS"):
         nodes = []
         for node in tree.body:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
@@ -159,8 +159,11 @@ def page_declarations(package):
             value = ast.literal_eval(nodes[0])
         except (ValueError, TypeError):
             continue
-        if len(nodes) != 1 or (value is not None or name != "TASK_ID") and (type(value) is not str or not value.strip()):
+        if len(nodes) != 1 or name != "TASKS" and (type(value) is not str or not value.strip()):
             raise ValueError(f"页面声明无效：{name}")
+        if name == "TASKS":
+            from .user_pages import validate_tasks
+            value = validate_tasks(value)
         values[name] = value
     if values.get("PAGE_ID") in {"dashboard", "general-settings"}:
         raise ValueError("页面使用了宿主保留 ID。")
@@ -699,14 +702,15 @@ def page_selection_errors(manager, package, checks, selected, reviewed):
         declarations = dict(check["declarations"])
         approval = reviewed.get(number)
         if approval and approval["sha256"] == check["package"].sha256 and approval["before"] == check["before"]:
-            declarations.update(PAGE_ID=approval["page_id"], TASK_ID=approval["task_id"])
+            declarations.update(PAGE_ID=approval["page_id"], TASKS=approval["tasks"])
         target = check["target"] if check["target"].is_file() else check["target"] / "page.py"
         for other, values in [*local, *chosen]:
             if other == target:
                 continue
-            for key in ("PAGE_ID", "TASK_ID"):
-                if declarations.get(key) is not None and declarations.get(key) == values.get(key):
-                    errors.setdefault(number, []).append(f"{key} 冲突：{other}")
+            if declarations.get("PAGE_ID") is not None and declarations.get("PAGE_ID") == values.get("PAGE_ID"):
+                errors.setdefault(number, []).append(f"PAGE_ID 冲突：{other}")
+            if {task["id"] for task in declarations.get("TASKS", [])} & {task["id"] for task in values.get("TASKS", [])}:
+                errors.setdefault(number, []).append(f"TASKS 冲突：{other}")
         chosen.append((target, declarations))
     return errors
 

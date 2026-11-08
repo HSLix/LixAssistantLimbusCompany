@@ -39,7 +39,7 @@ def test_documented_minimal_page_loads_and_submits_empty_config(tmp_path, app):
     assert not errors and len(pages) == 1
     page = pages[0]
     try:
-        assert page.page_id == "sample.notice" and page.task_id is None
+        assert page.page_id == "sample.notice" and not page.tasks
         assert page.widget.submit() == {}
         page.context.save(page.widget.submit())
         assert UserSettings(tmp_path).value["pages"]["sample.notice"] == {}
@@ -275,7 +275,7 @@ def test_profile_migration_and_auth_snapshot_survive_clear(tmp_path):
 
 
 def test_validation_failure_does_not_start_or_schedule_restart(owner):
-    page = next(page.widget for page in owner.user.business_pages if page.task_id)
+    page = next(page.widget for page in owner.user.business_pages if page.tasks)
     page.message.clear()
     with pytest.raises(ValueError, match="消息不能为空"):
         owner.user.start_plan()
@@ -480,12 +480,12 @@ def test_page_count_visibility_preserves_saved_count_and_controls_inputs(tmp_pat
     pages_dir = tmp_path / 'pages'
     shutil.copytree(PAGES, pages_dir)
     with (pages_dir / 'loop.py').open('a') as stream:
-        stream.write(f'\nSHOW_TASK_COUNT = {show!r}\n')
+        stream.write(f'\nTASKS[0]["show_task_count"] = {show!r}\n')
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(pages_dir, store)
     assert not errors
-    page = next(page for page in pages if page.task_id)
-    assert page.show_task_count is show
+    page = next(page for page in pages if page.tasks)
+    assert page.tasks[0]["show_task_count"] is show
     store.save_task('sample.loop', True, 9)
     repetitions, _, _ = task_inputs(pages, ('sample.loop',), store)
     assert repetitions['sample.loop'] == (9 if show else 1)
@@ -501,10 +501,10 @@ def test_invalid_count_declaration_isolates_page(tmp_path, app):
     pages_dir = tmp_path / 'pages'
     shutil.copytree(PAGES, pages_dir)
     with (pages_dir / 'loop.py').open('a') as stream:
-        stream.write('\nSHOW_TASK_COUNT = "false"\n')
+        stream.write('\nTASKS[0]["show_task_count"] = "false"\n')
     pages, errors = discover_pages(pages_dir, UserSettings(tmp_path))
-    assert all(page.task_id is None for page in pages)
-    assert len(errors) == 1 and 'SHOW_TASK_COUNT' in errors[0]
+    assert all(not page.tasks for page in pages)
+    assert len(errors) == 1 and 'show_task_count' in errors[0]
 
 
 def test_count_buttons_and_hidden_count_row(owner, app):
@@ -535,8 +535,8 @@ def test_count_buttons_and_hidden_count_row(owner, app):
         assert not enabled.geometry().intersects(controls.geometry())
         assert row.rect().contains(controls.geometry())
         assert row.rect().contains(enabled.geometry())
-    page = next(page for page in user.business_pages if page.task_id)
-    page.show_task_count = False
+    page = next(page for page in user.business_pages if page.tasks)
+    page.tasks[0]["show_task_count"] = False
     user.refresh_tasks()
     enabled, hidden_count = user.task_rows['sample.loop']
     assert hidden_count is None

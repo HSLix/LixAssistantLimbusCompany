@@ -7,7 +7,7 @@ PAGE_ID = "mirror"
 PAGE_NAME = "镜牢教学示例"
 PAGE_NAMES = {"zh_CN": "镜牢教学示例", "en_US": "Mirror example"}
 PAGE_ICON = FluentIcon.GAME
-TASK_ID = "mirror"
+TASKS = [{"id": "mirror", "name": "镜牢", "show_task_count": True, "names": {"zh_CN": "镜牢", "en_US": "Mirror Dungeon"}}]
 
 
 class MirrorPage(QWidget):

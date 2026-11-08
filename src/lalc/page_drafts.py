@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 
 from .runtime import _strict_json
-from .user_pages import UserSettings, check_page_registration
+from .user_pages import UserSettings, PageAvailability, check_page_registration
 from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries, page_entry,
                             page_filename, real_directory, snapshot_page)
 
@@ -90,7 +90,10 @@ class PageDrafts:
         items = []
         for name in names[offset:offset + limit]:
             package = snapshot_page(self.package_path(name, scope), freeze=False)
-            items.append({"filename": name, "sha256": package.sha256, "file_count": len(package.files)})
+            item = {"filename": name, "sha256": package.sha256, "file_count": len(package.files)}
+            if scope == "installed":
+                item["enabled"] = PageAvailability(self.installed.parent).enabled(name)
+            items.append(item)
         return {"scope": scope, "items": items, "next_offset": offset + limit if offset + limit < len(names) else None}
 
     def read(self, scope="installed", filename="", offset=0, limit=16000, path="page.py"):
@@ -198,14 +201,14 @@ class PageDrafts:
                              legacy_filename=filename if current.is_file() else None)
         return {"filename": filename, "path": path, "removed": remove, "package_sha256": package.sha256}
 
-    def check_registration(self, snapshot, page_id, task_id):
+    def check_registration(self, snapshot, page_id, tasks):
         """按当前正式注册检查必要冲突，不检查旧文件版本或自动合并。"""
         package = self.package_path(snapshot["filename"], "installed")
-        check_page_registration(self.installed, package if package.is_file() else package / "page.py", page_id, task_id)
+        check_page_registration(self.installed, package if package.is_file() else package / "page.py", page_id, tasks)
 
-    def install(self, snapshot, page_id, task_id):
+    def install(self, snapshot, page_id, tasks):
         """只由人工审查窗口调用；提交固定版本，不导入试填配置。"""
-        self.check_registration(snapshot, page_id, task_id)
+        self.check_registration(snapshot, page_id, tasks)
         filename = snapshot["filename"]
         current = self.package_path(filename, "installed")
         package = snapshot["package"]
@@ -214,4 +217,17 @@ class PageDrafts:
         install_page_package(self.installed, Path(filename).stem, package, replace=True,
                              legacy_filename=filename if current.is_file() else None)
         return {"status": "installed", "filename": snapshot["filename"], "sha256": snapshot["sha256"],
-                "page_id": page_id, "task_id": task_id, "reload_required": True}
+                "page_id": page_id, "tasks": tasks, "reload_required": True}
+
+    def set_enabled(self, snapshot, enabled):
+        """只由专用确认窗口提交；批准仅适用于展示的完整页面版本。"""
+        filename = snapshot["filename"]
+        current = snapshot_page(self.package_path(filename, "installed"))
+        if current.sha256 != snapshot["sha256"]:
+            raise ValueError("页面版本已变化，请重新请求确认。")
+        availability = PageAvailability(self.installed.parent)
+        changed = availability.enabled(filename) != enabled
+        if changed:
+            availability.set_enabled(filename, enabled)
+        return {"status": "availability_changed" if changed else "unchanged", "filename": filename,
+                "enabled": enabled, "reload_required": changed}
