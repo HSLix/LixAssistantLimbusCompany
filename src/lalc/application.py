@@ -613,6 +613,7 @@ class ApplicationService:
                                        resume_pending=False, result=result)
                     self._focused_session = None
                     self._input_session = None
+                    self._gate = None
                     self._changed_locked()
 
     def _fatal_result(
@@ -748,6 +749,7 @@ class ApplicationService:
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
             self._focused_session = None
             self._input_session = None
+            self._gate = None
             self._changed_locked()
 
     def _emit(self, event: str, fields: dict[str, Any]) -> None:
