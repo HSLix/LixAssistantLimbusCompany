@@ -45,9 +45,9 @@ class PageInstalledDialog(QDialog):
         self.window = window
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
-        self.setWindowTitle(tr('Page installed'))
+        self.setWindowTitle(tr('Pages changed'))
         layout = QVBoxLayout(self)
-        self.message = BodyLabel(tr('Page installation is complete. Restart LALC to apply the changes.'))
+        self.message = BodyLabel(tr('Page changes are saved. Restart LALC to apply the changes.'))
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         controls = QHBoxLayout()
@@ -214,7 +214,7 @@ class PagePreviewDialog(QDialog):
             path = self.packages.enter_context(materialized_page(snapshot['package']))
             self.proposed = create_business_page(path, *load_page_module(path, snapshot['source']), MemorySettings(value))
             self.proposed_column.addWidget(self.proposed.widget)
-            drafts.check_registration(snapshot, self.proposed.page_id, self.proposed.task_id)
+            drafts.check_registration(snapshot, self.proposed.page_id, self.proposed.tasks)
         except Exception as error:
             return self.fail_preview('proposed', error)
         if request.done.is_set():
@@ -232,15 +232,15 @@ class PagePreviewDialog(QDialog):
         except Exception as error:
             self.show_error(self.current_column, 'current', error)
         current_id = self.current.page_id if self.current else '—'
-        current_task = self.current.task_id if self.current and self.current.task_id else '—'
+        current_task = self.current.tasks if self.current else []
         self.review_details.setPlainText('\n'.join([
             tr('File: {0}').format(snapshot['filename']),
             tr('Session: {0}').format(request.identity[0]),
             tr('Proposed page ID: {0}').format(self.proposed.page_id),
-            tr('Proposed task ID: {0}').format(self.proposed.task_id or '—'),
+            tr('Proposed tasks: {0}').format(self.proposed.tasks or '—'),
             tr('Proposed SHA-256: {0}').format(snapshot['sha256']),
             tr('Current page ID: {0}').format(current_id),
-            tr('Current task ID: {0}').format(current_task),
+            tr('Current tasks: {0}').format(current_task),
             tr('Current SHA-256: {0}').format(self.current_hash or '—'),
             tr('Page loading was checked. Configuration and Plan compatibility are reviewed by the Agent.'),
         ]))
@@ -276,10 +276,10 @@ class PagePreviewDialog(QDialog):
         try:
             if self.request.review_only:
                 self.request.finish({"status": "reviewed", "sha256": self.request.snapshot["sha256"],
-                    "page_id": self.proposed.page_id, "task_id": self.proposed.task_id})
+                    "page_id": self.proposed.page_id, "tasks": self.proposed.tasks})
             else:
                 self.request.finish(action=lambda: {
-                    **self.request.drafts.install(self.request.snapshot, self.proposed.page_id, self.proposed.task_id),
+                    **self.request.drafts.install(self.request.snapshot, self.proposed.page_id, self.proposed.tasks),
                     "errors": dict(self.errors)})
         except Exception as error:
             message = self.clean_error(error)
@@ -312,3 +312,54 @@ class PagePreviewDialog(QDialog):
     def expire(self):
         if self.request.done.is_set():
             self.close()
+
+
+class PageAvailabilityDialog(QDialog):
+    """专用启停确认；关闭与取消均不修改页面状态。"""
+
+    def __init__(self, request, window):
+        super().__init__(window)
+        self.request, self.window = request, window
+        self.ready = True
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.setWindowTitle(tr('Enable page') if request.enabled else tr('Disable page'))
+        layout = QVBoxLayout(self)
+        # 与安装预览相同，可信源码只在 GUI 线程加载，避免后台线程创建 Qt 对象。
+        with materialized_page(request.snapshot['package']) as path:
+            _, page_id, name, tasks = load_page_module(path, content_bytes(request.snapshot['package'].files['page.py']))
+        details = PlainTextEdit()
+        details.setReadOnly(True)
+        details.setPlainText('\n'.join([name, page_id, request.snapshot['filename'],
+            *[task['id'] + ': ' + task['name'] for task in tasks], '', request.summary,
+            tr('Source, resources and settings are preserved. Restart LALC to apply changes.')]))
+        layout.addWidget(details)
+        controls = QHBoxLayout()
+        cancel = PushButton(tr('Cancel'))
+        cancel.clicked.connect(self.reject)
+        self.confirm = PrimaryPushButton(tr('Confirm'))
+        self.confirm.clicked.connect(self.apply_change)
+        controls.addWidget(cancel)
+        controls.addWidget(self.confirm)
+        layout.addLayout(controls)
+        self.finished.connect(lambda _: request.finish({'status': 'skipped'}))
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.check_cancelled)
+        self.timer.start(50)
+        self.finished.connect(lambda _: self.timer.stop())
+
+    def check_cancelled(self):
+        if self.request.done.is_set() or self.window.closing or any(job.cancel_requested for job in self.window.jobs):
+            self.request.close()
+            self.reject()
+
+    def apply_change(self):
+        """取消与确认共享请求锁，防止已取消轮次的迟到批准。"""
+        self.check_cancelled()
+        if self.request.done.is_set():
+            return
+        try:
+            self.request.finish(action=lambda: self.request.drafts.set_enabled(self.request.snapshot, self.request.enabled))
+        except Exception as error:
+            self.request.finish({'status': 'failed', 'error': str(error)})
+        self.accept()

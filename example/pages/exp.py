@@ -7,7 +7,7 @@ PAGE_ID = "exp"
 PAGE_NAME = "经验本教学示例"
 PAGE_NAMES = {"zh_CN": "经验本教学示例", "en_US": "EXP example"}
 PAGE_ICON = FluentIcon.EDUCATION
-TASK_ID = "exp"
+TASKS = [{"id": "exp", "name": "经验本", "show_task_count": True, "names": {"zh_CN": "经验本", "en_US": "EXP"}}]
 
 
 class ExpPage(QWidget):

@@ -110,7 +110,7 @@ Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打
 
 #332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/workflow/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。
 
-注册循环任务必须同时在页面声明 `TASK_ID`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[TASK_ID]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
+注册循环任务必须同时在页面声明 `TASKS` 并给出任务 `id`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[任务id]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
 
 Component 说明优先读取 execute 函数的 docstring，缺失时兼容回退到模块 docstring；两者至少提供一处。Recovery Rule 没有 execute 入口，仍必须提供模块 docstring。只写 # 注释不构成 docstring。
 
@@ -123,4 +123,16 @@ UserGUI 显示完整 UUID、本地时间（到秒）和说明；空白说明显�
 任务次数输入框按约六位数字限制宽度，不改变可输入次数范围；其余横向空间分配给任务名。
 
 
-Dashboard 的任务次数使用左减、居中数字、右加，仍可输入数字，范围 1–2147483647。页面模块可选声明 `SHOW_TASK_COUNT = False`，隐藏整组次数控件，保留勾选与“设置”。默认为 `True`，旧页面无需修改。`False` 时匹配且勾选的任务传入次数 `1`，未勾选或不匹配传 `0`；旧保存次数保留，重新开启控件时恢复。该属性必须为布尔值，非布尔值按页面声明错误隔离；纯设置页不受影响。此开关不改变 `TASK_ID` / Plan 支持列表、`submit()` 或页面配置结构。
+每个 TASKS 项必须声明布尔 show_task_count。False 隐藏该任务的次数控件，保留勾选与“设置”；匹配且启用传 1，未启用或不匹配传 0。True 使用保存的次数（1–2147483647）；隐藏期间保留旧次数。旧 TASK_ID 和页面级 SHOW_TASK_COUNT 不再支持。
+
+页面多任务声明示例（任务 ID 全局唯一；names 为可选中英文名称）：
+
+```python
+TASKS = [
+    {"id": "exp", "name": "经验本", "show_task_count": True,
+     "names": {"zh_CN": "经验本", "en_US": "EXP"}},
+    {"id": "reward", "name": "领取奖励", "show_task_count": False},
+]
+```
+
+GUI Construct Agent 可使用 page_list 查询包括停用页面在内的列表及 enabled 状态，通过 page_set_enabled 请求专用人工确认。停用与启用均需确认，关闭/取消不修改；保留全部资源、配置及 ID 占用，不提供永久删除或专门管理入口。变更重启后生效，覆盖安装不改变状态，恢复后仍按 Plan 支持项执行。详情见设计与影响审查。

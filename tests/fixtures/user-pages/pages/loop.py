@@ -5,7 +5,7 @@ from qfluentwidgets import BodyLabel as QLabel, LineEdit
 
 PAGE_ID = "sample.message"
 PAGE_NAME = "消息循环示例"
-TASK_ID = "sample.loop"
+TASKS = [{"id": "sample.loop", "name": "sample.loop", "show_task_count": True}]
 
 
 class MessagePage(QWidget):

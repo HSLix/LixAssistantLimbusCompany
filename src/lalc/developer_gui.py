@@ -1056,6 +1056,9 @@ class RepairPage(QWidget):
         self.context_button.setAccessibleName(tr('Chat context'))
         self.context_button.setToolTip(tr('Chat context'))
         self.context_button.clicked.connect(lambda: self.source_panel.setVisible(self.source_panel.isHidden()))
+        self.source_label = QLabel()
+        self.source_label.setMaximumWidth(300)
+        top.addWidget(self.source_label)
         top.addWidget(self.context_button)
         main_layout.addLayout(top)
         centered = QHBoxLayout()
@@ -1086,6 +1089,7 @@ class RepairPage(QWidget):
         source_layout.addWidget(QLabel(tr('Source Manifest')))
         self.baseline = QComboBox()
         self.baseline.setMinimumWidth(0)
+        self.baseline.currentIndexChanged.connect(self.update_source_label)
         source_layout.addWidget(self.baseline, 1)
         body.addWidget(self.source_panel)
         self.source_panel.hide()
@@ -1332,7 +1336,18 @@ class RepairPage(QWidget):
         self.attach.setToolTip(details or tr('Attachments'))
         self.attachment_notice.setToolTip(details)
 
+    def update_source_label(self):
+        """已有 Session 显示固定来源；新对话显示当前选择。"""
+        if self.session is not None:
+            source = json.loads((self.session.path / 'session.json').read_text())['source_manifest_id']
+        else:
+            source = self.baseline.currentData()
+        text = tr('Based on Manifest: {0}').format(source or tr('None'))
+        self.source_label.setText(text)
+        self.source_label.setToolTip(text)
+
     def update_source(self):
+        self.update_source_label()
         self.baseline.setItemText(0, tr('Blank (Construct only)') if self.mode.currentRouteKey() == 'Construct'
                                   else tr('Select a published Manifest'))
 
@@ -1706,7 +1721,7 @@ class RepairPage(QWidget):
         """轮次后台作业清理后汇总实际安装，取消或失败也提示；历史恢复不触发。"""
         requests, self._page_preview_requests = self._page_preview_requests, []
         if self.window.closing or not any(
-                request.result and request.result.get('status') == 'installed' for request in requests):
+                request.result and request.result.get('status') in {'installed', 'availability_changed'} for request in requests):
             return
         from .page_preview import PageInstalledDialog
         self.window.page_installed_dialog = PageInstalledDialog(self.window)
@@ -1733,14 +1748,14 @@ class RepairPage(QWidget):
         chat = self.host.conversation
         if (request.done.is_set() or self.window.closing or not self.window.jobs or chat is None
                 or self.session is None or self.session.mode != 'Construct'
-                or 'page_preview' not in chat.allowed
+                or ('page_set_enabled' if hasattr(request, 'enabled') else 'page_preview') not in chat.allowed
                 or any(job.cancel_requested for job in self.window.jobs)
                 or request.identity[:2] != (chat.log.identity, chat.log.group)):
             request.close()
             return
-        from .page_preview import PagePreviewDialog
+        from .page_preview import PagePreviewDialog, PageAvailabilityDialog
         try:
-            dialog = PagePreviewDialog(request, self.window)
+            dialog = (PageAvailabilityDialog if hasattr(request, 'enabled') else PagePreviewDialog)(request, self.window)
             if (dialog.ready and not request.done.is_set() and not self.window.closing
                     and not any(job.cancel_requested for job in self.window.jobs)):
                 self.page_preview_dialog = dialog

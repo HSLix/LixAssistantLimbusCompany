@@ -857,33 +857,34 @@ class UserWindow(MainWindow):
                 item.widget().deleteLater()
         self.task_rows = {}
         for page in self.business_pages:
-            if page.task_id not in self.current_supported:
-                continue
-            saved = self.page_store.value["tasks"].get(page.task_id, {"enabled": False, "count": 1})
-            row = QWidget()
-            layout = FlowLayout(row)
-            layout.setContentsMargins(9, 9, 9, 9)
-            enabled = QCheckBox(page.name)
-            enabled.setToolTip(page.name)
-            count = TaskCountSpinBox() if page.show_task_count else None
-            enabled.setChecked(saved["enabled"])
-            if count is not None:
-                count.setValue(saved["count"])
-            jump = QPushButton(tr('Settings'))
-            jump.clicked.connect(lambda _, widget=page.widget: self.switchTo(widget))
-            layout.addWidget(enabled)
-            controls = QWidget()
-            controls_layout = QHBoxLayout(controls)
-            controls_layout.setContentsMargins(0, 0, 0, 0)
-            if count is not None:
-                controls_layout.addWidget(count)
-            controls_layout.addWidget(jump)
-            layout.addWidget(controls)
-            self.task_rows[page.task_id] = (enabled, count)
-            enabled.toggled.connect(lambda _, identity=page.task_id: self._interact(lambda: self.save_task(identity)))
-            if count is not None:
-                count.valueChanged.connect(lambda _, identity=page.task_id: self._interact(lambda: self.save_task(identity)))
-            self.task_layout.addWidget(row)
+            for task in page.tasks:
+                if task["id"] not in self.current_supported:
+                    continue
+                saved = self.page_store.value["tasks"].get(task["id"], {"enabled": False, "count": 1})
+                row = QWidget()
+                layout = FlowLayout(row)
+                layout.setContentsMargins(9, 9, 9, 9)
+                enabled = QCheckBox(task.get("names", {}).get(page.context.language, task["name"]))
+                enabled.setToolTip(enabled.text())
+                count = TaskCountSpinBox() if task["show_task_count"] else None
+                enabled.setChecked(saved["enabled"])
+                if count is not None:
+                    count.setValue(saved["count"])
+                jump = QPushButton(tr('Settings'))
+                jump.clicked.connect(lambda _, widget=page.widget: self.switchTo(widget))
+                layout.addWidget(enabled)
+                controls = QWidget()
+                controls_layout = QHBoxLayout(controls)
+                controls_layout.setContentsMargins(0, 0, 0, 0)
+                if count is not None:
+                    controls_layout.addWidget(count)
+                controls_layout.addWidget(jump)
+                layout.addWidget(controls)
+                self.task_rows[task["id"]] = (enabled, count)
+                enabled.toggled.connect(lambda _, identity=task["id"]: self._interact(lambda: self.save_task(identity)))
+                if count is not None:
+                    count.valueChanged.connect(lambda _, identity=task["id"]: self._interact(lambda: self.save_task(identity)))
+                self.task_layout.addWidget(row)
         if not self.task_rows and (not self.current_manifest_id or result.ok):
             empty_state = QWidget()
             empty_layout = QHBoxLayout(empty_state)

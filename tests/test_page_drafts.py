@@ -27,7 +27,7 @@ from test_user_pages import app, owner
 SOURCE = '''from PySide6.QtWidgets import QWidget, QVBoxLayout, QLineEdit
 PAGE_ID = "sample.page"
 PAGE_NAME = "Sample"
-TASK_ID = "sample.task"
+TASKS = [{"id": "sample.task", "name": "sample.task", "show_task_count": True}]
 class Page(QWidget):
     def __init__(self, context):
         super().__init__()
@@ -130,24 +130,24 @@ def test_repeated_install_snapshot_conflict_and_failed_replace(drafts, monkeypat
     drafts.create("sample.py", SOURCE)
     snapshot = drafts.snapshot("sample.py")
     drafts.update("sample.py", SOURCE.replace('"Sample"', '"Changed"'))
-    installed = drafts.install(snapshot, "sample.page", "sample.task")
+    installed = drafts.install(snapshot, "sample.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     assert installed["sha256"] == snapshot["sha256"]
     target = drafts.path("sample.py", "installed")
     assert target.read_bytes() == SOURCE.encode()
-    drafts.install(snapshot, "sample.page", "sample.task")
+    drafts.install(snapshot, "sample.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     changed = drafts.snapshot("sample.py")
-    drafts.install(changed, "sample.page", "sample.task")
+    drafts.install(changed, "sample.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     assert target.read_bytes() == changed["source"]
     # 独立草稿也可从完整源码创建并覆盖同名正式页。
     other_session = PageDrafts(DeveloperSession.create(drafts.session.host.service, None, mode="Construct", entry="gui"))
     other_session.create("sample.py", SOURCE)
-    other_session.install(other_session.snapshot("sample.py"), "sample.page", "sample.task")
+    other_session.install(other_session.snapshot("sample.py"), "sample.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     assert target.read_bytes() == SOURCE.encode()
     drafts.create("other.py", SOURCE)
     with pytest.raises(ValueError, match="冲突"):
-        drafts.install(drafts.snapshot("other.py"), "sample.page", "other.task")
+        drafts.install(drafts.snapshot("other.py"), "sample.page", [{"id": "other.task", "name": "other.task", "show_task_count": True}])
     with pytest.raises(ValueError, match="冲突"):
-        drafts.install(drafts.snapshot("other.py"), "other.page", "sample.task")
+        drafts.install(drafts.snapshot("other.py"), "other.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     # 将新增草稿与已正式安装页面分开，用另一 Session 创建替换草稿。
     session = DeveloperSession.create(drafts.session.host.service, None, mode="Construct", entry="gui")
     replacement = PageDrafts(session)
@@ -160,7 +160,7 @@ def test_repeated_install_snapshot_conflict_and_failed_replace(drafts, monkeypat
         return original_rename(path, dest)
     monkeypatch.setattr(Path, "rename", failed_replace)
     with pytest.raises(OSError):
-        replacement.install(replacement.snapshot("sample.py"), "sample.page", "sample.task")
+        replacement.install(replacement.snapshot("sample.py"), "sample.page", [{"id": "sample.task", "name": "sample.task", "show_task_count": True}])
     assert target.read_bytes() == SOURCE.encode()
     assert replacement.snapshot("sample.py")["source"] != SOURCE.encode()
     assert not list(drafts.installed.glob(".page-*"))

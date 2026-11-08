@@ -1,5 +1,8 @@
 # 当前状态与文档入口
 
+2026-11-08 页面多任务、人工确认启停与 Session 来源显示已完成本地实施及相关回归；Windows、真实模型与游戏尚未验收，见[设计与影响审查](page-tasks-and-availability-design-impact-review.md)。
+
+
 2026-11-08 运行界面性能增量：状态与日志分离、百毫秒合并更新、运行弹窗最近 300 条及按相关变化刷新设置／版本，完整 Trace 与传输格式保留。设计、影响及本地验证见[高频日志专项记录](run-ui-performance-design-impact-review.md)。Windows 与真实游戏响应尚未验收。
 
 2026-11-08 日志增量：单日志 ZIP 导入导出、来源分类及中英文名称和时间展示，见[设计与影响审查](run-log-sharing.md)。Windows 原生验收未完成。

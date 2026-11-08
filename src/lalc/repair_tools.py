@@ -70,7 +70,7 @@ class RepairTools:
                        "page_list": self.page_list, "page_read": self.page_read,
                        "page_create": self.page_create, "page_update": self.page_update,
                        "page_resource": self.page_resource,
-                       "page_preview": self.page_preview}
+                       "page_preview": self.page_preview, "page_set_enabled": self.page_set_enabled}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
@@ -175,6 +175,35 @@ class RepairTools:
                 raise RuntimeError("页面审查已取消。")
             result = self.text(request.result)
             if request.result.get("status") == "preview_failed":
+                result["isError"] = True
+            return result
+        finally:
+            request.close()
+
+    def page_set_enabled(self, filename, enabled, summary):
+        """启停正式页面必须等待当前轮次的专用人工批准。"""
+        from .page_preview import PreviewRequest
+        from .page_packages import snapshot_page
+        if type(enabled) is not bool or not isinstance(summary, str) or not summary.strip():
+            raise ValueError("必须提供布尔 enabled 和非空变更说明。")
+        if self.on_page_preview is None:
+            raise ValueError("当前入口未连接页面确认界面。")
+        drafts = self.page_drafts()
+        package = snapshot_page(drafts.package_path(filename, "installed"))
+        snapshot = {"filename": filename, "package": package, "sha256": package.sha256}
+        request = PreviewRequest(drafts, snapshot, summary,
+                                 (self.log.identity, self.log.group, self.sequence))
+        request.enabled = enabled
+        self.log.snapshot(f"tool-{self.sequence}-page-availability", package.files)
+        try:
+            self.on_page_preview(request)
+            while not request.done.wait(.05):
+                self.checkpoint()
+            self.checkpoint()
+            if request.result is None:
+                raise RuntimeError("页面启停确认已取消。")
+            result = self.text(request.result)
+            if request.result.get("status") == "failed":
                 result["isError"] = True
             return result
         finally:

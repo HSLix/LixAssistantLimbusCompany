@@ -5,7 +5,7 @@ LALC automates a Windows-native Unity game window during an exclusive focused au
 ## Language
 
 **Business Settings Page**:
-A user-installed, trusted GUI page that owns configuration under a stable page ID, independently of any Manifest. It may register one Loop Task or only provide shared settings.
+A user-installed, trusted GUI page that owns configuration under a stable page ID, independently of any Manifest. It may register multiple Loop Tasks or only provide shared settings. A disabled page retains its identity, tasks and configuration while contributing no active task choices.
 _Avoid_: Manifest Component, unreviewed generated page, untrusted plugin
 
 **Loop Task**:

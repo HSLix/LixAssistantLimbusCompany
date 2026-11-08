@@ -406,3 +406,32 @@ def test_history_repeated_images_are_verified_once(tmp_path, monkeypatch):
     monkeypatch.setattr(sharing.FileContent, "from_path", counted)
     sharing.validate_history(root)
     assert len(calls) == 1
+
+
+def test_page_import_preserves_local_availability_and_reserves_disabled_task_ids(source, tmp_path):
+    """Sharing 不携带或重置本机启停状态，停用页的第二个任务也参与冲突检查。"""
+    from lalc.user_pages import PageAvailability
+    manager, _ = source
+    code = 'PAGE_ID="sharing.sample"\nPAGE_NAME="Sample"\nTASKS=[{"id":"first","name":"First","show_task_count":True},{"id":"second","name":"Second","show_task_count":False}]\n'
+    (manager.data_root / 'pages/sample/page.py').write_text(code)
+    PageAvailability(manager.data_root).set_enabled('sample.py', False)
+    archive = tmp_path / 'pages-state.zip'
+    save_package(build_export(manager, {'pages': ['sample.py']}), archive)
+    target = ManifestManager(tmp_path / 'target')
+    from contextlib import closing
+    with closing(SharingPackage(archive)) as package:
+        PageAvailability(target.data_root).set_enabled('sample.py', False)
+        checks = inspect_objects(target, package)
+        result = import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)
+        assert result['failed'] is None
+        assert not PageAvailability(target.data_root).enabled('sample.py')
+        PageAvailability(target.data_root).set_enabled('sample.py', True)
+        checks = inspect_objects(target, package)
+        result = import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)
+        assert result['failed'] is None and PageAvailability(target.data_root).enabled('sample.py')
+        other = target.data_root / 'pages/other'
+        other.mkdir()
+        (other / 'page.py').write_text(code.replace('sharing.sample', 'other').replace('"first"', '"third"'))
+        PageAvailability(target.data_root).set_enabled('other.py', False)
+        with pytest.raises(ValueError, match='TASKS'):
+            import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)

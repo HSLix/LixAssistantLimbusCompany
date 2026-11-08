@@ -1,5 +1,8 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。
+
+
 当前开发入口为 Agent Workbench 与 CLI Repair Session，完整规格见 [Stage 5](stage-5-agent-workbench.md)，阶段状态和历史证据入口见[当前状态](current-state.md)。知识库、A/B 更新及 pi／codesearch 进程复用见[外部搜索](external-code-search.md)，页面资源和 Sharing 见[Sharing](sharing.md)。
 
 ## Developer GUI
