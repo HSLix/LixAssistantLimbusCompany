@@ -3,18 +3,21 @@
 from collections import OrderedDict
 from datetime import datetime
 from threading import Event
+from pathlib import Path
+import tempfile
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable, QRectF,
                             QSize, Qt, QThreadPool, QTimer, Signal, Slot)
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
-                               QListWidgetItem, QStyledItemDelegate, QVBoxLayout, QWidget)
-from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, isDarkTheme
+                               QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
+from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, isDarkTheme
 
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
 from .run_logs import read_page, snapshot
+from .run_log_sharing import list_logs, export_log, import_log
 
 
 def log_colors(level: str) -> tuple[str, str]:
@@ -197,6 +200,7 @@ class RunLogPage(QWidget):
         super().__init__(parent)
         self.setObjectName("run-logs")
         self.root, self.run_id, self.boundary = root, None, None
+        self.read_root, self.selected_key, self.entries = root, None, {}
         self.cancelled = Event()
         self.generation, self.serial = 0, 0
         self.callbacks, self.tasks = {}, {}
@@ -226,10 +230,28 @@ class RunLogPage(QWidget):
         layout.addLayout(filters)
         body = QHBoxLayout()
         self.runs = QListWidget()
-        self.runs.setMaximumWidth(220)
+        self.runs.setSpacing(4)
+        self.runs.setStyleSheet("QListWidget {border: none; background: transparent;}")
         self.runs.itemClicked.connect(self.select_run)
         self.runs.itemActivated.connect(self.select_run)
-        body.addWidget(self.runs)
+        sidebar = CardWidget()
+        sidebar.setFixedWidth(270)
+        side = QVBoxLayout(sidebar)
+        heading = QHBoxLayout()
+        heading.addWidget(BodyLabel(tr('Run records')), 1)
+        self.import_button = PushButton(tr('Import'))
+        self.import_button.clicked.connect(self.import_zip)
+        heading.addWidget(self.import_button)
+        side.addLayout(heading)
+        self.source_filter = SegmentedWidget()
+        self.source_mode = 'all'
+        for key, title in (('all', tr('All')), ('local', tr('Local')), ('imported', tr('Import'))):
+            self.source_filter.addItem(key, title)
+        self.source_filter.setCurrentItem('all')
+        self.source_filter.currentItemChanged.connect(self.select_source)
+        side.addWidget(self.source_filter)
+        side.addWidget(self.runs, 1)
+        body.addWidget(sidebar)
         self.view = QListView()
         self.view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -239,7 +261,19 @@ class RunLogPage(QWidget):
         self.view.setItemDelegate(self.delegate)
         self.view.activated.connect(self.toggle_details)
         self.view.verticalScrollBar().valueChanged.connect(self.scrolled)
-        body.addWidget(self.view, 1)
+        detail_card = CardWidget()
+        details = QVBoxLayout(detail_card)
+        header = QHBoxLayout()
+        self.run_title = BodyLabel()
+        self.run_title.setTextFormat(Qt.TextFormat.PlainText)
+        header.addWidget(self.run_title, 1)
+        self.export_button = PushButton(tr('Export'))
+        self.export_button.setEnabled(False)
+        self.export_button.clicked.connect(self.export_zip)
+        header.addWidget(self.export_button)
+        details.addLayout(header)
+        details.addWidget(self.view, 1)
+        body.addWidget(detail_card, 1)
         layout.addLayout(body, 1)
         self.status = BodyLabel()
         self.status.setWordWrap(True)
@@ -291,43 +325,124 @@ class RunLogPage(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        def listing():
-            return sorted((int(p.stem) for p in (self.root / "traces").glob("*.jsonl")
-                           if p.stem.isdecimal() and int(p.stem) > 0 and not p.is_symlink()), reverse=True)
-        def shown(ids):
+        self.refresh_runs()
+
+    def select_source(self, key):
+        """切换列表来源，不混用本机与导入日志身份。"""
+        self.source_mode = key
+        self.refresh_runs()
+
+    def refresh_runs(self, *_):
+        """按来源过滤并按原始运行时间排序，导入身份独立于本机编号。"""
+        source = self.source_mode
+        self.listing_serial = getattr(self, 'listing_serial', 0) + 1
+        serial = self.listing_serial
+        def shown(entries):
+            if serial != self.listing_serial:
+                return
+            self.entries = {entry['key']: entry for entry in entries}
             self.runs.clear()
-            for identity in ids:
-                item = QListWidgetItem(f"Run #{identity}")
-                item.setData(Qt.ItemDataRole.UserRole, identity)
+            for entry in entries:
+                if source == 'local' and entry['imported'] or source == 'imported' and not entry['imported']:
+                    continue
+                title = tr('Log No.{0}').format(entry['run_id'])
+                stamp = log_time(entry['started_at'])
+                item = QListWidgetItem(title + '\n' + (stamp[:13] if stamp != '—' else stamp)
+                                       + (' · ' + tr('Imported') if entry['imported'] else ''))
+                item.setFont(self.run_title.font())
+                item.setSizeHint(QSize(230, 76))
+                item.setData(Qt.ItemDataRole.UserRole, entry['key'])
                 self.runs.addItem(item)
-                if identity == self.run_id:
+                if entry['key'] == self.selected_key:
                     self.runs.setCurrentItem(item)
-            if self.run_id is None and ids:
+            if self.runs.count() and self.runs.currentRow() < 0:
                 self.runs.setCurrentRow(0)
                 self.select_run(self.runs.item(0))
-            elif not ids:
-                self.status.setText(tr("No run logs"))
-        self.submit(listing, shown)
+            elif not self.runs.count():
+                self.invalidate()
+                self.model.replace([])
+                self.run_id = self.selected_key = self.boundary = None
+                self.run_title.clear()
+                self.export_button.setEnabled(False)
+                self.status.setText(tr('No run logs'))
+        self.submit(lambda: list_logs(self.root), shown)
+
+    def import_zip(self):
+        """选择后直接检查并导入，取消或失败不留下半成品。"""
+        from .sharing_gui import sharing_task
+        path, _ = QFileDialog.getOpenFileName(self, tr('Import log'), '', 'ZIP (*.zip)')
+        if not path:
+            return
+        try:
+            sharing_task(self, lambda: import_log(self.root, path))
+            self.source_filter.setCurrentItem('all')
+            self.source_mode = 'all'
+            self.refresh_runs()
+            QMessageBox.information(self, tr('Import log'), tr('Log imported successfully'))
+        except InterruptedError:
+            pass
+        except Exception as error:
+            QMessageBox.warning(self, tr('Import log'), str(error))
+
+    def export_zip(self):
+        """先压缩固定快照，再由系统保存对话框选择目标，安全替换文件。"""
+        from .sharing_gui import sharing_task
+        from .file_content import FileContent, checkpoint, require_disk, write_content
+        if self.run_id is None:
+            return
+        root, identity = self.read_root, self.run_id
+        try:
+            boundary = snapshot(root, identity)
+            with tempfile.TemporaryDirectory() as directory:
+                archive = Path(directory) / 'log.zip'
+                sharing_task(self, lambda: export_log(root, identity, archive, boundary))
+                destination, _ = QFileDialog.getSaveFileName(self, tr('Export log'), f'log-{identity}.zip', 'ZIP (*.zip)')
+                if destination:
+                    def save():
+                        target = Path(destination)
+                        from .page_packages import real_directory
+                        real_directory(target.parent)
+                        if target.is_symlink():
+                            raise ValueError('ZIP destination must not be a link.')
+                        content = FileContent.from_path(archive)
+                        require_disk([(target.parent, len(content))])
+                        with tempfile.TemporaryDirectory(dir=target.parent) as pending:
+                            output = Path(pending) / 'log.zip'
+                            write_content(output, content)
+                            checkpoint()
+                            output.replace(target)
+                    sharing_task(self, save)
+        except InterruptedError:
+            pass
+        except Exception as error:
+            QMessageBox.warning(self, tr('Export log'), str(error))
 
     def select_run(self, item):
         """选择运行才检查文件；当前快照有追加时等待用户接受。"""
-        identity = item.data(Qt.ItemDataRole.UserRole)
+        key = item.data(Qt.ItemDataRole.UserRole)
+        entry = self.entries[key]
+        identity = entry['run_id']
+        changed = key != self.selected_key
+        self.read_root = root = entry['root']
+        self.run_title.setText(tr('Log No.{0}').format(identity) + '\n' + log_time(entry['started_at'])
+                               + (' · ' + tr('Imported') if entry['imported'] else ''))
+        self.export_button.setEnabled(True)
         self.debounce.stop()
         self.invalidate()
-        old = self.boundary if identity == self.run_id else None
-        if identity != self.run_id:
+        old = self.boundary if not changed else None
+        if changed:
             self.boundary = None
             self.model.replace([])
-        self.run_id = identity
+        self.run_id, self.selected_key = identity, key
         self.loading = True
         cancelled = self.cancelled
         def check():
-            boundary = snapshot(self.root, identity)
+            boundary = snapshot(root, identity)
             if old is None or boundary[:2] != old[:2] or boundary[2] < old[2] or (boundary != old and boundary[2] == old[2]):
                 return boundary, "reset"
             if boundary == old:
                 return boundary, "same"
-            result = read_page(self.root, identity, boundary, start=old[2], reverse=False,
+            result = read_page(root, identity, boundary, start=old[2], reverse=False,
                                levels=tuple(self.levels), limit=1, cancelled=cancelled)
             return boundary, "new" if result["rows"] else "same"
         def checked(value):
@@ -392,7 +507,7 @@ class RunLogPage(QWidget):
     def load_reset(self, anchor=None):
         """加载最新或锚点附近的一批；较旧侧无匹配才寻找较新项。"""
         self.loading, self.older_done, self.newer_done = True, False, anchor is None
-        root, identity, boundary, options, cancelled = self.root, self.run_id, self.boundary, self.options(), self.cancelled
+        root, identity, boundary, options, cancelled = self.read_root, self.run_id, self.boundary, self.options(), self.cancelled
         self.status.setText(tr("Loading logs…"))
         def load():
             result = read_page(root, identity, boundary, end=anchor[1] if anchor else None, cancelled=cancelled, **options)
@@ -430,7 +545,7 @@ class RunLogPage(QWidget):
         anchor, rows = self.anchor(), self.model.rows
         options = self.options()
         options.update(end=rows[-1]["offset"]) if older else options.update(start=rows[0]["end"], reverse=False)
-        root, identity, boundary, cancelled = self.root, self.run_id, self.boundary, self.cancelled
+        root, identity, boundary, cancelled = self.read_root, self.run_id, self.boundary, self.cancelled
         def shown(result):
             added = result["rows"]
             if older:

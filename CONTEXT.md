@@ -336,3 +336,7 @@ _Avoid_: User GUI, concurrent executor
 **Workflow Settings Page**:
 A shared business-settings page independent of a Manifest that may contribute repetition tasks identified by stable task IDs. The selected Plan explicitly declares supported task IDs; page identity and task identity are distinct from Component logical names.
 _Avoid_: Manifest Component, automatic form schema
+
+**Imported Run Log**:
+A read-only copy of one execution Trace and its referenced screenshot evidence from another log package. It preserves the source Run number and event times but has an independent local import identity; it neither consumes a local Run number nor restores execution or grants source authority. Repeated imports remain separate records.
+_Avoid_: Local Run, restored Run, Agent Session

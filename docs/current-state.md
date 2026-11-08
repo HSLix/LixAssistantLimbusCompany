@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-08 日志增量：单日志 ZIP 导入导出、来源分类及中英文名称和时间展示，见[设计与影响审查](run-log-sharing.md)。Windows 原生验收未完成。
+
 2026-11-08 本地 GUI 增量：工作流版本卡片、固定发布时间与说明、历史选择和任务次数限宽，见[接受设计、影响审查与验证](gui-workflow-versions.md)。未完成 Windows 原生验收。
 
 2026-11-07 Component 说明改为 execute docstring 优先、模块 docstring 兼容回退；Recovery Rule 保留模块说明要求。影响和验证见[专项记录](component-description-impact-review.md)。

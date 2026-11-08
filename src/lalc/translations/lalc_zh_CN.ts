@@ -1941,5 +1941,41 @@ Original pixel region: {2}</source>
       <source>No additional information</source>
       <translation>无附加信息</translation>
     </message>
+    <message>
+      <source>Log No.{0}</source>
+      <translation>{0} 号日志</translation>
+    </message>
+    <message>
+      <source>Run records</source>
+      <translation>运行记录</translation>
+    </message>
+    <message>
+      <source>All</source>
+      <translation>全部</translation>
+    </message>
+    <message>
+      <source>Local</source>
+      <translation>本机</translation>
+    </message>
+    <message>
+      <source>Import log</source>
+      <translation>导入日志</translation>
+    </message>
+    <message>
+      <source>Export log</source>
+      <translation>导出日志</translation>
+    </message>
+    <message>
+      <source>Log imported successfully</source>
+      <translation>日志导入完成</translation>
+    </message>
+    <message>
+      <source>Import</source>
+      <translation>导入</translation>
+    </message>
+    <message>
+      <source>Export</source>
+      <translation>导出</translation>
+    </message>
   </context>
 </TS>
