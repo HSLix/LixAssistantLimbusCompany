@@ -84,6 +84,7 @@ class BusinessPage:
     widget: Any
     context: PageContext
     icon: Any = None
+    show_task_count: bool = True
 
 
 def load_page_module(path: Path, source: bytes):
@@ -112,6 +113,9 @@ def create_business_page(path, module, page_id, name, task_id, store):
     if (type(names) is not dict or any(key not in {"zh_CN", "en_US"} or
             type(value) is not str or not value.strip() for key, value in names.items())):
         raise ValueError("PAGE_NAMES must map zh_CN/en_US to non-empty display names.")
+    show_task_count = getattr(module, "SHOW_TASK_COUNT", True)
+    if type(show_task_count) is not bool:
+        raise ValueError("SHOW_TASK_COUNT must be a bool.")
     name = names.get(context.language, name)
     widget = module.create_page(context)
     if not isinstance(widget, QWidget) or not callable(getattr(widget, "submit", None)):
@@ -120,7 +124,7 @@ def create_business_page(path, module, page_id, name, task_id, store):
     if icon is not None and not isinstance(icon, FluentIcon):
         logging.getLogger(__name__).warning("%s（%s）：PAGE_ICON 无效，使用默认导航图标。", path.name, page_id)
         icon = None
-    return BusinessPage(page_id, name, task_id, widget, context, icon or FluentIcon.APPLICATION)
+    return BusinessPage(page_id, name, task_id, widget, context, icon or FluentIcon.APPLICATION, show_task_count)
 
 
 def discover_pages(directory: Path, store: UserSettings) -> tuple[list[BusinessPage], list[str]]:
@@ -169,6 +173,7 @@ def check_page_registration(directory, target, page_id, task_id):
 def task_inputs(pages: list[BusinessPage], supported: tuple[str, ...], store: UserSettings):
     """双向匹配；仅匹配且启用的项获得非零次数，告警不删除保存值。"""
     registered = {page.task_id for page in pages if page.task_id is not None}
+    single_run = {page.task_id for page in pages if not page.show_task_count}
     allowed = set(supported)
     warnings = []
     if not allowed:
@@ -178,5 +183,6 @@ def task_inputs(pages: list[BusinessPage], supported: tuple[str, ...], store: Us
     repetitions = {}
     for identity in registered | allowed:
         saved = store.value["tasks"].get(identity, {"enabled": False, "count": 1})
-        repetitions[identity] = saved["count"] if identity in registered & allowed and saved["enabled"] else 0
+        count = 1 if identity in single_run else saved["count"]
+        repetitions[identity] = count if identity in registered & allowed and saved["enabled"] else 0
     return repetitions, deepcopy(store.value["pages"]), warnings

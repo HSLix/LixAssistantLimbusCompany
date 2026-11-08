@@ -93,6 +93,14 @@ def test_pages_run_real_plan_with_pure_settings_and_independent_snapshot(owner, 
     try:
         user.start_plan()
         assert entered.wait(1)
+        original = owner.service.state['base_manifest_id']
+        published = user.host.manager.publish(EXAMPLE / 'manifest.json')
+        assert published.ok
+        user.refresh_manifest_card()
+        user.select_latest_manifest()
+        assert user.host.manager.default_manifest_id() == published.loaded.manifest_id
+        assert owner.service.state['base_manifest_id'] == original
+        assert owner.service.state['working_manifest_id'] == original
         pages["sample.message"].message.setText("after")
         user.page_store.save_task("sample.loop", False, 9)
         user.page_store.save("pages", "sample.message", {"message": "after"})
@@ -467,3 +475,75 @@ def create_page(context):
         if process.poll() is None:
             process.kill()
             process.communicate(timeout=2)
+
+
+@pytest.mark.parametrize('show', [True, False])
+def test_page_count_visibility_preserves_saved_count_and_controls_inputs(tmp_path, app, show):
+    pages_dir = tmp_path / 'pages'
+    shutil.copytree(PAGES, pages_dir)
+    with (pages_dir / 'loop.py').open('a') as stream:
+        stream.write(f'\nSHOW_TASK_COUNT = {show!r}\n')
+    store = UserSettings(tmp_path)
+    pages, errors = discover_pages(pages_dir, store)
+    assert not errors
+    page = next(page for page in pages if page.task_id)
+    assert page.show_task_count is show
+    store.save_task('sample.loop', True, 9)
+    repetitions, _, _ = task_inputs(pages, ('sample.loop',), store)
+    assert repetitions['sample.loop'] == (9 if show else 1)
+    repetitions, _, _ = task_inputs(pages, (), store)
+    assert repetitions['sample.loop'] == 0
+    store.save_task('sample.loop', False, 9)
+    repetitions, _, _ = task_inputs(pages, ('sample.loop',), store)
+    assert repetitions['sample.loop'] == 0
+    assert UserSettings(tmp_path).value['tasks']['sample.loop']['count'] == 9
+
+
+def test_invalid_count_declaration_isolates_page(tmp_path, app):
+    pages_dir = tmp_path / 'pages'
+    shutil.copytree(PAGES, pages_dir)
+    with (pages_dir / 'loop.py').open('a') as stream:
+        stream.write('\nSHOW_TASK_COUNT = "false"\n')
+    pages, errors = discover_pages(pages_dir, UserSettings(tmp_path))
+    assert all(page.task_id is None for page in pages)
+    assert len(errors) == 1 and 'SHOW_TASK_COUNT' in errors[0]
+
+
+def test_count_buttons_and_hidden_count_row(owner, app):
+    from PySide6.QtCore import Qt
+    user = owner.user
+    enabled, count = user.task_rows['sample.loop']
+    count.setValue(1)
+    assert not count.downButton.isEnabled()
+    count.upButton.click()
+    assert count.value() == 2
+    count.downButton.click()
+    assert count.value() == 1
+    count.setValue(2147483647)
+    assert not count.upButton.isEnabled()
+    count.downButton.click()
+    assert count.value() == 2147483646
+    assert count.alignment() == Qt.AlignmentFlag.AlignCenter
+    count.show()
+    app.processEvents()
+    assert count.downButton.geometry().right() < count.lineEdit().geometry().left()
+    assert count.lineEdit().geometry().right() < count.upButton.geometry().left()
+    assert count.lineEdit().width() >= count.fontMetrics().horizontalAdvance('2147483647')
+    for width in (1100, 850, 700):
+        user.resize(width, 700)
+        app.processEvents()
+        controls = count.parentWidget()
+        row = controls.parentWidget()
+        assert not enabled.geometry().intersects(controls.geometry())
+        assert row.rect().contains(controls.geometry())
+        assert row.rect().contains(enabled.geometry())
+    page = next(page for page in user.business_pages if page.task_id)
+    page.show_task_count = False
+    user.refresh_tasks()
+    enabled, hidden_count = user.task_rows['sample.loop']
+    assert hidden_count is None
+    enabled.setChecked(True)
+    user.save_task('sample.loop')
+    assert user.page_store.value['tasks']['sample.loop']['count'] == 2147483646
+    repetitions, _, _ = task_inputs(user.business_pages, ('sample.loop',), user.page_store)
+    assert repetitions['sample.loop'] == 1

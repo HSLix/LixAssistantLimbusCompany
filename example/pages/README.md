@@ -91,3 +91,6 @@ Agent 的 GUI Construct 页面工具现已接通整包：`filename="sample.py"` 
 `page_preview` 的 Current 和 Proposed 使用各自固定整包副本及独立内存配置，切换 Tab 保持实例。人工点击安装提交批准的源码和资源，即使草稿随后变化也不混入新内容；关闭后清理临时包，安装日志保留所审批的完整包证据。CLI／Repair 不获得这些工具，安装仍需专用人工审批。
 
 General Settings 的 [Sharing 向导](../../docs/sharing.md) 已支持整包导入导出。Sharing 的 Review 只批准固定整包，最终由 Import Selected 统一安装；未 Review 页面需额外明确确认。Agent 的人工批准仍直接安装，不继承 Sharing 的跳过 Review 例外。
+
+
+Dashboard 的任务次数使用左减、居中数字、右加，仍可输入数字，范围 1–2147483647。页面模块可选声明 `SHOW_TASK_COUNT = False`，隐藏整组次数控件，保留勾选与“设置”。默认为 `True`，旧页面无需修改。`False` 时匹配且勾选的任务传入次数 `1`，未勾选或不匹配传 `0`；旧保存次数保留，重新开启控件时恢复。该属性必须为布尔值，非布尔值按页面声明错误隔离；纯设置页不受影响。此开关不改变 `TASK_ID` / Plan 支持列表、`submit()` 或页面配置结构。
