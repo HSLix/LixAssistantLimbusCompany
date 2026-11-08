@@ -75,6 +75,7 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
         user.language_choice.setCurrentIndex(user.language_choice.findData("en_US"))
         assert load_language(owner.service.data_root) == "en_US"
         assert current_language() == "zh_CN"
+        owner.bridge.flush()
         assert not user.reload_button.isEnabled()
         with pytest.raises(ValueError, match="不能重载"):
             owner.request_reload()

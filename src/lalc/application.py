@@ -6,6 +6,7 @@ import sys
 import threading
 import time
 import uuid
+from collections import deque
 from copy import deepcopy
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -15,6 +16,7 @@ from typing import Any, Callable
 from .process_lock import ProcessLock
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
+from .run_logs import LIVE_LOG_LIMIT, is_live_log
 from .control import InputSession
 from .ocr import ocr_service
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
@@ -51,7 +53,7 @@ class ApplicationService:
         data_root: Path,
         *,
         manifest_manager: ManifestManager | None = None,
-        on_change: Callable[[dict[str, Any]], None] | None = None,
+        on_change: Callable[[], None] | None = None,
         logger: logging.Logger | None = None,
         recovery_choice: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         window_platform: Any | None = None,
@@ -60,6 +62,8 @@ class ApplicationService:
         self.data_root = Path(data_root)
         self.manifest_manager = manifest_manager or ManifestManager(self.data_root)
         self.on_change = on_change
+        self._live_logs: deque[dict[str, Any]] = deque(maxlen=LIVE_LOG_LIMIT)
+        self._live_logs_trimmed = False
         self.logger = logger or logging.getLogger(__name__)
         self.recovery_choice = recovery_choice
         self.window_platform = window_platform
@@ -116,6 +120,25 @@ class ApplicationService:
             self._state["default_manifest_id"] = self.manifest_manager.default_manifest_id()
             self._state["activity"] = self._activity
             return deepcopy(self._state)
+
+    @property
+    def status(self) -> dict[str, Any]:
+        """读取控制与界面状态，不复制累积的执行 Trace。"""
+        with self._condition:
+            self._state["default_manifest_id"] = self.manifest_manager.default_manifest_id()
+            self._state["activity"] = self._activity
+            return {**deepcopy({key: value for key, value in self._state.items() if key != "trace"}),
+                    "last_sequence": len(self._state["trace"])}
+
+    def ui_snapshot(self, run_id: int | None = None, after_sequence: int = 0) -> dict[str, Any]:
+        """一次取得轻量状态及最多 300 条新增可见日志，迟到的界面直接追到近期。"""
+        with self._condition:
+            state = self.status
+            if run_id != state["run_id"]:
+                after_sequence = 0
+            return {**state, "log_records": deepcopy([
+                record for record in self._live_logs if record["sequence"] > after_sequence
+            ]), "logs_trimmed": self._live_logs_trimmed}
 
     @contextmanager
     def activity(self, name: str):
@@ -492,6 +515,8 @@ class ApplicationService:
         self._input_session = None
         self._trace_path = trace_path
         self._ledger = WorkflowRunLedger(self.data_root, run_id)
+        self._live_logs.clear()
+        self._live_logs_trimmed = False
         self._state.update(
             phase="running", paused=False, pause_info=None, resume_pending=False,
             default_manifest_id=self.manifest_manager.default_manifest_id(),
@@ -588,9 +613,7 @@ class ApplicationService:
                                        resume_pending=False, result=result)
                     self._focused_session = None
                     self._input_session = None
-                    self._condition.notify_all()
-                    if self.on_change is not None:
-                        self.on_change(deepcopy(self._state))
+                    self._changed_locked()
 
     def _fatal_result(
         self, previous: dict[str, Any], errors: list[dict[str, Any]],
@@ -787,6 +810,10 @@ class ApplicationService:
         except (OSError, TypeError, ValueError) as error:
             raise TraceWriteError(str(error)) from error
         self._state["trace"].append(record)
+        if is_live_log(record):
+            if len(self._live_logs) == LIVE_LOG_LIMIT:
+                self._live_logs_trimmed = True
+            self._live_logs.append(record)
         if self._ledger is not None:
             if event == "component_started" and fields.get("role") == "task_workflow":
                 self._ledger.item_index = sum(r["workflow_kind"] == "task" for r in self._ledger.records)
@@ -827,12 +854,14 @@ class ApplicationService:
             raise StartError("run_id_allocation_failed", str(error)) from error
 
     def _changed_locked(self) -> None:
+        """仅通知状态已变；消费者自行合并读取，锁内不复制历史或调用 GUI。"""
         self._state["activity"] = self._activity
         self._condition.notify_all()
-        if self.on_change is None:
+        callback = self.on_change
+        if callback is None:
             return
         try:
-            self.on_change(deepcopy(self._state))
+            callback()
         except Exception:
             self.logger.exception("Application state callback failed")
 

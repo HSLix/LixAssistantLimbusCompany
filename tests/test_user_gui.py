@@ -23,19 +23,17 @@ from test_agent_repair import host_for
 def windows(tmp_path, monkeypatch):
     monkeypatch.setenv('QT_QPA_PLATFORM', 'offscreen')
     from PySide6.QtWidgets import QApplication, QMessageBox
-    from lalc.gui import GuiCoordinator, StateBridge
+    from lalc.gui import GuiCoordinator
     monkeypatch.chdir(tmp_path)
     app = QApplication.instance() or QApplication([])
     host, _ = host_for(tmp_path)
     coordinator = GuiCoordinator(host.service, ApplicationLifecycle())
     coordinator.host = host
-    bridge = StateBridge()
-    host.service.on_change = bridge.changed.emit
-    bridge.changed.connect(coordinator.render_state)
     user = coordinator.open_window()
     developer = coordinator.open_window(True)
     monkeypatch.setattr(QMessageBox, 'question', lambda *_: QMessageBox.StandardButton.Yes)
     yield app, coordinator, user, developer
+    coordinator.bridge.close()
     host.service.shutdown()
     for window in (coordinator.user, coordinator.developer):
         if window:
@@ -400,3 +398,25 @@ def test_history_marks_versions_and_only_applies_explicit_selection(windows, mon
     user.choose_manifest()
     assert manager.default_manifest_id() == (latest if apply else original)
     assert {path.name for path in manager.manifests_dir.glob('*.json')} == before
+
+
+def test_trace_updates_do_not_reload_settings_or_versions(windows, monkeypatch):
+    import lalc.agent_settings as settings
+    app, owner, user, _ = windows
+    state = user.service.status
+    owner.bridge.timer.stop()
+    def unexpected(*args, **kwargs):
+        pytest.fail('Trace updates must not reload unrelated files')
+    with monkeypatch.context() as patch:
+        patch.setattr(user.host.manager, 'list_manifests', unexpected)
+        patch.setattr(settings, 'settings_document', unexpected)
+        patch.setattr(settings, 'load_settings', unexpected)
+        for sequence in range(1, 21):
+            owner.render_state({**state, 'last_sequence': sequence, 'log_records': []})
+    from lalc.agent_settings import save_selection
+    save_selection(user.service.data_root, 'user', 'llama.cpp', enabled=True)
+    user.refresh_manifest_card()
+    assert user.user_enabled.isChecked() and not user._agent_ready
+    save_selection(user.service.data_root, 'user', 'llama.cpp', enabled=False)
+    owner.refresh_agent()
+    assert user._agent_ready and user.start_button.isEnabled()

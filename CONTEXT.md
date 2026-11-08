@@ -159,6 +159,7 @@ _Avoid_: Global runtime state, mutable Workflow
 
 **Execution Trace**:
 The executor-owned chronological record of what one real execution attempt actually did from its entry position. It records actual components, plans, actions, observations, results, evidence, and interruptions for diagnosis, recovery, Agent context, and audit, but does not carry normal Workflow business data or determine task success.
+The live running window is a bounded presentation of this record; removing an entry from that presentation does not remove execution evidence.
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:

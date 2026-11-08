@@ -296,7 +296,7 @@ class RepairTools:
         try:
             self.log.record({"type": "trial_started", "run_id": run_id, **request})
             while True:
-                state = service.state
+                state = service.status
                 if state["run_id"] != run_id:
                     raise RuntimeError("试运行的 Run ID 意外改变。")
                 if state["phase"] == "finished":
@@ -306,7 +306,8 @@ class RepairTools:
                     service.wait_for(lambda current: current["phase"] == "finished")
         finally:
             # 工具日志写入失败也不能把正在操作游戏的运行遗留到 Agent 轮次之外。
-            if service.state["run_id"] == run_id and service.state["phase"] == "running":
+            state = service.status
+            if state["run_id"] == run_id and state["phase"] == "running":
                 service.stop()
                 service.wait_for(lambda current: current["phase"] == "finished")
         self.checkpoint()
@@ -317,7 +318,7 @@ class RepairTools:
                    "Plan 结果已返回；遍历完成不代表每个任务成功，请检查各项结果。")
         return self.text({**request, "run_id": run_id, "result": result,
                           "log": {"run_id": run_id, "first_sequence": 1,
-                                  "last_sequence": len(state["trace"])},
+                                  "last_sequence": state["last_sequence"]},
                           "feedback": "用户主动停止了本次运行，建议总结并等待用户的下个指示。" if stopped else
                           outcome + "按 Run ID 查看日志；需要再试时调用 trial_run，修改 Candidate 后须先 Publish。"})
 

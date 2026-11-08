@@ -12,7 +12,7 @@ import pytest
 
 from lalc.agent_settings import load_settings, save_settings, save_selection, settings_document, settings_snapshot
 from lalc.application import ApplicationService
-from lalc.gui import GuiCoordinator, StateBridge
+from lalc.gui import GuiCoordinator
 from lalc.lifecycle import ApplicationLifecycle
 from lalc.manifest import ManifestManager, plan_task_ids
 from lalc.user_pages import UserSettings, discover_pages, task_inputs
@@ -59,11 +59,9 @@ def owner(tmp_path, app, monkeypatch):
     service = ApplicationService(root, manifest_manager=manager)
     coordinator = GuiCoordinator(service, ApplicationLifecycle())
     coordinator.host = DeveloperHost(service, tmp_path / "candidate")
-    bridge = StateBridge()
-    service.on_change = bridge.changed.emit
-    bridge.changed.connect(coordinator.render_state)
     coordinator.open_window()
     yield coordinator
+    coordinator.bridge.close()
     coordinator.reloading = False
     for window in (coordinator.user, coordinator.developer):
         if window:

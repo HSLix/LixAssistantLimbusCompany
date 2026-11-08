@@ -22,8 +22,11 @@ def test_publish_trial_uses_saved_version_and_retained_logs(tmp_path, monkeypatc
     with host.service.activity("Agent"):
         saved = tools.publish()["details"]["manifest_id"]
         source.write_text(source.read_text().replace(" if value > 0", ""))
-        first = tools.trial_run(saved, logical_name="steps.total", inputs={"values": [1, -2]})["details"]
+        with monkeypatch.context() as patch:
+            patch.setattr(type(host.service), "state", property(lambda _: pytest.fail("Trial copied full Trace")))
+            first = tools.trial_run(saved, logical_name="steps.total", inputs={"values": [1, -2]})["details"]
         assert first["result"]["output"] == 1
+        assert first["log"]["last_sequence"] == len(host.service.state["trace"])
         updated = tools.publish()["details"]["manifest_id"]
         second = tools.trial_run(updated, logical_name="steps.total", inputs={"values": [1, -2]})["details"]
         assert second["result"]["output"] == -1
