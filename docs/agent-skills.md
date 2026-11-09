@@ -4,7 +4,7 @@
 
 ## 文件与维护
 
-Skill 位于应用实际数据目录的 `skills/`：默认 Windows 为 `%LOCALAPPDATA%\LALC\skills`，其他平台为 `~/.local/share/LALC/skills`；指定自定义数据目录时随之变化。只在开始一轮开发 Agent 消息时按需准备，不需要模型请求来初始化。
+Skill 位于应用实际数据目录的 `skills/`：默认 Windows 为 `%LOCALAPPDATA%\LALC\skills`，其他平台为 `~/.local/share/LALC/skills`；指定自定义数据目录时随之变化。在开始一轮开发 Agent 消息时按需准备，也可通过 Developer GUI 的 Session “+”→工作区与页面→“打开 Skills 文件夹”初始化并打开持久化源目录，不需要模型请求。
 
 - `skills/` 不存在：创建并复制随程序发布的七个默认 Skills。
 - `skills/` 已存在：不补齐、不覆盖、不更新，空目录也保持为空。默认内容后续改进由开发者手动合入。

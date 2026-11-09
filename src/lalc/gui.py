@@ -81,13 +81,13 @@ class StateBridge(QObject):
 class ErrorDialog(QDialog):
     """先展示错误摘要，完整脱敏详情由用户展开并可复制。"""
 
-    def __init__(self, message: str, details: str, *, fatal: bool = False, parent=None) -> None:
+    def __init__(self, message: str, details: str, *, fatal: bool = False, error: bool = True, parent=None) -> None:
         super().__init__(parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, not fatal)
-        self.setWindowTitle(tr('Fatal error') if fatal else tr('Operation failed'))
+        self.setWindowTitle(tr('Fatal error') if fatal else (tr('Operation failed') if error else tr('Details')))
         self.resize(600, 180)
         layout = QVBoxLayout(self)
-        label = QLabel(message + '\n' + tr('No screenshot is needed. Use “Copy error details” below to report the error.'))
+        label = QLabel(message + ('\n' + tr('No screenshot is needed. Use “Copy error details” below to report the error.') if error else ''))
         label.setWordWrap(True)
         label.setTextFormat(Qt.TextFormat.PlainText)
         layout.addWidget(label)
@@ -96,17 +96,28 @@ class ErrorDialog(QDialog):
         self.details.setReadOnly(True)
         layout.addWidget(self.details)
         self.details.hide()
-        self.details_button = QPushButton(tr('Show error details'))
+        self.details_button = QPushButton(tr('Show error details') if error else tr('Show details'))
         self.details_button.setCheckable(True)
         def toggle_details(expanded):
             self.details.setVisible(expanded)
-            self.details_button.setText(tr('Hide error details') if expanded else tr('Show error details'))
+            self.details_button.setText((tr('Hide error details') if expanded else tr('Show error details')) if error
+                                        else (tr('Hide details') if expanded else tr('Show details')))
             self.resize(760 if expanded else 600, 520 if expanded else 180)
         self.details_button.toggled.connect(toggle_details)
         layout.addWidget(self.details_button)
-        copy = QPushButton(tr('Copy error details'))
-        setCustomStyleSheet(copy, 'QPushButton { color: #c42b1c; }', 'QPushButton { color: #ff99a4; }')
-        copy.clicked.connect(lambda: QApplication.clipboard().setText(message + "\n\n" + details))
+        copy_text = tr('Copy error details') if error else tr('Copy details')
+        copy = QPushButton(copy_text)
+        if error:
+            setCustomStyleSheet(copy, 'QPushButton { color: #c42b1c; }', 'QPushButton { color: #ff99a4; }')
+        self.copy_timer = QTimer(self)
+        self.copy_timer.setSingleShot(True)
+        self.copy_timer.setInterval(1500)
+        self.copy_timer.timeout.connect(lambda: copy.setText(copy_text))
+        def copy_details():
+            QApplication.clipboard().setText(message + "\n\n" + details)
+            copy.setText(tr('Copied successfully'))
+            self.copy_timer.start()
+        copy.clicked.connect(copy_details)
         layout.addWidget(copy)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
@@ -394,7 +405,7 @@ class NotificationList(QWidget):
         bar.contentLabel.setTextFormat(Qt.TextFormat.PlainText)
         if details:
             button = QPushButton(tr('Details'), bar)
-            button.clicked.connect(lambda: ErrorDialog(message, details, parent=self.window()).open())
+            button.clicked.connect(lambda: ErrorDialog(message, details, error=False, parent=self.window()).open())
             bar.addWidget(button)
         self.messages.addWidget(bar)
         bar.show()

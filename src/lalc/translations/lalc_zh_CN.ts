@@ -2010,5 +2010,8 @@ Original pixel region: {2}</source>
 <message><source>Page changes are saved. Restart LALC to apply the changes.</source><translation>页面变更已保存。重启 LALC 后生效。</translation></message>
 <message><source>Proposed tasks: {0}</source><translation>拟安装任务：{0}</translation></message>
 <message><source>Current tasks: {0}</source><translation>当前任务：{0}</translation></message>
+<message><source>Thinking and tools</source><translation>思考与工具</translation></message>
+<message><source>Open Skills directory</source><translation>打开 Skills 文件夹</translation></message>
+<message><source>Copied successfully</source><translation>复制成功</translation></message>
 </context>
 </TS>

@@ -29,7 +29,7 @@ from .run_logs import LIVE_LOG_LIMIT
 from .i18n import tr
 from .run_log_gui import log_colors, log_time
 
-from .repair_chat import RepairChat, chat_title, raw_output_text
+from .repair_chat import RepairChat, chat_title, process_text_parts
 from .chat_input import ChatInput
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
 from .agent_diagnostics import check_settings, details_text
@@ -289,7 +289,7 @@ class TrialDialog(QDialog):
             return
         from .gui import ErrorDialog
         _, message = _run_log_entry(record)
-        dialog = ErrorDialog(message, json.dumps(record, ensure_ascii=False, indent=2), parent=self)
+        dialog = ErrorDialog(message, json.dumps(record, ensure_ascii=False, indent=2), error=False, parent=self)
         dialog.setWindowTitle(tr("View details"))
         dialog.details_button.setChecked(True)
         dialog.open()
@@ -1169,7 +1169,7 @@ class RepairPage(QWidget):
         activity = self.chat.activity()
         changed = bool(activity['pending'])
         activity['pending'] = ''
-        if not activity['messages']:
+        if not activity['timeline']:
             activity['expanded'] = False
         if changed:
             self.chat.render()
@@ -1183,7 +1183,7 @@ class RepairPage(QWidget):
         """流式内容属于当前轮折叠区，完整消息到达时替换为保留记录。"""
         if number is not None:
             self.chat.activity_round = number
-        text = raw_output_text(content)
+        text = '\n\n'.join(process_text_parts(content))
         if not text or text == self.raw_pending:
             return
         first = not self.raw_pending
@@ -1225,7 +1225,9 @@ class RepairPage(QWidget):
         self.pages_action.triggered.connect(self.open_pages)
         self.knowledge_action = Action(tr('Open external knowledge directory'), self)
         self.knowledge_action.triggered.connect(self.open_knowledge)
-        workspace.addActions([self.workspace_action, self.page_drafts_action, self.pages_action, self.knowledge_action])
+        self.skills_action = Action(tr('Open Skills directory'), self)
+        self.skills_action.triggered.connect(self.open_skills)
+        workspace.addActions([self.workspace_action, self.page_drafts_action, self.pages_action, self.knowledge_action, self.skills_action])
         self.logs_action = Action(tr('Open Agent log directory'), self)
         self.logs_action.triggered.connect(self.diagnostics.open_logs)
         self.app_logs_action = Action(tr('Open LALC log directory'), self)
@@ -1593,6 +1595,14 @@ class RepairPage(QWidget):
         def operation():
             path = self.host.service.data_root / 'pages'
             path.mkdir(parents=True, exist_ok=True)
+            open_directory(self.window, path)
+        self.window._interact(operation)
+
+    def open_skills(self):
+        """打开持久化 Skill 源目录；首次初始化沿用默认内容和路径校验。"""
+        from .agent_skills import initialize_skills
+        def operation():
+            path = initialize_skills(self.window.service.data_root)
             open_directory(self.window, path)
         self.window._interact(operation)
 

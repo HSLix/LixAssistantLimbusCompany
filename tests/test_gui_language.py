@@ -231,6 +231,8 @@ def test_dynamic_controls_chat_and_notifications_keep_original_details(owner, ap
     chat.add_message("你", "用户 <raw>", 1)
     chat.upsert_tool(1, "call-1", "validate", "tool_execution_end", {"isError": False})
     assert ("你 · 第 1 轮" if language == "zh_CN" else "You · Round 1") in chat.toPlainText()
+    chat.activity(1)["expanded"] = True
+    chat.render()
     assert ("成功" if language == "zh_CN" else "Succeeded") in chat.toPlainText()
     assert "用户 <raw>" in chat.toPlainText()
     state = owner.service.state
