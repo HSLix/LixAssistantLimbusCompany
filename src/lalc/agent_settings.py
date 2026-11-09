@@ -8,11 +8,11 @@ import hashlib
 import json
 from pathlib import Path
 import sys
-import tempfile
 import threading
 from copy import deepcopy
 from urllib.parse import urlsplit
 
+from .work_files import work_file
 from .runtime import atomic_write_json
 
 
@@ -203,7 +203,7 @@ def save_secret(data_root: Path, name: str, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+        with work_file(dir=path.parent, delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(encrypted)
         temporary.replace(path)

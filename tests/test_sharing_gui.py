@@ -1,9 +1,11 @@
-"""覆盖导出两步、四 Tab 红点、Asset 冲突、可选页面 Review 和统一提交。
+"""覆盖直接导出、四 Tab 红点、Asset 冲突、可选页面 Review 和统一提交。
 
 项目根目录运行：QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_sharing_gui.py
 """
 
 from types import SimpleNamespace
+import os
+import stat
 
 import pytest
 from PySide6.QtWidgets import QWidget, QMessageBox
@@ -48,19 +50,21 @@ def visit_all(dialog):
     dialog.trust.setChecked(True)
 
 
-def test_export_defaults_and_frozen_second_step(window, source, tmp_path, monkeypatch):
+def test_export_defaults_and_direct_save(window, source, tmp_path, monkeypatch):
     window.host.manager = source[0]
     dialog = ExportDialog(window)
     try:
         selected = dialog.selection()
         assert set(selected["assets"]) == {"ui", "ui/child"}
         assert not selected["history"] and not selected["pages"]
-        dialog.advance()
-        assert dialog.stack.currentIndex() == 1
-        assert {obj["kind"] for obj in dialog.objects} == {"assets"}
+        assert not hasattr(dialog, "review")
         path = tmp_path / "export.zip"
         monkeypatch.setattr("lalc.sharing_gui.QFileDialog.getSaveFileName", lambda *args: (str(path), "ZIP"))
         dialog.advance()
+        if os.name != 'nt':
+            sibling = tmp_path / "ordinary-file"
+            sibling.write_bytes(b"ordinary")
+            assert stat.S_IMODE(path.stat().st_mode) == stat.S_IMODE(sibling.stat().st_mode)
         package = SharingPackage(path)
         try:
             assert len(package.objects) == 2
@@ -69,6 +73,18 @@ def test_export_defaults_and_frozen_second_step(window, source, tmp_path, monkey
     finally:
         dialog.close()
 
+
+
+def test_export_cancel_does_not_prepare_snapshot(window, source, monkeypatch):
+    window.host.manager = source[0]
+    dialog = ExportDialog(window)
+    monkeypatch.setattr("lalc.sharing_gui.QFileDialog.getSaveFileName", lambda *args: ("", ""))
+    def unexpected(*args):
+        pytest.fail("取消保存不应准备快照")
+    monkeypatch.setattr("lalc.sharing_gui.build_export", unexpected)
+    dialog.advance()
+    assert dialog.result() == 0
+    dialog.close()
 
 def test_tabs_view_state_asset_conflicts_and_recheck_are_independent(window, source, tmp_path):
     put_asset(window.service.data_root, "ui", png("yellow"))

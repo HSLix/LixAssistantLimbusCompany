@@ -4,7 +4,6 @@ from collections import OrderedDict
 from datetime import datetime
 from threading import Event
 from pathlib import Path
-import tempfile
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable, QRectF,
                             QSize, Qt, QThreadPool, QTimer, Signal, Slot)
@@ -13,6 +12,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QListVie
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
 from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, isDarkTheme
 
+from .work_files import WorkDirectory
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
@@ -393,7 +393,7 @@ class RunLogPage(QWidget):
         root, identity = self.read_root, self.run_id
         try:
             boundary = snapshot(root, identity)
-            with tempfile.TemporaryDirectory() as directory:
+            with WorkDirectory() as directory:
                 archive = Path(directory) / 'log.zip'
                 sharing_task(self, lambda: export_log(root, identity, archive, boundary))
                 destination, _ = QFileDialog.getSaveFileName(self, tr('Export log'), f'log-{identity}.zip', 'ZIP (*.zip)')
@@ -406,7 +406,7 @@ class RunLogPage(QWidget):
                             raise ValueError('ZIP destination must not be a link.')
                         content = FileContent.from_path(archive)
                         require_disk([(target.parent, len(content))])
-                        with tempfile.TemporaryDirectory(dir=target.parent) as pending:
+                        with WorkDirectory(dir=target.parent) as pending:
                             output = Path(pending) / 'log.zip'
                             write_content(output, content)
                             checkpoint()

@@ -3,6 +3,10 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Please select objects to share.</source>
+      <translation>请选择分享对象。</translation>
+    </message>
+    <message>
       <source>Showing the latest 300 entries. See Logs for earlier entries.</source>
       <translation>仅显示最近 300 条日志，更早记录请到 Logs 日志页查看。</translation>
     </message>

@@ -7,10 +7,10 @@ import json
 import logging
 from pathlib import Path
 import shutil
-import tempfile
 from types import MappingProxyType
 from typing import Mapping
 
+from .work_files import work_root, WorkDirectory, create_work_directory
 from .file_content import FileContent, content_hash, write_content, require_disk, require_memory, checkpoint
 
 
@@ -133,8 +133,8 @@ def snapshot_page(path, *, freeze=True):
 
 def _freeze_snapshot(files):
     """磁盘副本由资源引用持有，维持原有固定快照语义。"""
-    require_disk([(Path(tempfile.gettempdir()), sum(len(content) for content in files.values()))])
-    owner = tempfile.TemporaryDirectory(prefix="lalc-page-snapshot-")
+    require_disk([(work_root(), sum(len(content) for content in files.values()))])
+    owner = WorkDirectory(prefix="lalc-page-snapshot-")
     root = Path(owner.name).resolve()
     fixed = {}
     for name, content in files.items():
@@ -156,7 +156,7 @@ def _write_snapshot(snapshot, directory):
 @contextmanager
 def materialized_page(snapshot):
     """临时提供固定整包入口，供预览在整个窗口生命周期内使用。"""
-    with tempfile.TemporaryDirectory(prefix="lalc-page-preview-") as temporary:
+    with WorkDirectory(prefix="lalc-page-preview-") as temporary:
         package = Path(temporary).resolve() / "package"
         _write_snapshot(snapshot, package)
         yield package / "page.py"
@@ -183,7 +183,7 @@ def install_page_package(directory, name, snapshot, *, replace=False, legacy_fil
         raise FileExistsError("页面已存在，不能覆盖。")
     require_disk([(directory, sum(len(content) for content in snapshot.files.values()))])
     directory.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(dir=directory, prefix=".page-install-"))
+    work = Path(create_work_directory(dir=directory, prefix=".page-install-"))
     staged, backup = work / "new", work / "previous"
     installed = False
     try:
@@ -205,10 +205,10 @@ def install_page_package(directory, name, snapshot, *, replace=False, legacy_fil
                     raise OSError(f"旧页面恢复失败，原内容保留在 {backup}") from error
             raise
     finally:
-        # 恢复失败时不能让临时目录清理删掉唯一的旧版本。
+        # 恢复失败时不能让工作目录清理删掉唯一的旧版本。
         if installed or not backup.exists():
             try:
                 shutil.rmtree(work)
             except OSError:
-                logging.getLogger(__name__).warning("页面临时目录未清理：%s", work, exc_info=True)
+                logging.getLogger(__name__).warning("页面工作目录未清理：%s", work, exc_info=True)
     return target

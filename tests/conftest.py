@@ -54,3 +54,16 @@ def application_environment(monkeypatch):
 
     monkeypatch.setattr(application, "WindowsWindowPlatform", lambda **_: FakeWindow())
     monkeypatch.setattr(manifest, "application_actions", test_actions)
+
+
+@pytest.fixture(autouse=True)
+def isolated_work_root(tmp_path, monkeypatch):
+    """工作副本跟随测试隔离目录，避免测试写入真实应用数据。"""
+    import lalc.work_files as work_files
+
+    root = tmp_path / "work"
+    root.mkdir()
+    monkeypatch.setattr(work_files, "work_root", lambda: root)
+    # 这两个模块直接引用工作区入口。
+    monkeypatch.setattr("lalc.sharing.work_root", lambda: root)
+    monkeypatch.setattr("lalc.page_packages.work_root", lambda: root)

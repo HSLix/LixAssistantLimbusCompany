@@ -7,7 +7,7 @@ User GUI → General Settings → Sharing 提供 `Export…` / `Import…`。分
 
 ## 导出
 
-第一步可组合选择以下对象；第二步展示冻结快照的全部实际文件、大小及缺失证据，确认后保存 ZIP。
+可组合选择以下对象；选好后点击保存 ZIP，直接通过系统对话框确认保存位置，不再展示第二步导出审查页。确认位置后冻结实际文件并保存；取消保存对话框不准备导出副本。
 
 | 类别 | 内容与默认选择 |
 | --- | --- |
@@ -53,3 +53,5 @@ Sharing 的导入／导出和 Agent 页面资源不设置固定对象数、文�
 
 
 [决定演进](sharing-decisions.md)、[影响审查](sharing-design-impact-review.md)、[实施与验证记录](sharing-implementation-progress.md)、[ADR 0036](adr/0036-share-selected-objects-and-install-complete-page-packages.md)。本地替身和无界面 GUI 检查不等于真实模型、游戏或 Windows 成品验收。
+
+2026-11-09：工作数据改为继承父目录权限的普通目录和文件，保留生命周期清理、固定快照、活动锁和失败回滚；默认位于应用数据目录 `work/`。此决定替代此前临时目录／文件的创建方式，导入 Review 不变。详见[决定、影响审查与验证](ordinary-work-directories-impact-review.md)。

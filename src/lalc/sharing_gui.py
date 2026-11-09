@@ -20,7 +20,7 @@ from .page_packages import PageSnapshot
 from .page_preview import PagePreviewDialog, PreviewRequest
 from .sharing import (KINDS, SharingPackage, asset_files, build_export, catalog, image_size,
     import_selected, inspect_objects, installed_page, page_selection_errors, save_package,
-    sharing_activity, strict_json)
+    sharing_activity)
 from .user_pages import check_page_registration
 
 
@@ -179,7 +179,7 @@ def selected_list(widget):
 
 
 class ExportDialog(QDialog):
-    """选择对象后冻结实际文件，第二步只审阅该快照并保存 ZIP。"""
+    """选择对象后直接确认保存位置，再冻结实际文件并保存 ZIP。"""
 
     def __init__(self, window):
         super().__init__(window)
@@ -189,12 +189,8 @@ class ExportDialog(QDialog):
         self.resize(920, 720)
         layout = QVBoxLayout(self)
         layout.addWidget(TitleLabel(tr("Export Package")))
-        self.step = notice(tr("Step 1 of 2 · Select contents"))
-        layout.addWidget(self.step)
         layout.addWidget(notice(tr("Only selected objects are shared. Assets are independent of Workflow. Agent History is off by default.")))
         layout.addWidget(notice(tr("Assets are selected by default. Deselect groups you do not want to share.")))
-        self.stack = QStackedWidget()
-        layout.addWidget(self.stack, 1)
         first = QWidget()
         choices = QVBoxLayout(first)
         self.selectors = {}
@@ -220,29 +216,18 @@ class ExportDialog(QDialog):
             widget.itemChanged.connect(lambda *_: self.export_counts())
         tabs.currentItemChanged.connect(lambda key: panels.setCurrentIndex(KINDS.index(key)))
         tabs.setCurrentItem("workflow")
-        self.stack.addWidget(first)
-        self.review = details()
-        self.stack.addWidget(self.review)
+        layout.addWidget(first, 1)
         layout.addWidget(notice(tr("Privacy warning: conversations, screenshots, paths, source and resources may contain private information. No privacy scan is performed. Check before sharing.")))
         row = QHBoxLayout()
-        self.back = PushButton(tr("Back"))
-        self.back.clicked.connect(self.go_back)
-        self.back.hide()
-        row.addWidget(self.back)
         row.addStretch()
         cancel = PushButton(tr("Cancel"))
         cancel.clicked.connect(self.reject)
         row.addWidget(cancel)
-        self.next = PrimaryPushButton(tr("Review contents"))
+        self.next = PrimaryPushButton(tr("Save ZIP…"))
         self.next.clicked.connect(self.advance)
         row.addWidget(self.next)
         layout.addLayout(row)
-        self.objects = None
         self.export_counts()
-
-    def reject(self):
-        self.objects = None
-        super().reject()
 
     def export_counts(self):
         selection = self.selection()
@@ -269,38 +254,17 @@ class ExportDialog(QDialog):
                             if item.data(0, Qt.ItemDataRole.UserRole) is not None and item.checkState(0) == Qt.CheckState.Checked]
         return result
 
-    def go_back(self):
-        self.stack.setCurrentIndex(0)
-        self.objects = None
-        self.back.hide()
-        self.step.setText(tr("Step 1 of 2 · Select contents"))
-        self.next.setText(tr("Review contents"))
-
     def advance(self):
         try:
-            if self.objects is None:
-                selection = self.selection()
-                self.objects = sharing_task(self, lambda: build_export(self.manager, selection))
-                lines = []
-                for obj in self.objects:
-                    lines.append(f"{title(obj['kind'])} · {obj['id']}")
-                    if obj["kind"] == "history":
-                        lines.append(tr("Candidate and page drafts are snapshots taken at export time, not per-round versions."))
-                        if "snapshot-info.json" in obj["files"]:
-                            lines.append(strict_json(obj["files"]["snapshot-info.json"])["captured_at"])
-                        if "missing-evidence.json" in obj["files"]:
-                            lines.append(tr("Missing evidence: {0}").format(strict_json(obj["files"]["missing-evidence.json"])["missing"]))
-                    lines.extend(f"  {name}  ({len(content)} bytes)" for name, content in sorted(obj["files"].items()))
-                self.review.setPlainText("\n".join(lines))
-                self.stack.setCurrentIndex(1)
-                self.step.setText(tr("Step 2 of 2 · Review and save"))
-                self.next.setText(tr("Save ZIP…"))
-                self.back.show()
-                return
+            selection = self.selection()
+            if not any(selection.values()):
+                raise ValueError(tr("Please select objects to share."))
             filename, _ = QFileDialog.getSaveFileName(self, tr("Save shared package"), "lalc-sharing.zip", "ZIP (*.zip)")
             if filename:
-                sharing_task(self, lambda: save_package(self.objects, filename))
-                self.objects = None
+                def save():
+                    objects = build_export(self.manager, selection)
+                    save_package(objects, filename)
+                sharing_task(self, save)
                 self.accept()
         except InterruptedError:
             return

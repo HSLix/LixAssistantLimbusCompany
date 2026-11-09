@@ -11,12 +11,12 @@ import platform
 import shutil
 import subprocess
 import sys
-import tempfile
 import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
+from lalc.work_files import WorkDirectory
 from lalc.ocr import MODEL_HASHES
 from lalc.codesearch import MODEL_REPO, MODEL_REVISION, MODEL_FILES
 from lalc.agent_skills import DEFAULT_SKILL_NAMES
@@ -105,7 +105,7 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
     models = Path(models or MODEL_ROOT)
     check_codesearch(codesearch_archive, models)
     destination.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="lalc-release-", dir=destination) as directory:
+    with WorkDirectory(prefix="lalc-release-", dir=destination) as directory:
         stage = Path(directory)
         base = stage / "without-agent" / "LALC"
         shutil.copytree(application, base)

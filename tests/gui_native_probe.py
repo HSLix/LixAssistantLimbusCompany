@@ -1,4 +1,4 @@
-"""正式 Fluent GUI 的原生预览与双窗口检查；所有配置使用临时目录。
+"""正式 Fluent GUI 的原生预览与双窗口检查；所有配置使用独立普通工作目录。
 
 从项目根目录运行（macOS）：
 QT_QPA_PLATFORM=cocoa .venv/bin/python tests/gui_native_probe.py
@@ -9,7 +9,7 @@ import argparse
 import json
 from pathlib import Path
 import shutil
-from tempfile import TemporaryDirectory
+from lalc.work_files import WorkDirectory
 
 from PySide6.QtCore import QCoreApplication, QEvent
 from PySide6.QtTest import QTest
@@ -32,7 +32,7 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     app = QApplication.instance() or QApplication([])
     app.setQuitOnLastWindowClosed(False)
-    with TemporaryDirectory(prefix="lalc-fluent-gui-") as directory:
+    with WorkDirectory(prefix="lalc-fluent-gui-") as directory:
         root = Path(directory)
         shutil.copytree(project / "example/pages", root / "pages")
         manager = ManifestManager(root)

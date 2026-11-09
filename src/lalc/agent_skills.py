@@ -3,9 +3,9 @@
 import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
-import tempfile
 import threading
 
+from .work_files import WorkDirectory
 from .file_content import FileContent, checkpoint, copy_content, file_operation, require_disk
 from .process_lock import ProcessLock
 
@@ -57,7 +57,7 @@ def initialize_skills(data_root):
         files = skill_files(DEFAULT_SKILLS, diagnostics)
         if diagnostics or any(Path(name) / "SKILL.md" not in files for name in DEFAULT_SKILL_NAMES):
             raise ValueError("程序内置 Skill 资源不完整。")
-        with tempfile.TemporaryDirectory(prefix=".skills-init-", dir=data_root) as temporary:
+        with WorkDirectory(prefix=".skills-init-", dir=data_root) as temporary:
             stage = Path(temporary) / "skills"
             stage.mkdir()
             copy_files(files, stage)
@@ -83,9 +83,9 @@ def prepare_skills(data_root, destination, cancelled):
 
 @asynccontextmanager
 async def skill_snapshot(data_root):
-    """副本只存本轮临时目录；取消时先等待复制线程退出再删除。"""
+    """副本只存本轮普通工作目录；取消时先等待复制线程退出再删除。"""
     cancelled = threading.Event()
-    with tempfile.TemporaryDirectory(prefix="lalc-skills-") as temporary:
+    with WorkDirectory(prefix="lalc-skills-") as temporary:
         root = Path(temporary).resolve()
         pending = asyncio.create_task(asyncio.to_thread(prepare_skills, Path(data_root), root, cancelled))
         try:

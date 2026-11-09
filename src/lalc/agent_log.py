@@ -9,7 +9,8 @@ import json
 import os
 from pathlib import Path
 import re
-import tempfile
+
+from .work_files import create_work_file
 
 
 FORMAT = {"format": "lalc-agent-log", "version": 1}
@@ -59,7 +60,7 @@ class LogStore:
         if relative not in self.written:
             path = self._path(relative)
             path.parent.mkdir(exist_ok=True)
-            descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=".pending-")
+            descriptor, temporary = create_work_file(dir=path.parent, prefix=".pending-")
             try:
                 with os.fdopen(descriptor, "wb") as stream:
                     stream.write(content)
@@ -169,7 +170,7 @@ class LogStore:
         """原子替换日志文档；内容对象失败时不发布新的引用文档。"""
         target = self._path(Path(path).resolve().relative_to(self.root).as_posix())
         content = _json_bytes(self.pack(value))
-        descriptor, temporary = tempfile.mkstemp(dir=target.parent, prefix=".pending-")
+        descriptor, temporary = create_work_file(dir=target.parent, prefix=".pending-")
         try:
             with os.fdopen(descriptor, "wb") as stream:
                 stream.write(content)

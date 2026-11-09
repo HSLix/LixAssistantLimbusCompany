@@ -8,9 +8,9 @@ import difflib
 import json
 from pathlib import Path
 import shutil
-import tempfile
 from contextlib import contextmanager
 
+from .work_files import WorkDirectory
 from .process_lock import ProcessLock
 
 from .focused import FocusedAutomationSession, WindowError
@@ -168,7 +168,7 @@ class DeveloperHost:
             parent = parent.parent
         created = False
         # Manifest 临时文件放在 Candidate 外，失败不会污染快照；replace 是提交点。
-        with tempfile.TemporaryDirectory(dir=self.candidate.parent, prefix=".lalc-add-") as directory:
+        with WorkDirectory(dir=self.candidate.parent, prefix=".lalc-add-") as directory:
             prepared = Path(directory) / "manifest.json"
             prepared.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
             try:

@@ -9,10 +9,10 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 import urllib.request
 
+from .work_files import work_file
 from .file_content import require_disk
 from .page_packages import real_directory
 from .pi_probe import pi_process_environment
@@ -160,7 +160,7 @@ class CodeSearch:
                              **({"creationflags": subprocess.CREATE_NO_WINDOW} if os.name == "nt" else {}))
         if top.returncode or Path(top.stdout.decode("utf-8").strip()).resolve() != repo.resolve():
             raise ValueError("索引目标必须是允许的独立 Git 根，不能上溯或指向外部工作区。")
-        with tempfile.TemporaryFile() as output:
+        with work_file() as output:
             if (repo / ".codesearch.db").exists():
                 raise ValueError("索引构建目标必须为未发布的新副本。")
             process = spawn([self.binary, "index", "add", str(repo), "--local", "--model", "minilm-l6-q",

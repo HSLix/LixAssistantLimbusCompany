@@ -6,10 +6,10 @@ import json
 from pathlib import Path
 import re
 import stat
-import tempfile
 import uuid
 import zipfile
 
+from .work_files import WorkDirectory
 from .file_content import (FileContent, checkpoint, copy_content, require_disk, require_memory)
 from .page_packages import real_directory
 from .run_logs import lines, snapshot, trace_path
@@ -79,7 +79,7 @@ def export_log(root, run_id, destination, boundary=None):
     root, destination = Path(root), Path(destination)
     boundary = boundary or snapshot(root, run_id)
     require_disk([(destination.parent, boundary[2])])
-    with tempfile.TemporaryDirectory(dir=destination.parent) as directory:
+    with WorkDirectory(dir=destination.parent) as directory:
         stage = Path(directory)
         trace = stage / 'trace.jsonl'
         with trace_path(root, run_id).open('rb') as source, trace.open('wb') as target:
@@ -136,7 +136,7 @@ def import_log(root, archive_path):
         if ending is None:
             raise ValueError('Invalid ZIP index.')
         require_memory(ending[zipfile._ECD_SIZE] * 12)
-    with tempfile.TemporaryDirectory(prefix='.pending-', dir=folder) as directory:
+    with WorkDirectory(prefix='.pending-', dir=folder) as directory:
         stage = Path(directory)
         with zipfile.ZipFile(archive_path) as archive:
             members = archive.infolist()

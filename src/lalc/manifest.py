@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 import os
 import shutil
 import sys
-import tempfile
 import types
 import uuid
 from collections.abc import Mapping
@@ -16,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from types import MappingProxyType
 
+from .work_files import create_work_file
 from .actions import TrustedAction, application_actions
 from .runtime import _exception_fields, atomic_write_json, sha256_bytes
 
@@ -1064,7 +1064,7 @@ class ManifestManager:
             if target.read_bytes() != source.content:
                 raise ValueError("immutable_component_conflict")
             return
-        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{digest}.", suffix=".tmp", dir=target.parent)
+        descriptor, temporary_name = create_work_file(prefix=f".{digest}.", suffix=".tmp", dir=target.parent)
         temporary = Path(temporary_name)
         try:
             with os.fdopen(descriptor, "wb") as stream:

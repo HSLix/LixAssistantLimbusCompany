@@ -6,10 +6,17 @@ import json
 import os
 from pathlib import Path
 import queue
+import re
 import shutil
 import subprocess
-import tempfile
 import threading
+
+from .work_files import WorkDirectory
+
+EVENT_LIMIT = 16 * 1024 * 1024
+READ_CHUNK = 64 * 1024
+# shortcut: 仅识别 pi 1.5.0 的 type 首字段；上游顺序变化时退回普通受限解析。
+EVENT_PREFIX = re.compile(rb'\A\s*\{\s*"type"\s*:\s*"([A-Za-z0-9_]{1,64})"\s*[,}]')
 
 
 class PiProcess:
@@ -53,14 +60,42 @@ class PiProcess:
         self.signature = None
 
     def _read(self, stream, events, *, stderr=False):
+        """有界读取 JSONL；冗余收尾只留接收证据，未知大行仍失败。"""
+        channel, previous = "stderr" if stderr else "stdout", "none"
         try:
-            for line in iter(lambda: stream.readline(16 * 1024 * 1024 + 1), b""):
-                if len(line) > 16 * 1024 * 1024:
-                    raise ValueError("pi 协议事件超过上限。")
+            while prefix := stream.readline(4096):
+                match = EVENT_PREFIX.match(prefix) if not stderr else None
+                kind = match[1].decode("ascii") if match else "unknown"
+                omitted = kind == "agent_end"
+                line = bytearray() if omitted else bytearray(prefix)
+                size, chunk = len(prefix), prefix
+                while True:
+                    if not omitted and size > EVENT_LIMIT:
+                        reason = "无法从行首确认事件类型" if kind == "unknown" else "普通事件超限"
+                        raise ValueError(f"pi 协议事件超过上限。channel={channel}, type={kind}, "
+                                         f"received_bytes_at_least={size}, limit_bytes={EVENT_LIMIT}, "
+                                         f"previous_event={previous}, reason={reason}")
+                    if chunk.endswith(b"\n"):
+                        break
+                    chunk = stream.readline(READ_CHUNK if omitted else min(READ_CHUNK, EVENT_LIMIT + 1 - size))
+                    if not chunk:
+                        if omitted:
+                            raise ValueError(f"pi agent_end 未读完整。channel={channel}, type={kind}, "
+                                             f"received_bytes={size}, previous_event={previous}")
+                        break
+                    size += len(chunk)
+                    if not omitted:
+                        line.extend(chunk)
+                if omitted:
+                    events.put({"type": "agent_end", "payload_omitted": True, "received_bytes": size})
+                    previous = kind
+                    continue
                 if stderr:
                     self.show("pi stderr: " + line.decode(errors="replace").rstrip())
                 else:
-                    events.put(json.loads(line))
+                    item = json.loads(line)
+                    events.put(item)
+                    previous = kind
         except Exception as error:
             events.put(error)
         finally:
@@ -78,7 +113,7 @@ class PiProcess:
         reuse = self.process is not None and self.process.poll() is None and self.signature == signature
         if not reuse:
             self.close()
-            self.directory = tempfile.TemporaryDirectory(prefix="lalc-pi-process-")
+            self.directory = WorkDirectory(prefix="lalc-pi-process-")
             home = Path(self.directory.name)
         else:
             assert self.directory is not None
@@ -128,7 +163,8 @@ class PiProcess:
                         await asyncio.sleep(.01)
                         continue
                     if item is None:
-                        raise PiExited(f"pi exited before completion (exit={process.wait()})")
+                        raise PiExited(f"pi exited before completion：未收到必要的 agent_settled "
+                                       f"(exit={process.wait()})")
                     if isinstance(item, Exception):
                         raise item
                     return item

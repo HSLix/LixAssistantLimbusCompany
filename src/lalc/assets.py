@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import os
 import re
-import tempfile
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
+from .work_files import create_work_file
 from .runtime import atomic_write_json, sha256_bytes
 
 
@@ -150,7 +150,7 @@ class AssetLibrary:
             if path.read_bytes() != content:
                 raise FileExistsError(f"Asset content differs at full-hash path: {relative}")
         else:
-            descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=".asset-")
+            descriptor, temporary = create_work_file(dir=path.parent, prefix=".asset-")
             try:
                 with os.fdopen(descriptor, "wb") as stream:
                     stream.write(content)
