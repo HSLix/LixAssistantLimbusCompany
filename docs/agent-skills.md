@@ -11,6 +11,8 @@ Skill 位于应用实际数据目录的 `skills/`：默认 Windows 为 `%LOCALAP
 - 开发者直接编辑、新增或移除目录中的文件；没有 GUI 编辑器，Agent 只能读取。若整个目录被删除，下轮会按“目录不存在”重新初始化。
 - 同名普通文件或根目录链接会报告错误，不覆盖。目录内链接／特殊文件排除并显示诊断，避免 pi 在发现阶段读到目录外资料。
 
+设置页 Sharing 支持按完整 Skill 目录导出和导入，导入默认不选；同名相同内容跳过，不同内容显式覆盖或跳过。详见 [Sharing](sharing.md)。
+
 每个 Skill 使用 `技能名/SKILL.md`，例如 `skills/my-guide/SKILL.md`：
 
 ```markdown

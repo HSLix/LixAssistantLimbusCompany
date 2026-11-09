@@ -131,7 +131,7 @@ class TemplateMatchPage(QWidget):
                 if key not in nodes:
                     node = QTreeWidgetItem(nodes[parent], [segment])
                     node.setData(0, Qt.ItemDataRole.UserRole + 1, key)
-                    node.setExpanded(key in expanded or self.signature is None)
+                    node.setExpanded(key in expanded or (self.signature is None and "/" not in key))
                     nodes[key] = node
                 parent = key
             if not parent:
@@ -149,7 +149,7 @@ class TemplateMatchPage(QWidget):
         # Qt 恢复当前叶子时会展开祖先；随后还原用户折叠状态。
         for key, node in nodes.items():
             if key:
-                node.setExpanded(key in expanded or self.signature is None)
+                node.setExpanded(key in expanded or (self.signature is None and "/" not in key))
         self.tree.blockSignals(False)
         self.signature = signature
         self.select_template()

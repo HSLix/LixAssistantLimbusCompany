@@ -8,6 +8,7 @@ import os
 import stat
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QMessageBox
 
 from lalc.application import ApplicationService
@@ -283,3 +284,33 @@ def test_unknown_disk_space_requires_explicit_continuation(window, monkeypatch):
     monkeypatch.setattr(QMessageBox, "question", lambda *args: asked.append(args[2]) or QMessageBox.StandardButton.Yes)
     assert sharing_task(window, lambda: require_disk([(window.service.data_root, 1)])) is None
     assert asked and window.allow_unknown_space
+
+
+def test_skill_import_defaults_and_asset_tree_depth(window, source, tmp_path):
+    from lalc.sharing_gui import asset_tree
+    manager, _ = source
+    folder = manager.data_root / 'skills/custom'
+    folder.mkdir(parents=True)
+    (folder / 'SKILL.md').write_text('guidance')
+    path = tmp_path / 'skill.zip'
+    save_package(build_export(manager, {'skills': ['custom']}), path)
+    package = SharingPackage(path)
+    dialog = ImportDialog(window, package)
+    try:
+        assert not dialog.selected
+        dialog.trust.setChecked(True)
+        dialog.set_kind_selected('skills', True)
+        assert dialog.commit.isEnabled()
+        assert dialog.skills.item(0).checkState().value == 2
+    finally:
+        dialog.close()
+        package.close()
+    tree = asset_tree(['ui', 'ui/child', 'ui/child/deep'])
+    try:
+        items = list(tree_items(tree))
+        assert [item.text(0) for item in items] == ['ui', 'child', 'deep']
+        assert items[0].isExpanded() and not items[1].isExpanded()
+        items[0].setCheckState(0, Qt.CheckState.Unchecked)
+        assert all(item.checkState(0).value == 0 for item in items)
+    finally:
+        tree.close()

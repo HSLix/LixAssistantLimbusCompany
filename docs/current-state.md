@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-09 Sharing 增加完整 Skills 目录分享和默认不选导入，Asset 树简化选择，两处目录树仅默认展开顶层。边界及验证见[专项记录](skills-sharing-impact-review.md)。
+
 2026-11-09 pi 读取层省略已识别 `agent_end` 的重复聚合负载，仅保留接收标记与字节数；普通事件保留 16 MiB 限制与具体诊断，继续等待 `agent_settled`。设计、影响与验证见[专项记录](pi-agent-end-impact-review.md)。
 
 2026-11-09 Developer GUI 增加详情复制反馈、日志中性文案、持久化 Skills 目录入口及每轮思考／工具折叠时间线。接受交互、影响与验证见[专项记录](developer-process-timeline-impact-review.md)；Windows 原生与真实模型／游戏尚未验收。
