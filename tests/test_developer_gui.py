@@ -126,6 +126,13 @@ def test_trial_filters_debug_and_internal_events_and_opens_full_details(gui):
     dialog.show_log_details(QUrl("4"))
     details = dialog.findChild(ErrorDialog)
     assert json.loads(details.details.toPlainText()) == records[3]
+    from PySide6.QtWidgets import QLabel, QPushButton
+    assert details.details_button.text() == '收起详情'
+    assert not any('不用截图' in label.text() for label in details.findChildren(QLabel))
+    copy = next(button for button in details.findChildren(QPushButton) if button.text() == '复制详情')
+    copy.click()
+    assert copy.text() == '复制成功'
+
     details.close()
     dialog.render(state)
     assert dialog.logs.toPlainText() == text

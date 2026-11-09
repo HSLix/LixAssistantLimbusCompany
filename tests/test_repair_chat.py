@@ -23,6 +23,7 @@ def test_tool_details_wrap_with_viewport_and_preserve_json(gui):
     result = {'text': 'long sentence ' * 100}
     chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_start', {'args': arguments})
     chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_end', {'result': result})
+    chat.open_link(QUrl('raw:1'))
     chat.open_link(QUrl('tool:0'))
     chat.show()
     heights = []
@@ -129,6 +130,7 @@ def test_tool_lifecycle_merges_same_call_and_preserves_repeated_calls_and_rounds
     emit(page, "tool_execution_start", args={"query": "original-argument"})
     emit(page, "repair_tool", arguments={"query": "original-argument"},
          result={"details": {"actions": "contract-result"}})
+    chat.open_link(QUrl("raw:1"))
     assert len(chat.entries) == 1 and "等待完成确认" in chat.toPlainText()
     emit(page, "tool_execution_end", result={"content": [{"type": "text", "text": "contract-result"}]}, isError=False)
     assert len(chat.entries) == 1 and "成功" in chat.toPlainText()
@@ -207,6 +209,8 @@ def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resiz
     window.resize(900, 800)
     window.show()
     app.processEvents()
+    from PySide6.QtCore import QUrl
+    chat.activity(1)["expanded"] = True
     for number in range(150):
         chat.upsert_tool(1, f"previous-{number}", "read", "tool_execution_end", {"result": {}})
     app.processEvents()
@@ -221,3 +225,71 @@ def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resiz
         emit(page, kind, result={}, isError=False)
         app.processEvents()
         assert bar.value() == (bar.maximum() if at_bottom else position)
+
+
+def test_process_timeline_orders_thinking_and_tools_with_nested_collapse(gui):
+    """过程和工具详情两级折叠，失败仅节点标红，最终回答在外层。"""
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    _, _ = gui
+    chat = RepairChat()
+    chat.add_message('你', 'question', 1)
+    chat.remember_message(1, [{'type': 'thinking', 'thinking': 'first thought'},
+                             {'type': 'toolCall', 'name': 'read', 'arguments': {'path': 'secret argument'}}])
+    chat.upsert_tool(1, 'a', 'read', 'tool_execution_start', {'args': {'path': 'secret argument'}})
+    chat.upsert_tool(1, 'a', 'read', 'tool_execution_end', {'isError': True, 'result': {'error': 'failure body'}})
+    chat.remember_message(1, [{'type': 'thinking', 'thinking': 'second thought'}])
+    chat.add_message('Agent', 'final answer', 1)
+    assert not chat.activity(1)['expanded']
+    assert 'first thought' not in chat.toPlainText() and 'read' not in chat.toPlainText()
+    assert 'final answer' in chat.toPlainText()
+    chat.open_link(QUrl('raw:1'))
+    text = chat.toPlainText()
+    assert text.index('first thought') < text.index('read') < text.index('second thought') < text.index('final answer')
+    assert 'secret argument' not in text and 'failure body' not in text
+    assert '#9e1c1c' in chat.toHtml() and '失败' in text
+    chat.open_link(QUrl('tool:1'))
+    assert 'secret argument' in chat.toPlainText() and 'failure body' in chat.toPlainText()
+    chat.open_link(QUrl('raw:1'))
+    assert 'failure body' not in chat.toPlainText() and 'final answer' in chat.toPlainText()
+    chat.open_link(QUrl('raw:1'))
+    assert 'failure body' in chat.toPlainText()
+
+
+def test_skills_menu_opens_persistent_source_and_preserves_edits(gui, monkeypatch):
+    """菜单可初始化持久化源目录，重复打开不会覆盖用户修改。"""
+    from PySide6.QtGui import QDesktopServices
+    _, window = gui
+    page = window.repair_page
+    opened = []
+    monkeypatch.setattr(QDesktopServices, 'openUrl', lambda url: opened.append(url.toLocalFile()) or True)
+    monkeypatch.setattr(window, '_interact', lambda operation: operation())
+    root = window.service.data_root / 'skills'
+    page.skills_action.trigger()
+    assert opened == [str(root)]
+    skill = root / 'workflow-development' / 'SKILL.md'
+    assert skill.is_file()
+    skill.write_text('custom content')
+    page.skills_action.trigger()
+    assert opened == [str(root), str(root)] and skill.read_text() == 'custom content'
+
+
+def test_tool_links_follow_reordered_history_entries(gui):
+    """补载旧轮并重排后，详情链接仍指向原工具。"""
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    _, _ = gui
+    chat = RepairChat()
+    recent = chat.upsert_tool(2, 'recent', 'read', 'tool_execution_end', {'result': {'text': 'recent result'}})
+    older = chat.upsert_tool(1, 'older', 'read', 'tool_execution_end', {'result': {'text': 'older result'}})
+    chat.entries[:] = [older, recent]
+    chat.activity(1)['expanded'] = True
+    chat.activity(2)['expanded'] = True
+    chat.render()
+    assert 'tool:0' in chat.activity_html(1) and 'tool:1' in chat.activity_html(2)
+    chat.open_link(QUrl('tool:0'))
+    assert 'older result' in chat.toPlainText() and 'recent result' not in chat.toPlainText()
+    chat.open_link(QUrl('tool:1'))
+    assert 'recent result' in chat.toPlainText()

@@ -147,6 +147,10 @@ def test_error_dialog_prompts_copy_and_uses_red_button(fatal):
             app.processEvents()
             assert copy.palette().color(QPalette.ColorRole.ButtonText).name() == color
         copy.click()
+        assert copy.text() == '复制成功'
+        assert dialog.copy_timer.isActive()
+        dialog.copy_timer.timeout.emit()
+        assert copy.text() == '复制错误详情'
         assert '错误摘要' in app.clipboard().text() and '完整详情' in app.clipboard().text()
     finally:
         dialog.close()
@@ -564,3 +568,21 @@ def test_ctrl_c_in_qt_event_filter_shows_one_dialog_and_exits(tmp_path, monkeypa
     assert len(reports) == 1 and "KeyboardInterrupt" in reports[0]
     assert signal.getsignal(signal.SIGINT) == previous
     assert "KeyboardInterrupt" in (tmp_path / "logs/lalc.log").read_text()
+
+
+def test_neutral_details_dialog_copies_without_error_prompt():
+    """普通日志详情不提示报错，复制仍有成功反馈。"""
+    from PySide6.QtWidgets import QApplication, QLabel, QPushButton
+    from lalc.gui import ErrorDialog
+
+    app = QApplication.instance() or QApplication([])
+    dialog = ErrorDialog('日志摘要', '日志详情', error=False)
+    try:
+        assert not any('不用截图' in label.text() for label in dialog.findChildren(QLabel))
+        copy = next(button for button in dialog.findChildren(QPushButton) if button.text() == '复制详情')
+        copy.click()
+        assert copy.text() == '复制成功' and app.clipboard().text() == '日志摘要\n\n日志详情'
+        dialog.copy_timer.timeout.emit()
+        assert copy.text() == '复制详情'
+    finally:
+        dialog.close()

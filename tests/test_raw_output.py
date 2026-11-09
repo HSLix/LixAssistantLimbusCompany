@@ -63,7 +63,7 @@ def test_raw_output_collapsed_streams_and_preserves_choice(gui):
                {'type': 'toolCall', 'name': 'read', 'partialArgs': '{"path": "st', 'arguments': {}}])
     page.flush_raw_output()
     assert page.chat.activity()['expanded']
-    assert 'checking' in page.chat.toPlainText() and '{"path": "st' in page.chat.toPlainText()
+    assert 'checking' in page.chat.toPlainText() and '{"path": "st' not in page.chat.toPlainText()
     page.chat.open_link(QUrl(f'raw:{page.chat.activity_round}'))
     raw(page, [{'type': 'text', 'text': 'next chunk'}])
     assert not page.chat.activity()['expanded'] and 'next chunk' not in page.chat.toPlainText()
@@ -156,11 +156,12 @@ def test_status_and_raw_are_inline_before_agent_content(gui):
     raw(page, [{'type': 'text', 'text': '<literal raw>'}])
     assert page.status.isHidden()
     text = page.chat.toPlainText()
-    assert text.index('current question') < text.index('Reading source') < text.index('Tool:') < text.index('current answer')
+    assert text.index('current question') < text.index('Reading source') < text.index('current answer')
+    assert 'Tool:' not in text
     assert '<literal raw>' not in text
     page.chat.open_link(QUrl(f'raw:{page.chat.activity_round}'))
     text = page.chat.toPlainText()
-    assert text.index('Reading source') < text.index('<literal raw>') < text.index('Tool:')
+    assert text.index('Reading source') < text.index('Tool:') < text.index('<literal raw>')
     page.clear_raw_output()
     assert 'Reading source' in page.chat.toPlainText() and '<literal raw>' not in page.chat.toPlainText()
     page.set_status('Round complete')
@@ -200,7 +201,8 @@ def test_completed_generation_survives_answer_followup_and_history(gui):
     assert activity['expanded'] and len(activity['messages']) == 2 and not activity['pending']
     text = page.chat.toPlainText()
     assert text.index('earlier reasoning') < text.index('final reasoning') < text.rindex('final business answer')
-    assert 'step.py' in text
+    assert 'step.py' not in text  # 工具参数只出现在独立工具详情中。
+    assert 'revise_success' not in text
 
     log.group = 2
     page.chat.add_message('你', 'next question', 2)
