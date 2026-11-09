@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-09 pi 读取层省略已识别 `agent_end` 的重复聚合负载，仅保留接收标记与字节数；普通事件保留 16 MiB 限制与具体诊断，继续等待 `agent_settled`。设计、影响与验证见[专项记录](pi-agent-end-impact-review.md)。
+
 2026-11-09 Developer GUI 增加详情复制反馈、日志中性文案、持久化 Skills 目录入口及每轮思考／工具折叠时间线。接受交互、影响与验证见[专项记录](developer-process-timeline-impact-review.md)；Windows 原生与真实模型／游戏尚未验收。
 
 2026-11-08 修复取消 Run 后 Developer 截图与窗口调整被旧取消状态阻断：正常及异常收尾在输入清理后释放 Run gate，保留运行／暂停期间的排他与取消边界。设计、影响及本地回归见[专项记录](developer-capture-cancellation-impact-review.md)；Windows 与真实游戏尚未验收。
@@ -73,3 +75,5 @@
 - `.generated/external-search-validation/` 和相关实验代码、资源、成功／失败结果按原确认要求保留，不因本次文档维护清理。
 
 本次复检与维护证据见[一致性审计](architecture-consistency-audit-2026-11-05.md)。
+
+2026-11-09：已接受普通工作目录／文件权限继承及直接导出 ZIP 边界，保留清理、事务和导入 Review；设计与实施验证见[专项记录](ordinary-work-directories-impact-review.md)。

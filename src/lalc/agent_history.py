@@ -10,9 +10,9 @@ import logging
 from pathlib import Path
 import re
 import sqlite3
-import tempfile
 import uuid
 
+from .work_files import WorkDirectory
 from .agent_log import FORMAT, LogStore, read_json
 from .game_version import observe_game_version
 from .process_lock import ProcessLock
@@ -206,7 +206,7 @@ class AgentHistory:
     def rebuild(self):
         """显式从新增观测重建；原子替换前失败保留原索引，不导入无观测旧日志。"""
         self.root.mkdir(parents=True, exist_ok=True)
-        with self.lock(), tempfile.TemporaryDirectory(dir=self.root, prefix=".history-rebuild-") as temporary:
+        with self.lock(), WorkDirectory(dir=self.root, prefix=".history-rebuild-") as temporary:
             target = Path(temporary) / DATABASE
             count = 0
             with self.connection(write=True, path=target) as connection:

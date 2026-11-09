@@ -4,9 +4,9 @@ import json
 import os
 import re
 from pathlib import Path
-import tempfile
 import uuid
 
+from .work_files import work_file
 from .file_content import require_memory
 from .manifest import ManifestManager
 from .runtime import sha256_bytes
@@ -108,7 +108,7 @@ def import_workflow(manager, source_root, source_manifest_id, *, manifest_id, ma
     manifest = {**prepared.manifest, "manifest_id": manifest_id}
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(dir=manager.manifests_dir, prefix=".import-", delete=False) as stream:
+        with work_file(dir=manager.manifests_dir, prefix=".import-", delete=False) as stream:
             temporary = Path(stream.name)
             stream.write(json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"))
             stream.flush()

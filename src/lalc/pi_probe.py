@@ -12,11 +12,11 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
+from .work_files import WorkDirectory
 from .agent_diagnostics import AgentDiagnosticError, redact
 
 
@@ -298,7 +298,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
         raise AgentDiagnosticError("DeepSeek 当前仅支持 deepseek-flash", "settings")
     if require_image and provider != "deepseek" and "image" not in model.get("architecture", {}).get("input_modalities", []):
         raise AgentDiagnosticError("Selected service model does not declare image input support", "model_preflight")
-    with tempfile.TemporaryDirectory(prefix="lalc-pi-") as temporary:
+    with WorkDirectory(prefix="lalc-pi-") as temporary:
         agent_dir = Path(temporary) / "agent"
         agent_dir.mkdir()
         (agent_dir / "settings.json").write_text(json.dumps({

@@ -12,10 +12,10 @@ from pathlib import Path
 import re
 import shutil
 import stat
-import tempfile
 import uuid
 import zipfile
 
+from .work_files import work_root, WorkDirectory, create_work_directory, work_file
 from .file_content import (FileContent, content_hash, content_bytes, copy_content, write_content,
     content_stream, require_memory, require_disk, available_memory, open_image, image_preview, ResourceUnknown, checkpoint)
 from .agent_log import FORMAT, LogStore
@@ -304,8 +304,8 @@ def build_export(manager, selection):
                     "source": identity, "note": "Candidate and page drafts are export-time snapshots, not per-round snapshots."})
             objects.append({"kind": kind, "id": identity, "files": files})
     _index(objects)
-    require_disk([(Path(tempfile.gettempdir()), sum(len(content) for obj in objects for content in obj["files"].values()))])
-    owner = tempfile.TemporaryDirectory(prefix="lalc-export-")
+    require_disk([(work_root(), sum(len(content) for obj in objects for content in obj["files"].values()))])
+    owner = WorkDirectory(prefix="lalc-export-")
     root = Path(owner.name).resolve()
     for number, obj in enumerate(objects):
         fixed = {}
@@ -342,7 +342,7 @@ def _index(objects):
 
 
 def save_package(objects, destination):
-    """完整临时 ZIP 写完才替换用户目标；失败保留此前文件。"""
+    """完整待提交 ZIP 写完才替换用户目标；失败保留此前文件。"""
     index = json_bytes(_index(objects))
     destination = Path(destination)
     real_directory(destination.parent)
@@ -351,7 +351,7 @@ def save_package(objects, destination):
         raise ValueError("保存目标不能是链接。")
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(dir=destination.parent, prefix=".sharing-", delete=False) as stream:
+        with work_file(dir=destination.parent, prefix=".sharing-", delete=False) as stream:
             temporary = Path(stream.name)
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("sharing.json", index)
@@ -366,8 +366,8 @@ def save_package(objects, destination):
 
 
 def staging_root():
-    root = Path(tempfile.gettempdir()).resolve() / ("lalc-sharing-" + digest(str(Path.home()).encode())[:16])
-    real_directory(root).mkdir(mode=0o700, exist_ok=True)
+    root = work_root() / "sharing"
+    real_directory(root).mkdir(exist_ok=True)
     return root
 
 
@@ -396,7 +396,7 @@ class SharingPackage:
         self.closed = False
         self.stage_lock.acquire()
         try:
-            self.root.mkdir(mode=0o700)
+            self.root.mkdir()
             if self.path.is_symlink() or not self.path.is_file():
                 raise ValueError("ZIP 必须是普通文件。")
             # zipfile 在内存中建立中央目录；先按其实际字节数检查解析所需内存。
@@ -623,7 +623,7 @@ def replace_asset(root, identity, files, expected):
     base.mkdir(parents=True, exist_ok=True)
     target = real_directory(base / identity)
     target.mkdir(parents=True, exist_ok=True)
-    work = Path(tempfile.mkdtemp(dir=base, prefix=".sharing-asset-"))
+    work = Path(create_work_directory(dir=base, prefix=".sharing-asset-"))
     backup, staged = work / "old", work / "new"
     backup.mkdir()
     staged.mkdir()
@@ -653,7 +653,7 @@ def replace_asset(root, identity, files, expected):
             try:
                 shutil.rmtree(work)
             except OSError:
-                logging.getLogger(__name__).warning("Asset 临时目录未清理：%s", work, exc_info=True)
+                logging.getLogger(__name__).warning("Asset 工作目录未清理：%s", work, exc_info=True)
         if current is None and not success and target.exists() and not any(target.iterdir()):
             target.rmdir()
 
@@ -667,7 +667,7 @@ def import_history(root, obj, content_hash):
             if digest(FileContent.from_path(target / name)) != record["sha256"]:
                 raise ValueError("同名历史资料已被修改，不能覆盖。")
         return target
-    with tempfile.TemporaryDirectory(dir=parent, prefix=".sharing-history-") as temporary:
+    with WorkDirectory(dir=parent, prefix=".sharing-history-") as temporary:
         folder = Path(temporary) / "history"
         folder.mkdir()
         for name in obj["files"]:

@@ -42,6 +42,7 @@ uv run --frozen lalc pi-probe \
 - 关闭会话重试、自动压缩、缓存预热及启动联网；现成 pi 模型客户端设置 `maxRetries: 0`，避免内部 HTTP 重试绕过计数。
 - `--max-requests` 默认 20，在发送前计数并拒绝超限请求。到达上限后若模型已正常回答仍可完成；需要下一次请求时结束为未完成。
 - 终端展示实际模型请求（省略图片编码）、工具参数和结果、响应与最终状态。以 `agent_settled` 判断停止，不把 `agent_end` 当作最终结束。
+- 2026-11-09：读取层按 pi 1.5.0 的行首 `type` 首字段识别 `agent_end`，分块读到换行，仅记录 `type`、`received_bytes`（含换行）及 `payload_omitted: true`，不重复保存聚合 messages／willRetry。普通事件和 stderr 保留 16 MiB 单行上限；未能识别的超大行仍失败，错误包含通道、确认类型或 unknown、已读取字节数下界、上限及最近事件类型，不附原始负载。省略期间 EOF 或未收到必要完成信号即退出仍失败。不同字段顺序退回普通受限解析；详见[设计与影响审查](pi-agent-end-impact-review.md)。
 - 模型报错或上限触发返回 1；必须实际成功读取源码并收到正常非空回答才返回 0。这里的 completed 只代表验证流程完成，不评判模型建议是否正确。
 - Ctrl+C 请求 RPC abort，关闭输入并回收子进程；必要时 terminate/kill。取消返回 130，不自动续接。
 

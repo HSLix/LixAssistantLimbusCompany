@@ -15,7 +15,6 @@ import signal
 import socket
 import subprocess
 import sys
-import tempfile
 import time
 from types import SimpleNamespace
 import urllib.request
@@ -25,6 +24,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tests"))
 from agent_test_server import agent_server
+from lalc.work_files import create_work_directory
 from lalc.pi_probe import PiExited, configured_pi, rpc_session
 
 pytestmark = pytest.mark.agent
@@ -37,7 +37,7 @@ def retained():
     """每次运行建立独立目录，不自动清理验证证据。"""
     base = ROOT / ".generated/external-search-validation"
     base.mkdir(parents=True, exist_ok=True)
-    folder = Path(tempfile.mkdtemp(prefix="run-", dir=base))
+    folder = Path(create_work_directory(prefix="run-", dir=base))
     print(f"RETAINED={folder}", flush=True)
     return folder
 

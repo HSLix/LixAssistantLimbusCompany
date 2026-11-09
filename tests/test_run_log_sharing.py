@@ -5,6 +5,8 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_run_log_shari
 """
 
 import json
+import os
+import stat
 import zipfile
 from pathlib import Path
 
@@ -37,6 +39,8 @@ def test_roundtrip_snapshot_images_and_same_number(tmp_path):
     root.mkdir()
     archive = tmp_path / 'log.zip'
     package(root, archive)
+    if os.name != 'nt':
+        assert stat.S_IMODE(archive.stat().st_mode) == stat.S_IMODE((root / 'traces/1.jsonl').stat().st_mode)
     target = tmp_path / 'target'
     target.mkdir()
     write_logs(target, 1)

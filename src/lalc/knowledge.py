@@ -11,10 +11,10 @@ import re
 import shutil
 import signal
 import subprocess
-import tempfile
 import time
 import uuid
 
+from .work_files import work_file
 from .process_lock import ProcessLock
 from .file_content import require_disk
 from .page_packages import real_directory
@@ -254,7 +254,7 @@ class KnowledgeLibrary:
             # 参考副本不会使用链接；避免 Windows 检出要求创建链接的系统权限。
             command += ["-c", "core.symlinks=false"]
         command += args
-        with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        with work_file() as out, work_file() as err:
             process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=out, stderr=err, env=env,
                                        creationflags=(subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP) if os.name == "nt" else 0,
                                        start_new_session=os.name != "nt")

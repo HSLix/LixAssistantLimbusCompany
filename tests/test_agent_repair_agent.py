@@ -159,6 +159,21 @@ def test_text_only_and_context_retained(conversation):
     assert (chat.log.path / "round-2" / "result.json").exists()
 
 
+def test_agent_end_is_logged_without_duplicate_messages(conversation):
+    """真实 pi 收尾保留接收标记，逐条消息和 settled 仍然完整。"""
+    chat, options, state = conversation
+    script(state, [tool("read", {"path": "steps.total.py"}), answer("finished")])
+    result = asyncio.run(chat.run("inspect the source", options))
+    assert result["status"] == "completed", result
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
+    ended = [event for event in events if event["type"] == "agent_end"]
+    assert ended
+    assert all(event["payload_omitted"] and event["received_bytes"] > 0 for event in ended)
+    assert all("messages" not in event and "willRetry" not in event for event in ended)
+    assert any(event["type"] == "message_end" and event["message"]["role"] == "toolResult" for event in events)
+    assert any(event["type"] == "agent_settled" for event in events)
+
+
 @pytest.mark.parametrize("fault,phase", [("disconnect_at", "connect"), ("broken_body_at", "response_body")])
 @pytest.mark.parametrize("request_number", [1, 2])
 def test_transport_error_preserves_cause_and_request_without_retry(conversation, fault, phase, request_number):
