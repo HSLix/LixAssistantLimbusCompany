@@ -192,3 +192,17 @@ def test_gui_frozen_capture_parameters_results_and_failure(gui, monkeypatch):
     wait_jobs(app, window)
     assert errors and 'hash mismatch' in errors[-1]
     assert not page.view.items and not page.results.toPlainText() and page.run_button.isEnabled()
+
+
+def test_catalog_only_expands_top_level_and_preserves_manual_expansion(gui):
+    app, window = gui
+    page = window.template_match_page
+    entry(window.service.data_root, 'ui/start/deep')
+    page.update_catalog(window.host.template_catalog())
+    top = page.tree.topLevelItem(0)
+    second = top.child(0)
+    assert top.isExpanded() and not second.isExpanded()
+    second.setExpanded(True)
+    entry(window.service.data_root, 'ui/start/other')
+    page.update_catalog(window.host.template_catalog())
+    assert page.tree.topLevelItem(0).child(0).isExpanded()

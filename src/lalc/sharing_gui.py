@@ -117,7 +117,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
 
 def title(kind):
     return {"workflow": tr("Workflow"), "assets": tr("Assets"),
-            "pages": tr("Extension Pages"), "history": tr("Agent History")}[kind]
+            "pages": tr("Extension Pages"), "history": tr("Agent History"), "skills": tr("Skills")}[kind]
 
 
 def notice(text):
@@ -142,7 +142,7 @@ def tree_items(tree):
 
 
 def asset_tree(names):
-    """目录节点批量选择，单独叶节点表示本层逻辑组，兼容父层也有图片。"""
+    """逻辑名直接参与选择，目录节点联动子项，默认只展开顶层。"""
     tree = QTreeWidget()
     tree.setHeaderHidden(True)
     nodes = {}
@@ -155,11 +155,11 @@ def asset_tree(names):
                 node.setFlags(node.flags() | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsAutoTristate)
                 nodes[prefix] = node
             parent = nodes[prefix]
-        leaf = QTreeWidgetItem(parent, [tr("Images and tags")])
+        leaf = parent
         leaf.setData(0, Qt.ItemDataRole.UserRole, name)
         leaf.setFlags(leaf.flags() | Qt.ItemFlag.ItemIsUserCheckable)
         leaf.setCheckState(0, Qt.CheckState.Checked)
-    tree.expandToDepth(1)
+    tree.expandToDepth(0)
     return tree
 
 
@@ -293,7 +293,7 @@ class ImportDialog(QDialog):
         super().__init__(window)
         self.window_host, self.manager, self.package = window, window.host.manager, package
         self.allow_unknown_space = getattr(window, "allow_unknown_space", False)
-        self.selected = {obj["number"] for obj in package.objects}
+        self.selected = {obj["number"] for obj in package.objects if obj["kind"] != "skills"}
         self.reviewed, self.review_failed, self.asset_actions = {}, {}, {}
         self.viewed, self.checks = set(), {}
         self.by_kind = {kind: [obj for obj in package.objects if obj["kind"] == kind] for kind in KINDS}
@@ -375,6 +375,19 @@ class ImportDialog(QDialog):
         history.addWidget(self.history_details, 1)
         self.histories.itemChanged.connect(lambda item: self.choose(self.number("history", item.data(Qt.ItemDataRole.UserRole)), item.checkState() == Qt.CheckState.Checked))
         self.histories.currentRowChanged.connect(self.render_history)
+        skills = self.panel("skills")
+        self.skills = check_list([obj["id"] for obj in self.by_kind["skills"]], False)
+        skills.addWidget(self.skills)
+        actions = QHBoxLayout()
+        for label, action in ((tr("Replace all conflicts"), "replace"), (tr("Skip all conflicts"), "skip")):
+            button = PushButton(label)
+            button.clicked.connect(lambda _, action=action: self.skill_action(action))
+            actions.addWidget(button)
+        skills.addLayout(actions)
+        self.skill_details = details()
+        skills.addWidget(self.skill_details)
+        self.skills.itemChanged.connect(lambda item: self.choose(self.number("skills", item.data(Qt.ItemDataRole.UserRole)), item.checkState() == Qt.CheckState.Checked))
+        self.skills.currentRowChanged.connect(self.render_skill)
         self.error_box = notice("")
         layout.addWidget(self.error_box)
         self.trust = CheckBox(tr("I understand imported code and records are untrusted."))
@@ -474,6 +487,9 @@ class ImportDialog(QDialog):
                           tr("Unreviewed runtime identity, loading and interface are not verified. Existing settings are kept. Reload manually after installation.")])
             if obj["number"] in self.reviewed:
                 lines.append(tr("Reviewed page identity: {0}").format(self.reviewed[obj["number"]]["page_id"]))
+        elif obj["kind"] == "skills":
+            lines.append(tr("Destination: {0}").format(self.manager.data_root / "skills" / obj["id"]))
+            lines.extend(check.get("changed_files", []))
         elif obj["kind"] == "history":
             lines.append(tr("Destination: {0}").format(self.manager.data_root / "knowledge/imported-agent-history" / check.get("content_hash", "")))
         lines.append(tr("Files (including dependencies):"))
@@ -507,8 +523,18 @@ class ImportDialog(QDialog):
         if identity is not None:
             self.choose(self.number("assets", identity), item.checkState(0) == Qt.CheckState.Checked)
 
+    def skill_action(self, action):
+        for obj in self.by_kind["skills"]:
+            if self.checks.get(obj["number"], {}).get("conflict"):
+                self.asset_actions[obj["number"]] = action
+        self.update_state()
+
+    def render_skill(self, *_):
+        row = self.skills.currentRow()
+        self.skill_details.setPlainText(self.object_text(self.by_kind["skills"][row]) if row >= 0 else tr("No contents in this category."))
+
     def asset_action(self, action):
-        self.asset_actions = {number: action for number, check in self.checks.items() if check.get("conflict")}
+        self.asset_actions.update({obj["number"]: action for obj in self.by_kind["assets"] if self.checks.get(obj["number"], {}).get("conflict")})
         self.render_asset()
         self.update_state()
 
@@ -611,9 +637,9 @@ class ImportDialog(QDialog):
             number = obj["number"]
             check = self.checks.get(number, {})
             if check.get("conflict"):
-                conflicts += 1
+                conflicts += obj["kind"] == "assets"
                 if number in self.selected and number not in self.asset_actions:
-                    errors.append(tr("Choose Replace all conflicts or Skip all conflicts for Assets."))
+                    errors.append(tr("Choose Replace all conflicts or Skip all conflicts for Assets / Skills."))
             if number in self.selected:
                 errors.extend(check.get("errors", []))
                 if number in self.review_failed:
@@ -624,7 +650,7 @@ class ImportDialog(QDialog):
                 errors.extend(message for messages in extra.values() for message in messages)
             except Exception as error:
                 errors.append(self.window_host.clean_details(str(error)))
-        count = sum(len(check.get("changed_files", [])) for check in self.checks.values() if check.get("conflict"))
+        count = sum(len(check.get("changed_files", [])) for obj in self.by_kind["assets"] if (check := self.checks.get(obj["number"], {})).get("conflict"))
         self.asset_count.setText(tr("Asset conflicts: {0} groups, {1} files").format(conflicts, count))
         self.assets.blockSignals(True)
         for item in tree_items(self.assets):
@@ -635,7 +661,7 @@ class ImportDialog(QDialog):
                 action = self.asset_actions.get(self.number("assets", identity))
                 if action:
                     status += " · " + (tr("Replace") if action == "replace" else tr("Skip"))
-                item.setText(0, tr("Images and tags") + " — " + status)
+                item.setText(0, identity.rsplit("/", 1)[-1] + " — " + status)
         self.assets.blockSignals(False)
         self.pages.blockSignals(True)
         for index, obj in enumerate(self.by_kind["pages"]):
@@ -645,6 +671,14 @@ class ImportDialog(QDialog):
             name = name[:80] if isinstance(name, str) else obj["id"]
             self.pages.item(index).setText((name + " · " if name != obj["id"] else "") + obj["id"] + " — " + status)
         self.pages.blockSignals(False)
+        self.skills.blockSignals(True)
+        for index, obj in enumerate(self.by_kind["skills"]):
+            check = self.checks.get(obj["number"], {})
+            status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
+            action = self.asset_actions.get(obj["number"])
+            self.skills.item(index).setText(obj["id"] + " — " + status + (" · " + tr("Replace" if action == "replace" else "Skip") if action else ""))
+        self.skills.blockSignals(False)
+        self.render_skill()
         self.error_box.setText("\n".join(dict.fromkeys(errors)))
         self.commit.setEnabled(bool(self.selected) and nonempty <= self.viewed and not errors and self.trust.isChecked())
 
@@ -716,7 +750,7 @@ class ImportDialog(QDialog):
             self.recheck()
 
     def sync_selection(self):
-        for kind, widget in (("pages", self.pages), ("history", self.histories)):
+        for kind, widget in (("pages", self.pages), ("history", self.histories), ("skills", self.skills)):
             widget.blockSignals(True)
             for index, obj in enumerate(self.by_kind[kind]):
                 widget.item(index).setCheckState(Qt.CheckState.Checked if obj["number"] in self.selected else Qt.CheckState.Unchecked)

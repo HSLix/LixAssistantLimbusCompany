@@ -1,4 +1,4 @@
-"""四类分享对象的快照、受控 ZIP、静态审查及逐对象导入；不执行包内代码。"""
+"""分享对象的快照、受控 ZIP、静态审查及逐对象导入；不执行包内代码。"""
 
 import ast
 from contextlib import contextmanager
@@ -25,7 +25,7 @@ from .page_packages import (PageSnapshot, _relative, install_page_package, page_
 from .process_lock import ProcessLock
 from .workflow_sharing import _prepare, import_workflow, inspect_workflow_import
 
-KINDS = ("workflow", "assets", "pages", "history")
+KINDS = ("workflow", "assets", "pages", "history", "skills")
 
 
 def digest(content):
@@ -181,6 +181,62 @@ def installed_page(root, filename):
     return legacy if legacy.exists() else package
 
 
+def skill_files(root, identity):
+    """按顶层目录标识完整 Skill；拒绝链接并保留所有普通附属文件。"""
+    if len(_relative(identity)) != 1:
+        raise ValueError("Skill 名称必须是单层目录名。")
+    target = real_directory(real_directory(root / "skills") / identity)
+    if not target.exists():
+        return None
+    from .agent_skills import skill_files as enumerate_files
+    diagnostics = []
+    files = {path.as_posix(): content for path, content in enumerate_files(target, diagnostics).items()}
+    if diagnostics:
+        raise ValueError("Skill 包含链接或特殊文件。")
+    validate_skill(files)
+    return files
+
+
+def validate_skill(files):
+    """分享只检查结构，不执行 Skill 内容或附属脚本。"""
+    if "SKILL.md" not in files:
+        raise ValueError("Skill 缺少 SKILL.md。")
+
+
+def replace_skill(root, identity, files, expected):
+    """同盘准备后整目录替换，恢复失败时保留唯一旧副本。"""
+    base = real_directory(root / "skills")
+    base.mkdir(parents=True, exist_ok=True)
+    target = base / identity
+    work = Path(create_work_directory(dir=base, prefix=".sharing-skill-"))
+    staged, backup = work / "new", work / "old"
+    staged.mkdir()
+    preserve = False
+    try:
+        for name, content in files.items():
+            path = staged / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            write_content(path, content)
+        current = skill_files(root, identity)
+        if (files_version(current) if current is not None else None) != expected:
+            raise ValueError("本地 Skill 已变化，请重新检查。")
+        if current is not None:
+            target.rename(backup)
+        try:
+            staged.rename(target)
+        except BaseException:
+            if backup.exists():
+                try:
+                    backup.rename(target)
+                except BaseException as error:
+                    preserve = True
+                    raise OSError(f"Skill 恢复失败，旧副本保留于 {backup}") from error
+            raise
+    finally:
+        if not preserve:
+            shutil.rmtree(work)
+
+
 def catalog(manager):
     """枚举可显式选择的对象；不加载页面、Workflow 或可恢复 Session。"""
     root = manager.data_root
@@ -202,7 +258,9 @@ def catalog(manager):
             histories.append(path.parent.parent.relative_to(root).as_posix() if path.parent.name == "log"
                              else path.parent.relative_to(root).as_posix())
     return {"workflow": [item["manifest_id"] for item in manager.list_manifests()],
-            "assets": sorted(names), "pages": sorted(handles), "history": histories}
+            "assets": sorted(names), "pages": sorted(handles), "history": histories,
+            "skills": sorted(path.name for path in real_directory(root / "skills").iterdir()
+                             if (path / "SKILL.md").exists()) if (root / "skills").exists() else []}
 
 
 @contextmanager
@@ -294,6 +352,10 @@ def build_export(manager, selection):
                 if files is None:
                     raise ValueError(f"Asset 不存在：{identity}")
                 validate_assets(files)
+            elif kind == "skills":
+                files = skill_files(manager.data_root, identity)
+                if files is None:
+                    raise ValueError(f"Skill 不存在：{identity}")
             elif kind == "pages":
                 path = installed_page(manager.data_root, identity)
                 files = {"page.py": FileContent.from_path(path)} if path.is_file() else tree_files(path)
@@ -520,10 +582,15 @@ def inspect_objects(manager, package):
                 expected = {f"manifests/{identity}.json", *(f"components/{source.component_id[7:]}.py" for source in prepared.sources.values())}
                 if set(files) != expected:
                     raise ValueError("Workflow 含非登记内容。")
-            elif kind == "assets":
-                asset_name(identity)
-                validate_assets(files)
-                old = asset_files(manager.data_root, identity)
+            elif kind in {"assets", "skills"}:
+                if kind == "assets":
+                    asset_name(identity)
+                    validate_assets(files)
+                else:
+                    if len(_relative(identity)) != 1:
+                        raise ValueError("Skill 名称必须是单层目录名。")
+                    validate_skill(files)
+                old = (asset_files if kind == "assets" else skill_files)(manager.data_root, identity)
                 result.update(before=files_version(old) if old is not None else None,
                               same=old == files, conflict=old is not None and old != files,
                               changed_files=[name for name in sorted(set(old or {}) | set(files)) if (old or {}).get(name) != files.get(name)])
@@ -732,8 +799,8 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                 raise ValueError("; ".join(check["errors"]))
             if kind == "workflow":
                 outcome = import_workflow(manager, obj["root"], identity, manifest_id=check["manifest_id"], manifest_sha256=check["manifest_sha256"])
-            elif kind == "assets":
-                current = asset_files(manager.data_root, identity)
+            elif kind in {"assets", "skills"}:
+                current = (asset_files if kind == "assets" else skill_files)(manager.data_root, identity)
                 if (files_version(current) if current is not None else None) != check["before"]:
                     raise ValueError("本地 Asset 已变化，请重新检查。")
                 if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
@@ -741,7 +808,7 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                 else:
                     if check["conflict"] and asset_actions.get(number) != "replace":
                         raise ValueError("Asset 冲突尚未选择替换或跳过。")
-                    replace_asset(manager.data_root, identity, package.files(obj), check["before"])
+                    (replace_asset if kind == "assets" else replace_skill)(manager.data_root, identity, package.files(obj), check["before"])
                     outcome = {"status": "imported"}
             elif kind == "pages":
                 if number not in reviewed and not allow_unreviewed:

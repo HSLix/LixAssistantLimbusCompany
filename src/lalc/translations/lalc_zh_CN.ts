@@ -2017,5 +2017,7 @@ Original pixel region: {2}</source>
 <message><source>Thinking and tools</source><translation>思考与工具</translation></message>
 <message><source>Open Skills directory</source><translation>打开 Skills 文件夹</translation></message>
 <message><source>Copied successfully</source><translation>复制成功</translation></message>
+<message><source>Skills</source><translation>Skills</translation></message>
+<message><source>Choose Replace all conflicts or Skip all conflicts for Assets / Skills.</source><translation>请为冲突的 Asset／Skill 选择全部覆盖或全部跳过。</translation></message>
 </context>
 </TS>

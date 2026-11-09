@@ -435,3 +435,69 @@ def test_page_import_preserves_local_availability_and_reserves_disabled_task_ids
         PageAvailability(target.data_root).set_enabled('other.py', False)
         with pytest.raises(ValueError, match='TASKS'):
             import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)
+
+
+def test_skill_complete_roundtrip_conflicts_and_stale_target(source, tmp_path):
+    manager, _ = source
+    folder = manager.data_root / 'skills/custom'
+    (folder / 'references').mkdir(parents=True)
+    (folder / 'SKILL.md').write_bytes(b'guidance')
+    (folder / 'references/info.txt').write_bytes(b'reference')
+    assert catalog(manager)['skills'] == ['custom']
+    archive = tmp_path / 'skills.zip'
+    save_package(build_export(manager, {'skills': ['custom']}), archive)
+    target = ManifestManager(tmp_path / 'skill-target')
+    with_package = SharingPackage(archive)
+    try:
+        def apply(checks, actions):
+            return import_selected(target, with_package, checks, {0}, asset_actions=actions, reviewed={})
+        checks = inspect_objects(target, with_package)
+        assert not checks[0]['errors']
+        assert apply(checks, {})['failed'] is None
+        local = target.data_root / 'skills/custom'
+        assert (local / 'references/info.txt').read_bytes() == b'reference'
+        checks = inspect_objects(target, with_package)
+        assert checks[0]['same']
+        assert apply(checks, {})['completed'][0]['status'] == 'skipped'
+        (local / 'obsolete.txt').write_bytes(b'old')
+        checks = inspect_objects(target, with_package)
+        assert checks[0]['conflict']
+        assert apply(checks, {})['failed']
+        assert apply(checks, {0: 'skip'})['completed'][0]['status'] == 'skipped'
+        (local / 'SKILL.md').write_bytes(b'changed')
+        assert apply(checks, {0: 'replace'})['failed']
+        checks = inspect_objects(target, with_package)
+        assert apply(checks, {0: 'replace'})['failed'] is None
+        assert not (local / 'obsolete.txt').exists()
+    finally:
+        with_package.close()
+
+
+def test_skill_replace_rolls_back_directory_on_commit_failure(tmp_path, monkeypatch):
+    from lalc.sharing import skill_files, files_version, replace_skill
+    folder = tmp_path / 'skills/custom'
+    folder.mkdir(parents=True)
+    (folder / 'SKILL.md').write_bytes(b'old')
+    before = files_version(skill_files(tmp_path, 'custom'))
+    rename = Path.rename
+    def fail_new(path, target):
+        if path.name == 'new':
+            raise OSError('commit failed')
+        return rename(path, target)
+    monkeypatch.setattr(Path, 'rename', fail_new)
+    with pytest.raises(OSError, match='commit failed'):
+        replace_skill(tmp_path, 'custom', {'SKILL.md': b'new'}, before)
+    assert (folder / 'SKILL.md').read_bytes() == b'old'
+    assert list(folder.parent.iterdir()) == [folder]
+
+
+def test_skill_rejects_nested_identity_and_links(tmp_path):
+    from lalc.sharing import skill_files
+    with pytest.raises(ValueError):
+        skill_files(tmp_path, '../escape')
+    folder = tmp_path / 'skills/custom'
+    folder.mkdir(parents=True)
+    (folder / 'SKILL.md').write_bytes(b'guidance')
+    (folder / 'linked').symlink_to(folder / 'SKILL.md')
+    with pytest.raises(ValueError, match='链接'):
+        skill_files(tmp_path, 'custom')
