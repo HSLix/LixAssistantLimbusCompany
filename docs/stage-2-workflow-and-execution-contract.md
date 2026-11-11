@@ -1,5 +1,7 @@
 # Stage 2: Python-first Workflow and Execution Contract
 
+2026-11-11 Stage 6 目标契约修订：ADR 0040 接受 RunState、Plan 无旧参数兼容层、Plan／Workflow／Step 自身失败恢复及同一 Agent Session。下文旧 Step-only、禁止共享业务状态、执行前审批及硬性旧新签名一致条款在该范围被替代。本地实现及证据见[Stage 6 实施记录](stage-6-implementation.md)，真实环境尚未验收。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 2026-11-05 状态修订：[#317 已由开发者取消并关闭](https://github.com/HSLix/LixAssistantLimbusCompany/issues/317#issuecomment-6652564769)，不再保留独立邮箱 Workflow 验收任务；当前验收由 #340 推进。下文 #317 延期／待恢复的清单保留为原时点记录，取消不表示这些检查已通过。
 
 2026-10-27 #331 实施更新：当前使用唯一不可变 Python Plan、User/Developer 双窗口及跨进程游戏排他；已有 Candidate Plan 可编辑。现行入口和迁移步骤见[实施记录](stage-4-331-implementation.md)。下文旧 JSON Plan、Runner 页及 plan.json 只读内容保留为历史设计/验收，不能作为当前操作要求。
@@ -250,15 +252,15 @@ If physical takeover is detected at a Workflow observation boundary with no acti
 
 ## Run Context
 
-Each direct Component run receives an executor-provided Run Context that connects formal Components to runtime services: `ctx.call()`, Target Window access, current game language, Manifest resolution, Trace and evidence recording, cancellation, and non-time execution budgets. Its internal state belongs only to the executor, role wrappers, and Trusted Actions. Formal Components cannot add or arbitrarily modify Context fields, and the API exposes no `ctx.state`, shared business dictionary, or other implicit cross-Component data channel. Formal Components likewise keep no mutable module-global business state: a Task Workflow owns run-local control state in ordinary Python locals, Components exchange business data only through copied explicit parameters and normal returns, and the current game state is learned again through Trusted Actions.
+Each direct Component run receives an executor-provided Run Context that connects formal Components to runtime services: `ctx.call()`, Target Window access, current game language, Manifest resolution, Trace and evidence recording, cancellation, and non-time execution budgets. The executor still owns runtime services and arbitrary Context fields remain unsupported. Stage 6 adds the explicit `ctx.run_state` business-state channel: one in-memory object per Run, shared by Plan, Workflow, Step and Recovery Rule code; direct business mutations survive failing calls without rollback, while framework-maintained recovery counters are read-only. Formal Components keep no mutable module-global business state; ordinary intermediate values remain in Python locals or copied parameters and returns, explicitly shared progress belongs in RunState, and current game state is learned through Trusted Actions.
 
 Developers may annotate the injected parameter with `RunContext`, imported from the public `lalc` package. The complete generated `run_context.pyi` preserves other public members and describes `ctx.action()` with literal-name overloads derived from application registration and callable signatures. Regenerate it with `uv run lalc generate-stubs` after changing registration, Action signatures or public Context members; tests check freshness and representative Pyright calls. These declarations do not alter dispatch or replace the existing role/phase permission and runtime validation boundaries.
 
 2026-11-01: `observe.ocr` recognizes the existing valid client-area screenshot without implicit capture or saving, under the same observe permission boundary. Results contain the observation identity, actual search region and full recognized text items in original client coordinates. The Agent's existing `game_screenshot` includes the same result from its own fresh original image; OCR failure preserves its images with an explicit `ocr_error`, while the Workflow Action raises. Korean is unsupported. See [OCR contract](ocr.md).
 
-Business data moves through named call parameters and ordinary returns. A complete task dictionary is not passed through layers for callees to search, and there is no generic business-state `update()` API. Task Workflow loop positions, intermediate results, and configuration remain ordinary Python local variables, lists, or dictionaries. If a Subworkflow needs to influence later scheduling, it returns a suggestion and the Task Workflow decides whether to update its own local state. External game state is re-observed through Trusted Actions rather than inferred from an in-memory marker; when it cannot be identified reliably, formal code may deliberately return the game to a known start before continuing. The first version has no child Context, Context cloning, or Context merge mechanism.
+Ordinary call data continues through copied named parameters and returns. Stage 6 moves Plan task_repetitions and settings into shared RunState without a legacy Plan-parameter compatibility layer. Formal code decides business field meanings and update timing; the executor does not infer progress, recompute bound arguments, commit/rollback business mutations or persist RunState for process-restart recovery. Existing Python locals are retained only in callers still on the stack; a failed entry runs again from its beginning. Current source has not yet implemented this interface.
 
-Task Workflow remains thin but complete: it interprets top-level inputs, arranges business order, loops, and branches, aggregates Step and Subworkflow returns in ordinary locals, returns its JSON-compatible root result, with meaningful outcome checks expressed as ordinary Steps. Recognition, input, waiting, and result confirmation are pushed down where useful, but a few lines of ordinary business logic do not mechanically require another Component. The first version exposes no general Task Workflow state export, inheritance, or resume method. Local counts, selected teams, loop positions, and intermediate results cannot migrate to a replacement Task Workflow or become mutable shared Context state.
+Task Workflow remains thin but complete: it interprets top-level inputs, arranges business order, loops, and branches, aggregates Step and Subworkflow returns in ordinary locals, returns its JSON-compatible root result, with meaningful outcome checks expressed as ordinary Steps. Recognition, input, waiting, and result confirmation are pushed down where useful, but a few lines of ordinary business logic do not mechanically require another Component. Stage 6 does not export or reconstruct Python frames. Business code may explicitly keep necessary counts, team rotation and other progress in RunState for a newly invoked implementation; the framework does not choose those fields or guarantee business replay safety.
 
 ```python
 @task_workflow
@@ -346,6 +348,8 @@ The Ledger has no Subworkflow restart count or restart-related field because the
 
 ## Agent candidate trial
 
+Stage 6 局部替代：本节的 Step-only、旧新签名一致及审批限制属于原基线；当前目标以 [ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md) 和 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#当前恢复流程目标契约) 为准，当前源码尚待迁移。
+
 The first version executes no Temporary Action Plan and provides no direct model-action channel. An Agent proposal may change Steps, Task Workflows, and Subworkflows together in one complete Manifest and include screenshot-derived Asset additions under ADR 0020; existing Asset files, Trusted Actions, and Recovery Rules remain unchanged. Selection requires complete validation, supervised permission for the current execution, and an immediate legal fresh invocation of the paused current Step. Changed Components then run through the ordinary Component path; entered Python frames are not patched.
 
 A Working Manifest update is legal only while the Top-level Execution is paused at a current Step that can be invoked immediately and compatibly. The executor validates all identities, hashes, formal call targets, roles, and signatures in the complete candidate Manifest, then atomically selects that complete Manifest. Every complete Manifest used for an attempt remains durable under its Manifest ID. A compatible current-Step return commits the whole selection for later calls; failure pauses execution for an Agent decision without automatic rollback. The Agent may base another complete candidate on any retained attempt Manifest ID or end execution. No further Component call or game input occurs while that decision is pending. Later Step failure is a new interruption at that Step and does not roll back an earlier committed selection. Runtime permission does not grant permanent publication after the Top-level Execution ends.
@@ -355,6 +359,8 @@ Candidate formal source receives all ordinary structural, signature, call-target
 If the user terminates the Top-level Execution while a structurally valid proposal awaits runtime confirmation, the candidate is never selected for execution and is not the post-execution Capability Proposal. Only a current Working Manifest whose ID has not already received permanent approval can enter post-execution approval; the candidate and any created files remain stored without approval or automatic deletion, as specified by ADR 0021.
 
 ## Result and recovery boundary
+
+Stage 6 局部替代：本节的 Step-only、旧新签名一致及审批限制属于原基线；当前目标以 [ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md) 和 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#当前恢复流程目标契约) 为准，当前源码尚待迁移。
 
 Normal returns stay inside Python control flow. An `ExecutionFailure` crosses into the deterministic executor, which alone applies:
 
@@ -367,6 +373,8 @@ Deterministic Recovery
 The Agent cannot invoke itself or perform a control action directly. The parent executor alone interprets one of the three Agent Turn results and decides whether to recheck the Step, validate and trial a Working Manifest proposal, continue another bounded Turn, or perform Safe Task Termination.
 
 ### Public exception timing
+
+Stage 6 局部替代：本节的 Step-only、旧新签名一致及审批限制属于原基线；当前目标以 [ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md) 和 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#当前恢复流程目标契约) 为准，当前源码尚待迁移。
 
 Public cross-Workflow exceptions are represented by immutable Recovery Rule Components in the current Working Manifest, initially copied unchanged from the Run's Base Manifest. Each rule occupies one Python module with a concise module docstring and exactly the fixed `detect(ctx) -> bool` and `recover(ctx) -> None` functions. It has a stable logical name and Component ID, but no role decorator and is not callable through `ctx.call()`. The executor enumerates rules only from the Manifest's dedicated `recovery_rules` mapping, using stable logical-name order without adding an ordering field to the Manifest.
 
@@ -399,6 +407,8 @@ An ExecutionFailure in Task/Subworkflow execute outside a Step is recorded and r
 A Task Workflow normal return is validated against its declared JSON-compatible type and records success. Invalid format or an exception records failure, with no independent verifier or Task retry. Authors are advised to place meaningful business checks in Steps before return; those checks share ordinary Step recovery. A containing Plan advances after an ordinary Task failure.
 
 ### Paused Step replacement compatibility
+
+Stage 6 局部替代：本节的 Step-only、旧新签名一致及审批限制属于原基线；当前目标以 [ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md) 和 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#当前恢复流程目标契约) 为准，当前源码尚待迁移。
 
 A replacement Step may return to the original paused caller only through one entirely new invocation resolved from a Working Manifest that the executor atomically selected while input was paused. Loading the selected Manifest verifies its source against the Component ID; invocation checks the stable logical name and `@step` role against that verified implementation. This replaces no active Python frame: the original `@step` wrapper still owns the paused caller frame.
 

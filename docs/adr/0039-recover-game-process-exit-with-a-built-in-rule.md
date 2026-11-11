@@ -4,6 +4,8 @@ status: accepted
 
 # 用内置 Recovery Rule 恢复游戏进程退出
 
+2026-11-11 局部替代：取消每 Run 最多自动重启一次的独立限制，内置崩溃恢复计入统一连续恢复次数，Step 返回或 Agent 介入清零；退出确认、绑定、取消与重启失败终止保持。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 2026-11-07 开发者确认：新增应用登记的 `control.restart_game`，并由应用内置 `builtin.game_crash` 规则为所有 Manifest 处理运行中已确认的游戏进程退出。原先窗口消失统一人工暂停；现在只有确认原进程退出进入自动规则，失焦、最小化、窗口消失但进程仍在、身份不明和用户接管继续保持人工处理。此决定仅替代 ADR 0019／0023 中这一种非用户窗口失效的处理，不放宽用户控制权或初次运行必须存在目标窗口的要求。
 
 内置规则在当前 Step 边界优先执行，调用同一 control Trusted Action，保留权限、校验、Trace 和中断语义。重启成功后重新调用当前 Step，保留外层 Workflow 帧与局部结果；不重放 Task/Plan，不增加 Step 外恢复边界，不开放 Agent 修改内置规则。相比每个 Manifest 重复注册，应用统一登记能保证无窗口时仍有确定的恢复入口，业务规则不必承担进程生命周期职责。

@@ -4,6 +4,8 @@ status: accepted
 
 # Limit first-version Agent maintenance to Supervised Operation
 
+2026-11-11 局部替代：取消运行时新版本执行前逐次人工批准，不再将无人值守执行已校验修复代码整体排除；人工反馈另由 User GUI 开关授权。其他独立审批不自动取消。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 ADR 0025 moves the runtime recovery, supervised trial, and Agent Asset creation scope described here to Stage 3.5. Current Stage 3 is independent single-Component repair; these runtime contracts are not its prerequisites.
 
 ADR 0020 supersedes only the blanket exclusion of Asset additions below: new templates may be cropped from real game screenshots and proposed through the complete Manifest review path. Existing Asset files remain immutable.

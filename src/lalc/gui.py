@@ -418,6 +418,9 @@ class UserWindow(MainWindow):
         # 共用窗口清理/后台操作和脱敏错误处理，用户页面独立构建。
         FluentWindow.__init__(self)
         self.service, self.host, self.coordinator = service, host, coordinator
+        self.feedback_requested.connect(self.show_runtime_feedback)
+        service.on_runtime_feedback = self.feedback_requested.emit
+        service.agent_secrets = host.secrets
         self.lifecycle = lifecycle or ApplicationLifecycle()
         self.jobs = []
         self.owns_run = False
@@ -567,7 +570,6 @@ class UserWindow(MainWindow):
         agent_layout.addLayout(heading)
         self.agent_summary = QLabel()
         agent_layout.addWidget(self.agent_summary)
-        agent_layout.addWidget(QLabel(tr('Runtime automatic repair is not implemented yet.')))
         self.settings_page = SettingsPage(self, side="user")
         agent_layout.addWidget(self.settings_page)
         options.addWidget(self.agent_controls)
@@ -947,7 +949,8 @@ class UserWindow(MainWindow):
         self.submit_pages()
         self.refresh_tasks()
         repetitions, settings, _ = task_inputs(self.business_pages, self.current_supported, self.page_store)
-        self.service.start_plan(manifest_id=self.current_manifest_id, task_repetitions=repetitions, settings=settings)
+        self.service.start_plan(manifest_id=self.current_manifest_id, task_repetitions=repetitions, settings=settings,
+                                use_saved_config=False)
         self.owns_run = True
         self.render_state(self.service.status)
 
@@ -994,6 +997,23 @@ class UserWindow(MainWindow):
             else:
                 message = (tr('Execution completed') if result.get("all_tasks_succeeded") else tr('Execution completed with failed tasks')) if result.get("status") == "completed" else tr('Execution interrupted')
                 self.notifications.notify(message, result_diagnostics(result))
+                update = state.get("default_update")
+                if update:
+                    self.notifications.notify(tr('Repaired version is now the default') if update["status"] == "changed"
+                                              else tr('Could not automatically use the repaired version'),
+                                              update["manifest_id"])
+
+    def show_runtime_feedback(self, request):
+        """在 GUI 线程展示父 Run 的人工请求，取消按钮停止该 Run。"""
+        if request.done.is_set() or self.closing or self.service.status["phase"] != "running":
+            request.close()
+            return
+        from .developer_gui import FeedbackDialog
+        dialog = FeedbackDialog(request, self)
+        dialog.cancel.clicked.disconnect()
+        dialog.cancel.clicked.connect(lambda: (self.service.stop(), request.close(), dialog.close()))
+        self.runtime_feedback_dialog = dialog
+        dialog.show()
 
 
 class GuiCoordinator:

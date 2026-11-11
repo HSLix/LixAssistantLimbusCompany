@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Literal, Union, get_args, get_origin, get_overloads
 
 from .actions import TrustedAction, application_actions
-from .run_context import RunContext
+from .run_context import RunContext, RunState
 
 
 def _signature(function) -> inspect.Signature:
@@ -78,8 +78,17 @@ def render_stubs(actions: Mapping[str, TrustedAction] | None = None) -> str:
         'from .runtime import WorkflowExecutor',
         '',
         '',
-        'class RunContext:',
+        'class RunState:',
     ]
+    for name, annotation in RunState.__annotations__.items():
+        lines.append(f'    {name}: {annotation}')
+    for name, member in vars(RunState).items():
+        if name == '__init__' or not name.startswith('_') and (inspect.isfunction(member) or isinstance(member, property)):
+            if isinstance(member, property):
+                lines.append('    @property')
+                member = member.fget
+            lines.append(f'    def {name}{_signature(member)}: ...')
+    lines += ['', '', 'class RunContext:']
     for name, member in vars(RunContext).items():
         if name.startswith('_') and name != '__init__':
             continue
@@ -100,7 +109,7 @@ def render_stubs(actions: Mapping[str, TrustedAction] | None = None) -> str:
                 member = member.fget
             # 构造器引用仅在 TYPE_CHECKING 时导入的 Executor，保留其前向引用。
             signature = inspect.signature(member) if name == '__init__' else _signature(member)
-            lines.append(f'    def {name}{signature}: ...')
+            lines.append(f'    def {name}{str(signature).replace("lalc.run_context.RunState", "RunState")}: ...')
         lines.append('')
     return '\n'.join(lines)
 

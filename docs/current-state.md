@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-11 Stage 6 已完成本地实施：RunState、Plan／Workflow／Step 各自恢复、同一 Repair Session 的 Publish → Recheck 循环、开关与结束时 Default 选择已接线。Plan 正常结束即可自动使用最终 Working Manifest，不要求所有 Task 成功。设计见[影响审查](stage-6-design-impact-review.md)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，接口、迁移及验证边界见[实施记录](stage-6-implementation.md)。未创建 tickets；Windows、真实模型与游戏尚未验收。
+
 2026-11-11 Developer GUI 打开期间，User GUI 的 User Agent 启用开关保持可用，仅具体 Agent 配置表单冻结；交接保存及关闭后重读共享值保持。影响与验证见[专项记录](user-agent-toggle-design-impact-review.md)。
 
 2026-11-09 Sharing 增加完整 Skills 目录分享和默认不选导入，Asset 树简化选择，两处目录树仅默认展开顶层。边界及验证见[专项记录](skills-sharing-impact-review.md)。
@@ -66,7 +68,7 @@
 | 外部搜索／进程复用 | 本地接入 literal／hybrid、A/B 文件与索引切换、宿主级 pi／codesearch 复用 | [外部搜索](external-code-search.md)、[ADR 0038](adr/0038-use-versioned-reference-search-and-reusable-agent-processes.md) | [实施记录](external-code-search-implementation.md)；Windows、真实远端／模型与大仓库待验 |
 | Windows 双包 | 构建逻辑已支持 with-agent／without-agent；不是成品现场通过 | [打包与验收](windows-packaging.md) | [#334 历史记录](stage-4-334-implementation.md)、[当前资源增量](external-code-search-implementation.md) |
 | OCR／版本历史／Prompt | 已本地接入，具体限制分别记录 | [OCR](ocr.md)、[版本历史](game-version-history.md)、[Prompt 与 Skills](agent-repair.md#prompt-与-skills) | [OCR 记录](ocr-integration-impact-review.md)、[版本记录](game-version-session-implementation.md)、[Skills 记录](agent-skills-implementation.md) |
-| Stage 6 Runtime | 接入及新增设计仍待推进，不继承 Workbench 权限 | [Runtime 契约与 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md) | 本次不宣称已实现 Runtime Agent 闭环 |
+| Stage 6 Runtime | 新设计已接受并完成影响审查，待反馈／实施；复用 Session，按入口限权 | [Runtime 契约与 TODO](stage-3.5-agent-runtime-step-recovery-and-maintenance.md) | 本次不宣称已实现 Runtime Agent 闭环 |
 
 ## 必须保留的边界
 

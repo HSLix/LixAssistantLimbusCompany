@@ -128,6 +128,7 @@ def test_recovery_failures_propagate_original_traceback(tmp_path: Path, phase: s
     elif phase == "recover":
         rules = {"blocking": _rule("return True", native)}
     elif phase == "reinvoke":
+        rules = {"transient": _rule("return True")}
         source = STEP.replace("{nonce}", phase).replace('return f"step-old:{value}"', native)
     base = _publish(tmp_path, manager, step_source=source, rules=rules)
     choice = None
@@ -143,7 +144,7 @@ def test_recovery_failures_propagate_original_traceback(tmp_path: Path, phase: s
         choices = iter([replacement, None])
         choice = lambda *_: next(choices)
     service = ApplicationService(tmp_path, manifest_manager=manager, recovery_choice=choice)
-    state = _finish(service, service.start_plan( manifest_id=base))
+    state = _finish(service, service.start_plan(use_saved_config=False,  manifest_id=base))
     item = state["result"]["items"][0]
     assert item["failure_code"] == "execution_failed"
     diagnostic = item["traceback"]
@@ -167,7 +168,7 @@ def test_step_failure_enters_recovery_without_unwinding_callers(tmp_path: Path, 
     source = STEP.replace("{nonce}", exception_name).replace(
         'raise ExecutionFailure("state unknown")', f'raise {exception_name}("state unknown")',
     )
-    manifest_id = _publish(tmp_path, manager, step_source=source)
+    manifest_id = _publish(tmp_path, manager, step_source=source, rules={"transient": _rule("return True")})
     service = ApplicationService(tmp_path, manifest_manager=manager)
     state = _finish(service, service.start("tasks.run", {"value": 3}, manifest_id=manifest_id))
     assert state["result"]["output"] == ["task-old", "step-old:3", "sub-old"]
@@ -182,7 +183,7 @@ def test_step_failure_enters_recovery_without_unwinding_callers(tmp_path: Path, 
 @pytest.mark.parametrize(
     ("rules", "success", "expected"),
     [
-        ({}, True, "step_reinvocation_returned"),
+        ({}, False, "execution_anomaly"),
         ({"one": _rule("return True")}, True, "recovery_rule_returned"),
         ({"two": _rule("return True"), "one": _rule("return True")}, False, "execution_anomaly"),
         ({"one": _rule('raise RuntimeError("detect boom")'), "two": _rule("return True")}, False, "recovery_rule_failed"),
@@ -215,7 +216,7 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
         assert state["result"]["output"] == ["task-old", "step-old:7", "sub-old"]
         assert "safe_task_termination" not in events
     else:
-        assert state["result"]["failure_code"] == "execution_failed"
+        assert state["result"]["failure_code"] == ("recovery_rule_ambiguous" if len(rules) > 1 and all("return True" in rule for rule in rules.values()) else "execution_failed")
         assert events.count("safe_task_termination") == 1
         assert "component_started" not in events[events.index("execution_anomaly"):]
     assert json.loads((tmp_path / "runs" / "1.json").read_text(encoding="utf-8"))["working_manifest_id"] == manifest_id
@@ -223,7 +224,7 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
 
 def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     revised_task = TASK.replace('"task-old"', '"task-new"')
     revised_sub = SUB.replace('"sub-old"', '"sub-new"')
@@ -250,7 +251,7 @@ def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path
 
 def test_failed_selected_step_remains_history_then_prior_manifest_can_succeed(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     failed = _publish(tmp_path, manager, step_source=FAIL_STEP, rules=rules)
     assert manager.set_default(base).ok
@@ -267,7 +268,7 @@ def test_failed_selected_step_remains_history_then_prior_manifest_can_succeed(tm
 
 def test_later_step_failure_keeps_selected_manifest(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     later_sub = SUB.replace('return "sub-old"', 'return ctx.call("steps.break", value=value)')
     selected = _publish(tmp_path, manager, step_source=LATER_FAIL_STEP, sub_source=later_sub, rules=rules)
@@ -284,18 +285,18 @@ def test_later_step_failure_keeps_selected_manifest(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
-    "replacement_source",
+    "replacement_source,expected_code",
     [
-        NEW_STEP.replace("*, value: int", "*, value: int, extra: int"),
-        NEW_STEP.replace("-> str:", "-> int:").replace('return f"step-new:{value}"', "return value"),
-        NEW_STEP + "\ndef condition(ctx, *, value: int) -> bool:\n    return False\n",
+        (NEW_STEP.replace("*, value: int", "*, value: int, extra: int"), "working_manifest_incompatible"),
+        (NEW_STEP.replace("-> str:", "-> int:").replace('return f"step-new:{value}"', "return value"), "invalid_output"),
+        (NEW_STEP + "\ndef condition(ctx, *, value: int) -> bool:\n    return False\n", "execution_failed"),
     ],
 )
-def test_incompatible_replacement_is_rejected_before_selection(
-    tmp_path: Path, replacement_source: str,
+def test_changed_call_contract_is_selected_and_ordinary_validation_still_applies(
+    tmp_path: Path, replacement_source: str, expected_code: str,
 ) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     incompatible = _publish(tmp_path, manager, step_source=replacement_source, rules=rules)
     assert manager.set_default(base).ok
@@ -304,10 +305,10 @@ def test_incompatible_replacement_is_rejected_before_selection(
 
     state = _finish(service, service.start("tasks.run", {"value": 6}))
 
-    assert state["result"]["failure_code"] == "execution_failed"
-    assert state["working_manifest_id"] == base
-    assert state["attempted_manifest_ids"] == [base]
-    assert any(event["event"] == "manifest_selection_rejected" and event["manifest_id"] == incompatible for event in state["trace"])
+    assert state["result"]["failure_code"] == expected_code
+    assert state["working_manifest_id"] == incompatible
+    assert state["attempted_manifest_ids"] == [base, incompatible]
+    assert not any(event["event"] == "manifest_selection_rejected" for event in state["trace"])
 
 
 def test_repeated_interruption_and_step_external_interruption_terminate(tmp_path: Path) -> None:
@@ -319,8 +320,8 @@ def test_repeated_interruption_and_step_external_interruption_terminate(tmp_path
     repeated_state = _finish(service, service.start("tasks.run", {"value": 2}))
     assert repeated_state["result"]["failure_code"] == "execution_failed"
     repeated_events = [event["event"] for event in repeated_state["trace"]]
-    assert sum(event["event"] == "component_failed" and event["logical_name"] == "steps.break" for event in repeated_state["trace"]) == 2
-    assert repeated_events.count("step_reinvocation_failed") == 1
+    assert sum(event["event"] == "component_failed" and event["logical_name"] == "steps.break" for event in repeated_state["trace"]) == 1
+    assert repeated_events.count("step_reinvocation_failed") == 0
 
     external_task = TASK.replace(
         '    first = ctx.call("steps.break", value=value)',
@@ -331,7 +332,7 @@ def test_repeated_interruption_and_step_external_interruption_terminate(tmp_path
     assert external_state["result"]["failure_code"] == "execution_failed"
     external_events = [event["event"] for event in external_state["trace"]]
     assert "step_reinvocation_started" not in external_events
-    assert "safe_task_termination" not in external_events
+    assert "safe_task_termination" in external_events
 
 
 def test_unsatisfied_step_condition_never_enters_step_body(tmp_path: Path) -> None:
@@ -354,12 +355,12 @@ def condition(ctx, *, value: int) -> bool:
 
     assert state["result"]["failure_code"] == "execution_failed"
     assert not any(event["event"] == "component_started" and event["logical_name"] == "steps.break" for event in state["trace"])
-    assert [event["return_value"] for event in state["trace"] if event["event"] == "condition_evaluated"] == [False, False]
+    assert [event["return_value"] for event in state["trace"] if event["event"] == "condition_evaluated"] == [False]
 
 
 def test_invalid_complete_manifest_cannot_replace_working_manifest(tmp_path: Path) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     invalid = _publish(tmp_path, manager, step_source=NEW_STEP, rules=rules)
     path = manager.manifests_dir / f"{invalid}.json"
@@ -372,7 +373,7 @@ def test_invalid_complete_manifest_cannot_replace_working_manifest(tmp_path: Pat
 
     state = _finish(service, service.start("tasks.run", {"value": 9}))
 
-    assert state["result"]["failure_code"] == "execution_failed"
+    assert state["result"]["failure_code"] == "manifest_selection_rejected"
     assert state["working_manifest_id"] == base
     assert state["attempted_manifest_ids"] == [base]
     assert any(event["event"] == "manifest_selection_rejected" and event["manifest_id"] == invalid for event in state["trace"])
@@ -382,7 +383,7 @@ def test_working_manifest_write_failure_prevents_replacement_execution(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     manager = ManifestManager(tmp_path)
-    rules = {"blocking": _rule('raise RuntimeError("needs repair")')}
+    rules = {"blocking": _rule("return False")}
     base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
     replacement = _publish(tmp_path, manager, step_source=NEW_STEP, rules=rules)
     replacement_step_id = manager.load(replacement).loaded.components["steps.break"].component_id

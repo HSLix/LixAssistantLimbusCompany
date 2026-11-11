@@ -64,6 +64,8 @@ class WorkflowRunLedger:
             **{name: 0 for name in _COUNTS},
         }
         self.records.append(record)
+        if kind == "task":
+            record["attempts"] = [{name: record[name] for name in ("call_id", "component_id", "manifest_id")}]
         self.active.append(record)
         self._save()
         return record
@@ -74,11 +76,13 @@ class WorkflowRunLedger:
         name = event["event"]
         role = event.get("role")
         if name == "component_started" and role in {"task_workflow", "sub_workflow"}:
-            if role == "task_workflow" and any(
-                record["workflow_kind"] == "task" and record["call_id"] == event["call_id"]
-                for record in self.active
-            ):
-                return
+            if role == "task_workflow":
+                current = next((record for record in self.active if record["workflow_kind"] == "task"), None)
+                if current is not None:
+                    if current["call_id"] != event["call_id"]:
+                        current["attempts"].append({key: event[key] for key in ("call_id", "component_id", "manifest_id")})
+                        self._save()
+                    return
             self._new(event, "task" if role == "task_workflow" else "sub")
             return
         if name in {"component_returned", "component_failed"} and role == "sub_workflow":

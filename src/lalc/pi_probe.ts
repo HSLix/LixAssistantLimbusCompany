@@ -316,10 +316,13 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
       { name: "list_manifests", description: "List published Manifest IDs with paging. Read only; does not load Python or change selections.", parameters: Type.Object(paging) },
       { name: "read_manifest", description: "Read registered members of an explicit published Manifest. No attachment required. Returns identity and continuation offset; does not execute source.", parameters: Type.Object({ manifest_id: Type.String(), ...paging }) },
       { name: "read_manifest_source", description: "Read verified source of a registered member in an explicit published Manifest, paged by lines (zero-based offset). No import, execution or copying to Candidate. Does not change selection.", parameters: Type.Object({ manifest_id: Type.String(), section: Type.Union([Type.Literal("components"), Type.Literal("recovery_rules")]), logical_name: Type.String(), ...paging }) },
-      { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default or grant runtime permanent approval. Publish after edits before trial_run.", parameters: Type.Object({}) },
-      { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Omit logical_name to run the saved Manifest unique Python Plan; inputs then contains task_repetitions and settings. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
+      { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default. Runtime MUST supply summary describing this repair; host saves it as AdditionalMessage. Developer publishes before trial_run; Runtime publishes before recheck.", parameters: Type.Object({ summary: Type.Optional(Type.String({ minLength: 1 })) }) },
+      { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Omit logical_name to run the saved Manifest unique Python Plan with no business inputs. use_saved_config defaults true and reads saved page settings/counts; set false to use explicit run_state or empty state. Never launches Runtime Agent repair inside a Developer trial. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
         parameters: Type.Object({ manifest_id: Type.String(), logical_name: Type.Optional(Type.String()),
-          inputs: Type.Optional(Type.Record(Type.String(), Type.Any())) }) },
+          inputs: Type.Optional(Type.Record(Type.String(), Type.Any())), use_saved_config: Type.Optional(Type.Boolean()),
+          run_state: Type.Optional(Type.Object({task_repetitions: Type.Optional(Type.Record(Type.String(), Type.Integer({minimum: 0}))), settings: Type.Optional(Type.Record(Type.String(), Type.Any()))})) }) },
+      { name: "read_run_state", description: "Runtime only. Read an independent snapshot of the current RunState including shared settings, task_repetitions and read-only recovery_count. No state mutation authority.", parameters: Type.Object({}) },
+      { name: "recheck", description: "Runtime only. End this Agent round and hand control to the parent Run executor to retry ONLY its interrupted entry using this saved Manifest. Publish changes first; no independent trial, no further tools after handoff. Does not declare execution success.", parameters: Type.Object({manifest_id: Type.String()}) },
       { name: "list_runs", description: "List retained Run IDs, newest first. No log content search.",
         parameters: Type.Object({ offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) }) },
       { name: "read_run_log", description: "Read retained Trace events for an explicit Run ID, paged by event sequence. Optionally view an evidence_id screenshot referenced by this Run's log. Missing or cleaned records are unavailable.",
@@ -358,6 +361,10 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
           const result = JSON.parse(await readFile(path, "utf8"));
           if (!result.isError && (tool.name === "add_component" || tool.name === "add_recovery_rule")) {
             repairTargets.push(await checkedPath(root, result.details.filename));
+          }
+          if (tool.name === "recheck" && !result.isError) {
+            pi.setActiveTools([]);
+            ctx.abort();
           }
           return result;
         },

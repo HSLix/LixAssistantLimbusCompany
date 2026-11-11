@@ -33,7 +33,7 @@ def test_game_owner_blocks_cli_and_other_service_without_allocating_run(tmp_path
     finally:
         process.communicate('\n', timeout=3)
     service = ApplicationService(tmp_path, manifest_manager=manager)
-    assert _finished(service, service.start_plan())['result']['status'] == 'completed'
+    assert _finished(service, service.start_plan(use_saved_config=False, ))['result']['status'] == 'completed'
 
 
 def test_exiting_process_releases_game_lock(tmp_path):

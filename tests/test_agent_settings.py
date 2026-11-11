@@ -19,6 +19,23 @@ def arguments(**values):
     return argparse.Namespace(**{**dict.fromkeys(settings.FIELDS), "ask_api_key": False, **values})
 
 
+def test_global_options_survive_provider_and_side_saves(tmp_path):
+    assert settings.load_settings(tmp_path, for_use=False)["max_requests"] == 50
+    settings.save_options(tmp_path, history_enabled=False, runtime_feedback_enabled=True,
+                          recovery_limit=3, automatic_repair_default=False)
+    settings.save_selection(tmp_path, "user", "deepseek", enabled=True)
+    settings.save_settings(tmp_path, {"provider": "llama.cpp", "model": "local", "max_requests": 7})
+    document = settings.settings_document(tmp_path)
+    assert not document["history_enabled"] and document["runtime_feedback_enabled"]
+    assert document["recovery_limit"] == 3 and not document["automatic_repair_default"]
+    assert document["user_provider"] == "deepseek" and document["user_enabled"]
+    assert settings.load_settings(tmp_path, for_use=False)["max_requests"] == 7
+    before = (tmp_path / "agent-settings.json").read_bytes()
+    with pytest.raises(ValueError):
+        settings.save_options(tmp_path, recovery_limit=0)
+    assert (tmp_path / "agent-settings.json").read_bytes() == before
+
+
 def test_saved_settings_and_per_call_overrides(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
     assert cli.main(["agent-config", "--base-url", "http://example.test/custom/api", "--model", "chosen",

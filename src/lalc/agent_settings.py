@@ -19,10 +19,24 @@ from .runtime import atomic_write_json
 FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit",
           "thinking", "reasoning_effort")
 DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "model": None,
-            "max_requests": 20, "secret_name": None, "output_limit": "server_default",
+            "max_requests": 50, "secret_name": None, "output_limit": "server_default",
             "thinking": False, "reasoning_effort": "high"}
 PROVIDERS = {"llama.cpp", "deepseek"}
 SETTINGS_LOCK = threading.RLock()
+OPTION_DEFAULTS = {"history_enabled": True, "runtime_feedback_enabled": False,
+                   "automatic_repair_default": True, "recovery_limit": 10}
+
+
+def checked_options(value: dict) -> dict:
+    """检查独立于 provider 的运行与历史开关，旧配置只补缺省值。"""
+    result = {name: value.get(name, default) for name, default in OPTION_DEFAULTS.items()}
+    for name in OPTION_DEFAULTS:
+        if name == "recovery_limit":
+            if type(result[name]) is not int or result[name] < 1:
+                raise ValueError("连续恢复次数上限必须是正整数。")
+        elif type(result[name]) is not bool:
+            raise ValueError(f"{name} must be a boolean")
+    return result
 
 
 def provider_defaults(provider: str) -> dict:
@@ -76,11 +90,13 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
     saved = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     if not isinstance(saved, dict):
         raise ValueError("Agent settings must be a JSON object")
+    options = checked_options(saved)
     if "profiles" not in saved:
         repair = overrides or {}
         if repair.get("provider", saved.get("provider", "llama.cpp")) != saved.get("provider", "llama.cpp"):
             repair = {}
-        legacy = validate_settings({**saved, **repair}, for_use=False)
+        legacy = validate_settings({**{k: v for k, v in saved.items() if k not in OPTION_DEFAULTS},
+                                    **repair}, for_use=False)
         profiles = {}
         for provider in PROVIDERS:
             value = legacy if provider == legacy["provider"] else validate_settings({
@@ -88,7 +104,7 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
             profiles[provider] = {field: value[field] for field in FIELDS}
         return {"profiles": profiles, "provider_secrets": legacy["provider_secrets"],
                 "user_provider": legacy["provider"], "developer_provider": legacy["provider"],
-                "user_enabled": False}
+                "user_enabled": False, **options}
     if (not isinstance(saved["profiles"], dict) or set(saved["profiles"]) != PROVIDERS or
             any(saved.get(side + "_provider") not in PROVIDERS for side in ("user", "developer")) or
             type(saved.get("user_enabled")) is not bool):
@@ -97,8 +113,8 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
         if not isinstance(profile, dict) or profile.get("provider") != provider:
             raise ValueError("Invalid provider profile")
         validate_settings({**profile, "provider_secrets": saved.get("provider_secrets", {})}, for_use=False)
-    return {name: saved[name] for name in ("profiles", "provider_secrets", "user_provider",
-                                          "developer_provider", "user_enabled")}
+    return {**{name: saved[name] for name in ("profiles", "provider_secrets", "user_provider",
+                                             "developer_provider", "user_enabled")}, **options}
 
 
 def load_settings(data_root: Path, overrides: dict | None = None, *, side="developer", for_use=True) -> dict:
@@ -127,6 +143,17 @@ def _save_document(data_root: Path, document: dict) -> None:
     # 平面视图保留 Developer 有效字段，供现有 CLI/诊断消费者读取。
     selected = document["profiles"][document["developer_provider"]]
     atomic_write_json(data_root / "agent-settings.json", {**selected, **document})
+
+
+def save_options(data_root: Path, **changes) -> dict:
+    """只更新全局开关，保留两侧选择、provider 配置和凭据引用。"""
+    if changes.keys() - OPTION_DEFAULTS.keys():
+        raise ValueError("Unknown Agent option")
+    with SETTINGS_LOCK:
+        document = settings_document(data_root)
+        document.update(checked_options({**document, **changes}))
+        _save_document(data_root, document)
+        return document
 
 
 def save_selection(data_root: Path, side: str, provider: str, *, enabled=None) -> None:

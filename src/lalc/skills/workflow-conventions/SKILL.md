@@ -5,6 +5,8 @@ description: LALC Workflow 的共用编写规范。创建、修改或审查 Plan
 # Workflow 编写规范
 
 - 遵守 Python Plan → TaskWorkflow → Subworkflow → Step 的调用边界；通过 ctx.call 调用 Component、ctx.action 调用应用注册的 Trusted Action，Recovery Rule 保持 detect/recover 契约。
+- Plan 使用 execute(ctx)，不再接收 task_repetitions、settings 参数；配置和必要业务进度通过 ctx.run_state.task_repetitions / settings 共享。业务代码自行决定状态含义、更新时间与重调入口后的行为，修改立即共享，失败不回滚；普通调用参数仍是独立快照，不随 RunState 自动重算。框架 recovery_count 只读，不可自行清零。
+- Plan／Workflow／Step 各自调度或执行失败可在本层入口修复后重新调用；不能依赖失败帧的局部变量或任意行续跑。非必要不修改调用约定，避免破坏仍在等待的调用者；这是编写建议，不是旧新签名一致的强制校验。
 - Step 承担自身职责的状态识别、动作、完成确认及业务异常；恢复时重新观察，已完成则直接返回，不重放已完成动作。预期过渡继续观察，未知或停滞按证据抛出 ExecutionFailure。
 - Task Workflow／Subworkflow 只负责排布、参数传递及根据 Step 结果分支、循环、汇总；游戏状态识别和业务成功判断放在 Step 中，以便恢复时重新判断。观察、等待等基础 Step 只确认自身职责，不冒充业务完成。
 - 点击返回或固定等待结束不证明业务完成。完成证据可以是模板、OCR 或其他可靠状态，不限定必须使用某种识别方式。

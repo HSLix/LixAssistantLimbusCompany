@@ -4,6 +4,8 @@ status: accepted
 
 # Protect saved manifests from Agent modification and select complete working manifests
 
+2026-11-11 术语澄清：Stage 6 当前恢复点指仍可续接的失败调用入口；下文把 retained Manifest 称为 Recovery Point 的历史措辞不表示可恢复 Python 帧或 RunState。Manifest 的不可变保存与按 ID 选择约定保留，见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。
+
 Asset ownership, language selection, naming and Candidate/publication instructions in this ADR are superseded by [ADR 0027](0027-resolve-assets-independently-with-optional-priority-tags.md). Component immutability, fresh-crop provenance and the accepted stage boundaries remain in force.
 
 

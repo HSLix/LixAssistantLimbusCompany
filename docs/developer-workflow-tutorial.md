@@ -1,5 +1,7 @@
 # Developer Workflow
 
+2026-11-11 Stage 6 已实施：正式 Plan 为 `execute(ctx)`，配置通过 `ctx.run_state` 共享，旧签名没有兼容层。旧已发布版本可只读复制到修复草稿，改签名后校验并重新发布；原不可变版本不重写。恢复、配置来源及验证见 [Stage 6 实施记录](stage-6-implementation.md)。
+
 2026-10-30：本文 uv 命令针对源码项目；Windows 成品通过 `LALC-console.exe` 使用同一 CLI，Candidate 固定在用户数据目录，不随终端工作目录改变。构建输入、独立示例准备与验收见[Windows 说明](windows-packaging.md)。
 
 2026-10-27：#331 已实现 Python Plan、双窗口及跨进程互斥，当前用法见下文和[实施记录](stage-4-331-implementation.md)。外置页面及共享 Agent 配置已在 #332 本地实现，#333 双语与语言重载也已完成本地实现、已获开发者人工验收确认并关闭 #333（[使用与证据](stage-4-333-implementation.md)）；#334 已由开发者决定关闭，未执行项不计通过；当前验收由 #340 推进，阶段状态见[集中入口](current-state.md)。
@@ -25,7 +27,7 @@ uv run lalc --developer
 
 Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另有 UUID `manifest_id`。Asset 与 Trusted Action 都不是 Manifest 条目，不接受内嵌 `assets` / `trusted_actions`。Candidate 不需要素材映射文件；init 不复制素材，validate 不验证素材或写发布物，publish 不改 Default。手工已有非空 Candidate 仅在明确使用 `init --replace` 后重建；clear 需要确认。初始化同时保存独立的固定 Diff 基线。Agent 使用独立 Developer Session，换来源须新建 Session，不接管手工 Candidate；工作台用法见 [修复指南](agent-repair.md)。
 
-初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其固定输入为 `task_repetitions: dict[str, int]` 与 `settings: dict[str, Any]`，由宿主规范化并复制；完整示例见[实施记录](stage-4-331-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
+初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其入口为 `execute(ctx)`，通过 `ctx.run_state.task_repetitions` 和 `ctx.run_state.settings` 读写本 Run 配置。宿主复制初始数据，同一 Run 后续共享修改，失败不回滚，不回写页面配置；示例及启动选项见 [Stage 6](stage-6-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
 业务 Step 负责识别当前状态、执行动作、确认完成及抛出业务异常；已完成时直接返回，预期过渡继续观察，未知或停滞状态按证据失败。完成标识可用模板、OCR 或其他可靠状态，点击返回或固定等待结束不能证明业务完成。基础截图、等待 Step 只保证自身职责。Task／Subworkflow 负责排布、传参和按 Step 结果分支、循环、汇总，不能把游戏状态检查搬到这些非恢复边界。
 
@@ -110,7 +112,7 @@ Developer GUI → Agent Repair 中，“打开 Agent 工作区”右侧的“打
 
 #332 已接入数据目录 pages/ 中的可信 Python 页面、按任务 ID 配置的循环次数和纯设置页输入。最小页面/Plan 示例、安装及创建契约见[示例](../example/workflow/README.md)，双窗口即时保存、单一编辑入口和整应用重载见[实施记录](stage-4-332-implementation.md)。旧 Plan 未声明支持列表时会告警，不改写旧发布物。
 
-注册循环任务必须同时在页面声明 `TASKS` 并给出任务 `id`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `settings[PAGE_ID]`，次数按 `task_repetitions[任务id]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
+注册循环任务必须同时在页面声明 `TASKS` 并给出任务 `id`、在 Plan 模块声明字面量字符串列表 `SUPPORTED_TASK_IDS` 包含该 ID。Dashboard 使用已加载页面与当前 Default Plan 的任务交集；配置按 `ctx.run_state.settings[PAGE_ID]`，次数按 `ctx.run_state.task_repetitions[任务id]` 读取。安装页面、发布 Workflow、用户选择 Default 相互独立；重载不会补上缺失声明，也不会自动切换到新发布版本，Agent 不设置 Default。底层对缺声明仍产生 warning；User GUI 按现行规则展示中性空状态。
 
 Component 说明优先读取 execute 函数的 docstring，缺失时兼容回退到模块 docstring；两者至少提供一处。Recovery Rule 没有 execute 入口，仍必须提供模块 docstring。只写 # 注释不构成 docstring。
 

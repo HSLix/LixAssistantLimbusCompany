@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-11 Stage 6 已实施：Runtime 从当前 Working Manifest 创建同一套 Repair Session，Run 结束后可在 Developer GUI 接续；Runtime 提供当前失败入口的 `recheck` 和 `read_run_state`，不提供独立 `trial_run` 或删除。请求上限默认 50，同一恢复会话共享余额。历史检索默认开启，Runtime 人工反馈默认关闭，均在下一轮 Agent 开始时生效。详见 [Stage 6 实施记录](stage-6-implementation.md)。
+
 2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。
 
 
@@ -10,7 +12,7 @@
 安装已有 `gui`、`automation` extras 后运行 `uv run --frozen lalc --developer`；无参数启动 User Dashboard，可在 General Settings 打开 Developer。普通执行不启动 pi；Agent 当前接入回归基线为 pi 1.5.0；其他版本也允许启动，版本不匹配会写 WARNING 日志，在 CLI 终端及 GUI 对话提示，兼容性须另行验证。
 
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
-- **Agent Settings**：User／Developer 共用 provider 设置内容，各自选用；失焦或选择变化时保存。Developer 打开时独占具体配置的编辑，关闭后交还 User；User 的“启用 User Agent”开关始终可操作并立即保存。每轮请求上限默认 20、最小 2；Windows 凭据使用当前用户 DPAPI，其他平台仅在本次 GUI 内存中保留临时密钥，不读取其他 pi 实例的个人配置。
+- **Agent Settings**：User／Developer 共用 provider 设置内容，各自选用；失焦或选择变化时保存。Developer 打开时独占具体配置的编辑，关闭后交还 User；User 的“启用 User Agent”开关始终可操作并立即保存。每轮请求上限默认 50、最小 2（Runtime 同一恢复会话共享额度）；Windows 凭据使用当前用户 DPAPI，其他平台仅在本次 GUI 内存中保留临时密钥，不读取其他 pi 实例的个人配置。
 - **Agent Workbench**：新聊天选择 Construct／Repair 及来源，首条消息提交时固定。Construct 可空白起步，Repair 必须选择已发布 Manifest。每 Session 独立保存 Candidate、固定 Diff 基线、聊天与页面草稿；GUI 可打开 CLI Repair Session。开始后更换模式／来源须新建 Session，旧 Session 保留，不重建或清空。
 - **聊天与审阅**：纯文字及可选多图片，每条用户消息启动一轮；历史续聊不重放操作。思考与工具按轮放入默认收起的内联时间线，左侧竖线及节点串联过程段落与工具调用；工具参数与结果再独立默认收起，最终回答显示在外部。失败工具仅该行标红并显示失败，不自动展开，不在区域标题统计失败数；累计 Diff、Validate 与 Publish 绑定当前 Session。展示增量与影响见[专项记录](developer-process-timeline-impact-review.md)。人工反馈限 GUI 两种模式；页面包构建和人工预览安装限 GUI Construct，详见 [Stage 5 权限表](stage-5-agent-workbench.md#prompt-与工具权限)。
 - **运行入口**：Developer GUI 不再提供所选 Manifest 或人工运行区域。普通执行从 User GUI 启动；Agent `trial_run` 仍显式运行已发布版本，CLI 也保留直接运行入口。
@@ -89,7 +91,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 允许 Agent 在一次开发者消息中自主重复修改、校验、发布、试运行和读日志。此规则优先于旧有“Agent 不自动 Publish/运行”的说明，与 Stage 3.5 Runtime Policy 分开。
 
 - `publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`，不改变 Default，不授予运行时永久批准。
-- `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 使用 `trial_run(manifest_id, inputs={"task_repetitions": {}, "settings": {}})`，省略 logical_name，只加载该已发布 Manifest 的唯一 Python Plan；不接受文件路径。修改 Candidate 后先重新 Publish 才能运行新代码。
+- `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 省略 logical_name，普通 inputs 必须为空。`use_saved_config` 默认 True，采用页面保存配置及已启用任务次数；False 才采用显式 `run_state={"task_repetitions": {}, "settings": {}}`，未提供字段为空。只加载该已发布 Manifest 的唯一 Python Plan，不接受文件路径。独立试运行失败交给原 Developer Agent，不启动 Runtime Agent。修改 Candidate 后先重新 Publish 才能运行新代码。
 - 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
 - `list_runs(offset=0, limit=100)`：列出仍有 Trace 的 Run ID，按新到旧分页。
 - `read_run_log(run_id, start_sequence=1, limit=100, evidence_id=...)`：分段读取日志，可选查看该日志引用的截图；记录已清理时明确报不可用。两个日志工具均只读，不做内容搜索。

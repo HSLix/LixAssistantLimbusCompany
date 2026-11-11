@@ -40,8 +40,6 @@ def execute(ctx, *, value: int) -> int:
     calls += 1
     if value < 0:
         raise ExecutionFailure("negative value")
-    if calls == 1:
-        raise ExecutionFailure("observe again")
     return value * 2
 '''
 
@@ -94,8 +92,8 @@ def test_plan_continues_after_item_failure_and_ledger_counts_unique_events(tmp_p
     subs = [record for record in saved["records"] if record["workflow_kind"] == "sub"]
     assert [record["result"] for record in tasks] == ["success", "failure", "success"]
     assert [record["result"] for record in subs] == ["success", "failure", "success"]
-    assert tasks[0]["step_reinvocations"] == subs[0]["step_reinvocations"] == 1
-    assert service.application_event_totals()["step_reinvocations"] == 2
+    assert tasks[0]["step_reinvocations"] == subs[0]["step_reinvocations"] == 0
+    assert service.application_event_totals()["step_reinvocations"] == 0
     health = service.workflow_health()[manager.default.components["tasks.double"].component_id]
     assert health["strict_success_rate"] == 2 / 3
     assert health["agent_assisted_completion_rate"] == 0
@@ -129,7 +127,7 @@ def test_cancellation_stops_plan_and_skips_later_item(tmp_path: Path, monkeypatc
     monkeypatch.setattr(manager.default.components["steps.double"].module, "execute", blocking)
     service = ApplicationService(tmp_path, manifest_manager=manager)
 
-    run_id = service.start_plan()
+    run_id = service.start_plan(use_saved_config=False, )
     assert entered.wait(2)
     service.stop()
     release.set()
@@ -171,7 +169,7 @@ def execute(ctx, *, value: int) -> int:
         recovery_choice=lambda *_: next(choices, None),
     )
 
-    state = _finished(service, service.start_plan(manifest_id=first_id))
+    state = _finished(service, service.start_plan(use_saved_config=False, manifest_id=first_id))
 
     assert state["result"]["status"] == "completed"
     assert [item["result"] for item in state["result"]["items"]] == ["success", "failure"]
@@ -191,7 +189,7 @@ def test_ledger_write_failure_interrupts_plan(tmp_path: Path, monkeypatch) -> No
     monkeypatch.setattr(WorkflowRunLedger, "_save", fail_save)
     service = ApplicationService(tmp_path, manifest_manager=manager)
 
-    state = _finished(service, service.start_plan())
+    state = _finished(service, service.start_plan(use_saved_config=False, ))
 
     assert state["result"]["status"] == "interrupted"
     assert state["result"]["reason"] == "ledger_write_failed"
@@ -213,7 +211,7 @@ def test_cancellation_between_items_creates_no_next_task_record(tmp_path: Path) 
             service.stop()
 
     service._emit = stop_after_first
-    state = _finished(service, service.start_plan())
+    state = _finished(service, service.start_plan(use_saved_config=False, ))
 
     assert state["result"]["reason"] == "user_cancelled"
     assert len(state["result"]["items"]) == 1

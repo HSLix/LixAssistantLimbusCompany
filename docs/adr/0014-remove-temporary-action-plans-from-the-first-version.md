@@ -5,6 +5,8 @@ supersedes: [0006, 0008]
 
 # Remove Temporary Action Plans from the first version
 
+2026-11-11 局部替代：同一现有 Session／工具循环和终结式 Recheck 替代旧三类独立最终 Turn 协议；允许修复 Manifest Recovery Rule、取消执行前人工批准。禁止临时任意执行计划与直接模型动作的边界保留。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 ADR 0020 supersedes only the blanket exclusion of Asset additions below: new templates may be cropped from real game screenshots and proposed through the complete Manifest review path. Existing Asset files remain immutable.
 
 The first-version Runtime Agent cannot emit or execute a Temporary Action Plan and has no direct model-action channel. Every Agent Turn returns exactly one Working Manifest Update Proposal, `Request Step Recheck`, or Safe Task Termination recommendation. A proposal may change Steps, Task Workflows, or Subworkflows and must pass complete Manifest validation. The executor selects the complete Manifest for an immediate legal fresh call of the paused current Step; changed Components then use their ordinary execution path. Trusted Actions and Recovery Rules are outside the Agent modification scope. The Agent may propose new template Assets cropped by the executor from a fresh Target Window screenshot taken for that crop request (ADR 0020); it cannot overwrite, rename, or delete existing Asset files.

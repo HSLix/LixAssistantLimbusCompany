@@ -1,5 +1,7 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
+2026-11-11 Stage 6 后续契约已接受：Plan 配置参数迁入 ctx.run_state，不保留旧签名兼容层；Plan 自身调度失败可在同一 Run 修复重调；User GUI 新增恢复上限、“运行成功后自动使用修复版本” 和人工反馈选项。下文 Stage 4 的旧入口、Plan 错误直接结束及人工 Default 交互保留为该阶段实现记录，不作为阻止 Stage 6 的现行限制。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。
 
 

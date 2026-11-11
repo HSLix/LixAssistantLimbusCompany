@@ -676,7 +676,7 @@ class ImportDialog(QDialog):
             check = self.checks.get(obj["number"], {})
             status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
             action = self.asset_actions.get(obj["number"])
-            self.skills.item(index).setText(obj["id"] + " — " + status + (" · " + tr("Replace" if action == "replace" else "Skip") if action else ""))
+            self.skills.item(index).setText(obj["id"] + " — " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
         self.skills.blockSignals(False)
         self.render_skill()
         self.error_box.setText("\n".join(dict.fromkeys(errors)))

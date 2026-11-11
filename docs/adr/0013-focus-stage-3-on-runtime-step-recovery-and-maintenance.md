@@ -5,6 +5,8 @@ supersedes: 0012
 
 # Focus Stage 3 on Runtime Step Recovery and Maintenance
 
+2026-11-11 局部替代：运行时 Step-only 维护边界由按失败归属恢复替代；恢复时仍不替换已进入的调用者帧。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 ADR 0025 moves the runtime recovery, supervised trial, and Agent Asset creation scope described here to Stage 3.5. Current Stage 3 is independent single-Component repair; these runtime contracts are not its prerequisites.
 
 ADR 0020 supersedes only the blanket exclusion of Asset additions below: new templates may be cropped from real game screenshots and proposed through the complete Manifest review path. Existing Asset files remain immutable.

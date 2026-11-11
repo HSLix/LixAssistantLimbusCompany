@@ -1,5 +1,7 @@
 # Stage 5 — Agent 工作台
 
+2026-11-11 Stage 6 接受复用同一 Repair Session、Candidate、对话与日志，由程序组织 active Manifest 和故障反馈，Run 后可在 Developer GUI 接续；Runtime 工具仍按入口授权。全模式历史检索总开关默认开启、下一轮生效；Runtime 只读知识库／Skills 已获准，人工反馈由 User GUI 默认关闭的开关控制。Stage 6 已完成本地接入，接口与验证边界见[实施记录](stage-6-implementation.md)。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。
 
 

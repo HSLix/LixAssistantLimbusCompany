@@ -78,9 +78,8 @@ class ManifestReference:
                  for section in SECTIONS for name, entry in value[section].items()]
         return {"manifest_id": manifest_id, **self._page(items, offset, limit)}
 
-    def source(self, manifest_id, section, logical_name, offset=0, limit=100):
-        self._bounds(offset, limit)
-        value = self.read(manifest_id)
+    def source_content(self, value, section, logical_name):
+        """从已检查的登记关系读取原始源码；仅校验路径和哈希，不导入。"""
         if section not in SECTIONS or logical_name not in value[section]:
             raise ValueError("指定成员不属于该 Manifest 分区。")
         identity = value[section][logical_name]["component_id"]
@@ -88,6 +87,13 @@ class ManifestReference:
         content = self._file(self.manager.components_dir / f"{digest}.py")
         if hashlib.sha256(content).hexdigest() != digest:
             raise ValueError("Component 内容哈希校验失败。")
+        return content
+
+    def source(self, manifest_id, section, logical_name, offset=0, limit=100):
+        self._bounds(offset, limit)
+        value = self.read(manifest_id)
+        content = self.source_content(value, section, logical_name)
+        identity = value[section][logical_name]["component_id"]
         lines = content.decode("utf-8").splitlines(keepends=True)
         page = self._page(lines, offset, limit)
         return {"manifest_id": manifest_id, "section": section, "logical_name": logical_name,

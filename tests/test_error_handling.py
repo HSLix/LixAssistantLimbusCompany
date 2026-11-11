@@ -18,6 +18,7 @@ from lalc.application import ApplicationService, StartError
 from lalc.manifest import ManifestManager
 from lalc.errors import FATAL_MESSAGE, configure_logging, result_diagnostics
 from test_workflow import _publish, _finished, STEP_SOURCE, CONTROL_SOURCE, TASK_SOURCE
+from test_recovery import _rule
 
 
 @pytest.mark.parametrize("callback", ["condition", "verify"])
@@ -58,7 +59,7 @@ def check_once():
     else:
         action = action.replace('\ndef execute', '\nfrom lalc import ExecutionFailure\n\ndef execute') + '\n' + body
         action = action.replace('    return {"team": team}', '    check_once()\n    return {"team": team}')
-    manager = _publish(tmp_path, step_source=step, control_source=action)
+    manager = _publish(tmp_path, step_source=step, control_source=action, rules={"transient": _rule("return True")})
     service = ApplicationService(tmp_path, manifest_manager=manager)
     state = _finished(service, service.start("tasks.rotate_teams", {"teams": ["alpha"], "runs": 1}))
     assert state["result"]["output"] == ["alpha"]
@@ -296,7 +297,7 @@ def test_business_verification_in_step_recovers_without_replaying_task(tmp_path:
     action = CONTROL_SOURCE + '\ncalls = 0\n'
     action = action.replace('    return {"team": team}',
                             '    global calls\n    calls += 1\n    return {"team": "wrong" if calls == 1 else team}')
-    manager = _publish(tmp_path, step_source=step, control_source=action)
+    manager = _publish(tmp_path, step_source=step, control_source=action, rules={"transient": _rule("return True")})
     service = ApplicationService(tmp_path, manifest_manager=manager)
     state = _finished(service, service.start("tasks.rotate_teams", {"teams": ["alpha"], "runs": 1}))
     assert state["result"]["output"] == ["alpha"]
@@ -399,7 +400,7 @@ def test_plan_fatal_result_keeps_plan_status_items_and_original_result(tmp_path:
             return teams
         execute.__lalc_role__ = "task_workflow"
         manager.default.components["tasks.rotate_teams"].module.execute = execute
-    state = _finished(service, service.start_plan())
+    state = _finished(service, service.start_plan(use_saved_config=False, ))
     result = state["result"]
     assert result["fatal"] and result["status"] == "interrupted"
     assert result["reason"] == "fatal_error" and "failure_code" not in result

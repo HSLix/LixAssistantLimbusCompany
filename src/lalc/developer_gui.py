@@ -31,7 +31,7 @@ from .run_log_gui import log_colors, log_time
 
 from .repair_chat import RepairChat, chat_title, process_text_parts
 from .chat_input import ChatInput
-from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot
+from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot, settings_document, save_options
 from .agent_diagnostics import check_settings, details_text
 
 
@@ -753,6 +753,23 @@ class SettingsPage(QWidget):
         self.dirty = False
         self.revision = 0
         layout = QVBoxLayout(self)
+        self.global_controls = {}
+        option_labels = ({"history_enabled": tr('Allow searching Agent history')} if side == "developer" else {
+            "automatic_repair_default": tr('Automatically use the repaired version after normal completion'),
+            "runtime_feedback_enabled": tr('Allow requesting human feedback'),
+        })
+        for name, label in option_labels.items():
+            control = QCheckBox(label)
+            self.global_controls[name] = control
+            layout.addWidget(control)
+            control.toggled.connect(lambda value, name=name: self.change_option(name, value))
+        if side == "user":
+            layout.addWidget(QLabel(tr('Maximum consecutive recoveries')))
+            control = QSpinBox()
+            control.setRange(1, 2147483647)
+            self.global_controls["recovery_limit"] = control
+            layout.addWidget(control)
+            control.valueChanged.connect(lambda value: self.change_option("recovery_limit", value))
         self.provider = QComboBox()
         self.provider.addItem("llama.cpp", userData="llama.cpp")
         self.provider.addItem("DeepSeek", userData="deepseek")
@@ -781,7 +798,8 @@ class SettingsPage(QWidget):
             self.advanced_button.toggled.connect(self.advanced.setVisible)
             layout.addWidget(self.advanced_button)
             self.advanced.hide()
-        advanced.addWidget(QLabel(tr('Maximum model requests per message')))
+        advanced.addWidget(QLabel(tr('Maximum model requests per recovery') if side == "user"
+                                 else tr('Maximum model requests per message')))
         advanced.addWidget(self.limit)
         self.deepseek_options = QWidget()
         options = QVBoxLayout(self.deepseek_options)
@@ -948,6 +966,12 @@ class SettingsPage(QWidget):
     def reload(self):
         self.loading = True
         try:
+            document = settings_document(self.host.service.data_root)
+            for name, control in self.global_controls.items():
+                if isinstance(control, QCheckBox):
+                    control.setChecked(document[name])
+                else:
+                    control.setValue(document[name])
             value = load_settings(self.host.service.data_root, side=self.side, for_use=False)
             self.provider.setCurrentIndex(self.provider.findData(value["provider"]))
             self.form_provider = value["provider"]
@@ -965,6 +989,11 @@ class SettingsPage(QWidget):
             self.dirty = False
         finally:
             self.loading = False
+
+    def change_option(self, name, value):
+        """保存独立开关，不触发模型请求或覆盖 provider 表单。"""
+        if not self.loading:
+            self.window._interact(lambda: save_options(self.host.service.data_root, **{name: value}))
 
     def show_secret(self, value):
         configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
