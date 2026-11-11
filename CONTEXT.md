@@ -57,7 +57,7 @@ Executor-controlled handling inside an interrupted `@step` wrapper: inspect appl
 _Avoid_: Agent recovery, implicit error jump
 
 **Recovery Rule**:
-A deterministic rule that identifies one cross-Workflow external interruption through a read-only detection phase and handles it through a recovery phase. Manifest-defined rules are immutable Python Components with `detect(ctx) -> bool` and `recover(ctx) -> None`, a stable logical name and Component ID but no role decorator; neither entrypoint invokes another formal Component.
+A deterministic rule that identifies one cross-Workflow external interruption through an observe-only detection phase and handles it through a recovery phase; Stage 6 permits both phases to read and mutate Run State. Manifest-defined rules are immutable Python Components with `detect(ctx) -> bool` and `recover(ctx) -> None`, a stable logical name and Component ID but no role decorator; neither entrypoint invokes another formal Component.
 _Avoid_: Error node, task-specific branch, global exception plugin
 
 **Built-in Recovery Rule**:
@@ -154,8 +154,12 @@ The fixed escalation order for an interrupted task: exhaust Deterministic Recove
 _Avoid_: Error handler chain, Agent-first recovery
 
 **Run Context**:
-The executor-owned interface between formal Components and one execution environment, including component invocation, Target Window access, language, Manifest resolution, Trace, evidence, cancellation, and non-time execution budgets. Business data flows through explicit parameters, returns, and ordinary Python locals rather than mutable Context fields or mutable Component module globals; the Agent receives only a JSON-compatible diagnostic snapshot and never the live Context.
+The executor-owned interface between formal Components and one execution environment, including component invocation, Target Window access, language, Manifest resolution, Trace, evidence, cancellation, and non-time execution budgets. Business data flows through explicit parameters, returns, and ordinary Python locals, with Stage 6 introducing explicitly shared Run State; this does not permit arbitrary mutable Context fields or Component module globals, and the Agent never receives the live Context.
 _Avoid_: Global runtime state, mutable Workflow
+
+**Run State**:
+The mutable runtime configuration and business progress shared within one Top-level Execution; direct business-code mutations are immediately visible to subsequent reads and survive a failing call without rollback. Its business meaning and updates belong to Plan, Workflow and Step code; it ends with that execution and is not persisted or inherited by a new execution.
+_Avoid_: User settings, Python stack snapshot, persistent checkpoint
 
 **Execution Trace**:
 The executor-owned chronological record of what one real execution attempt actually did from its entry position. It records actual components, plans, actions, observations, results, evidence, and interruptions for diagnosis, recovery, Agent context, and audit, but does not carry normal Workflow business data or determine task success.

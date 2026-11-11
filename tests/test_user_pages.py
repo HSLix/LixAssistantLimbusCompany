@@ -212,7 +212,8 @@ def test_single_editor_handoff_autosaves_and_restores_independent_selection(owne
     user.settings_page.url.setText("http://local-before/v1")
     developer = owner.open_window(True)
     assert load_settings(owner.service.data_root)["base_url"] == "http://local-before/v1"
-    assert not user.agent_controls.isEnabled()
+    assert not user.settings_page.isEnabled()
+    assert user.agent_controls.isEnabled() and user.user_enabled.isEnabled()
     assert developer.settings_page.isEnabled()
     page = developer.settings_page
     page.provider.setCurrentIndex(page.provider.findData("deepseek"))
@@ -224,8 +225,18 @@ def test_single_editor_handoff_autosaves_and_restores_independent_selection(owne
     page.provider.setCurrentIndex(page.provider.findData("llama.cpp"))
     page.url.setText("http://local-after/v1")
     page.url.editingFinished.emit()
+    document = settings_document(owner.service.data_root)
+    for enabled in (True, False, True):
+        user.user_enabled.click()
+        saved = settings_document(owner.service.data_root)
+        assert user.user_enabled.isChecked() is enabled
+        assert saved == {**document, "user_enabled": enabled}
+        assert not user.settings_page.isEnabled()
+        user.settings_page.submit()
+        assert settings_document(owner.service.data_root) == saved
     assert developer.close()
-    assert user.agent_controls.isEnabled()
+    assert user.user_enabled.isEnabled() and user.user_enabled.isChecked()
+    assert user.settings_page.isEnabled()
     assert user.settings_page.url.text() == "http://local-after/v1"
     user.settings_page.provider.setCurrentIndex(user.settings_page.provider.findData("deepseek"))
     assert user.settings_page.limit.value() == 7
@@ -238,11 +249,11 @@ def test_invalid_text_is_saved_and_handed_off_for_later_correction(owner):
     user.settings_page.url.setText("invalid")
     developer = owner.open_window(True)
     assert developer.settings_page.url.text() == "invalid"
-    assert not user.agent_controls.isEnabled()
+    assert not user.settings_page.isEnabled()
     with pytest.raises(ValueError):
         load_settings(owner.service.data_root)
     assert developer.close()
-    assert user.agent_controls.isEnabled()
+    assert user.settings_page.isEnabled()
     assert user.settings_page.url.text() == "invalid"
 
 
@@ -425,7 +436,8 @@ def create_page(context):
         if second:
             assert isinstance(owner.user, FluentWindow) and isinstance(owner.developer, FluentWindow)
             assert owner.user.pages.count() == 4
-            assert not owner.user.agent_controls.isEnabled()
+            assert not owner.user.settings_page.isEnabled()
+            assert owner.user.user_enabled.isEnabled()
             assert context.language == "en_US"
             assert owner.user.start_button.text() == "Start Plan"
             assert not hasattr(owner.developer, "trial_button")

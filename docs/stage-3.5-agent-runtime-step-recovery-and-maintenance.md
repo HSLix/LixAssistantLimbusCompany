@@ -1,5 +1,24 @@
 # Stage 6（原 Stage 3.5）: Agent Runtime Step Recovery and Maintenance
 
+## 2026-11-11 设计讨论：已确认边界
+
+以下记录本轮逐项确认的设计，不表示已实现或整轮设计已收敛；下文旧基线在相抵触的范围内由本节替代，其他未被明确替代的权限、校验、审批与中断约束继续保留。
+
+- Stage 6 支持 Workflow 自身调度失败的修复，不再仅限 Step。Step 内失败归属 Step；Workflow 自身调度失败归属对应 Workflow，不采用下层恢复失败后自动逐层重启外层的设计。修复后重新进入对应入口，实际返回交回仍在等待的调用者；不恢复失败函数内部任意代码行。
+- 引入 RunState，承载同一次 Run 内可由 Plan、Workflow、Step 修改的运行配置和必要业务进度；以现有 `task_repetitions`、`settings` 为设计起点。业务代码自行决定字段含义、更新时机及重新进入后的行为，框架不解释队伍轮换、剩余次数或推断业务重放策略。
+- **RunState 仅驻留内存，生命周期为一次 Run。** 同一 Run 内调用及恢复保留该状态；Run 结束即结束，不落盘，不支持据此恢复进程退出前的 Run，也不自动继承到新的 Run 或回写用户配置。原有 Trace 等证据留存不因此移除。
+- RunState 允许业务代码直接修改共享对象（例如 `ctx.run_state.settings["team"] = "B"`）；修改立即对后续读取生效，即使当前调用随后失败也保留，不增加显式提交或失败自动回滚；游戏状态与内存状态的一致性由业务代码负责。
+- 已确认将 Plan 的 `task_repetitions`、`settings` 两个入口参数迁入 `ctx.run_state`，Plan、Workflow、Step 均从同一 RunState 读取和修改这些数据，不再由 Plan 层层传递整套配置。普通业务参数仍经 `ctx.call()` 显式传递并遵循原有独立副本与重试参数快照规则；框架不根据最新 RunState 自动重算调用参数，业务代码自行决定何时读取共享状态。此决定改变正式 Plan 入口契约；应用启动时的初始化输入接口、旧 Plan 的迁移方式及其他直接入口的初始化规则待影响审查和后续讨论，不据此宣称已迁移现有源码。
+- Recovery Rule 的 `detect`、`recover` 均可访问和直接修改同一 RunState，不对 RunState 增设角色／阶段读写限制；`detect` 的修改也立即共享且失败不回滚。此决定仅放宽共享业务状态访问，不改变 Trusted Action 的 observe/control 权限；原有“只读检测”在禁止修改 RunState 的含义上被替代，影响审查需同步相关术语与规格。
+- Runtime Agent 获准通过专用只读工具查看当前 RunState，由宿主返回查看时的状态快照，不交付可变 Python 对象；首版不提供 Agent 修改 RunState 的工具或直接写入权限。此边界不取消正式业务代码已确认的读写权限，修复源码的执行仍遵守单独的校验和执行边界，不再要求下述已取消的逐次人工批准。
+- Plan 自身调度失败时，同样在对应边界修复，并在同一 Run 内重新调用修复后的 Plan 入口，保留当前 RunState 及此前实际产生的任务记录；不创建新的独立 Run，不恢复原 Plan 内任意报错行。Plan 自行依据 RunState 决定后续调度，正常返回后结束本次执行。此决定替代旧讨论中“Plan 报错直接结束”作为 Stage 6 行为的限制，不改变当前尚未迁移的实现事实。
+- 取消 Runtime Agent 修复后新 Manifest 执行前的逐次人工审批流程：完整校验及恢复兼容检查通过后可自动选择并执行，不因有人／无人值守而要求源码批准。此决定替代 ADR 0015 及旧基线相应的 Supervised Review／运行许可要求；不取消用户 Stop、暂停／接管、既有工具权限或必要的校验，也不顺带取消开发页面安装等其他审批。现有 Python 执行不具备安全沙箱保证，不将自动执行描述为具备隔离。
+- Runtime Agent 修复后须在 Publish 前，于候选 Manifest 现有 `AdditionalMessage` 字段简要说明本次修复的问题，再发布不可变版本；不能省略或仅保留与本次无关的旧说明。复用现有说明字段，不新增平行元数据；版本说明不是修复已成功的执行证据。当前该字段允许缺省／空字符串，现有 `publish()` 未强制修复说明，需在运行时发布接入时落实本要求，不据此要求所有历史版本补填。
+- User GUI 的 Agent 设置新增“自动将修复版本设为 Default”选项，**默认开启**；关闭时 Runtime 修复版本仅供本次 Run 选择使用，不自动更新 Default。本选项不改变通用 Publish 的职责，也不授予 Developer Agent 设置 Default 的工具权限。自动切换的具体时点（发布后或恢复调用成功后）尚待确认，不把已发布解释为修复成功。
+- 待讨论：自动切换 Default 的时点；修复版本兼容、取消和预算。当前 Run Context 没有 RunState 接口，旧执行契约禁止共享业务状态、旧 Plan 入口参数及运行时逐次审批的条款需在设计收敛后的影响审查中同步修改。
+
+## 原基线与历史补充
+
 2026-11-07 局部新增已接受契约：[ADR 0039](adr/0039-recover-game-process-exit-with-a-built-in-rule.md) 规定应用内置游戏崩溃恢复规则，在当前 Step 内确认绑定进程退出时优先调用 `control.restart_game` 并重新调用该 Step，每个 Run 最多一次；再次退出或重启失败终止整个 Run/Plan。失焦、最小化、未知窗口故障和用户接管仍走人工处理，Step 外不新增恢复边界。此增量不接受下文尚待讨论的通用循环、预算或 Runtime Agent 提案。过程日志及验证见[实施记录](game-restart-design.md)。
 
 2026-10-30 追加边界：Runtime Repair 不提供删除工具或删除权限，包括开发 Repair 的 remove_asset；不因复用 Repair 继承其完整工具集。Recovery Rule 修改范围、生效与运行时修复接口等变更保留为 [Stage 6 TODO](#stage-6-todo-repair-integration)，本阶段不据此改写下文原有执行基线或放宽源码检查。

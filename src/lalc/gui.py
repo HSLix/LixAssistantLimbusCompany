@@ -1042,7 +1042,7 @@ class GuiCoordinator:
         from .agent_settings import settings_document
         document = settings_document(self.service.data_root)
         owned = self.developer is not None
-        self.user.agent_controls.setEnabled(not owned)
+        self.user.settings_page.setEnabled(not owned)
         self.user.edit_owner_notice.setText(tr('Edit in Developer GUI') if owned else "")
         self.user.edit_owner_notice.setVisible(owned)
         self.user.user_enabled.blockSignals(True)
