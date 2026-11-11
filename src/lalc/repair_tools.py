@@ -35,6 +35,9 @@ class RepairTools:
         self.log = log
         self.platform = platform
         self.cancelled = threading.Event()
+        self.requested_manifest_id = None
+        self.run_state = None
+        self.runtime_gate = None
         self.on_feedback = None
         self.on_page_preview = None
         self.knowledge = KnowledgeLibrary(data_root, self.checkpoint, host.service.codesearch if host is not None else None)
@@ -45,6 +48,10 @@ class RepairTools:
     def checkpoint(self):
         if self.cancelled.is_set():
             raise RuntimeError("Repair tool cancelled")
+        if self.requested_manifest_id is not None:
+            raise RuntimeError("Recheck 已提交，本轮不再接受工具调用。")
+        if self.runtime_gate is not None:
+            self.runtime_gate.checkpoint()
 
     def call(self, name, arguments, *, tool_call_id=None):
         """工具错误原样反馈模型；不把工具失败当作整个修复进程失败。"""
@@ -59,6 +66,7 @@ class RepairTools:
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
                        "publish": self.publish, "trial_run": self.trial_run,
+                       "read_run_state": self.read_run_state, "recheck": self.recheck,
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
                        "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
@@ -295,8 +303,16 @@ class RepairTools:
         """创建普通 Component 并登记；角色由实际源码决定。"""
         return self.add_source("components", filename, logical_name, source)
 
-    def publish(self):
+    def publish(self, summary=None):
         """在当前 Agent 活动中完整校验并保存不可变版本，不改变 Default。"""
+        if self.run_state is not None:
+            if not isinstance(summary, str) or not summary.strip():
+                raise ValueError("Runtime 发布前必须提供本次修复问题的简要说明 summary。")
+            from .runtime import atomic_write_json
+            path = self.host.candidate / "manifest.json"
+            value = json.loads(path.read_text(encoding="utf-8"))
+            value["AdditionalMessage"] = summary.strip()
+            atomic_write_json(path, value)
         result = self.host.manager.publish(self.host.candidate / "manifest.json")
         if not result.ok:
             return {**self.text({"ok": False, "errors": [error.as_dict() for error in result.errors]}),
@@ -304,20 +320,42 @@ class RepairTools:
         return self.text({"ok": True, "manifest_id": result.loaded.manifest_id,
                           "message": "已保存不可变版本，可用此 Manifest ID 试运行；Default 未改变。"})
 
-    def trial_run(self, manifest_id, *, logical_name=None, inputs=None):
+    def read_run_state(self):
+        """只返回当前父 Run 的状态副本，不向 Agent 暴露可写对象。"""
+        if self.run_state is None:
+            raise ValueError("当前入口没有活动 RunState。")
+        return self.text(self.run_state.snapshot())
+
+    def recheck(self, manifest_id):
+        """登记本轮终结式交接；实际调用只能由父 Run 执行器完成。"""
+        if self.run_state is None:
+            raise ValueError("当前入口没有待恢复 Run。")
+        ManifestReference(self.host.manager).read(manifest_id)
+        result = self.text({"manifest_id": manifest_id, "handoff": "recheck"})
+        self.requested_manifest_id = manifest_id
+        return result
+
+    def trial_run(self, manifest_id, *, logical_name=None, inputs=None, use_saved_config=True, run_state=None):
         """串行执行已保存版本；取消整轮时先停止运行并等输入释放，再返回宿主。"""
         from .application import StartError
         if not isinstance(manifest_id, str) or not manifest_id:
             raise ValueError("必须指定已 Publish 的 Manifest ID；修改 Candidate 后须先 Publish。")
         service = self.host.service
         request = {"manifest_id": manifest_id, "logical_name": logical_name,
-                   "inputs": inputs if inputs is not None else {}}
+                   "inputs": inputs if inputs is not None else {}, "use_saved_config": use_saved_config,
+                   "run_state": run_state}
+        configuration = {} if run_state is None else run_state
+        if type(configuration) is not dict or configuration.keys() - {"settings", "task_repetitions"}:
+            raise ValueError("run_state 仅接受 task_repetitions 和 settings。")
         try:
             if logical_name is None:
-                run_id = service.start_plan(**request["inputs"], manifest_id=manifest_id, _developer_trial=True)
+                if request["inputs"]:
+                    raise ValueError("Plan 无业务入口参数，请通过 run_state 提供配置。")
+                run_id = service.start_plan(**configuration, use_saved_config=use_saved_config,
+                                            manifest_id=manifest_id, _developer_trial=True)
             else:
                 run_id = service.start(logical_name, request["inputs"], manifest_id=manifest_id,
-                                       _developer_trial=True)
+                                       _developer_trial=True, use_saved_config=use_saved_config, **configuration)
         except StartError as error:
             return self.text({**request, "status": "rejected", "run_id": None,
                               "code": error.code, "message": str(error), "errors": error.errors,

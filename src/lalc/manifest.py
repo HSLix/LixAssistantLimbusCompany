@@ -26,7 +26,7 @@ TOP_LEVEL_FIELDS = {"schema_version", *SECTIONS}
 SAVED_TOP_LEVEL_FIELDS = {*TOP_LEVEL_FIELDS, "manifest_id"}
 OPTIONAL_FIELDS = {"AdditionalMessage", "published_at"}
 COMPONENT_ID_PREFIX = "sha256:"
-EMPTY_PLAN = '"""空调度 Plan；由开发者填写 Task 调用。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:\n    return None\n'
+EMPTY_PLAN = '"""空调度 Plan；由开发者填写 Task 调用。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx) -> None:\n    return None\n'
 
 
 
@@ -343,17 +343,16 @@ class ManifestManager:
                     "recovery_rules": {},
                 }
             else:
-                result = self.load_default()
-                if not result.ok:
-                    return result.errors
-                assert result.loaded is not None
-                manifest = result.loaded.manifest
-        else:
-            result = self.load(manifest_id)
-            if not result.ok:
-                return result.errors
-            assert result.loaded is not None
-            manifest = result.loaded.manifest
+                manifest_id = self.default_manifest_id()
+                if manifest_id is None:
+                    return (ValidationError("default_manifest_missing", "请先选择有效的 Default Manifest。"),)
+        if manifest_id is not None:
+            from .manifest_reference import ManifestReference
+            reference = ManifestReference(self)
+            try:
+                manifest = reference.read(manifest_id)
+            except (OSError, ValueError, TypeError) as error:
+                return (ValidationError("candidate_source_invalid", str(error), cause=error),)
 
         target.parent.mkdir(parents=True, exist_ok=True)
         temporary = target.parent / f".{target.name}.{uuid.uuid4()}"
@@ -372,10 +371,8 @@ class ManifestManager:
             for section in SECTIONS:
                 for logical_name, entry in manifest.get(section, {}).items():
                     filename = f"{logical_name}.py"
-                    component_id = entry["component_id"]
-                    digest = component_id.removeprefix(COMPONENT_ID_PREFIX)
                     (temporary / filename).write_bytes(
-                        (self.components_dir / f"{digest}.py").read_bytes()
+                        reference.source_content(manifest, section, logical_name)
                     )
                     candidate_entry = {"source_path": filename}
                     candidate[section][logical_name] = candidate_entry
@@ -1189,10 +1186,7 @@ class ManifestManager:
             and all(item.annotation is not None for item in arguments.kwonlyargs)
         )
         if valid and plan:
-            valid = ([item.arg for item in arguments.kwonlyargs] == ["task_repetitions", "settings"]
-                     and [ast.unparse(item.annotation) for item in arguments.kwonlyargs]
-                     == ["dict[str, int]", "dict[str, Any]"]
-                     and all(default is None for default in arguments.kw_defaults))
+            valid = not arguments.kwonlyargs
         elif valid:
             valid = all(self._input_annotation_allowed(item.annotation) for item in arguments.kwonlyargs)
         if valid:
@@ -1203,7 +1197,8 @@ class ManifestManager:
             errors.append(
                 self._node_error(
                     "signature_invalid",
-                    "execute must be typed execute(ctx, *, ...) with JSON-compatible inputs.",
+                    "Plan execute must be typed execute(ctx); configuration belongs in ctx.run_state."
+                    if plan else "execute must be typed execute(ctx, *, ...) with JSON-compatible inputs.",
                     logical_name,
                     function,
                 )

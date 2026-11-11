@@ -75,7 +75,8 @@ def test_user_groups_navigation_and_developer_lock(owner, app):
     assert user.pages.currentWidget() is user.general_settings
     assert not user.update_button.isEnabled()
     developer = owner.open_window(True)
-    assert not user.agent_controls.isEnabled()
+    assert user.agent_controls.isEnabled()
+    assert not page.isEnabled()
     assert user.edit_owner_notice.text() == "请在 Developer GUI 中修改"
     assert hasattr(developer.settings_page, "diagnostics")
     assert developer.close()

@@ -1,6 +1,8 @@
 # Developer Skills
 
-开发 Agent 使用 pi 原生格式的 Skill 按需获取流程指导和只读参考资料；Skill 不授予权限，不执行附带脚本。GUI Construct、GUI Repair 和 CLI Repair 展示同一份目录，实际操作仍取决于本轮工具权限。Runtime 不继承此能力。
+2026-11-11 Stage 6 已接入 Runtime 只读 Skills；随包指导已更新 RunState、非必要不改调用约定、发布问题简述及当前入口 Recheck。已有用户 `skills/` 仍不自动覆盖，需手动合并随包变更；程序组织的 Runtime 提示始终包含新接口及权限边界。见 [Stage 6 实施记录](stage-6-implementation.md)。
+
+开发 Agent 使用 pi 原生格式的 Skill 按需获取流程指导和只读参考资料；Skill 不授予权限，不执行附带脚本。GUI Construct、GUI Repair 和 CLI Repair 展示同一份目录，实际操作仍取决于本轮工具权限。Runtime 同样可只读加载 Skills，其可操作工具由 Runtime 白名单决定。
 
 ## 文件与维护
 

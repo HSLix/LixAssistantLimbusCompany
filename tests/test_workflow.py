@@ -63,6 +63,7 @@ def _publish(
     sub_source: str = SUB_SOURCE,
     step_source: str = STEP_SOURCE,
     control_source: str = CONTROL_SOURCE,
+    rules: dict[str, str] | None = None,
 ) -> ManifestManager:
     candidate = root / f"candidate-{len(list(root.glob('candidate-*')))}"
     candidate.mkdir(parents=True)
@@ -71,6 +72,7 @@ def _publish(
         "sub.py": sub_source,
         "step.py": step_source,
     }
+    sources.update({f"{name}.py": source for name, source in (rules or {}).items()})
     for name, source in sources.items():
         (candidate / name).write_text(source, encoding="utf-8")
     manifest = {
@@ -80,7 +82,7 @@ def _publish(
             "flows.run_once": {"source_path": "sub.py"},
             "steps.run_team": {"source_path": "step.py"},
         },
-        "recovery_rules": {},
+        "recovery_rules": {name: {"source_path": f"{name}.py"} for name in (rules or {})},
     }
     path = candidate / "manifest.json"
     path.write_text(json.dumps(manifest), encoding="utf-8")

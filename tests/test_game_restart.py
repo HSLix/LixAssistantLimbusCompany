@@ -246,10 +246,10 @@ def execute(ctx, *, value: int) -> list[str]:
     result = state["result"]
     assert result["status"] == ("failure" if repeat_crash else "success")
     if repeat_crash:
-        assert result["failure_code"] == "game_restart_limit"
+        assert result["failure_code"] == "game_recovery_exhausted"
     else:
         assert result["output"] == ["retained", "step-old:9"]
-    assert env.platform.launches == 1
+    assert env.platform.launches == (10 if repeat_crash else 1)
     trace = state["trace"]
     assert sum(e["event"] == "component_log" and e["message"] == "已完成前序业务" for e in trace) == 1
     assert not any(e["event"] == "recovery_rule_started" and e["logical_name"] == "business" for e in trace)
@@ -316,13 +316,13 @@ def execute(ctx, *, value: int) -> str:
             raise OSError("cannot inspect original process")
         env.platform.processes[7].exited = exited
     service = ApplicationService(env.root, manifest_manager=manager, window_platform=env.platform)
-    service.start_plan(manifest_id=identity)
+    service.start_plan(use_saved_config=False, manifest_id=identity)
     result = service.wait_for(lambda state: state["phase"] == "finished")["result"]
     assert result["status"] == "interrupted"
-    assert result["failure_code"] == ("game_restart_limit" if failure == "second_crash" else "game_restart_failed")
+    assert result["failure_code"] == ("game_recovery_exhausted" if failure == "second_crash" else "game_restart_failed")
     assert len(result["items"]) == 1
     assert result["items"][0]["status"] == "failure"
-    assert env.platform.launches == (1 if failure == "second_crash" else 0)
+    assert env.platform.launches == (10 if failure == "second_crash" else 0)
 
 
 def test_explicit_restart_does_not_consume_automatic_budget(environment):

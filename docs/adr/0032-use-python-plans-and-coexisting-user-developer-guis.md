@@ -5,6 +5,8 @@ supersedes: 0004 (JSON Automation Plan identity and Plan call hierarchy only), 0
 
 # Use a unique Python Plan per Manifest and coexisting User/Developer GUIs
 
+2026-11-11 局部替代：正式 Plan 配置参数迁入 RunState、无旧参数兼容层，Plan 自身失败可在同一 Run 修复重调；原 Stage 4 阶段限制保留为历史实现边界。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 2026-10-31：[ADR 0034](0034-extend-developer-agent-with-reviewed-page-drafts.md) 接受统一 Agent 工作台、按模式和入口限权、每 Session 独立 Candidate 与连续聊天、CLI / GUI 互通、取消 Session 重建及同进程模态双页对比后人工安装。GUI 两种模式均可请求人工反馈，仅 Construct 构建页面；手工 Candidate 不再由 Agent 接管。以上待实现，本文相关旧生命周期 / GUI 边界由新规格替代，历史实现和验收证据保留。Runtime 无删除工具，人工交互仅有人值守开放，其余接入留 Stage 6。
 
 2026-10-27：Stage 4 grill 结束，开发者确认[接受规格](../stage-4-extensible-user-gui.md)及[影响审查](../stage-4-design-impact-review.md)。为了让业务调度由 Python 表达、让新增业务设置页无需修改主 GUI，每个 Manifest 改为拥有唯一、内容哈希固定的正式 Python Plan，以稳定逻辑名通过统一调用边界执行，并由 Plan 调用 Task。直接替换 JSON Plan，不兼容、不自动转换或改写旧不可变发布物。Plan→Task 返回结构化成功/失败结果，普通 Task 失败可继续；取消、环境无法继续及 Plan 自身错误中断执行，完整实际结果由执行器保留，不能把遍历完成等同于全部成功。

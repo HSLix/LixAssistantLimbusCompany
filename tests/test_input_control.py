@@ -267,7 +267,7 @@ def test_release_failure_ends_plan_without_resume_or_later_task(tmp_path):
     service, window = service_for(tmp_path, repetitions=2)
     window.backend.takeovers = 1
     window.backend.fail_release = True
-    service.start_plan()
+    service.start_plan(use_saved_config=False, )
     state = finished(service)
     assert state["result"]["reason"] == "input_release_failed"
     assert len(state["result"]["items"]) == 1
@@ -577,7 +577,7 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         return capture(hwnd, width, height)
     monkeypatch.setattr(window, "capture", observe)
     if plan:
-        service.start_plan()
+        service.start_plan(use_saved_config=False, )
     else:
         service.start("tasks.control", {})
     if problem == "takeover":

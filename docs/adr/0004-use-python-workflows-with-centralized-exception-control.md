@@ -4,6 +4,8 @@ status: accepted
 
 # Use Python Workflows with Centralized Exception Control
 
+2026-11-11 局部替代：Step-only 的恢复边界扩展到 Plan／Workflow／Step；共享业务状态由 RunState 承担。错误原始诊断、用户中断和致命收尾约束保留。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 2026-10-27：后续 [ADR 0032](0032-use-python-plans-and-coexisting-user-developer-guis.md) 接受每 Manifest 唯一 Python Plan、同进程双 GUI 和 Candidate Plan 编辑/已发布试运行，按其列明范围替代本文的旧 Plan/GUI 边界；本文其余决定及历史实施证据保留，Stage 4 尚未实现。
 
 Task entry `condition` and independent final `verify` callbacks are removed. This decision supersedes the earlier proposal to extend recovery to those callbacks. Entry checks and business-result validation belong in ordinary Steps; only Step has a recoverable continuation.

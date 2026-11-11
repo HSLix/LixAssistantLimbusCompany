@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
 
-from .run_context import RunContext as RunContext
+from .run_context import RunContext as RunContext, RunState as RunState
 
 if TYPE_CHECKING:
     from .manifest import LoadedComponent, LoadedManifest, ManifestManager
@@ -59,6 +59,10 @@ class ExecutionFailure(RuntimeError):
         self.code = code
         if cause is not None:
             self.__cause__ = cause
+
+
+class RecoveryTerminated(ExecutionFailure):
+    """下层恢复已结束；穿过调用者时不得再当成外层自身调度失败。"""
 
 
 class EnvironmentFailure(ExecutionFailure):
@@ -160,7 +164,7 @@ class _Frame:
 
 
 class WorkflowExecutor:
-    """在当前线程同步执行正式 Component，并在 Step 边界处理恢复。"""
+    """同步执行 Component；各入口处理自身失败，共享一次 Run 的状态。"""
 
     _ACTION_ACCESS = {
         ("task_workflow", "execute"): {"observe"},
@@ -192,6 +196,9 @@ class WorkflowExecutor:
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
         debug_screenshot: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
+        run_state: RunState | None = None,
+        recovery_limit: int = 10,
+        repair: Callable[[dict[str, Any]], str | None] | None = None,
     ) -> None:
         self.task_results: list[dict[str, Any]] = []
         self.task_finished = task_finished
@@ -204,7 +211,10 @@ class WorkflowExecutor:
         self._control_input = control_input
         self._check_input = check_input
         self._game_process_exited = game_process_exited
-        self._automatic_restarts = 0
+        self.run_state = run_state if run_state is not None else RunState()
+        self.recovery_limit = recovery_limit
+        self.repair = repair
+        self._recovery_key: int | None = None
         self._prepare_resume = prepare_resume
         self._active_action: str | None = None
         self.context = RunContext(self)
@@ -224,20 +234,6 @@ class WorkflowExecutor:
     def prepare_inputs(component: LoadedComponent, arguments: dict[str, Any]) -> dict[str, Any]:
         """绑定默认值并按 execute 注解生成独立的 JSON 输入副本。"""
 
-        if component.role == "automation_plan":
-            if type(arguments) is not dict or set(arguments) != {"task_repetitions", "settings"}:
-                raise InputValidationError("Plan requires task_repetitions and settings")
-            repetitions, settings = arguments["task_repetitions"], arguments["settings"]
-            if type(repetitions) is not dict or any(type(k) is not str or type(v) is not int or v < 0
-                                                   for k, v in repetitions.items()):
-                raise InputValidationError("task_repetitions must map task IDs to non-negative integers")
-            if type(settings) is not dict or any(type(k) is not str or type(v) is not dict
-                                               for k, v in settings.items()):
-                raise InputValidationError("settings must map page IDs to JSON objects")
-            try:
-                return {"task_repetitions": deepcopy(repetitions), "settings": _strict_json(settings)}
-            except (ValueError, TypeError) as error:
-                raise InputValidationError(str(error)) from error
         return _bind_and_normalize(component.module.execute, arguments)
 
     def run(
@@ -247,10 +243,7 @@ class WorkflowExecutor:
 
         self._root_call_id = None
         try:
-            if component.role == "step":
-                output = self._invoke_step(logical_name, component, inputs, None)
-            else:
-                output = self._invoke_component(logical_name, component, inputs, parent_call_id=None)
+            output = self._invoke_entry(logical_name, component, inputs, None)
             return {
                 "status": "success",
                 "logical_name": logical_name,
@@ -304,9 +297,7 @@ class WorkflowExecutor:
             caller.role == "sub_workflow" and component.role != "step"
         ):
             raise ExecutionFailure("execution_failed", f"Illegal Component target role: {component.role}")
-        if component.role == "step":
-            return self._invoke_step(logical_name, component, arguments, caller.call_id)
-        return self._invoke_component(logical_name, component, arguments, parent_call_id=caller.call_id)
+        return self._invoke_entry(logical_name, component, arguments, caller.call_id)
 
     def _call_task(self, name: str, arguments: dict[str, Any], parent_call_id: int) -> dict[str, Any]:
         """Plan 的 Task 结果边界；环境故障和用户控制信号始终向外传播。"""
@@ -324,7 +315,7 @@ class WorkflowExecutor:
         try:
             if component is None:
                 raise ExecutionFailure("working_manifest_incompatible", f"Task unavailable: {name}")
-            output = self._invoke_component(name, component, arguments, parent_call_id=parent_call_id)
+            output = self._invoke_entry(name, component, arguments, parent_call_id)
             self.gate.checkpoint()
             result = {"status": "success", "output": _json_copy(output)}
         except (UserInterruption, TraceWriteError, EnvironmentFailure) as error:
@@ -351,60 +342,42 @@ class WorkflowExecutor:
             raise terminal
         return _json_copy(result)
 
-    def _invoke_step(
-        self, logical_name: str, component: LoadedComponent, arguments: dict[str, Any],
-        parent_call_id: int | None,
-    ) -> Any:
-        """只在当前 Step 调用边界恢复，保留仍在栈上的 Workflow 调用帧。"""
-        inputs = _bind_and_normalize(component.module.execute, arguments)
-        restarted = False
-        while True:
-            try:
-                try:
-                    try:
-                        result = self._invoke_component(logical_name, component, inputs, parent_call_id=parent_call_id)
-                    except (UserInterruption, EnvironmentFailure):
-                        raise
-                    except ExecutionFailure as error:
-                        self.emit("step_interrupted", {"logical_name": logical_name,
-                                  "component_id": component.component_id, **_exception_fields(error)})
-                        result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
-                except UserInterruption as error:
-                    if error.reason == "cancel":
-                        raise
-                    current = self.manifest.components[logical_name]
-                    result = self._resume_step(logical_name, current, inputs, parent_call_id, error)
-            except GameProcessExited as error:
-                if restarted:
-                    self.emit("step_reinvocation_failed", {"logical_name": logical_name,
-                              "reason": "game_restart", **_exception_fields(error)})
-                self.emit("step_interrupted", {"logical_name": logical_name,
-                          "component_id": component.component_id, **_exception_fields(error)})
-                self._recover_game(logical_name, parent_call_id)
-                component = self.manifest.components[logical_name]
-                restarted = True
-                continue
-            except (ExecutionFailure, UserInterruption) as error:
-                if restarted:
-                    self.emit("step_reinvocation_failed", {"logical_name": logical_name,
-                              "reason": "game_restart", **_exception_fields(error)})
+    def _invoke_step(self, logical_name, component, arguments, parent_call_id):
+        """保留手动恢复路径使用的 Step 入口。"""
+        return self._invoke_entry(logical_name, component, arguments, parent_call_id)
+
+    def _invoke_entry(self, logical_name, component, arguments, parent_call_id):
+        """仅在所属调用边界修复；仍在等待的调用者帧不退出。"""
+        call_id = self._next_call_id
+        try:
+            result = self._invoke_component(logical_name, component, arguments, parent_call_id=parent_call_id)
+        except (RecoveryTerminated, TraceWriteError):
+            raise
+        except UserInterruption as error:
+            if error.reason == "cancel" or component.role != "step":
                 raise
-            if restarted:
-                self.emit("step_reinvocation_returned", {"logical_name": logical_name,
-                          "component_id": component.component_id, "reason": "game_restart"})
-            return result
+            try:
+                result = self._resume_step(logical_name, self.manifest.components[logical_name],
+                                           arguments, parent_call_id, error)
+            except GameProcessExited as exited:
+                result = self._recover_call(logical_name, component, arguments, parent_call_id, exited, call_id)
+        except GameProcessExited as error:
+            result = self._recover_call(logical_name, component, arguments, parent_call_id, error, call_id)
+        except EnvironmentFailure:
+            raise
+        except (ExecutionFailure, InputValidationError) as error:
+            result = self._recover_call(logical_name, component, arguments, parent_call_id, error, call_id)
+        if component.role == "step":
+            self.run_state._recovery_count = 0
+        return result
 
     def _recover_game(self, step_name: str, parent_call_id: int | None) -> None:
-        """优先执行应用内置崩溃规则；每个顶层执行最多一次，不检测无窗口业务规则。"""
+        """优先执行内置崩溃规则，额度由统一连续恢复计数控制。"""
         fields = {"logical_name": "builtin.game_crash", "role": "recovery_rule",
                   "parent_call_id": parent_call_id, "step": step_name}
 
         def recover():
-            if self._automatic_restarts >= 1:
-                self.log("本次运行已自动重启过游戏，再次退出，终止运行。", level="error")
-                raise EnvironmentFailure("game_restart_limit", "Automatic game restart limit reached.")
-            self._automatic_restarts += 1
-            self.log("已确认游戏进程退出，执行内置崩溃恢复（本次运行 1/1）。", level="warning")
+            self.log("已确认游戏进程退出，执行内置崩溃恢复。", level="warning")
             self.trusted_action("control.restart_game", {})
             self.log("游戏已重启并重新绑定窗口，重新调用当前 Step。")
 
@@ -504,7 +477,7 @@ class WorkflowExecutor:
                 except ExecutionFailure as interrupted:
                     self.emit("step_interrupted", {"logical_name": logical_name,
                               "component_id": component.component_id, **_exception_fields(interrupted)})
-                    result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id)
+                    result = self._invoke_step_recovery(logical_name, component, inputs, parent_call_id, interrupted)
             except UserInterruption as next_error:
                 if next_error.reason == "cancel":
                     raise
@@ -514,166 +487,150 @@ class WorkflowExecutor:
                       "component_id": component.component_id, "reason": "focus" if automatic else "manual_resume"})
             return result
 
-    def _invoke_step_recovery(self, logical_name: str, component: LoadedComponent,
-                              inputs: dict[str, Any], parent_call_id: int | None) -> Any:
-        """新调用发生普通中断时复用既有恢复阶梯。"""
+    def _invoke_step_recovery(self, logical_name, component, inputs, parent_call_id, error):
+        """手动恢复后普通错误继续使用同一入口恢复流程。"""
+        return self._recover_call(logical_name, component, inputs, parent_call_id, error)
 
-        recovered, outcome = self._recover_step(logical_name, component, inputs, parent_call_id)
-        if recovered:
-            return outcome
-        recovered, outcome = self._try_manifest_choices(logical_name, component, inputs, parent_call_id, outcome)
-        if recovered:
-            return outcome
-        self._terminate_anomaly(str(outcome), logical_name)
-        if isinstance(outcome, ExecutionFailure):
-            raise outcome
-        raise ExecutionFailure(str(outcome))
-
-    def _try_manifest_choices(
-        self, logical_name: str, original: LoadedComponent, inputs: dict[str, Any],
-        parent_call_id: int | None, reason: str | ExecutionFailure,
-    ) -> tuple[bool, Any]:
-        """在原调用链仍暂停时，尝试完整 Manifest 选择或结束本次任务。"""
-
-        if self.choose_manifest is None or self.manifest_manager is None or self.select_manifest is None:
-            return False, reason
-        while True:
-            self.gate.checkpoint()
-            try:
-                manifest_id = self.choose_manifest(str(reason), logical_name, tuple(self.attempted_manifest_ids))
-            except (UserInterruption, TraceWriteError, EnvironmentFailure):
-                raise
-            except Exception as error:
-                self.emit("recovery_choice_failed", {"logical_name": logical_name, **_exception_fields(error)})
-                return False, ExecutionFailure(str(error), cause=error)
-            self.gate.checkpoint()
-            if manifest_id is None:
-                return False, reason
-            loaded = self.manifest_manager.load(manifest_id)
-            if not loaded.ok:
-                reason = ExecutionFailure(
-                    "execution_failed", "; ".join(error.message for error in loaded.errors),
-                    cause=next((error.cause for error in loaded.errors if error.cause is not None), None),
-                )
-                self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(reason),
-                          "errors": [error.as_dict() for error in loaded.errors]})
-                continue
-            candidate = loaded.loaded
-            assert candidate is not None
-            replacement = candidate.components.get(logical_name)
-            reason = self._replacement_problem(original, replacement, candidate)
-            if reason:
-                self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": reason})
-                continue
-            assert replacement is not None
-            condition = getattr(replacement.module, "condition", None)
-            if condition is not None:
-                try:
-                    previous = self.manifest
-                    self.manifest = candidate
+    def _recover_call(self, logical_name, original, inputs, parent_call_id, error, call_id=None):
+        """规则与 Agent 串行交接；失败尝试不回滚 RunState 或已选择版本。"""
+        outermost = self._recovery_key is None
+        if outermost:
+            self._recovery_key = self._allocate_call_id()
+        recheck = False
+        must_agent = False
+        interrupted_call_id = call_id
+        try:
+            self.emit("step_interrupted" if original.role == "step" else "workflow_interrupted",
+                      {"logical_name": logical_name, "component_id": original.component_id,
+                       "recovery_id": self._recovery_key, **_exception_fields(error)})
+            while True:
+                self.gate.checkpoint()
+                execute = False
+                if not must_agent and self.run_state.recovery_count < self.recovery_limit:
+                    if isinstance(error, GameProcessExited):
+                        self._recover_game(logical_name, parent_call_id)
+                        recovered, problem = True, None
+                    else:
+                        recovered, problem = self._recover_rules()
+                    if recovered:
+                        self.run_state._recovery_count += 1
+                        execute = True
+                    elif problem is None and recheck:
+                        execute = True
+                    elif problem is not None:
+                        error = problem
+                if not execute:
+                    if self.repair is None and self.choose_manifest is None:
+                        self._end_recovery(logical_name, error)
+                    if self.repair is None:
+                        self.run_state._recovery_count = 0
+                    context = {"recovery_id": self._recovery_key, "logical_name": logical_name,
+                               "role": original.role, "parent_call_id": parent_call_id,
+                               "interrupted_call_id": interrupted_call_id, "failed_call_id": call_id,
+                               "inputs": _json_copy(inputs), "manifest_id": self.manifest.manifest_id,
+                               "attempted_manifest_ids": list(self.attempted_manifest_ids),
+                               **_exception_fields(error)}
                     try:
-                        self._run_condition(
-                            replacement, condition,
-                            {"logical_name": logical_name, "component_id": replacement.component_id,
-                             "role": "step", "manifest_id": manifest_id,
-                             "call_id": self._allocate_call_id(), "inputs": _json_copy(inputs)},
-                            inputs,
-                        )
-                    finally:
-                        self.manifest = previous
-                except Exception as error:
-                    if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
+                        manifest_id = (self.repair(context) if self.repair is not None else
+                                       self.choose_manifest(str(error), logical_name, tuple(self.attempted_manifest_ids)))
+                    except (UserInterruption, TraceWriteError, EnvironmentFailure):
                         raise
-                    reason = error
-                    self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(reason), **_exception_fields(error)})
+                    except Exception as failure:
+                        self.emit("recovery_choice_failed", {"logical_name": logical_name, **_exception_fields(failure)})
+                        if isinstance(error, GameProcessExited):
+                            raise EnvironmentFailure("game_recovery_exhausted", str(failure), cause=failure) from failure
+                        raise RecoveryTerminated("execution_failed", str(failure), cause=failure) from failure
+                    if manifest_id is None:
+                        self._end_recovery(logical_name, error)
+                    loaded = self.manifest_manager.load(manifest_id)
+                    candidate = loaded.loaded
+                    replacement = candidate.components.get(logical_name) if candidate else None
+                    if not loaded.ok or replacement is None or replacement.role != original.role:
+                        error = ExecutionFailure("manifest_selection_rejected", "; ".join(e.message for e in loaded.errors)
+                                                 or "恢复入口必须保留原逻辑名及角色。")
+                        self.emit("manifest_selection_rejected", {"manifest_id": manifest_id, "reason": str(error)})
+                        must_agent = True
+                        continue
+                    self.select_manifest(candidate)
+                    self.manifest = candidate
+                    if manifest_id not in self.attempted_manifest_ids:
+                        self.attempted_manifest_ids.append(manifest_id)
+                    self.emit("working_manifest_selected", {"manifest_id": manifest_id,
+                              "recovery_id": self._recovery_key})
+                    recheck, must_agent = True, False
                     continue
-            self.gate.checkpoint()
-            self.select_manifest(candidate)
-            self.manifest = candidate
-            if manifest_id not in self.attempted_manifest_ids:
-                self.attempted_manifest_ids.append(manifest_id)
-            self.emit("working_manifest_selected", {"manifest_id": manifest_id})
-            self.emit("step_reinvocation_started", {"logical_name": logical_name, "component_id": replacement.component_id})
-            try:
-                result = self._invoke_component(logical_name, replacement, _json_copy(inputs), parent_call_id=parent_call_id, skip_condition=True)
-                original_return = get_type_hints(original.module.execute, globalns=original.module.execute.__globals__)["return"]
-                _normalize_output(result, original_return)
-                self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": replacement.component_id})
-                return True, result
-            except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
+                current = self.manifest.components[logical_name]
+                fields = {"logical_name": logical_name, "component_id": current.component_id,
+                          "recovery_id": self._recovery_key, "parent_call_id": parent_call_id,
+                          "attempt_call_id": self._next_call_id}
+                self.emit("step_reinvocation_started" if current.role == "step" else "workflow_reinvocation_started", fields)
+                try:
+                    call_id = self._next_call_id
+                    result = self._invoke_component(logical_name, current, _json_copy(inputs), parent_call_id=parent_call_id)
+                    self.emit("step_reinvocation_returned" if current.role == "step" else "workflow_reinvocation_returned", fields)
+                    if current.role == "step":
+                        self.run_state._recovery_count = 0
+                    return result
+                except (RecoveryTerminated, TraceWriteError):
                     raise
-                reason = error
-                self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": replacement.component_id, **_exception_fields(error)})
+                except UserInterruption as interrupted:
+                    if interrupted.reason == "cancel" or current.role != "step":
+                        raise
+                    try:
+                        return self._resume_step(logical_name, current, inputs, parent_call_id, interrupted)
+                    except GameProcessExited as exited:
+                        error = exited
+                except GameProcessExited as interrupted:
+                    error = interrupted
+                except EnvironmentFailure:
+                    raise
+                except (ExecutionFailure, InputValidationError) as interrupted:
+                    error = interrupted
+                self.emit("step_reinvocation_failed" if current.role == "step" else "workflow_reinvocation_failed",
+                          {**fields, **_exception_fields(error)})
+                self.emit("step_interrupted" if current.role == "step" else "workflow_interrupted",
+                          {**fields, **_exception_fields(error)})
+                recheck, must_agent = False, False
+        finally:
+            if outermost:
+                self._recovery_key = None
 
-    def _replacement_problem(
-        self, original: LoadedComponent, replacement: LoadedComponent | None,
-        candidate: LoadedManifest,
-    ) -> str:
-        """拒绝无法接回原 Step 调用链的整份 Manifest。"""
+    def _end_recovery(self, logical_name, error):
+        """无 Agent 可接续时保留失败归属；重启耗尽终止整个 Run。"""
+        if isinstance(error, GameProcessExited):
+            raise EnvironmentFailure("game_recovery_exhausted", "重启恢复达到上限且 Agent 无法继续。", cause=error) from error
+        self._terminate_anomaly(str(error), logical_name)
+        code = getattr(error, "code", "working_manifest_incompatible" if isinstance(error, InputValidationError) else "execution_failed")
+        raise RecoveryTerminated(code, str(error), cause=error) from error
 
-        if replacement is None or replacement.role != "step":
-            return "Current logical name must still identify a Step."
-        for section in ("recovery_rules",):
-            if candidate.manifest[section] != self.manifest.manifest[section]:
-                return f"Runtime replacement cannot modify {section}."
-        old = inspect.signature(original.module.execute)
-        new = inspect.signature(replacement.module.execute)
-        old_hints = get_type_hints(original.module.execute, globalns=original.module.execute.__globals__)
-        new_hints = get_type_hints(replacement.module.execute, globalns=replacement.module.execute.__globals__)
-        if old_hints["return"] != new_hints["return"]:
-            return "Current Step return contract changed."
-        for name, parameter in list(old.parameters.items())[1:]:
-            updated = new.parameters.get(name)
-            if updated is None or updated.kind != parameter.kind or updated.default != parameter.default or new_hints[name] != old_hints[name]:
-                return f"Current Step parameter changed: {name}."
-        for name, parameter in list(new.parameters.items())[1:]:
-            if name not in old.parameters and (parameter.kind is not inspect.Parameter.KEYWORD_ONLY or parameter.default is inspect.Parameter.empty):
-                return f"New Step parameter must be optional keyword-only: {name}."
-        return ""
-
-    def _recover_step(
-        self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
-        parent_call_id: int | None,
-    ) -> tuple[bool, Any]:
-        """检查公共规则并最多重新调用当前 Step 一次。"""
-
-        matches: list[tuple[str, LoadedComponent]] = []
+    def _recover_rules(self):
+        """完整检测一轮；零匹配不伪称已恢复，多匹配或规则错误交 Agent。"""
+        matches = []
         for name, rule in sorted(self.manifest.recovery_rules.items()):
             try:
                 matched = self._invoke_recovery_rule(name, rule, "detect")
+                if type(matched) is not bool:
+                    raise ExecutionFailure(f"Recovery Rule {name} detect did not return bool.")
+            except (UserInterruption, TraceWriteError, EnvironmentFailure):
+                raise
             except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
-                    raise
                 return False, error
-            if type(matched) is not bool:
-                return False, f"Recovery Rule {name} detect did not return bool."
             if matched:
                 matches.append((name, rule))
         if len(matches) > 1:
-            return False, "Multiple Recovery Rules matched."
-        if matches:
-            name, rule = matches[0]
-            try:
-                recovered = self._invoke_recovery_rule(name, rule, "recover")
-            except Exception as error:
-                if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
-                    raise
-                return False, error
-            if recovered is not None:
-                return False, f"Recovery Rule {name} recover did not return None."
-        current = self.manifest.components[logical_name]
-        self.emit("step_reinvocation_started", {"logical_name": logical_name, "component_id": current.component_id})
+            return False, ExecutionFailure("recovery_rule_ambiguous", "Multiple Recovery Rules matched: " +
+                                           ", ".join(name for name, _ in matches))
+        if not matches:
+            return False, None
+        name, rule = matches[0]
         try:
-            result = self._invoke_component(logical_name, current, _json_copy(inputs), parent_call_id=parent_call_id)
-            original_return = get_type_hints(component.module.execute, globalns=component.module.execute.__globals__)["return"]
-            _normalize_output(result, original_return)
-            self.emit("step_reinvocation_returned", {"logical_name": logical_name, "component_id": current.component_id})
-            return True, result
+            result = self._invoke_recovery_rule(name, rule, "recover")
+            if result is not None:
+                raise ExecutionFailure(f"Recovery Rule {name} recover did not return None.")
+            return True, None
+        except (UserInterruption, TraceWriteError, EnvironmentFailure):
+            raise
         except Exception as error:
-            if isinstance(error, (UserInterruption, TraceWriteError, EnvironmentFailure)):
-                raise
-            self.emit("step_reinvocation_failed", {"logical_name": logical_name, "component_id": current.component_id, **_exception_fields(error)})
             return False, error
 
     def _invoke_recovery_rule(self, name: str, rule: LoadedComponent, phase: str) -> Any:

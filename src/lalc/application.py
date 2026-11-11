@@ -32,6 +32,7 @@ from .runtime import (
     _exception_fields,
     sha256_bytes,
 )
+from .run_context import RunState
 
 
 class StartError(RuntimeError):
@@ -81,6 +82,11 @@ class ApplicationService:
         self._gate: RunGate | None = None
         self._trace_path: Path | None = None
         self._ledger: WorkflowRunLedger | None = None
+        self.agent_secrets: dict[str, str] = {}
+        self.on_runtime_feedback = None
+        self._runtime_chat = None
+        self._runtime_session_key = None
+        self._run_options = {"automatic_repair_default": True}
         self._state: dict[str, Any] = {
             "phase": "idle",
             "paused": False,
@@ -141,12 +147,15 @@ class ApplicationService:
             ]), "logs_trimmed": self._live_logs_trimmed}
 
     @contextmanager
-    def activity(self, name: str):
+    def activity(self, name: str, *, runtime: bool = False):
         """共享宿主排他操作；暂停中的 Run 仍占用执行环境。"""
         with self._condition:
-            if self._activity or self._state["phase"] == "running":
+            if runtime and (name != "Agent" or threading.current_thread() is not self._thread
+                            or self._state["phase"] != "running"):
+                raise StartError("runtime_not_authorized", "Runtime repair belongs to the active Run worker.")
+            if self._activity or self._state["phase"] == "running" and not runtime:
                 raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or '运行'}")
-            if name == "Agent" or name.startswith("Capture"):
+            if not runtime and (name == "Agent" or name.startswith("Capture")):
                 lock = ProcessLock("game")
                 try:
                     lock.acquire()
@@ -175,6 +184,8 @@ class ApplicationService:
     def start(
         self, logical_name: str | None, inputs: dict[str, Any], *, manifest_id: str | None = None,
         _developer_trial: bool = False,
+        use_saved_config: bool = True, task_repetitions: dict[str, int] | None = None,
+        settings: dict[str, Any] | None = None,
     ) -> int:
         """同步校验启动请求，再在单一后台线程执行已捕获的 Manifest。"""
 
@@ -196,18 +207,35 @@ class ApplicationService:
             if component is None:
                 raise StartError("entry_not_found", f"Unknown runnable Component: {logical_name}")
             try:
+                if type(use_saved_config) is not bool:
+                    raise InputValidationError("use_saved_config must be a boolean")
+                if use_saved_config:
+                    from .user_pages import UserSettings
+                    saved = UserSettings(self.data_root).value
+                    task_repetitions = {name: item["count"] if item["enabled"] else 0
+                                        for name, item in saved["tasks"].items()}
+                    settings = saved["pages"]
+                run_state = RunState(task_repetitions, settings)
                 normalized_inputs = WorkflowExecutor.prepare_inputs(component, inputs)
+                from .agent_settings import settings_document
+                options = settings_document(self.data_root)
             except (InputValidationError, TypeError, ValueError) as error:
                 raise StartError("inputs_invalid", str(error)) from error
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
             if _developer_trial:
                 entry["developer_trial"] = True
-            run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs)
+            run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs, run_state, use_saved_config)
+            self._run_options = options
+            self._runtime_allowed = options["user_enabled"] and not _developer_trial
+            self._runtime_chat = None
+            self._runtime_session_key = None
+            self._runtime_remaining = None
 
             self._thread = threading.Thread(
                 target=self._worker,
-                args=(self._run, snapshot, logical_name, component.component_id, normalized_inputs, gate),
+                args=(self._run, snapshot, logical_name, component.component_id, normalized_inputs, gate,
+                      run_state, options),
                 name=f"lalc-run-{run_id}",
                 daemon=True,
             )
@@ -219,10 +247,11 @@ class ApplicationService:
         self, *, manifest_id: str | None = None,
         task_repetitions: dict[str, int] | None = None,
         settings: dict[str, Any] | None = None, _developer_trial: bool = False,
+        use_saved_config: bool = True,
     ) -> int:
         """只启动已发布 Manifest 的唯一 Python Plan，冻结两份输入快照。"""
-        return self.start(None, {"task_repetitions": task_repetitions if task_repetitions is not None else {},
-                                 "settings": settings if settings is not None else {}},
+        return self.start(None, {}, task_repetitions=task_repetitions, settings=settings,
+                          use_saved_config=use_saved_config,
                           manifest_id=manifest_id, _developer_trial=_developer_trial)
 
     def connect(self) -> dict[str, Any]:
@@ -480,7 +509,8 @@ class ApplicationService:
         return application_event_totals(self.data_root)
 
     def _begin_run(
-        self, manifest: LoadedManifest, entry: dict[str, Any], inputs: dict[str, Any]
+        self, manifest: LoadedManifest, entry: dict[str, Any], inputs: dict[str, Any],
+        run_state: RunState, use_saved_config: bool,
     ) -> tuple[int, LoadedManifest, RunGate]:
         """为直接运行与 Plan 建立同一个持久 Run 边界。"""
 
@@ -492,7 +522,7 @@ class ApplicationService:
                 raise StartError("activity_busy", "另一进程正在使用游戏环境。") from error
             self._run_lock = lock
         try:
-            return self._establish_run(manifest, entry, inputs)
+            return self._establish_run(manifest, entry, inputs, run_state, use_saved_config)
         except BaseException:
             self._release_run_lock()
             raise
@@ -502,7 +532,7 @@ class ApplicationService:
             self._run_lock.release()
             self._run_lock = None
 
-    def _establish_run(self, manifest, entry, inputs):
+    def _establish_run(self, manifest, entry, inputs, run_state, use_saved_config):
         """已获得游戏排他后建立 Run；失败由调用方释放锁。"""
         run_id = self._allocate_run_id()
         snapshot = _manifest_snapshot(manifest)
@@ -523,11 +553,13 @@ class ApplicationService:
             base_manifest_id=snapshot.manifest_id,
             working_manifest_id=snapshot.manifest_id,
             attempted_manifest_ids=[snapshot.manifest_id], run_id=run_id,
-            entry=entry, result=None, trace=[],
+            entry=entry, result=None, trace=[], default_update=None,
         )
         try:
             self._persist_working_locked()
-            self._record_locked("run_started", {**entry, "base_manifest_id": snapshot.manifest_id, "game_language": self.game_language, "inputs": deepcopy(inputs)})
+            self._record_locked("run_started", {**entry, "base_manifest_id": snapshot.manifest_id,
+                                "game_language": self.game_language, "inputs": deepcopy(inputs),
+                                "run_state": run_state.snapshot(), "use_saved_config": use_saved_config})
         except TraceWriteError as error:
             self._state.update(phase="idle", base_manifest_id=None, working_manifest_id=None, attempted_manifest_ids=[], run_id=None, entry=None, trace=[])
             self._gate = None
@@ -566,6 +598,10 @@ class ApplicationService:
             self._state["paused"] = False
             self._state["pause_info"] = None
             self._record_locked("run_cancel_requested", {})
+            task = getattr(self, "_runtime_task", None)
+            loop = getattr(self, "_runtime_loop", None)
+            if task is not None and loop is not None:
+                loop.call_soon_threadsafe(task.cancel)
 
     def shutdown(self) -> None:
         """应用退出时请求协作式停止，并等运行线程完成输入释放和最终记录。"""
@@ -643,6 +679,8 @@ class ApplicationService:
         component_id: str,
         inputs: dict[str, Any],
         gate: RunGate,
+        run_state: RunState,
+        options: dict[str, Any],
     ) -> dict[str, Any]:
         component = manifest.components[logical_name]
         assert component.component_id == component_id
@@ -659,7 +697,11 @@ class ApplicationService:
             game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
             ocr=self._ocr,
             task_finished=self._finish_plan_task,
+            run_state=run_state, recovery_limit=options["recovery_limit"],
         )
+        self._active_executor = executor
+        if self._runtime_allowed:
+            executor.repair = self._runtime_repair
         started = time.monotonic()
         started_at = datetime.now(UTC).isoformat()
         try:
@@ -719,6 +761,52 @@ class ApplicationService:
                 result["reason"] = result["failure_code"]
         return result
 
+    def _runtime_repair(self, context):
+        """在父 Run 的线程与活动所有权内复用标准 Repair Session。"""
+        import asyncio
+        from types import SimpleNamespace
+        from .developer_session import DeveloperSession
+        from .agent_settings import load_settings, FIELDS
+        context = {"run_id": self._state["run_id"], **context}
+        if context["recovery_id"] != self._runtime_session_key:
+            session = DeveloperSession.create(self, context["manifest_id"], entry="runtime")
+            session.host.secrets = self.agent_secrets
+            self._runtime_chat = session.conversation()
+            self._runtime_session_key = context["recovery_id"]
+            self._runtime_remaining = load_settings(self.data_root, side="user")["max_requests"]
+        chat = self._runtime_chat
+        if self._runtime_remaining <= 0:
+            return None
+        self._active_executor.run_state._recovery_count = 0
+        self._emit("agent_invoked", {"session_id": chat.session.identity, **context})
+        chat.tools.run_state = self._active_executor.run_state
+        chat.tools.runtime_gate = self._gate
+        settings = load_settings(self.data_root, side="user")
+        arguments = SimpleNamespace(**{field: settings[field] for field in FIELDS}, ask_api_key=False, pi="pi")
+        prompt = ("Runtime 修复：仅修复当前失败入口，保留原调用者。完成后先填写修复说明并 Publish，"
+                  "再调用 recheck(manifest_id) 交还执行权；无须输出成功声明或独立试运行。\n"
+                  + json.dumps(context, ensure_ascii=False))
+
+        async def run_round():
+            self._runtime_loop = asyncio.get_running_loop()
+            self._runtime_task = asyncio.current_task()
+            try:
+                return await chat.run(prompt, arguments, request_limit=self._runtime_remaining,
+                                      on_feedback=self.on_runtime_feedback)
+            finally:
+                self._runtime_task = None
+
+        try:
+            result = asyncio.run(run_round())
+        finally:
+            self._runtime_loop = None
+        self._runtime_remaining -= result.get("requests", 0)
+        self._emit("runtime_agent_result", {"session_id": chat.session.identity,
+                   "round": result.get("round"), "recovery_id": context["recovery_id"],
+                   "requests_remaining": self._runtime_remaining, "result": result})
+        self._gate.checkpoint()
+        return result.get("manifest_id") if result.get("status") == "recheck" else None
+
     def _finish_plan_task(self, event, result, duration):
         """按实际动态 Task 调用收尾 Ledger；故障必须中断 Plan。"""
         assert self._ledger is not None
@@ -744,12 +832,26 @@ class ApplicationService:
                               "status": "failure", "failure_code": "trace_write_failed",
                               "failure_message": str(error), **_exception_fields(error)}
                 result["previous_result"] = previous
+            update = None
+            normal = result.get("status") in {"success", "completed"} and not result.get("fatal")
+            if (normal and self._run_options["automatic_repair_default"]
+                    and self._state["working_manifest_id"] != self._state["base_manifest_id"]
+                    and self._state["working_manifest_id"] != self.manifest_manager.default_manifest_id()):
+                selected = self.manifest_manager.set_default(self._state["working_manifest_id"])
+                update = {"status": "changed" if selected.ok else "failed",
+                          "manifest_id": self._state["working_manifest_id"],
+                          "errors": [error.as_dict() for error in selected.errors]}
+            self._state["default_update"] = update
             self._release_run_lock()
             self._state.update(phase="finished", paused=False, pause_info=None, resume_pending=False,
                                default_manifest_id=self.manifest_manager.default_manifest_id(), result=result)
             self._focused_session = None
             self._input_session = None
             self._gate = None
+            self._active_executor = None
+            if self._runtime_chat is not None:
+                self._runtime_chat.tools.run_state = None
+                self._runtime_chat.tools.runtime_gate = None
             self._changed_locked()
 
     def _emit(self, event: str, fields: dict[str, Any]) -> None:

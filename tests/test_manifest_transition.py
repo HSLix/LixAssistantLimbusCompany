@@ -99,7 +99,7 @@ def execute(ctx) -> int:
     assert window.captures == 0  # 启动会话不代替 Component 决定何时截图。
     plan_window = FakeWindow()
     plan_service = ApplicationService(manager.data_root, manifest_manager=manager, window_platform=plan_window)
-    plan_run = plan_service.start_plan( manifest_id=saved.manifest_id)
+    plan_run = plan_service.start_plan(use_saved_config=False,  manifest_id=saved.manifest_id)
     done = plan_service.wait_for(lambda s: s["run_id"] == plan_run and s["phase"] == "finished")
     assert done["result"]["status"] == "completed"
     assert plan_window.focus_calls == 1 and plan_window.backend.closed

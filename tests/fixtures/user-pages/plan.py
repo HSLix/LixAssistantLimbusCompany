@@ -6,7 +6,7 @@ SUPPORTED_TASK_IDS = ["sample.loop"]
 
 
 @automation_plan
-def execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:
-    for _ in range(task_repetitions.get("sample.loop", 0)):
-        ctx.call("tasks.message", message=settings["sample.general"]["prefix"] + settings["sample.message"]["message"])
+def execute(ctx) -> None:
+    for _ in range(ctx.run_state.task_repetitions.get("sample.loop", 0)):
+        ctx.call("tasks.message", message=ctx.run_state.settings["sample.general"]["prefix"] + ctx.run_state.settings["sample.message"]["message"])
     return None

@@ -258,7 +258,7 @@ def test_trial_stop_or_round_cancel_waits_for_cleanup(conversation, monkeypatch,
     chat, options, state = conversation
     entered, cleaned = threading.Event(), threading.Event()
     identity = chat.host.manager.default_manifest_id()
-    def run(_manifest, _name, _component, _inputs, gate):
+    def run(_manifest, _name, _component, _inputs, gate, _run_state, _options):
         gate.pause()
         entered.set()
         try:

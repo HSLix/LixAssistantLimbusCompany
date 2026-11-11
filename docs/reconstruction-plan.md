@@ -178,7 +178,9 @@ Stage 5 六票已发布：[#335](https://github.com/HSLix/LixAssistantLimbusComp
 
 ## Stage 6（原 Stage 3.5）：Runtime Agent Maintenance
 
-**状态：延期至 Stage 6 已确认；新增设计、名称与验收目标待讨论。**
+2026-11-11：本阶段关键设计已逐项确认并完成[影响审查](stage-6-design-impact-review.md)，目标契约见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)及 [ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文候选与开放问题保留为原规划输入，不能把已确认事项再次视为待定；已获开发者授权并完成本地实施，未创建 tickets；证据见[实施记录](stage-6-implementation.md)。
+
+**状态：Stage 6 已完成本地实施；Windows、真实模型及游戏尚未验收。**
 
 原 Runtime Agent Session、自动异常接管、监督运行/审批、Working Manifest 试跑、暂停 Step 续接等设计，保留在[原运行时设计文档](stage-3.5-agent-runtime-step-recovery-and-maintenance.md)。ADR 0025 的排期由本次确认更新，既有契约不被 AI 草案覆盖。
 

@@ -77,6 +77,9 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("logical_name")
     run.add_argument("--manifest")
     run.add_argument("--language", default="en", help="Running game language (default: en)")
+    run.add_argument("--use-saved-config", action=argparse.BooleanOptionalAction, default=True,
+                     help="Use saved page settings and task counts (default: true)")
+    run.add_argument("--run-state", help="JSON with task_repetitions/settings; used with --no-use-saved-config")
     inputs = run.add_mutually_exclusive_group()
     inputs.add_argument("--inputs")
     inputs.add_argument("--inputs-file", type=Path)
@@ -86,6 +89,8 @@ def _parser() -> argparse.ArgumentParser:
     plan_inputs.add_argument("--inputs-file", type=Path)
     plan.add_argument("--manifest")
     plan.add_argument("--language", default="en", help="Running game language (default: en)")
+    plan.add_argument("--use-saved-config", action=argparse.BooleanOptionalAction, default=True,
+                      help="Use saved page settings and task counts (default: true)")
     listing = commands.add_parser("list-manifests")
     listing.add_argument("-n", type=int, default=9)
     default = commands.add_parser("set-default")
@@ -158,10 +163,14 @@ def _run(args: argparse.Namespace, manager: ManifestManager, data_root: Path) ->
             inputs = _read_inputs(args)
             if set(inputs) - {"task_repetitions", "settings"}:
                 raise ValueError("Plan inputs may contain only task_repetitions and settings.")
-            run_id = service.start_plan(**inputs, manifest_id=args.manifest)
+            run_id = service.start_plan(**inputs, manifest_id=args.manifest, use_saved_config=args.use_saved_config)
         else:
             inputs = _read_inputs(args)
-            run_id = service.start(args.logical_name, inputs, manifest_id=args.manifest)
+            configuration = json.loads(args.run_state) if args.run_state else {}
+            if type(configuration) is not dict or configuration.keys() - {"task_repetitions", "settings"}:
+                raise ValueError("run-state accepts only task_repetitions and settings")
+            run_id = service.start(args.logical_name, inputs, manifest_id=args.manifest,
+                                   use_saved_config=args.use_saved_config, **configuration)
         try:
             while True:
                 state = service.wait_for(lambda current: current["run_id"] == run_id and (

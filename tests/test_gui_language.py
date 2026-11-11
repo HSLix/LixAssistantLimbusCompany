@@ -67,7 +67,8 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
     user = owner.user
     game_language = owner.service.game_language
     developer = owner.open_window(True)
-    assert not user.agent_controls.isEnabled()
+    assert user.agent_controls.isEnabled()
+    assert not user.settings_page.isEnabled()
     assert user.language_choice.isEnabled()
     assert not hasattr(developer, "language_choice")
     before = user.start_button.text()

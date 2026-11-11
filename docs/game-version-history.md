@@ -1,5 +1,7 @@
 # 游戏版本与 Agent 历史
 
+2026-11-11：Stage 6 已接受 Runtime 使用同一历史只读核心；Developer GUI 新增全模式历史检索总开关，默认开启、下一轮生效，关闭同时限制搜索和详情读取，不停止版本观测与日志留存。已完成本地接入，见[Stage 6 实施记录](stage-6-implementation.md)。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 GUI Construct / Repair、CLI Repair 每次提交消息开始一轮时观测一次；连接 / 模型 / GUI 错误诊断在独立日志开始时观测一次。不要求游戏运行，不启动或激活游戏。打开 / 恢复 Session 本身不观测、不更新历史时间。
 
 ## 路径与依赖

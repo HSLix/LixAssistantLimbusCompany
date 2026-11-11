@@ -7,6 +7,8 @@ supersedes: 0029 (Agent shared Candidate and conversation reset lifecycle), 0032
 
 # 统一 Agent 工作台、独立开发 Session 与人工页面安装
 
+2026-11-11 局部替代：Runtime 使用现有 Repair Session 并可在 Run 后通过 Developer GUI 接续，按入口配权限；Runtime 只读知识库／Skills、全模式历史开关及人工反馈开关按新规格接入。开发页面安装审批和 Runtime 无删除权限保留。 见 [ADR 0040](0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)。下文保留原决定，不代表新设计已实现。
+
 2026-10-31 经逐项 grill 确认，开发者授权开始设计影响审查。本文按最终决定重写，替代 2026-10-30 双页面与独立进程预览、以及本日早先双入口共享 Candidate 的方案；其余旧 ADR 仅在本声明涉及范围内被替代，历史实现证据不改写。
 
 ## 决定与取舍

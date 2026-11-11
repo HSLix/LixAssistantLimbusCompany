@@ -74,7 +74,7 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
         '    ctx.log("已选中 Drive", level="WARNING", screenshot=True)\n'
         '    ctx.log("无需点击", screenshot=True)\n')
     if plan:
-        run = service.start_plan(manifest_id=manifest)
+        run = service.start_plan(use_saved_config=False, manifest_id=manifest)
     else:
         run = service.start('tasks.drive', {}, manifest_id=manifest)
     state = finish(service, run)

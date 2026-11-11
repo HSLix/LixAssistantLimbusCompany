@@ -93,7 +93,7 @@ def test_stop_and_round_cancel_wait_for_trial_completion(tmp_path, monkeypatch, 
     entered = threading.Event()
     cleaned = threading.Event()
     tools = host.conversation.tools
-    def run(_manifest, _name, _component, _inputs, gate):
+    def run(_manifest, _name, _component, _inputs, gate, _run_state, _options):
         gate.pause()
         entered.set()
         try:
@@ -148,7 +148,7 @@ def test_log_evidence_is_bound_to_run_and_missing_is_explicit(tmp_path):
 def test_trial_log_failure_does_not_leave_game_running(tmp_path, monkeypatch):
     host, saved = host_for(tmp_path)
     tools = host.conversation.tools
-    def run(_manifest, _name, _component, _inputs, gate):
+    def run(_manifest, _name, _component, _inputs, gate, _run_state, _options):
         gate.pause()
         try:
             gate.checkpoint()

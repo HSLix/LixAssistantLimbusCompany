@@ -24,7 +24,7 @@ def test_empty_initial_plan_publishes_and_runs(tmp_path):
     assert saved.ok, saved.errors
     assert manager.default_manifest_id() is None
     service = ApplicationService(manager.data_root, manifest_manager=manager)
-    result = _finished(service, service.start_plan(manifest_id=saved.loaded.manifest_id))['result']
+    result = _finished(service, service.start_plan(use_saved_config=False, manifest_id=saved.loaded.manifest_id))['result']
     assert result['status'] == 'completed' and result['all_tasks_succeeded']
     assert result['items'] == [] and result['output'] is None
 
@@ -55,7 +55,7 @@ def test_legacy_saved_manifest_and_arbitrary_path_are_rejected_without_run(tmp_p
     before = path.read_bytes()
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with pytest.raises(StartError, match='incompatible'):
-        service.start_plan()
+        service.start_plan(use_saved_config=False, )
     with pytest.raises(TypeError):
         service.start_plan(tmp_path / 'plan.py')
     assert service.state['run_id'] is None
@@ -78,14 +78,14 @@ def test_plan_cannot_bypass_task_or_literal_call_boundary(tmp_path, body):
 
 
 def test_plan_input_snapshot_and_business_output_do_not_replace_statistics(tmp_path):
-    manager = _publish(tmp_path, plan_body='    settings["page"]["items"].append("local")\n    ctx.call("tasks.double", value=1)\n    return {"items": [], "status": "fake", "configuration": settings}\n')
+    manager = _publish(tmp_path, plan_body='    ctx.run_state.settings["page"]["items"].append("local")\n    ctx.call("tasks.double", value=1)\n    return {"items": [], "status": "fake", "configuration": ctx.run_state.settings}\n')
     path = tmp_path / 'candidate-0/plan.py'
     path.write_text(path.read_text().replace('-> None:', '-> Any:'))
     saved = manager.publish(path.parent / 'manifest.json')
     assert saved.ok, saved.errors
     service = ApplicationService(tmp_path, manifest_manager=manager)
     settings = {'page': {'items': [1, True, None, {'nested': 1.5}]}}
-    result = _finished(service, service.start_plan(manifest_id=saved.loaded.manifest_id, settings=settings))['result']
+    result = _finished(service, service.start_plan(use_saved_config=False, manifest_id=saved.loaded.manifest_id, settings=settings))['result']
     assert settings['page']['items'] == [1, True, None, {'nested': 1.5}]
     assert result['status'] == 'completed' and len(result['items']) == 1
     assert result['output']['status'] == 'fake' and result['output']['items'] == []
@@ -101,15 +101,15 @@ def test_invalid_plan_inputs_do_not_allocate_run(tmp_path, inputs):
     manager = _publish(tmp_path)
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with pytest.raises(StartError) as raised:
-        service.start_plan(**inputs)
+        service.start_plan(use_saved_config=False, **inputs)
     assert raised.value.code == 'inputs_invalid'
     assert service.state['run_id'] is None
 
 
 def test_repetitions_continue_after_task_failures(tmp_path):
-    manager = _publish(tmp_path, plan_body='    for _ in range(task_repetitions["sample"]):\n        ctx.call("tasks.double", value=-1)\n')
+    manager = _publish(tmp_path, plan_body='    for _ in range(ctx.run_state.task_repetitions["sample"]):\n        ctx.call("tasks.double", value=-1)\n')
     service = ApplicationService(tmp_path, manifest_manager=manager)
-    result = _finished(service, service.start_plan(task_repetitions={'sample': 3}))['result']
+    result = _finished(service, service.start_plan(use_saved_config=False, task_repetitions={'sample': 3}))['result']
     assert result['status'] == 'completed' and not result['all_tasks_succeeded']
     assert len(result['items']) == 3
     assert all(i['failure_code'] == 'execution_failed' for i in result['items'])
@@ -118,7 +118,7 @@ def test_repetitions_continue_after_task_failures(tmp_path):
 def test_plan_error_keeps_previous_task_output_and_ledger(tmp_path):
     manager = _publish(tmp_path, plan_body='    ctx.call("tasks.double", value=1)\n    raise ValueError("plan failed")\n    ctx.call("tasks.double", value=2)\n')
     service = ApplicationService(tmp_path, manifest_manager=manager)
-    result = _finished(service, service.start_plan())['result']
+    result = _finished(service, service.start_plan(use_saved_config=False, ))['result']
     assert result['status'] == 'interrupted' and result['reason'] == 'execution_failed'
     assert len(result['items']) == 1 and result['items'][0]['output'] == 2
     assert 'plan failed' in result['traceback'] and 'output' not in result
@@ -133,7 +133,7 @@ def test_environment_failure_ends_plan_without_task_recovery(tmp_path, monkeypat
     execute.__lalc_role__ = 'step'
     monkeypatch.setattr(manager.default.components['steps.double'].module, 'execute', execute)
     service = ApplicationService(tmp_path, manifest_manager=manager)
-    state = _finished(service, service.start_plan())
+    state = _finished(service, service.start_plan(use_saved_config=False, ))
     assert state['result']['status'] == 'interrupted'
     assert state['result']['reason'] == 'environment_unavailable'
     assert len(state['result']['items']) == 1
@@ -147,7 +147,7 @@ def test_published_plan_hash_is_checked_before_start(tmp_path):
     source.write_text(source.read_text() + '\n# tampered\n')
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with pytest.raises(StartError):
-        service.start_plan()
+        service.start_plan(use_saved_config=False, )
     assert service.state['run_id'] is None
 
 
@@ -164,7 +164,7 @@ def test_agent_cannot_create_an_additional_plan(tmp_path):
 
 def test_later_task_missing_from_working_manifest_is_recorded_as_task_failure(tmp_path):
     from test_plan import STEP
-    broken = STEP.replace('if calls == 1:', 'if True:')
+    broken = STEP.replace('    return value * 2', '    raise ExecutionFailure("broken")')
     manager = _publish(tmp_path, step_source=broken)
     first = manager.default.manifest_id
     replacement = STEP.replace('if calls == 1:', 'if False:')
@@ -179,7 +179,7 @@ def test_later_task_missing_from_working_manifest_is_recorded_as_task_failure(tm
     choices = iter([saved.loaded.manifest_id])
     service = ApplicationService(tmp_path, manifest_manager=manager,
                                  recovery_choice=lambda *_: next(choices, None))
-    result = _finished(service, service.start_plan(manifest_id=first))['result']
+    result = _finished(service, service.start_plan(use_saved_config=False, manifest_id=first))['result']
     assert result['status'] == 'completed'
     assert [i['result'] for i in result['items']] == ['success', 'failure']
     assert result['items'][1]['failure_code'] == 'working_manifest_incompatible'
@@ -198,7 +198,7 @@ def test_cancellation_before_task_entry_creates_no_task_result(tmp_path, monkeyp
         return invoke(self, name, component, arguments, **kwargs)
     monkeypatch.setattr(WorkflowExecutor, "_invoke_component", cancel_before_entry)
     service = ApplicationService(tmp_path, manifest_manager=manager)
-    result = _finished(service, service.start_plan())["result"]
+    result = _finished(service, service.start_plan(use_saved_config=False, ))["result"]
     assert result["reason"] == "user_cancelled" and result["items"] == []
     assert service.ledger_records() == []
 

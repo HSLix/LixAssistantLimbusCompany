@@ -3,5 +3,5 @@ from typing import Any
 from lalc import automation_plan
 
 @automation_plan
-def execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:
+def execute(ctx) -> None:
     return None

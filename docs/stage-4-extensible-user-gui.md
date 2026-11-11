@@ -1,5 +1,7 @@
 # Stage 4 — Extensible User GUI and Python Plan
 
+2026-11-11 Stage 6 后续契约已接受：Plan 配置参数迁入 ctx.run_state，不保留旧签名兼容层；Plan 自身调度失败可在同一 Run 修复重调；User GUI 新增恢复上限、“运行成功后自动使用修复版本” 和人工反馈选项。下文 Stage 4 的旧入口、Plan 错误直接结束及人工 Default 交互保留为该阶段实现记录，不作为阻止 Stage 6 的现行限制。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。
 
 
@@ -148,9 +150,9 @@ Stage 6 才在 User Agent 已启用时，对 Plan 自身故障最终触发一次
 
 同轮确认：首次迁移保留现有 provider 的完整设置和凭据引用，User/Developer 初始均选用该 provider，User Agent 开关默认关闭；Developer 不受该开关影响。另一 provider 尚无完整保存内容时使用现有默认值，之后独立保存；不声称能够恢复旧文件从未保留的另一 provider 参数。
 
-同轮追加 grill：Developer GUI 打开期间，User GUI 的 Agent Settings 暂时不可用/不可编辑；Developer GUI 关闭后恢复。采用单一编辑入口避免双侧同时编辑共享配置，不建设双表单字段合并或同字段冲突选择机制。其他普通配置不因该编辑权限制而整体禁用。
+2026-11-11 修订：Developer GUI 打开期间，User GUI 的“启用 User Agent”开关仍可操作并立即保存；仅具体 Agent 配置表单（含 provider 选择、连接、模型、凭据和高级参数）不可编辑，Developer GUI 关闭后恢复。采用单一编辑入口避免双侧同时编辑共享配置，不建设双表单字段合并或同字段冲突选择机制。其他普通配置不因该编辑权限制而整体禁用。
 
-追加确认：从 User 打开或转交打开 Developer 前，先提交并保存 User 当前 Agent 输入（不因文本格式无效阻止交接）；失败则明确提示，暂不打开 Developer。保存成功后才打开 Developer 并禁用 User Agent 设置；Developer 关闭后恢复 User 编辑前重新读取最新共享值。禁用的旧 User 表单不参与后续配置回写。
+追加确认：从 User 打开或转交打开 Developer 前，先提交并保存 User 当前 Agent 输入（不因文本格式无效阻止交接）；失败则明确提示，暂不打开 Developer。保存成功后才打开 Developer 并禁用 User Agent 具体配置表单（不禁用启用开关）；Developer 关闭后恢复 User 编辑前重新读取最新共享值。禁用的旧 User 表单不参与后续配置回写。
 
 追加确认：Developer Agent Settings 也采用即时保存，替代手动点击保存按钮；编辑框失焦时保存；Agent 文本格式在使用前校验，选择项变更立即保存。尽量复用已有通用 GUI 交互组件、设置字段与保存逻辑，不为 User/Developer 分别创造重复组件。保存失败须明确呈现，不得将未保存输入显示为已保存。
 

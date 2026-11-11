@@ -242,8 +242,14 @@ class RepairConversation:
         self.session = session
         self.entry = entry
         self.mode = session.mode if session else "Repair"
-        self.allowed = allowed_tools(self.mode, entry)
+        from .agent_settings import settings_document
+        options = settings_document(host.service.data_root)
+        self.allowed = allowed_tools(self.mode, entry, history_enabled=options["history_enabled"],
+                                     runtime_feedback_enabled=options["runtime_feedback_enabled"])
         self.system_prompt = system_prompt(self.mode)
+        if entry == "runtime":
+            from .agent_prompts import RUNTIME_GUIDANCE
+            self.system_prompt += "\n" + RUNTIME_GUIDANCE
         self.log = RepairLog(host.service.data_root, path=session.path / "log" if session else None,
                              identity=session.identity if session else None)
         self.history = []
@@ -263,14 +269,18 @@ class RepairConversation:
             "开发者执行完整校验：" + json.dumps(result, ensure_ascii=False)}], "timestamp": int(datetime.now().timestamp() * 1000)})
         self.log.save_json("context.json", self.history)
 
-    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None, on_page_preview=None):
+    async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None, on_page_preview=None,
+                  request_limit=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
-        with self.host.candidate_lock(), self.host.service.activity("Agent"):
+        with self.host.candidate_lock(), self.host.service.activity("Agent", runtime=self.entry == "runtime"):
             if self.session:
                 self.session.restore(self)
             if self.session and self.mode != self.session.mode:
                 raise ValueError("Session 模式不能改变。")
-            self.allowed = allowed_tools(self.mode, self.entry)
+            from .agent_settings import settings_document
+            options = settings_document(self.host.service.data_root)
+            self.allowed = allowed_tools(self.mode, self.entry, history_enabled=options["history_enabled"],
+                                         runtime_feedback_enabled=options["runtime_feedback_enabled"])
             self.tools.allowed = frozenset(self.allowed)
             references = list(dict.fromkeys(manifest_references))
             for identity in references:
@@ -306,6 +316,7 @@ class RepairConversation:
             tools.on_feedback = on_feedback
             tools.on_page_preview = on_page_preview
             tools.cancelled.clear()
+            tools.requested_manifest_id = None
             tools.created_files.clear()
             tools.knowledge.begin_round()
             prior_history = list(self.history)
@@ -344,6 +355,8 @@ class RepairConversation:
                 stage = "settings"
                 settings, actual_key = settings_snapshot(args, self.host.service.data_root,
                                                          temporary_keys=self.host.secrets, key=key)
+                if request_limit is not None:
+                    settings["max_requests"] = min(settings["max_requests"], request_limit)
                 context["settings"] = settings
                 options = SimpleNamespace(**vars(args))
                 for field, value in settings.items():
@@ -352,7 +365,7 @@ class RepairConversation:
                 self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                     "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 submitted = True
-                input_record = {"policy": "developer", "prompt": prompt, "settings": settings,
+                input_record = {"policy": "runtime" if self.entry == "runtime" else "developer", "prompt": prompt, "settings": settings,
                                     "game_version_observation": observation,
                                     "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "mode": self.mode, "entry": self.entry,
@@ -447,7 +460,10 @@ class RepairConversation:
                                 await send({"type": "extension_ui_response", "id": item["id"], "value": value})
                                 stage = "agent"
                             elif kind == "agent_settled":
-                                if last.get("stopReason") != "stop":
+                                if tools.requested_manifest_id is not None:
+                                    result = {"status": "recheck", "reason": "executor_handoff",
+                                              "manifest_id": tools.requested_manifest_id}
+                                elif last.get("stopReason") != "stop":
                                     error = model_error(last, "provider_request", self.log.requests, settings["max_requests"], self.log.transport_error)
                                     reason = error.evidence["failure_code"]
                                     result = {"status": "incomplete", "reason": reason, "answer": last}

@@ -31,6 +31,15 @@ MODE_PROMPTS = {
     "Repair": "# Mode: Repair\n聚焦 Workflow / Asset 的故障定位和修复，使用当前启用的工具。",
 }
 
+RUNTIME_GUIDANCE = """# Runtime 修复入口
+本轮由当前 Run 的故障触发，使用同一 Repair Session。只修复证据支持的问题，非必要不修改调用约定。
+Plan 的 execute 仅接收 ctx；配置和运行进度从 ctx.run_state.task_repetitions / settings 读取，业务代码可修改，框架恢复计数只读。
+read_run_state 只供查看，Agent 无直接修改状态权限。不可变历史源码可参考，修改仅在本 Session Candidate。
+修改后完整 Validate，publish(summary="简述本次修复问题") 保存版本，再 recheck(manifest_id) 交回 Runtime。
+recheck 是终结式交接，之后不得继续工具调用；它不声明运行成功。Runtime 仅重调当前失败入口，不提供独立 trial_run。
+规则歧义、失败及再次执行结果由程序组织为后续反馈；同一恢复过程共用模型请求额度。
+"""
+
 SKILL_GUIDANCE = """# Skills 使用规则
 目录仅展示 Skill 名称、description 和路径，正文通过 read 按需读取，引用相对路径以该 Skill 所在目录为基准。
 本轮使用某个 Skill 前必须读取本轮目录中的版本，即使历史中已读取；旧读取内容只作为当时依据，旧路径不代表当前可用。

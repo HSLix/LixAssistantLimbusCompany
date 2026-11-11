@@ -1,5 +1,7 @@
 # 游戏重启与内置崩溃恢复
 
+2026-11-11 后续替代：Stage 6 将内置崩溃恢复纳入统一连续恢复计数（默认上限 10），取消每 Run 自动重启一次的独立限制；Step 返回或 Agent 介入清零，重启失败仍属不可继续环境故障。下文实施及测试记录对应旧实现；统一计数已完成本地迁移，重启耗尽且 Agent 无法介入时终止整个 Run，见[Stage 6 实施记录](stage-6-implementation.md)。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。
+
 ## 2026-11-07 已确认决定
 
 - 新增应用登记的 control Trusted Action `control.restart_game`，按已保存的 Steam 客户端路径及库配置定位 Limbus 可执行文件。
