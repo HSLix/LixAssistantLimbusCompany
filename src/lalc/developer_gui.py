@@ -1164,6 +1164,11 @@ class RepairPage(QWidget):
         self.mode_badge = QLabel()
         title_row.addWidget(self.mode_badge)
         body.addLayout(title_row)
+        self.session_uuid = QLabel()
+        self.session_uuid.setTextFormat(Qt.TextFormat.PlainText)
+        self.session_uuid.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.session_uuid.hide()
+        body.addWidget(self.session_uuid)
         self.source_panel = QWidget()
         source_layout = QHBoxLayout(self.source_panel)
         source_layout.setContentsMargins(0, 0, 0, 0)
@@ -1448,40 +1453,9 @@ class RepairPage(QWidget):
         self.update_source()
 
     def saved_title(self, path):
-        """只读首条用户消息；忙会话使用已有缓存，不阻塞或恢复执行。"""
-        from .developer_session import DeveloperSession
-        from .agent_log import read_events
-        events = path / 'log' / 'events.jsonl'
-        if (path / 'log').is_symlink() or events.is_symlink():
-            raise ValueError('Session log symlink')
-        session = DeveloperSession(self.window.service, path.name, entry='gui')
-        with session.host.candidate_lock():
-            metadata = json.loads((path / 'session.json').read_text(encoding='utf-8'))
-            if 'title' in metadata:
-                title = metadata['title']
-                if not isinstance(title, str) or not title.strip() or '\n' in title or '\r' in title:
-                    raise ValueError('Invalid Session title')
-                self.titles[path.name] = (title[:39] + '…' if len(title) > 40 else title, title)
-                return self.titles[path.name]
-            if path.name in self.titles:
-                return self.titles[path.name]
-            if not events.exists():
-                return '', ''
-            for row in read_events(events):
-                if not isinstance(row, dict) or not isinstance(row.get('event'), dict):
-                    raise ValueError('Invalid Session event')
-                value = row['event']
-                if value.get('type') == 'session_message' and (not isinstance(value.get('message'), dict)
-                        or not isinstance(value['message'].get('content'), list)
-                        or any(not isinstance(part, dict) for part in value['message']['content'])):
-                    raise ValueError('Invalid Session message')
-                if value.get('type') == 'session_message' and value['message'].get('role') == 'user':
-                    text = '\n'.join(part.get('text', '') for part in value['message'].get('content', []) if part.get('type') == 'text')
-                    title = chat_title(text)
-                    if title[0]:
-                        self.titles[path.name] = title
-                        return title
-        return '', ''
+        """复用只读标题解析；忙会话由列表刷新使用已有缓存。"""
+        from .developer_session import saved_session_title
+        return saved_session_title(path, self.titles)
 
     def open_session_menu(self, identity, position):
         """菜单开启和执行都检查忙状态，避免对话框期间活动变化绕过门槛。"""
@@ -1596,6 +1570,8 @@ class RepairPage(QWidget):
                     self.history.setCurrentItem(item)
         if self.session:
             title, full = self.titles.get(self.session.identity, ('', ''))
+            self.session_uuid.setText(self.session.identity)
+            self.session_uuid.show()
             self.identity.setText(title or tr('New Chat'))
             self.identity.setToolTip((full + '\n' if full else '') + self.session.identity)
         if hasattr(self, 'baseline'):
@@ -1616,6 +1592,8 @@ class RepairPage(QWidget):
         self.clear_image()
         self.identity.setText(tr('New Chat'))
         self.identity.setToolTip('')
+        self.session_uuid.clear()
+        self.session_uuid.hide()
         self.source_panel.hide()
         self.show_empty_chat()
         self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))

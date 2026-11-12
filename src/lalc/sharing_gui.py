@@ -1,6 +1,7 @@
 """General Settings 分享向导；四类别审查、资源冲突及统一人工提交。"""
 
 from pathlib import Path
+from datetime import datetime
 import time
 from typing import TypeVar, Callable, cast
 
@@ -14,6 +15,7 @@ from qfluentwidgets import (BodyLabel, TitleLabel, PushButton, PrimaryPushButton
 
 from .i18n import tr
 from .developer_gui import Operation
+from .developer_session import saved_session_title
 from .file_content import file_operation, image_preview, content_bytes, ResourceUnknown, content_hash, require_memory
 
 from .page_packages import PageSnapshot
@@ -195,6 +197,8 @@ class ExportDialog(QDialog):
         choices = QVBoxLayout(first)
         self.selectors = {}
         available = catalog(self.manager)
+        manifests = {item["manifest_id"]: item for item in self.manager.list_manifests()}
+        titles = {}
         self.select_tabs, panels = SegmentedWidget(), QStackedWidget()
         tabs = self.select_tabs
         choices.addWidget(tabs)
@@ -202,6 +206,24 @@ class ExportDialog(QDialog):
         for kind in KINDS:
             tabs.addItem(kind, title(kind))
             widget = asset_tree(available[kind]) if kind == "assets" else check_list(available[kind], False)
+            if kind in {"workflow", "history"} and isinstance(widget, QListWidget):
+                for index in range(widget.count()):
+                    item = widget.item(index)
+                    identity = item.data(Qt.ItemDataRole.UserRole)
+                    if kind == "workflow":
+                        path = self.manager.manifests_dir / f"{identity}.json"
+                        extra = manifests[identity]["AdditionalMessage"]
+                    else:
+                        path = self.manager.data_root / identity
+                        extra = ""
+                        if identity.startswith("developer-sessions/"):
+                            try:
+                                extra, _ = saved_session_title(path, titles)
+                            except (OSError, ValueError, KeyError, TypeError):
+                                pass
+                    modified = datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                    item.setText(f"{identity}\n{extra}\n{modified}")
+                    item.setToolTip(item.text())
             self.selectors[kind] = widget
             panel = QWidget()
             column = QVBoxLayout(panel)

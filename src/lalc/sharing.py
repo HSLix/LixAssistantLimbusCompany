@@ -253,7 +253,12 @@ def catalog(manager):
     histories = []
     for pattern in ("developer-sessions/*/log/events.jsonl", "developer-operations/*/*/events.jsonl",
                     "agent-interactions/*/*/events.jsonl"):
-        for path in sorted(root.glob(pattern)):
+        paths = root.glob(pattern)
+        if pattern.startswith("developer-sessions/"):
+            paths = sorted(paths, key=lambda path: path.parent.parent.lstat().st_mtime, reverse=True)
+        else:
+            paths = sorted(paths)
+        for path in paths:
             real_directory(path.parent)
             histories.append(path.parent.parent.relative_to(root).as_posix() if path.parent.name == "log"
                              else path.parent.relative_to(root).as_posix())

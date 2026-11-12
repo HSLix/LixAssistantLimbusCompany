@@ -4,6 +4,8 @@
 """
 
 from types import SimpleNamespace
+from datetime import datetime
+import json
 import os
 import stat
 
@@ -314,3 +316,58 @@ def test_skill_import_defaults_and_asset_tree_depth(window, source, tmp_path):
         assert all(item.checkState(0).value == 0 for item in items)
     finally:
         tree.close()
+
+
+@pytest.mark.parametrize("additional", ["", "版本附加说明"])
+def test_export_labels_keep_ids_and_match_session_history_order(window, source, additional):
+    from lalc.agent_repair import RepairLog
+    manager, _ = source
+    window.host.manager = manager
+    manifest_id = catalog(manager)["workflow"][0]
+    manifest_path = manager.manifests_dir / f"{manifest_id}.json"
+    metadata = json.loads(manifest_path.read_text())
+    if additional:
+        metadata["AdditionalMessage"] = additional
+    manifest_path.write_text(json.dumps(metadata))
+    os.utime(manifest_path, (100, 100))
+    root = manager.data_root
+    sessions = []
+    # UUID 字典序与活动顺序相反，防止排序回退后测试仍通过。
+    for identity, title, stamp in (("ffffffff-ffff-4fff-8fff-ffffffffffff", "最近会话", 300),
+                                    ("00000000-0000-4000-8000-000000000000", None, 200)):
+        path = root / "developer-sessions" / identity
+        path.mkdir()
+        (path / "session.json").write_text(json.dumps({"title": title} if title else {}))
+        log = RepairLog(root, path=path / "log")
+        log.record({"type": "session_message", "message": {"role": "user", "content": [
+            {"type": "text", "text": "旧会话首条请求。后续内容"}]}})
+        os.utime(path, (stamp, stamp))
+        sessions.append(path.relative_to(root).as_posix())
+    original = next(path for path in (root / "developer-sessions").iterdir()
+                    if path.relative_to(root).as_posix() not in sessions)
+    os.utime(original, (150, 150))
+    for category in ("developer-operations", "agent-interactions"):
+        path = root / category / "day" / "operation"
+        path.mkdir(parents=True)
+        (path / "events.jsonl").write_text("")
+        os.utime(path, (500, 500))
+    dialog = ExportDialog(window)
+    try:
+        workflow = dialog.selectors["workflow"].item(0)
+        assert workflow.text().split("\n") == [manifest_id, additional,
+            datetime.fromtimestamp(100).strftime("%Y-%m-%d %H:%M:%S")]
+        history = dialog.selectors["history"]
+        ids = [history.item(index).data(Qt.ItemDataRole.UserRole) for index in range(history.count())]
+        expected = sorted((root / "developer-sessions").iterdir(), key=lambda path: path.stat().st_mtime, reverse=True)
+        assert ids[:3] == [path.relative_to(root).as_posix() for path in expected]
+        assert ids[:2] == sessions
+        assert history.item(0).text().split("\n")[1] == "最近会话"
+        assert history.item(1).text().split("\n")[1] == "旧会话首条请求。"
+        assert history.item(2).text().split("\n")[1] == ""
+        assert all(not identity.startswith("developer-sessions/") for identity in ids[3:])
+        assert history.item(0).text().split("\n")[-1] == datetime.fromtimestamp(300).strftime("%Y-%m-%d %H:%M:%S")
+        dialog.set_export_selection(history, True)
+        assert dialog.selection()["history"] == ids
+        assert workflow.data(Qt.ItemDataRole.UserRole) == manifest_id
+    finally:
+        dialog.close()
