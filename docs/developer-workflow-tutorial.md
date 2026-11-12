@@ -29,7 +29,9 @@ Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另�
 
 初始化即生成并登记空调度 `plan.py`；Manifest 必须恰有一个 `@automation_plan`，其仅通过字面量 `ctx.call()` 调用 Task，不能直接调用动作。其入口为 `execute(ctx)`，通过 `ctx.run_state.task_repetitions` 和 `ctx.run_state.settings` 读写本 Run 配置。宿主复制初始数据，同一 Run 后续共享修改，失败不回滚，不回写页面配置；示例及启动选项见 [Stage 6](stage-6-implementation.md)。其余源码用 `@task_workflow`、`@sub_workflow`、`@step` 标记角色，Recovery Rule 使用 detect/recover。字面量 `ctx.call()` 调用正式 Component，`ctx.action()` 调用应用统一注册的动作；不直接调用原生截图或控制后端。
 
-业务 Step 负责识别当前状态、执行动作、确认完成及抛出业务异常；已完成时直接返回，预期过渡继续观察，未知或停滞状态按证据失败。完成标识可用模板、OCR 或其他可靠状态，点击返回或固定等待结束不能证明业务完成。基础截图、等待 Step 只保证自身职责。Task／Subworkflow 负责排布、传参和按 Step 结果分支、循环、汇总，不能把游戏状态检查搬到这些非恢复边界。
+业务 Step 负责识别当前状态、执行动作、确认完成及抛出业务异常；已完成时直接返回，预期过渡继续观察，未知或停滞状态按证据失败。完成标识可用模板、OCR 或其他可靠状态，点击返回或固定等待结束不能证明业务完成。基础截图、等待 Step 只保证自身职责。Task／Subworkflow 负责排布、传参、分支、循环和汇总，也可通过 observe 动作先观测、确认状态再进入子步骤；控制动作仍由 Step 执行，上层检查不能替代 Step 恢复重调时自身的状态确认。
+
+开发时优先从当前中间状态验证受影响的 Step／分支，各段稳定后再补一次完整路径；每次试运行前简要明确起点和期望变化、终点或输出，结束后核对是否符合。共有导航标志或已在终点时零动作返回不能证明完整路径已覆盖。正常流程等待通常十秒左右到十几秒，更长超时须有实际耗时依据；超时后交给 Recovery Rule 识别错误，不要求在正常轮询中反复检测错误弹窗。同一帧先用足够的模板证据，按需再做局部／全屏 OCR。准确类型示例见[共用编写规范](../src/lalc/skills/workflow-conventions/SKILL.md#component-类型示例)。
 
 Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败含 `failure_code`、`failure_message`。记录 Task 逻辑名、当前/总循环次数和这些字段，不把失败简化为 `unknown`；普通 Task 失败可继续，取消及不可恢复环境故障仍向外传播。完整 Trace 已由宿主记录，无需新建日志存储。
 
@@ -79,6 +81,10 @@ uv run lalc tag-asset ui/claim --image <crop返回的image_path> --tags dark eve
 标签按本次输入整体覆盖：原为 `["zh", "event"]`，再传 `--tags dark event` 后为 `["dark", "event"]`。不追加、不合并、不去重，输入顺序与重复项原样保留。省略 `--tags` 或传空列表会写入 `[]`，清空已有标签。新图片和不同主题可并存；相同字节复用同一哈希图片，图片字节从不覆盖。重复裁剪相同图片时也按本次 tags 替换标签列表。标签更新无需确认，不改变其他哈希的标签。
 
 ## 匹配规则
+
+截图默认使用 `auto_park_cursor=True`：仅在拥有控制权且无需等待用户返还控制时，将客户区内的鼠标移到游戏窗口右下角外 8 像素，并等待 0.1 秒供游戏刷新悬停状态。鼠标本来在外则不移动。移动前后及截图前后检查接管；Run 中接管后丢弃本次观察，手动恢复后重新检测位置和截图，不沿用中断前的位置。手动截图也监听接管，发生接管则报错，由用户重新发起。截图完成后再次确认鼠标未进入客户区，若进入则重新观察。
+
+可用 `ctx.action("observe.capture_screen", auto_park_cursor=False)` 关闭本次截图的自动归位。该参数也适用于底层 `FocusedAutomationSession.capture`、开发者截图接口和 Agent 的 `game_screenshot` 工具。若右下角外目标超出桌面范围，或移动后鼠标仍在客户区，截图失败；需移动／缩小窗口或显式关闭归位。0.1 秒是固定重绘等待，不代表已验证每个游戏动画结束。
 
 Step 先 `ctx.action("observe.capture_screen")`，再执行：
 

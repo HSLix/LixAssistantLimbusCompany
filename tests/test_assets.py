@@ -89,6 +89,9 @@ class Window:
     def find_windows(self):
         return [7]
 
+    def cursor_position(self, hwnd):
+        return {"x": -1, "y": -1, "inside": False}
+
     def create_input_backend(self):
         from test_input_control import FakeInput
         return FakeInput()

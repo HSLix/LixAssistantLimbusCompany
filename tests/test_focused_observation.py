@@ -55,6 +55,9 @@ class FakeWindowPlatform:
         self.focus_calls = 0
         self.blur_during_capture = False
 
+    def cursor_position(self, hwnd):
+        return {"x": -1, "y": -1, "inside": False}
+
     def create_input_backend(self):
         from test_input_control import FakeInput
         return FakeInput()

@@ -1,5 +1,7 @@
 # Agent Step 职责与开发指导影响审查
 
+2026-11-12 修订：本文“不把游戏状态识别移到 Workflow 层”的限制已由开发者确认替代：Task／Subworkflow 可先观测确认状态再进入子步骤，Step 仍须在恢复重调时自行确认状态，控制权限不变。现行规则见[开发教程](developer-workflow-tutorial.md)和[共用编写规范](../src/lalc/skills/workflow-conventions/SKILL.md)；下文保留当时决定及证据。
+
 2026-11-06，开发者通过 grill-with-docs 逐项确认，最终确认以下实现范围。本文记录决策及实施前的只读影响审查，不代表真实模型或游戏验收。现有术语及架构边界不变，无需新增术语或 ADR。
 
 ## 已确认的设计

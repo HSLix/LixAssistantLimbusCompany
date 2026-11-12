@@ -181,7 +181,7 @@ class WorkflowExecutor:
         gate: RunGate,
         emit: Callable[[str, dict[str, Any]], None],
         *,
-        capture_screen: Callable[[bool], dict[str, Any]] | None = None,
+        capture_screen: Callable[..., dict[str, Any]] | None = None,
         control_input: Callable[[str, dict[str, Any]], None] | None = None,
         check_input: Callable[[], None] | None = None,
         game_process_exited: Callable[[], bool] | None = None,
@@ -735,12 +735,12 @@ class WorkflowExecutor:
             fields.update(self._save_screenshot())
         self.emit("component_log", fields)
 
-    def capture_screen(self, save: bool) -> dict[str, Any]:
+    def capture_screen(self, save: bool, *, auto_park_cursor: bool = True) -> dict[str, Any]:
         """将原始像素留在会话中，仅返回可写入 Trace 的信息。"""
 
         if self._active_action != "observe" or self._capture_screen is None:
             raise ExecutionFailure("execution_failed", "Screenshot capture requires an observe Trusted Action.")
-        return self._capture_screen(save)
+        return self._capture_screen(save, auto_park_cursor=auto_park_cursor)
 
     def match_asset(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
         if self._active_action != "observe" or self._match_asset is None:

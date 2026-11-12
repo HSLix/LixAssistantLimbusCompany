@@ -64,6 +64,7 @@ class InputSession:
         self.focus_wait_seconds = 0.0
         self.resume_focus = False
         self.focus_checkpoint: Callable[[], None] | None = None
+        window.before_capture = self.park_cursor
         window.before_check = self.ensure_foreground
         window.before_focus = self.before_focus
         self.monitor.target_hwnd = window.hwnd
@@ -192,6 +193,23 @@ class InputSession:
                 self.window.capture()
         else:
             self.resume_focus = False
+
+    def park_cursor(self) -> None:
+        """只在拥有前台控制权时移开鼠标，移动前后响应接管并等待悬停画面刷新。"""
+        self.check(record=False)
+        hwnd = self.window.hwnd
+        if not self.window.platform.cursor_position(hwnd)["inside"]:
+            return
+        while self.backend.any_pressed():
+            self.check(record=False)
+            time.sleep(self.POLL_SECONDS)
+        self.check(record=False)
+        self.backend.park_cursor(hwnd)
+        self.check(record=False)
+        # 留出游戏处理鼠标离开和重绘悬停状态的时间。
+        self._wait(0.1)
+        if self.window.platform.cursor_position(hwnd)["inside"]:
+            raise WindowError("Cannot park cursor outside the game; move or resize the game window.")
 
     def prepare_resume(self) -> None:
         """明确恢复仅等待输入释放，不等待十秒；恢复后首次聚焦享有例外。"""

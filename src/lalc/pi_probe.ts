@@ -246,6 +246,7 @@ export default async function (pi) {
     });
     pi.registerTool({
       ...edit,
+      description: edit.description + " Chinese text can be used directly in oldText/newText; do not manually encode Unicode escapes. Copy oldText from the latest read, using a short unique code anchor. On mismatch, read again and correct the anchor before retrying.",
       async execute(id, params, signal, onUpdate) {
         authorize("edit");
         const path = await checkedEdit(params.path);
@@ -344,8 +345,8 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
           sha256: Type.String({ pattern: "^[0-9a-f]{64}$" }) }), { minItems: 1 }) }) },
       { name: "action_contracts", description: "Read all registered Trusted Action classifications, signatures, return types and docstrings before writing wrappers. control.click first supports centerxy=target['centerxy'], then complete x/y; never mix forms. Preserve all match results including centerxy, score and provenance instead of stripping fields and recomputing centers. Multiple matches do not require acting on all; business Steps decide and log ambiguity warnings. Step wrappers have their own signatures. Does not execute actions or expose implementation source.",
         parameters: Type.Object({}) },
-      { name: "game_screenshot", description: "Return a fresh original game screenshot, a separate 40px coordinate grid image, and full OCR JSON (observation, region, items with text, score, box, polygon and centerxy) from the SAME original pixels. OCR coordinates are client-area pixels; no summarization or correction. Korean is unsupported. OCR failure preserves both images and returns ocr_error, never an empty success. Cancellation or window invalidation still fails the tool. Overlays are viewing aids only, never OCR, template or evidence pixels. Restores and focuses the unique game window.",
-        parameters: Type.Object({}) },
+      { name: "game_screenshot", description: "Return a fresh original game screenshot, a separate 40px coordinate grid image, and full OCR JSON (observation, region, items with text, score, box, polygon and centerxy) from the SAME original pixels. OCR coordinates are client-area pixels; no summarization or correction. Korean is unsupported. OCR failure preserves both images and returns ocr_error, never an empty success. Cancellation or window invalidation still fails the tool. Overlays are viewing aids only, never OCR, template or evidence pixels. Restores and focuses the unique game window. By default, parks the cursor outside the game before capture under input ownership checks; set auto_park_cursor=false to disable.",
+        parameters: Type.Object({ auto_park_cursor: Type.Optional(Type.Boolean({ default: true })) }) },
       { name: "preview_crop", description: "Capture the game anew; preview a crop without adding an active Asset. Return full image with crop boundary lines, the clean crop, and same-image template matching at threshold. A match is diagnostic, not proof of cross-state reliability. Returns preview_id for crop_asset to save the identical pixels and parameters.",
         parameters: Type.Object({ logical_name: logicalName,
           region: Type.Object({ x: Type.Integer(), y: Type.Integer(), width: Type.Integer(), height: Type.Integer() }),

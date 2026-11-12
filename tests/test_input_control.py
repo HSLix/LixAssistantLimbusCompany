@@ -125,6 +125,9 @@ class FakeWindow:
             raise OSError(5, "capture denied")
         return bytes(width * height * 4)
 
+    def cursor_position(self, hwnd):
+        return {"x": -1, "y": -1, "inside": False}
+
     def create_input_backend(self):
         return self.backend
 

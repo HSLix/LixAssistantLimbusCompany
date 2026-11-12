@@ -237,7 +237,8 @@ def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
     class Session:
         def __init__(self, *_):
             self.image, self.size, self.observation = pixels, (200, 100), 1
-        def capture(self):
+        def capture(self, *, auto_park_cursor=True):
+            assert auto_park_cursor is True
             captures.append(True)
     monkeypatch.setattr('lalc.developer.FocusedAutomationSession', Session)
     window.host.preview = original = (bytes(16), (2, 2), 7)
