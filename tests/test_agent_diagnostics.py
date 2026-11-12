@@ -106,7 +106,14 @@ def test_repair_failure_preserves_candidate_context_and_full_details(tmp_path, m
         raise AgentDiagnosticError("test-secret failure", error_stage)
         yield
     monkeypatch.setattr("lalc.agent_repair.configured_pi", fail)
+    ticks = iter((100.0, 165.5))
+    monkeypatch.setattr('lalc.agent_repair.time', SimpleNamespace(monotonic=lambda: next(ticks)))
     result = asyncio.run(chat.run("test", SimpleNamespace(pi="pi", ask_api_key=False), key="test-secret"))
+    assert result['duration_seconds'] == 65.5
+    from lalc.agent_log import read_json, read_events
+    assert read_json(chat.log.path / 'round-1/result.json')['duration_seconds'] == 65.5
+    assert read_json(chat.log.path / 'result.json')['duration_seconds'] == 65.5
+    assert list(read_events(chat.log.path / 'events.jsonl'))[-1]['event']['duration_seconds'] == 65.5
     assert result["status"] == "incomplete" and result["diagnostics"]["stage"] == error_stage
     assert result["diagnostics"]["round"] == 1 and "traceback" in result["diagnostics"]
     assert candidate_files(host.candidate) == before and chat.history[0] == history

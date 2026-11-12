@@ -227,15 +227,16 @@ def test_history_scroll_position_is_kept_and_bottom_can_follow(gui):
 
 @pytest.mark.parametrize("at_bottom", [True, False])
 @pytest.mark.parametrize("resize", [True, False])
-def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resize):
+@pytest.mark.parametrize("expanded", [True, False])
+def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resize, expanded):
     app, window = gui
     page, chat = window.repair_page, window.repair_page.chat
     window.switchTo(page)
     window.resize(900, 800)
     window.show()
     app.processEvents()
-    from PySide6.QtCore import QUrl
-    chat.activity(1)["expanded"] = True
+    chat.activity(1)["expanded"] = expanded
+    chat.add_message('Agent', '已有回答\n\n' * 100, 1)
     for number in range(150):
         chat.upsert_tool(1, f"previous-{number}", "read", "tool_execution_end", {"result": {}})
     app.processEvents()
@@ -250,6 +251,123 @@ def test_long_chat_tool_updates_follow_only_when_at_bottom(gui, at_bottom, resiz
         emit(page, kind, result={}, isError=False)
         app.processEvents()
         assert bar.value() == (bar.maximum() if at_bottom else position)
+
+
+@pytest.mark.parametrize('at_bottom', [True, False])
+def test_working_timer_keeps_following_when_title_wraps(gui, at_bottom):
+    """计时刷新引起标题增高时继续贴底；主动上滚后保留位置，回到底部恢复跟随。"""
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    chat.resize(360, 250)
+    chat.add_message('你', '已有内容\n' * 100, 1)
+    chat.start_work(1)
+    chat.show()
+    app.processEvents()
+    bar = chat.verticalScrollBar()
+    bar.setValue(bar.maximum() if at_bottom else bar.maximum() // 3)
+    position, maximum = bar.value(), bar.maximum()
+    try:
+        # 模拟计时文字换行后的标题增长，避免依赖平台字体的具体换行宽度。
+        chat.activity(1)['status'] = '长标题 ' * 100
+        chat.working_timer.timeout.emit()
+        app.processEvents()
+        assert bar.maximum() > maximum
+        assert bar.value() == (bar.maximum() if at_bottom else position)
+        QTest.keyClick(chat, Qt.Key.Key_PageUp)
+        position = bar.value()
+        chat.upsert_tool(1, 'a', 'read', 'tool_execution_start', {'args': {}})
+        app.processEvents()
+        assert bar.value() == position
+        QTest.keyClick(bar, Qt.Key.Key_End)
+        assert bar.value() == bar.maximum()
+        chat.add_message('Agent', '新回答\n' * 50, 1)
+        app.processEvents()
+        assert bar.value() == bar.maximum()
+    finally:
+        chat.stop_work()
+        chat.close()
+
+
+def test_collapsing_process_at_bottom_keeps_following_new_answer(gui):
+    """手动收起过程后视角仍在底部时，后续回复继续跟随。"""
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    chat.resize(360, 250)
+    chat.add_message('你', '问题\n' * 100, 1)
+    chat.remember_message(1, [{'type': 'thinking', 'thinking': '思考\n' * 100}])
+    chat.show()
+    app.processEvents()
+    bar = chat.verticalScrollBar()
+    try:
+        chat.open_link(QUrl('raw:1'))
+        app.processEvents()
+        bar.setValue(bar.maximum())
+        chat.open_link(QUrl('raw:1'))
+        app.processEvents()
+        assert bar.value() == bar.maximum()
+        chat.add_message('Agent', '新回答\n' * 100, 1)
+        app.processEvents()
+        assert bar.value() == bar.maximum()
+        older = []
+        chat.olderRequested.connect(lambda: older.append(True))
+        chat.resize(360, 10000)
+        app.processEvents()
+        assert bar.maximum() == 0
+        assert not older
+    finally:
+        chat.close()
+
+
+def test_completed_working_time_survives_history_reload_and_prepend(gui):
+    """结束耗时从轮次事件恢复；无耗时记录的历史不推算或显示耗时。"""
+    from lalc.i18n import tr
+    from lalc.repair_chat import working_duration
+
+    app, window = gui
+    page, chat = window.repair_page, window.repair_page.chat
+    log = page.host.conversation.log
+    completed = {'type': 'round_finished', 'reason': 'answered', 'duration_seconds': 65}
+    chat.start_work(1)
+    page.show_event({'round': 1, 'event': completed})
+    label = tr('Worked for {0}').format(working_duration(65))
+    assert label in chat.toPlainText()
+    assert not chat.working_timer.isActive()
+    for number, result in ((1, completed), (2, {'type': 'round_finished', 'reason': 'answered'})):
+        log.group = number
+        log.record({'type': 'session_message', 'message': {'role': 'user', 'content': [
+            {'type': 'text', 'text': f'question {number}\n' * 30}]}})
+        log.record(result)
+    page.reload_history()
+    assert tr('Worked for {0}').split('{0}')[0] not in chat.toPlainText()
+    page.load_older_history()
+    wait_jobs(app, window)
+    assert label in chat.toPlainText()
+    assert chat.activity(1)['duration_seconds'] == 65
+    assert 'duration_seconds' not in chat.activity(2)
+    assert not chat.working_timer.isActive()
+
+
+@pytest.mark.parametrize('duration', [None, 0, -1, 'unknown'])
+def test_completed_working_time_displays_only_recorded_valid_duration(gui, duration):
+    """零秒仍是有效耗时；缺失或无效记录不显示结束耗时。"""
+    from lalc.i18n import tr
+
+    _, window = gui
+    page, chat = window.repair_page, window.repair_page.chat
+    event = {'type': 'round_finished'}
+    if duration is not None:
+        event['duration_seconds'] = duration
+    chat.start_work(1)
+    page.show_event({'round': 1, 'event': event})
+    assert (tr('Worked for {0}').split('{0}')[0] in chat.toPlainText()) == (duration == 0)
+    assert not chat.working_timer.isActive()
 
 
 def test_process_timeline_orders_thinking_and_tools_with_nested_collapse(gui):

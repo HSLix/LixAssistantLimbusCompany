@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-12：聊天贴底改为持续跟随状态，工具更新、延迟排版及计时刷新沿用该状态；轮次结束耗时随结果和事件保存，历史无记录则不显示。相关普通回归 189 passed，范围和验收边界见[专项记录](chat-scroll-and-duration-implementation.md)。
+
 2026-11-12：根据镜牢入口开发日志复盘修订默认 Agent 指导：局部修改分段试跑、稳定后补完整路径，每次运行前明确起点和期望并在结束后核对；通常采用十秒左右到十几秒超时后交给 Recovery Rule，不要求正常轮询检测错误弹窗。Task／Subworkflow 可先观测状态再进入子步骤，现有 observe／control 权限不变。补充中文直接编辑、准确类型示例及按需 OCR 指导，见[开发教程](developer-workflow-tutorial.md)与[默认规范](../src/lalc/skills/workflow-conventions/SKILL.md)。仅修改指导和工具说明；已有数据目录 Skills 不自动覆盖，需人工合并。
 
 2026-11-12：游戏截图默认受控归位鼠标：客户区内鼠标移到窗口右下角外 8 像素，接管后丢弃本次观察，Run 手动恢复后重新检测；`auto_park_cursor=False` 可关闭。手动截图增加接管监测并保留失焦即失败的边界；右下角无桌面空间时明确失败。用法与限制见[开发教程](developer-workflow-tutorial.md#匹配规则)，核心回归见 `tests/test_capture_cursor.py`。相关普通回归 289 passed；另有既存 PNG／AVIF 文件名断言不符的一项测试，单独执行失败后从最终回归排除。未运行真实 pi／模型、Windows 与游戏验收。

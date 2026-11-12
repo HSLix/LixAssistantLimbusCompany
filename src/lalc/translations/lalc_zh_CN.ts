@@ -2063,6 +2063,7 @@ Original pixel region: {2}</source>
     </message>
 <message><source>Allow querying external knowledge</source><translation>允许查询外部知识库</translation></message>
 <message><source>Working for {0}</source><translation>已工作 {0}</translation></message>
+<message><source>Worked for {0}</source><translation>耗时 {0}</translation></message>
 <message><source>{0}s</source><translation>{0}秒</translation></message>
 <message><source>{0}m {1}s</source><translation>{0}分{1}秒</translation></message>
 <message><source>{0}h {1}m</source><translation>{0}时{1}分</translation></message>
