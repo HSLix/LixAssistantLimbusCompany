@@ -2067,5 +2067,15 @@ Original pixel region: {2}</source>
 <message><source>{0}s</source><translation>{0}秒</translation></message>
 <message><source>{0}m {1}s</source><translation>{0}分{1}秒</translation></message>
 <message><source>{0}h {1}m</source><translation>{0}时{1}分</translation></message>
+<message><source>Overall progress</source><translation>整体进度</translation></message>
+<message><source>Processed {0} / {1} files</source><translation>已处理 {0} / {1} 个文件</translation></message>
+<message><source>Current file {0}%</source><translation>当前文件 {0}%</translation></message>
+<message><source>Export sharing package</source><translation>导出分享包</translation></message>
+<message><source>Import sharing package</source><translation>导入分享包</translation></message>
+<message><source>Preparing export files</source><translation>正在准备导出文件</translation></message>
+<message><source>Writing ZIP</source><translation>正在写入 ZIP</translation></message>
+<message><source>Extracting files</source><translation>正在解压文件</translation></message>
+<message><source>Installing files</source><translation>正在安装文件</translation></message>
+<message><source>Finishing…</source><translation>正在收尾…</translation></message>
 </context>
 </TS>

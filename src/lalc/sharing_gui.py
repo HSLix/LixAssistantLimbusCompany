@@ -11,12 +11,13 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QStackedWidget
     QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QListWidget, QListWidgetItem,
     QScrollArea, QFileDialog, QMessageBox, QProgressBar, QApplication)
 from qfluentwidgets import (BodyLabel, TitleLabel, PushButton, PrimaryPushButton, PlainTextEdit,
-                            CheckBox, ComboBox, SegmentedWidget)
+                            CheckBox, ComboBox, SegmentedWidget, StrongBodyLabel, themeColor, isDarkTheme)
 
 from .i18n import tr
 from .developer_gui import Operation
 from .developer_session import saved_session_title
-from .file_content import file_operation, image_preview, content_bytes, ResourceUnknown, content_hash, require_memory
+from .file_content import (file_operation, image_preview, content_bytes, ResourceUnknown,
+                           content_hash, require_memory, TransferProgress)
 
 from .page_packages import PageSnapshot
 from .page_preview import PagePreviewDialog, PreviewRequest
@@ -35,12 +36,25 @@ class SharingWorker(Operation):
 
     def run(self):
         last = [0.0]
+        detailed = [False]
         def progress(done, total, name):
+            if detailed[0]:
+                return
             now = time.monotonic()
             if now - last[0] >= .05 or total and done == total:
                 last[0] = now
                 self.progress.emit((done, total, name))
-        with file_operation(lambda: self.cancel_requested, progress, allow_unknown_space=self.allow_unknown_space):
+        previous = [None]
+        def details(value):
+            detailed[0] = True
+            now = time.monotonic()
+            key = (value.phase, value.completed)
+            if (key != previous[0] or now - last[0] >= .05 or value.finished
+                    or value.total and value.completed == value.total):
+                previous[0], last[0] = key, now
+                self.progress.emit(value)
+        with file_operation(lambda: self.cancel_requested, progress,
+                            allow_unknown_space=self.allow_unknown_space, details=details):
             try:
                 self.result = self.operation()
             except BaseException as error:
@@ -50,7 +64,8 @@ class SharingWorker(Operation):
 T = TypeVar("T")
 
 
-def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=False) -> T:
+def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=False,
+                 title="Processing sharing files") -> T:
     """模态进度窗保持事件循环响应；取消须等 Worker 停止、完成清理再关闭。"""
     app = QApplication.instance()
     assert isinstance(app, QApplication)
@@ -58,13 +73,45 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
     app.setQuitOnLastWindowClosed(False)
     worker = SharingWorker(operation)
     worker.allow_unknown_space = allow_unknown_space or getattr(parent, "allow_unknown_space", False)
+    heading = {"Export sharing package": tr("Export sharing package"),
+               "Import sharing package": tr("Import sharing package")}.get(title, tr("Processing sharing files"))
+    phases = {"Preparing export files": tr("Preparing export files"), "Writing ZIP": tr("Writing ZIP"),
+              "Extracting files": tr("Extracting files"), "Installing files": tr("Installing files"),
+              "Finishing…": tr("Finishing…"), "Skipped": tr("Skipped")}
     class ProgressDialog(QDialog):
         @Slot(object)
         def update_progress(self, value):
+            if worker.cancel_requested:
+                return
+            if isinstance(value, TransferProgress):
+                if value.total:
+                    bar.setRange(0, 100)
+                    percent = 100 if value.finished else min(99, value.completed * 100 // value.total)
+                    bar.setValue(percent)
+                    overall_percent.setText(f"{percent}%")
+                    count.setText(tr("Processed {0} / {1} files").format(value.completed, value.total))
+                elif value.finished:
+                    bar.setRange(0, 100)
+                    bar.setValue(100)
+                    overall_percent.setText("100%")
+                    count.setText(tr("Processed {0} / {1} files").format(0, 0))
+                label.setText(phases.get(value.phase, value.phase))
+                filename.setText(filename.fontMetrics().elidedText(value.name, Qt.TextElideMode.ElideMiddle, 544))
+                filename.setToolTip(value.name)
+                file_bar.setRange(0, 100)
+                percent = (100 if value.file_finished else
+                           min(99, value.done * 100 // value.size) if value.size else 0)
+                file_bar.setValue(percent)
+                file_label.setText(tr("Current file {0}%").format(percent))
+                return
             done, total, name = value
             if total:
                 bar.setRange(0, 1000)
                 bar.setValue(int(done * 1000 / total))
+                overall_percent.setText(f"{int(done * 100 / total)}%")
+            else:
+                bar.setRange(0, 0)
+                overall_percent.clear()
             label.setText(tr("Processing: {0}").format(name) if name else tr("Checking files and available resources…"))
         def reject(self):
             worker.cancel()
@@ -77,18 +124,64 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
             else:
                 super().closeEvent(event)
     dialog = ProgressDialog(parent)
-    dialog.setWindowTitle(tr("Processing sharing files"))
+    dialog.setObjectName("sharingProgressDialog")
+    background = "#202020" if isDarkTheme() else "#ffffff"
+    dialog.setStyleSheet(f"QDialog#sharingProgressDialog {{ background: {background}; }}")
+    dialog.setWindowTitle(heading)
     dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-    dialog.resize(520, 160)
+    dialog.resize(600, 360)
     layout = QVBoxLayout(dialog)
-    label = notice(tr("Checking files and available resources…"))
-    layout.addWidget(label)
+    layout.setContentsMargins(28, 24, 28, 24)
+    layout.setSpacing(12)
+    layout.addWidget(TitleLabel(heading))
+    overall = QHBoxLayout()
+    overall.addWidget(StrongBodyLabel(tr("Overall progress")))
+    overall.addStretch()
+    overall_percent = BodyLabel("")
+    overall_percent.setObjectName("overallPercent")
+    overall_percent.setMinimumWidth(48)
+    overall_percent.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    overall.addWidget(overall_percent)
+    layout.addLayout(overall)
     bar = QProgressBar()
+    bar.setObjectName("overallProgress")
+    bar.setTextVisible(False)
+    bar.setFixedHeight(14)
+    bar.setStyleSheet(f"QProgressBar {{ border: none; border-radius: 7px; background: rgba(128,128,128,0.18); }}"
+                     f"QProgressBar::chunk {{ border-radius: 7px; background: {themeColor().name()}; }}")
     bar.setRange(0, 0)
     layout.addWidget(bar)
+    count = notice("")
+    count.setObjectName("fileCount")
+    layout.addWidget(count)
+    layout.addSpacing(8)
+    label = StrongBodyLabel(tr("Checking files and available resources…"))
+    label.setObjectName("transferPhase")
+    layout.addWidget(label)
+    filename = BodyLabel("")
+    filename.setObjectName("currentFilename")
+    filename.setMinimumWidth(0)
+    filename.setMaximumWidth(544)
+    layout.addWidget(filename)
+    file_bar = QProgressBar()
+    file_bar.setObjectName("currentFileProgress")
+    file_bar.setTextVisible(False)
+    file_bar.setRange(0, 100)
+    file_bar.setValue(0)
+    file_bar.setFixedHeight(8)
+    file_bar.setStyleSheet(f"QProgressBar {{ border: none; border-radius: 4px; background: rgba(128,128,128,0.18); }}"
+                          f"QProgressBar::chunk {{ border-radius: 4px; background: {themeColor().name()}; }}")
+    layout.addWidget(file_bar)
+    file_label = notice(tr("Current file {0}%").format(0))
+    file_label.setObjectName("currentFilePercent")
+    layout.addWidget(file_label)
+    layout.addStretch()
     cancel = PushButton(tr("Cancel"))
     cancel.clicked.connect(dialog.reject)
-    layout.addWidget(cancel)
+    buttons = QHBoxLayout()
+    buttons.addStretch()
+    buttons.addWidget(cancel)
+    layout.addLayout(buttons)
     worker.progress.connect(dialog.update_progress)
     worker.finished.connect(dialog.accept)
     worker.start()
@@ -112,7 +205,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
                 parent.allow_unknown_space = True
-                return sharing_task(parent, operation, allow_unknown_space=True)
+                return sharing_task(parent, operation, allow_unknown_space=True, title=title)
         raise error
     return cast(T, result)
 
@@ -286,7 +379,7 @@ class ExportDialog(QDialog):
                 def save():
                     objects = build_export(self.manager, selection)
                     save_package(objects, filename)
-                sharing_task(self, save)
+                sharing_task(self, save, title="Export sharing package")
                 self.accept()
         except InterruptedError:
             return
@@ -480,7 +573,7 @@ class ImportDialog(QDialog):
     def recheck(self):
         try:
             old = self.checks
-            self.checks = sharing_task(self, lambda: inspect_objects(self.manager, self.package))
+            self.checks = sharing_task(self, lambda: inspect_objects(self.manager, self.package), title="Import sharing package")
             for obj in self.package.objects:
                 number = obj["number"]
                 if old.get(number, {}).get("before") != self.checks[number].get("before"):
@@ -604,7 +697,7 @@ class ImportDialog(QDialog):
                             previews[content_hash(content)] = None
                 return previews
             try:
-                previews = sharing_task(self, prepare_previews)
+                previews = sharing_task(self, prepare_previews, title="Import sharing package")
             except InterruptedError:
                 self.asset_more.setChecked(False)
                 return
@@ -747,7 +840,7 @@ class ImportDialog(QDialog):
                 return
         try:
             self.result_data = sharing_task(self, lambda: import_selected(self.manager, self.package, self.checks, self.selected,
-                asset_actions=self.asset_actions, reviewed=self.reviewed, allow_unreviewed=bool(unreviewed)))
+                asset_actions=self.asset_actions, reviewed=self.reviewed, allow_unreviewed=bool(unreviewed)), title="Import sharing package")
             lines = [tr("Completed: {0}").format(len(self.result_data["completed"]))]
             for item in self.result_data["completed"]:
                 status = {"skipped": tr("Skipped"), "imported": tr("Imported"), "installed": tr("Installed")}.get(item.get("status"), item.get("manifest_id", item.get("path", "")))
@@ -796,7 +889,7 @@ def open_sharing(window, *, exporting):
             filename, _ = QFileDialog.getOpenFileName(window, tr("Choose shared package"), "", "ZIP (*.zip)")
             if filename:
                 try:
-                    package = sharing_task(window, lambda: SharingPackage(filename, window.service.data_root))
+                    package = sharing_task(window, lambda: SharingPackage(filename, window.service.data_root), title="Import sharing package")
                 except InterruptedError:
                     return
                 try:

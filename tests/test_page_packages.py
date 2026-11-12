@@ -135,10 +135,10 @@ def test_resource_write_failure_never_moves_old_package(tmp_path, monkeypatch):
     original = PageSnapshot({"page.py": b"original"})
     target = install_page_package(pages, "sample", original)
     from lalc.page_packages import write_content
-    def fail_resource_write(path, content):
+    def fail_resource_write(path, content, **kwargs):
         if "new" in path.parts and path.name == "banner.png":
             raise OSError("resource write failed")
-        return write_content(path, content)
+        return write_content(path, content, **kwargs)
     monkeypatch.setattr("lalc.page_packages.write_content", fail_resource_write)
     replacement = PageSnapshot({"page.py": b"replacement", "assets/banner.png": b"image"})
     with pytest.raises(OSError, match="resource write failed"):

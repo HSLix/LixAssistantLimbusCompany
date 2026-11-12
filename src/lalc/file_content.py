@@ -1,7 +1,7 @@
 """文件快照的流式读写与实时资源预检；处理块大小不作为文件准入上限。"""
 
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from io import BytesIO
 import hashlib
 import os
@@ -18,9 +18,10 @@ _operation = threading.local()
 
 
 @contextmanager
-def file_operation(cancelled=lambda: False, progress=lambda *args: None, *, allow_unknown_space=False):
+def file_operation(cancelled=lambda: False, progress=lambda *args: None, *, allow_unknown_space=False,
+                   details=lambda value: None):
     previous = getattr(_operation, 'callbacks', None)
-    _operation.callbacks = (cancelled, progress, allow_unknown_space)
+    _operation.callbacks = (cancelled, progress, allow_unknown_space, details)
     try:
         yield
     finally:
@@ -34,6 +35,57 @@ def checkpoint(done=0, total=0, name=''):
             raise InterruptedError('操作已取消。')
         callbacks[1](done, total, name)
 
+
+@dataclass(frozen=True)
+class TransferProgress:
+    """整体计数按文件提交，当前文件按字节更新；快照可安全送往 GUI。"""
+
+    phase: str
+    total: int
+    completed: int = 0
+    name: str = ''
+    done: int = 0
+    size: int = 0
+    file_finished: bool = False
+    finished: bool = False
+
+
+class FileTransfers:
+    """为一次文件任务集中计数，不在底层复制结束时提前宣告对象提交。"""
+
+    def __init__(self, phase, total):
+        self.value = TransferProgress(phase, total)
+        self.prefix = ''
+        self.update()
+
+    def update(self, **changes):
+        self.value = replace(self.value, **changes)
+        callbacks = getattr(_operation, 'callbacks', None)
+        if callbacks:
+            callbacks[3](self.value)
+
+    def complete(self, count=1, *, skipped=False):
+        self.update(completed=self.value.completed + count,
+                    phase='Skipped' if skipped else self.value.phase)
+
+
+@contextmanager
+def file_transfers(phase, total):
+    """限定进度作用域；嵌套或失败后恢复调用方状态，不改变事务边界。"""
+    previous = getattr(_operation, 'transfers', None)
+    progress = FileTransfers(phase, total)
+    _operation.transfers = progress
+    try:
+        yield progress
+    finally:
+        _operation.transfers = previous
+
+
+def transfer_file(done, size, name, *, finished=False):
+    """只更新当前文件；取消仍由原检查点处理，提交后的通知不可触发取消。"""
+    progress = getattr(_operation, 'transfers', None)
+    if progress is not None:
+        progress.update(name=progress.prefix + name, done=done, size=size, file_finished=finished)
 
 
 class ResourceUnknown(OSError):
@@ -160,9 +212,11 @@ def content_stream(content):
             yield stream
 
 
-def copy_content(content, destination):
+def copy_content(content, destination, *, name=None):
     """流式写入并核验固定版本；目标由调用方的事务管理。"""
     fingerprint, size = hashlib.sha256(), 0
+    name = name or (content.path.name if isinstance(content, FileContent) else '')
+    transfer_file(0, len(content), name)
     with content_stream(content) as source:
         while chunk := source.read(CHUNK):
             checkpoint()
@@ -171,13 +225,15 @@ def copy_content(content, destination):
                 raise ValueError('文件内容已变化。')
             fingerprint.update(chunk)
             destination.write(chunk)
+            transfer_file(size, len(content), name)
     if size != len(content) or fingerprint.hexdigest() != content_hash(content):
         raise ValueError('文件内容已变化。')
+    transfer_file(size, len(content), name, finished=True)
 
 
-def write_content(path, content):
+def write_content(path, content, *, name=None):
     with Path(path).open('wb') as stream:
-        copy_content(content, stream)
+        copy_content(content, stream, name=name or Path(path).name)
 
 
 def content_bytes(content):
