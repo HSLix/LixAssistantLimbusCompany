@@ -2,8 +2,9 @@
 
 from html import escape
 import json
+import time
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Signal, QTimer
 from PySide6.QtGui import QDesktopServices, QTextDocument
 from PySide6.QtWidgets import QTextBrowser
 
@@ -46,6 +47,18 @@ def process_text_parts(content):
             yield value
 
 
+def working_duration(seconds):
+    """工作时长只按秒、分秒或时分显示，不引入更大的时间单位。"""
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return tr('{0}s').format(seconds)
+    minutes, seconds = divmod(seconds, 60)
+    if minutes < 60:
+        return tr('{0}m {1}s').format(minutes, seconds)
+    hours, minutes = divmod(minutes, 60)
+    return tr('{0}h {1}m').format(hours, minutes)
+
+
 class RepairChat(QTextBrowser):
     """用原生富文本区呈现角色与 Markdown，按调用 ID 合并可展开工具记录。"""
 
@@ -59,6 +72,11 @@ class RepairChat(QTextBrowser):
         self.tools = {}
         self.activities = {}
         self.activity_round = 0
+        self.working_round = None
+        self.working_started = None
+        self.working_timer = QTimer(self)
+        self.working_timer.setInterval(1000)
+        self.working_timer.timeout.connect(lambda: self.render(follow=False))
         self.setOpenLinks(False)
         self.anchorClicked.connect(self.open_link)
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
@@ -73,11 +91,22 @@ class RepairChat(QTextBrowser):
         super().wheelEvent(event)
 
     def clear(self):
+        self.stop_work()
         self.entries.clear()
         self.tools.clear()
         self.activities.clear()
         self.activity_round = 0
         super().clear()
+
+    def start_work(self, number):
+        """仅现场轮次启动单调时钟；状态切换和工具调用不重置计时。"""
+        self.working_round, self.working_started = number, time.monotonic()
+        self.working_timer.start()
+
+    def stop_work(self):
+        """轮次结束或清理时停止界面计时，不向模型或日志写入时钟。"""
+        self.working_timer.stop()
+        self.working_round = self.working_started = None
 
     def activity(self, number=None):
         """每轮独立保存生成过程和展开选择，避免续聊覆盖上一轮。"""
@@ -112,6 +141,8 @@ class RepairChat(QTextBrowser):
         title = escape(tr('Thinking and tools'))
         if activity['status']:
             title += ' · ' + escape(activity['status'])
+        if self.working_round == number and self.working_started is not None:
+            title += ' · ' + escape(tr('Working for {0}').format(working_duration(time.monotonic() - self.working_started)))
         tooltip = escape(activity['tooltip'], quote=True)
         if has_content:
             arrow = '▾' if activity['expanded'] else '▸'
@@ -165,6 +196,19 @@ class RepairChat(QTextBrowser):
         status = {"失败": tr("Failed"), "成功": tr("Succeeded"),
                   "等待完成确认": tr("Awaiting completion"), "执行中": tr("In progress")}[entry["status"]]
         title = tr('Tool: {0} · {1}').format(escape(entry['name']), status)
+        events = entry['events']
+        arguments = events.get('repair_tool', {}).get('arguments', events.get('tool_execution_start', {}).get('args', {}))
+        if isinstance(arguments, dict):
+            details = []
+            for key in ('path', 'filename', 'run_id', 'logical_name', 'asset', 'manifest_id', 'query', 'keyword'):
+                value = arguments.get(key)
+                if isinstance(value, (str, int)) and str(value):
+                    text = str(value).replace('\n', ' ')
+                    details.append((key + '=' if key == 'run_id' else '') + (text[:97] + '…' if len(text) > 100 else text))
+                if len(details) == 2:
+                    break
+            if details:
+                title += ' · ' + escape(' · '.join(details))
         toggle = tr('Hide details') if entry["expanded"] else tr('Show details')
         body = f'<p style="color:{color}">{title}　<a href="tool:{entry['index']}">{toggle}</a></p>'
         if entry["expanded"]:

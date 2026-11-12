@@ -68,6 +68,7 @@ class RepairTools:
                        "publish": self.publish, "trial_run": self.trial_run,
                        "read_run_state": self.read_run_state, "recheck": self.recheck,
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
+                       "search_run_logs": self.search_run_logs,
                        "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
                        "read_manifest_source": self.read_manifest_source,
@@ -149,6 +150,8 @@ class RepairTools:
                 if content_hash(content) != asset["sha256"]:
                     raise ValueError("Asset 内容哈希不符。")
             elif scope == "knowledge" and set(copy_from) == {"scope", "path"}:
+                if "knowledge_read" not in self.allowed:
+                    raise ValueError("当前设置不允许查询外部知识库。")
                 source = self.knowledge.path(copy_from["path"])
                 content = FileContent.from_path(source)
             else:
@@ -390,28 +393,38 @@ class RepairTools:
                           outcome + "按 Run ID 查看日志；需要再试时调用 trial_run，修改 Candidate 后须先 Publish。"})
 
     def list_runs(self, offset=0, limit=100):
-        """列出仍有 Trace 的 Run ID，不把已清理记录当作空日志。"""
+        """列出保留 Run 的首尾元数据；旧记录不能确认的字段明确未知。"""
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 200:
             raise ValueError("offset 必须非负，limit 必须为 1–200 的整数。")
-        directory = self.library.data_root / "traces"
-        ids = sorted((int(path.stem) for path in directory.glob("*.jsonl")
-                      if path.stem.isdecimal() and not path.is_symlink()), reverse=True)
-        return self.text({"run_ids": ids[offset:offset + limit],
+        from .run_logs import retained_runs, run_summary
+        root = self.library.data_root
+        ids = retained_runs(root)
+        runs = [run_summary(root, identity, check=self.checkpoint) for identity in ids[offset:offset + limit]]
+        if self.host is not None:
+            current = self.host.service.status
+            for item in runs:
+                if item["run_id"] == current.get("run_id") and current.get("phase") == "running":
+                    item["status"] = "running"
+        return self.text({"run_ids": ids[offset:offset + limit], "runs": runs,
                           "next_offset": offset + limit if offset + limit < len(ids) else None})
 
-    def read_run_log(self, run_id, start_sequence=1, limit=100, evidence_id=None):
+    def read_run_log(self, run_id, start_sequence=1, limit=100, evidence_id=None, levels=None, logical_name=None):
         """按事件序号读取 Trace；仅允许查看该 Trace 实际引用的截图。"""
         if (type(run_id) is not int or run_id < 1 or type(start_sequence) is not int or start_sequence < 1
                 or type(limit) is not int or not 1 <= limit <= 200):
             raise ValueError("run_id/start_sequence 必须为正整数，limit 必须为 1–200 的整数。")
+        from .run_logs import image_path, query_trace, trace_records, trace_path
+        from .file_content import FileContent, image_preview
         root = self.library.data_root
-        path = root / "traces" / f"{run_id}.jsonl"
-        if path.is_symlink() or not path.is_file():
-            raise ValueError("Run 日志不可用：记录不存在或已清理。")
-        records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        selected = [record for record in records if record["sequence"] >= start_sequence]
-        details = {"run_id": run_id, "events": selected[:limit],
-                   "next_sequence": selected[limit]["sequence"] if len(selected) > limit else None}
+        try:
+            trace_path(root, run_id)
+        except (ValueError, OSError) as error:
+            raise ValueError("Run 日志不可用：记录不存在或已清理。") from error
+        page = query_trace(root, [run_id], start_sequence=start_sequence, limit=limit,
+                           levels=levels, logical_name=logical_name, check=self.checkpoint)
+        details = {"run_id": run_id, "events": [item["record"] for item in page["matches"]],
+                   "next_sequence": page["next"]["start_sequence"] if page["next"] else None,
+                   "damaged_records": page["damaged_records"]}
         if evidence_id is None:
             return self.text(details)
         def referenced(value):
@@ -419,12 +432,39 @@ class RepairTools:
                 return value.get("evidence_id") == evidence_id or any(referenced(item) for item in value.values())
             return isinstance(value, list) and any(referenced(item) for item in value)
         prefix, separator, observation = str(evidence_id).partition("/")
-        if prefix != str(run_id) or not separator or not observation.isdecimal() or not referenced(records):
+        if (prefix != str(run_id) or not separator or not observation.isdecimal()
+                or not any(referenced(record) for record in trace_records(root, run_id, check=self.checkpoint) if record)):
             raise ValueError("截图必须是该 Run 日志引用的 evidence_id。")
-        image_path = root / "evidence" / str(run_id) / f"{observation}.png"
-        if image_path.is_symlink() or not image_path.resolve().is_relative_to((root / "evidence").resolve()):
+        path = image_path(root, run_id, {"evidence_id": evidence_id})
+        if path is None:
             raise ValueError("截图路径越界。")
-        return self.image(image_path.read_bytes(), {**details, "evidence_id": evidence_id})
+        content = image_preview(FileContent.from_path(path))
+        filename = self.log.path / f"tool-{self.sequence}-run-preview.jpg"
+        filename.write_bytes(content)
+        self.log.store.register_image(filename)
+        result = self.text({**details, "evidence_id": evidence_id})
+        result["content"].append({"type": "image", "mimeType": "image/jpeg", "data": base64.b64encode(content).decode()})
+        return result
+
+    def search_run_logs(self, keyword, run_id=None, *, all_runs=False, start_run_id=None,
+                        start_sequence=1, limit=100, levels=None, logical_name=None):
+        """显式选择单 Run 或所有保留 Run，按原文子串检索并返回可续读游标。"""
+        from .run_logs import query_trace, retained_runs
+        if not isinstance(keyword, str) or not keyword.strip() or type(all_runs) is not bool:
+            raise ValueError("keyword 必须非空，all_runs 必须为布尔值。")
+        if (all_runs and run_id is not None) or (not all_runs and (type(run_id) is not int or run_id < 1)):
+            raise ValueError("指定正整数 run_id，或显式 all_runs=true，不能同时选择。")
+        if start_run_id is not None and (type(start_run_id) is not int or start_run_id < 1):
+            raise ValueError("start_run_id 必须为正整数。")
+        ids = retained_runs(self.library.data_root) if all_runs else [run_id]
+        if start_run_id is not None:
+            if not all_runs and start_run_id != run_id:
+                raise ValueError("游标不属于选定 Run。")
+            ids = [identity for identity in ids if identity <= start_run_id]
+            if ids and ids[0] != start_run_id:
+                start_sequence = 1
+        return self.text(query_trace(self.library.data_root, ids, start_sequence=start_sequence, limit=limit,
+                                    levels=levels, logical_name=logical_name, keyword=keyword, check=self.checkpoint))
 
     def add_recovery_rule(self, filename, logical_name, source):
         """创建 Recovery Rule 并登记，不赋予通用写入权限。"""

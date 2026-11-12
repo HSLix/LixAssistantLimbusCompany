@@ -24,7 +24,7 @@ DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "m
 PROVIDERS = {"llama.cpp", "deepseek"}
 SETTINGS_LOCK = threading.RLock()
 OPTION_DEFAULTS = {"history_enabled": True, "runtime_feedback_enabled": False,
-                   "automatic_repair_default": True, "recovery_limit": 10}
+                   "automatic_repair_default": True, "recovery_limit": 10, "knowledge_enabled": True}
 
 
 def checked_options(value: dict) -> dict:

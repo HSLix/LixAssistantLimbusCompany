@@ -24,14 +24,14 @@ def capture_screen(ctx, *, save: bool = False) -> dict[str, int | str]:
 
 
 def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, int | dict[str, int] | list[dict[str, str | float | dict[str, int] | list[int] | list[list[int]]]]]:
-    """识别当前有效截图的文字，返回 observation、region 和完整 items；不刷新或保存截图，不支持韩文。"""
+    """识别当前帧，返回 observation、region 和完整 items；不刷新，执行器自动保留诊断图，不支持韩文。"""
     return ctx.ocr(region=region, min_score=min_score)
 
 
 def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
                 threshold: float = 0.9, nms: bool = True,
                 nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]]:
-    """返回选定批次经 NMS 后全部命中，保留 centerxy、分数和来源；多命中不要求全部动作，业务 Step 判断歧义并记录 warning 日志。"""
+    """返回选定批次经 NMS 后全部命中，保留 centerxy、分数和来源，不自动保存截图；业务 Step 判断多命中歧义并记录 warning 日志。"""
     return ctx.match_asset(asset, priority_tags=priority_tags, region=region, threshold=threshold, nms=nms,
                            nms_iou_threshold=nms_iou_threshold)
 

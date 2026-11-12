@@ -88,9 +88,10 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     assert logs[1]['logical_name'] == 'steps.drive' and logs[0]['logical_name'] == 'tasks.drive'
     assert logs[1]['observation'] == 1 and logs[1]['evidence_path'] == logs[2]['evidence_path']
     assert Path(logs[1]['evidence_path']).is_file()
-    from lalc.recognition import decode_image
-    assert (decode_image(Path(logs[1]['evidence_path']).read_bytes()) == window.image).all()
-    assert len(list((tmp_path / 'evidence' / str(run)).glob('*.png'))) == 1
+    from PIL import Image
+    with Image.open(logs[1]['evidence_path']) as image:
+        assert image.format == 'AVIF' and image.size == (window.image.shape[1], window.image.shape[0])
+    assert len(list((tmp_path / 'evidence' / str(run)).glob('*.avif'))) == 1
     persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
     assert [event for event in persisted if event['event'] == 'component_log'] == logs
 
@@ -160,8 +161,8 @@ def test_action_debug_records_reuse_capture_and_keep_matching_results(tmp_path):
     assert len(ended) == 4 and all(e['level'] == 'debug' for e in ended)
     matched, clicked = ended[1:3]
     assert len(matched['return_value']) == 2
-    assert matched['debug_image'] == clicked['debug_image']
-    assert matched['debug_image']['captured_at'] <= clicked['recorded_at']
+    assert 'debug_image' not in matched
+    assert clicked['debug_image']['captured_at'] <= clicked['recorded_at']
     assert window.captures == 1
     assert sum(e['event'] == 'screenshot_saved' for e in state['trace']) == 1
 

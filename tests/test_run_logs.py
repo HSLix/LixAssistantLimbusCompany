@@ -129,6 +129,24 @@ def test_selection_checks_for_updates_without_moving_view(log_page):
     assert page.view.verticalScrollBar().value() == 0
 
 
+def test_wheel_step_stays_small_with_tall_logs(log_page):
+    """长日志改变行高后，普通滚轮仍按小像素步长滚动。"""
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+    app, page, _, _ = log_page
+    for row in page.model.rows:
+        row.update(text='detail\n' * 80, expanded=True)
+    page.view.doItemsLayout()
+    app.processEvents()
+    bar = page.view.verticalScrollBar()
+    assert bar.singleStep() == 20
+    bar.setValue(0)
+    event = QWheelEvent(QPointF(20, 20), QPointF(20, 20), QPoint(), QPoint(0, -120),
+                        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+    app.sendEvent(page.view.viewport(), event)
+    assert 0 < bar.value() <= 120
+
+
 def test_filter_retains_anchor_and_collapsed_text_is_searchable(log_page):
     app, page, path, until = log_page
     index = page.model.index(20)

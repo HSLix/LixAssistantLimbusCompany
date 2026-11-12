@@ -93,8 +93,13 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 - `publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`，不改变 Default，不授予运行时永久批准。
 - `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 省略 logical_name，普通 inputs 必须为空。`use_saved_config` 默认 True，采用页面保存配置及已启用任务次数；False 才采用显式 `run_state={"task_repetitions": {}, "settings": {}}`，未提供字段为空。只加载该已发布 Manifest 的唯一 Python Plan，不接受文件路径。独立试运行失败交给原 Developer Agent，不启动 Runtime Agent。修改 Candidate 后先重新 Publish 才能运行新代码。
 - 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
-- `list_runs(offset=0, limit=100)`：列出仍有 Trace 的 Run ID，按新到旧分页。
-- `read_run_log(run_id, start_sequence=1, limit=100, evidence_id=...)`：分段读取日志，可选查看该日志引用的截图；记录已清理时明确报不可用。两个日志工具均只读，不做内容搜索。
+- `list_runs(offset=0, limit=100)`：按 Run ID 新到旧分页，返回 ID 与开始／结束时间、耗时、状态、入口 logical name、Manifest ID、来源（Agent 试运行／用户运行／未知）、结果和失败原因。缺失字段不推断，缺少结束记录不等于仍运行。
+- `read_run_log(run_id, start_sequence=1, limit=100, levels=..., logical_name=..., evidence_id=...)`：按事件序号读取原始 Trace；levels 内取并集，与精确 logical name 取交集，limit 计匹配条数，沿 next_sequence 续读并保留条件。可选查看该 Run 真实引用的 PNG／AVIF 证据，返回 JPEG 预览；日志截图不作为素材来源。记录已清理时明确报不可用。
+- `search_run_logs(keyword, run_id=...)`：不区分大小写的原始事件 JSON 子串查询（含参数、结果和错误），可显式使用 `all_runs=true` 替代 run_id 搜索全部保留 Run。支持相同 levels／logical_name 条件；Run ID 降序、Run 内序号升序。返回 matches（run_id、sequence、完整 record）及 next（start_run_id、start_sequence），沿游标续读时保留全部查询条件。按命中序号调用 read_run_log 读取上下文；damaged_records 非零表示扫描遇到损坏行，不能宣称完整无匹配。没有持久索引，大范围查询可能耗时。
+
+开发者面板 Agent 设置的“允许查询外部知识库”默认开启，同时控制开发者和运行时 Agent；每轮开始固定开关，轮次内不变。关闭时 knowledge_* 和从知识库复制页面资源均不可用；历史记录和 Skills 不属于该开关。
+
+每轮新增 prompt 的 runtime_context.local_time 动态采集本机时间、时区名和 UTC 偏移后固定保存，不改历史前缀，不在工具循环更新。日志仍为 UTC；Agent 对用户采用当地时间，明确指定其他时区时优先遵循。应用保持前缀稳定不等于保证服务端缓存命中。
 
 GUI 试运行期间显示模态日志窗口，只含日志、暂停/恢复、停止；阻止操作主界面，显示时不主动抢游戏焦点。暂停/接管仅人工恢复。结束、报错或停止后窗口自动关闭，结果作为工具响应交给同轮 Agent，后续请求继续计入原额度；不会自动创建新一轮。停止只结束当前运行并建议总结等待，不禁用后续工具。取消本轮则停止试运行、等待输入释放及收尾，再结束 Agent。CLI 复用相同工具与结果，模态窗口仅用于 GUI。
 

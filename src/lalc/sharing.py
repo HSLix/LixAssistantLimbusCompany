@@ -305,9 +305,14 @@ def history_files(root, identity):
         event = record["event"]
         assert isinstance(event, dict)
         arguments = event.get("arguments", {})
-        run_id = event.get("run_id") if event.get("type") == "trial_started" else arguments.get("run_id") if event.get("type") == "repair_tool" and event.get("name") == "read_run_log" and isinstance(arguments, dict) else None
+        run_id = event.get("run_id") if event.get("type") == "trial_started" else arguments.get("run_id") if event.get("type") == "repair_tool" and event.get("name") in {"read_run_log", "search_run_logs"} and isinstance(arguments, dict) else None
         if type(run_id) is int and run_id > 0:
             run_ids.add(run_id)
+        if event.get("type") == "repair_tool" and event.get("name") == "search_run_logs":
+            for match in event.get("result", {}).get("details", {}).get("matches", []):
+                identity = match.get("run_id")
+                if type(identity) is int and identity > 0:
+                    run_ids.add(identity)
     def evidence_ids(value):
         if isinstance(value, dict):
             if isinstance(value.get("evidence_id"), str):
@@ -332,11 +337,12 @@ def history_files(root, identity):
         for identity in referenced:
             if not re.fullmatch(fr"{run_id}/[0-9]+", identity):
                 continue
-            source = root / "evidence" / (identity + ".png")
-            if source.exists():
-                files[f"runs/{run_id}/evidence/{identity.split('/')[1]}.png"] = FileContent.from_path(source)
+            from .run_logs import image_path
+            source = image_path(root, run_id, {"evidence_id": identity})
+            if source is not None and source.is_file():
+                files[f"runs/{run_id}/evidence/{source.name}"] = FileContent.from_path(source)
             else:
-                missing.append("evidence/" + identity + ".png")
+                missing.append("evidence/" + identity)
     if missing:
         files["missing-evidence.json"] = json_bytes({"missing": sorted(missing)})
     validate_history(folder, log_root=log)

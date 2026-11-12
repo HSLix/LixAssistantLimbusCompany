@@ -702,7 +702,7 @@ class WorkflowExecutor:
         while True:
             self.gate.checkpoint()
             try:
-                if logical_name in {"control.click", "control.drag", "observe.ocr", "observe.match_asset"}:
+                if logical_name in {"control.click", "control.drag", "observe.ocr"}:
                     fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
                               else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")

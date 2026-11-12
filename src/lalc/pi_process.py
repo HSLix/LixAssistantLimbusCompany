@@ -106,7 +106,8 @@ class PiProcess:
     async def session(self, command, env, cwd, show):
         from .pi_probe import PiExited, PiStartError, pi_process_environment
         signature_command = list(command)
-        for flag in ("--tools", "--system-prompt"):
+        # pi 的启动工具白名单会跨 new_session 保留；权限变化必须重建进程。
+        for flag in ("--system-prompt",):
             signature_command[signature_command.index(flag) + 1] = "<round>"
         signature = (tuple(signature_command), *(env.get(key) for key in
                      ("LALC_PI_BASE_URL", "LALC_PI_API_KEY", "LALC_PI_PROVIDER")))

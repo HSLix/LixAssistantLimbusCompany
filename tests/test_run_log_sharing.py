@@ -162,6 +162,8 @@ def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
     from PySide6.QtCore import Qt
     app, page, path, until = log_page
     archive = tmp_path / 'log.zip'
+    # 导入副本早于后续 Run，避免同一时间的 UUID 排序影响批次数量断言。
+    path.write_text(path.read_text().replace('2026-11-06T', '2026-11-01T'))
     export_log(tmp_path, 1, archive)
     imported = import_log(tmp_path, archive)
     for identity in range(2, 26):
