@@ -8,6 +8,7 @@ import base64
 from datetime import datetime, timezone
 import json
 import sys
+import time
 from pathlib import Path
 from types import SimpleNamespace
 import uuid
@@ -290,6 +291,7 @@ class RepairConversation:
             names = editable_files(self.host.candidate)
             if not message.strip():
                 raise ValueError("消息不能为空。")
+            started = time.monotonic()
             self.log.on_event = on_event
             self.log.group += 1
             self.log.requests = 0
@@ -533,7 +535,8 @@ class RepairConversation:
                     details = failed(error, "artifacts")
                     result.update(status="incomplete", artifact_error=details["message"],
                                   error=details["message"], diagnostics=details)
-                result.update(requests=self.log.requests, round=self.log.group, log_path=str(self.log.path))
+                result.update(requests=self.log.requests, round=self.log.group, log_path=str(self.log.path),
+                              duration_seconds=max(0.0, time.monotonic() - started))
                 self.log.save_json(f"{prefix}/result.json", result)
                 self.log.save_json("result.json", result)
                 self.log.save_json("context.json", self.history)

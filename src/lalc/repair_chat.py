@@ -68,6 +68,7 @@ class RepairChat(QTextBrowser):
         super().__init__(parent)
         self.batch_render = False
         self._rendering = False
+        self._following = True
         self.entries = []
         self.tools = {}
         self.activities = {}
@@ -76,14 +77,25 @@ class RepairChat(QTextBrowser):
         self.working_started = None
         self.working_timer = QTimer(self)
         self.working_timer.setInterval(1000)
-        self.working_timer.timeout.connect(lambda: self.render(follow=False))
+        self.working_timer.timeout.connect(self.render)
         self.setOpenLinks(False)
         self.anchorClicked.connect(self.open_link)
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
+        self.verticalScrollBar().rangeChanged.connect(self._scroll_range_changed)
 
     def _scroll_changed(self, value):
-        if value == 0 and not self._rendering and not self.batch_render:
+        if self._rendering or self.batch_render:
+            return
+        self._following = value >= self.verticalScrollBar().maximum() - 2
+        if value == 0:
             self.olderRequested.emit()
+
+    def _scroll_range_changed(self, minimum, maximum):
+        """延迟排版或窗口缩放改变高度时，沿用更新前的贴底选择。"""
+        if self._following and not self._rendering and not self.batch_render:
+            self._rendering = True
+            self.verticalScrollBar().setValue(maximum)
+            self._rendering = False
 
     def wheelEvent(self, event):
         if event.angleDelta().y() > 0 and self.verticalScrollBar().value() == 0:
@@ -97,6 +109,7 @@ class RepairChat(QTextBrowser):
         self.activities.clear()
         self.activity_round = 0
         super().clear()
+        self._following = True
 
     def start_work(self, number):
         """仅现场轮次启动单调时钟；状态切换和工具调用不重置计时。"""
@@ -138,16 +151,19 @@ class RepairChat(QTextBrowser):
         """真实状态作折叠标题；模型内容按纯文字转义。"""
         activity = self.activity(number)
         has_content = bool(activity['timeline'] or activity['pending'])
+        duration = activity.get('duration_seconds')
         title = escape(tr('Thinking and tools'))
         if activity['status']:
             title += ' · ' + escape(activity['status'])
         if self.working_round == number and self.working_started is not None:
             title += ' · ' + escape(tr('Working for {0}').format(working_duration(time.monotonic() - self.working_started)))
+        elif duration is not None:
+            title += ' · ' + escape(tr('Worked for {0}').format(working_duration(duration)))
         tooltip = escape(activity['tooltip'], quote=True)
         if has_content:
             arrow = '▾' if activity['expanded'] else '▸'
             title = f'<a href="raw:{number}" title="{tooltip}" style="color:#737980;text-decoration:none">{title} {arrow}</a>'
-        elif not activity['status']:
+        elif not activity['status'] and duration is None:
             return ''
         body = f'<p style="color:#737980" title="{tooltip}">{title}</p>'
         if has_content and activity['expanded']:
@@ -251,22 +267,14 @@ class RepairChat(QTextBrowser):
         elif url.scheme() in {"http", "https"}:
             QDesktopServices.openUrl(url)
 
-    def resizeEvent(self, event):
-        """聊天区重新分配高度时保留贴底状态，阅读历史时不主动滚动。"""
-        bar = self.verticalScrollBar()
-        at_bottom = bar.value() >= bar.maximum() - 2
-        super().resizeEvent(event)
-        if at_bottom:
-            bar.setValue(bar.maximum())
-
     def render(self, *, follow=True):
-        """只在本来位于底部时跟随新内容；查看历史与展开详情时保留滚动位置。"""
+        """更新沿用贴底选择；主动展开详情或补载历史时保留阅读位置。"""
         if self.batch_render:
             return
         self._rendering = True
         bar = self.verticalScrollBar()
         position = bar.value()
-        at_bottom = position >= bar.maximum() - 2
+        self._following = self._following and follow
         parts, previous_round = [], None
         # 每轮折叠区跟随该轮用户消息，续聊仍保留旧轮次内容。
         activity_indices = {}
@@ -303,7 +311,9 @@ class RepairChat(QTextBrowser):
         for number in activity_at.get(len(self.entries), []):
             parts.append(self.activity_html(number))
         self.setHtml("".join(parts))
-        # 富文本可能延迟排版，先取得完整高度再恢复阅读位置。
+        # 后续延迟排版继续由 rangeChanged 沿用贴底状态。
         self.document().documentLayout().documentSize()
-        bar.setValue(bar.maximum() if follow and at_bottom else position)
+        bar.setValue(bar.maximum() if self._following else position)
+        if not follow:
+            self._following = bar.value() >= bar.maximum() - 2
         self._rendering = False

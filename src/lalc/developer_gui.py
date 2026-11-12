@@ -1942,6 +1942,14 @@ class RepairPage(QWidget):
         kind, number = value.get("type"), event.get("round", 0)
         live = (not getattr(self, '_replaying', False) and not self.window.closing
                 and not any(job.cancel_requested for job in self.window.jobs))
+        if kind == 'round_finished':
+            import math
+            duration = value.get('duration_seconds')
+            if type(duration) in (int, float) and math.isfinite(duration) and duration >= 0:
+                self.chat.activity(number)['duration_seconds'] = duration
+            if self.chat.working_round == number:
+                self.chat.stop_work()
+            self.chat.render()
         if kind == 'raw_output':
             if live and self._round_running:
                 self.update_raw_output(value.get('content', []), number)
