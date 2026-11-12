@@ -183,6 +183,7 @@ class WindowsInputBackend:
             "GetAncestor": ([wintypes.HWND, wintypes.UINT], wintypes.HWND),
             "MapVirtualKeyW": ([wintypes.UINT, wintypes.UINT], wintypes.UINT),
             "SendInput": ([wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int], wintypes.UINT),
+            "GetSystemMetrics": ([ctypes.c_int], ctypes.c_int),
             "CreateSyntheticPointerDevice": ([ctypes.c_uint32, wintypes.ULONG, ctypes.c_uint32], ctypes.c_void_p),
             "InjectSyntheticPointerInput": ([ctypes.c_void_p, ctypes.POINTER(POINTER_TYPE_INFO), ctypes.c_uint32], wintypes.BOOL),
             "DestroySyntheticPointerDevice": ([ctypes.c_void_p], None),
@@ -287,6 +288,24 @@ class WindowsInputBackend:
 
     def client_point(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         return self.platform.client_to_screen(hwnd, x, y)
+
+    def park_cursor(self, hwnd: int) -> None:
+        """向窗口右下角外侧发送带注入标志的绝对移动，不触发自身物理接管。"""
+        rect = wintypes.RECT()
+        if not self.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        left, top, width, height = (self.user32.GetSystemMetrics(i) for i in (76, 77, 78, 79))
+        x, y = rect.right + 8, rect.bottom + 8
+        if width <= 1 or height <= 1 or not (left <= x < left + width and top <= y < top + height):
+            from .focused import WindowError
+            raise WindowError("No desktop space beyond the game's bottom-right corner; move or resize the game window.")
+        item = INPUT()
+        item.type = 0
+        item.mi = MOUSEINPUT(round((x - left) * 65535 / (width - 1)),
+                             round((y - top) * 65535 / (height - 1)), 0,
+                             0x0001 | 0x8000 | 0x4000, 0, 0x4C414C43)
+        if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
+            raise ctypes.WinError(ctypes.get_last_error())
 
     def key(self, virtual_key: int, up: bool) -> None:
         item = INPUT()

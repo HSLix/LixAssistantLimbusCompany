@@ -32,6 +32,7 @@ class FocusedAutomationSession:
         self.captured_at: str | None = None
         self.before_check: Callable[[], None] | None = None
         self.before_focus: Callable[[int], None] | None = None
+        self.before_capture: Callable[[], None] | None = None
 
     def connect(self, *, checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
         """唯一匹配后只恢复并置前一次，随后核验真实前台状态。"""
@@ -89,8 +90,34 @@ class FocusedAutomationSession:
                 f"title={info['title']!r}."
             )
 
-    def capture(self) -> dict[str, int]:
-        """取得客户区原始图像；失败不沿用旧图。"""
+    def capture(self, *, auto_park_cursor: bool = True) -> dict[str, int]:
+        """默认在受监测的控制权内移开鼠标；接管后丢弃本次观察，恢复时重新检测。"""
+        if type(auto_park_cursor) is not bool:
+            raise ValueError("auto_park_cursor must be a bool")
+        if not auto_park_cursor or self.before_capture is not None:
+            return self._capture(auto_park_cursor)
+        from .control import InputSession
+        from .runtime import RunGate
+        # 手动截图也监听接管；已有 Run 则复用其输入会话。
+        self.image = None
+        self.size = None
+        self.check()
+        hooks = self.before_check, self.before_focus, self.before_capture
+        inputs = None
+        try:
+            inputs = InputSession(self, self.platform.create_input_backend(), RunGate(), self.emit)
+            # 手动截图保持原有失焦即失败的边界，不在观察途中重新抢焦点。
+            self.before_check = inputs.check_ownership
+            return self._capture(True)
+        finally:
+            try:
+                if inputs is not None:
+                    inputs.close()
+            finally:
+                self.before_check, self.before_focus, self.before_capture = hooks
+
+    def _capture(self, auto_park_cursor: bool) -> dict[str, int]:
+        """取得客户区原始图像；焦点变化或鼠标重新进入时从头重试。"""
 
         self.image = None
         self.size = None
@@ -98,6 +125,11 @@ class FocusedAutomationSession:
             while True:
                 info = self.check()
                 revision = self.focus_revision
+                if auto_park_cursor:
+                    assert self.before_capture is not None
+                    self.before_capture()
+                    if self.focus_revision != revision:
+                        continue
                 pixels = self.platform.capture(info["hwnd"], info["width"], info["height"])
                 if type(pixels) is not bytes or len(pixels) != info["width"] * info["height"] * 4:
                     raise WindowError("Captured image has an invalid size.")
@@ -106,6 +138,8 @@ class FocusedAutomationSession:
                 if (current["width"], current["height"]) != (info["width"], info["height"]):
                     raise WindowError("Target Window client area changed during capture.")
                 if self.focus_revision == revision:
+                    if auto_park_cursor and self.platform.cursor_position(info["hwnd"])["inside"]:
+                        continue
                     break
         except Exception as error:
             self.emit("screenshot_refresh_failed", {"reason": str(error)})

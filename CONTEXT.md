@@ -41,7 +41,7 @@ The collective name for Python-first Task Workflows and Subworkflows. Each has a
 _Avoid_: Global node pool, workflow component
 
 **Task Workflow**:
-A user-startable root Workflow marked by `@task_workflow`. It organizes Subworkflows and Steps, maintains completion data in ordinary local values, and returns a JSON-compatible result. Entry checks and verification are ordinary Step responsibilities, not separate Task callbacks. A normal contract-valid return records success.
+A user-startable root Workflow marked by `@task_workflow`. It organizes Subworkflows and Steps, may observe current state before choosing a child, maintains completion data in ordinary local values, and returns a JSON-compatible result. Steps retain their own state checks when re-entered; entry checks and verification are not separate Task callbacks. A normal contract-valid return records success.
 _Avoid_: Root node, top-level Subworkflow
 
 **Subworkflow**:

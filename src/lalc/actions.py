@@ -18,9 +18,9 @@ class TrustedAction:
             raise ValueError("Trusted Action requires a callable and observe/control classification.")
 
 
-def capture_screen(ctx, *, save: bool = False) -> dict[str, int | str]:
-    """刷新客户区内存截图，按要求保存证据。"""
-    return ctx.capture_screen(save=save)
+def capture_screen(ctx, *, save: bool = False, auto_park_cursor: bool = True) -> dict[str, int | str]:
+    """刷新客户区截图，默认受控移开鼠标；可关闭 auto_park_cursor，按要求保存证据。"""
+    return ctx.capture_screen(save=save, auto_park_cursor=auto_park_cursor)
 
 
 def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, int | dict[str, int] | list[dict[str, str | float | dict[str, int] | list[int] | list[list[int]]]]]:

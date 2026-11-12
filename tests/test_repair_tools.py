@@ -216,3 +216,12 @@ def test_crop_rejects_invalid_region_and_cancel_retains_new_asset(tools):
     with pytest.raises(RuntimeError, match="cancelled"):
         invoke(tools, "game_screenshot")
     assert snapshot(tools.library.root) == before
+
+
+def test_screenshot_can_disable_cursor_parking(tools, monkeypatch):
+    def unexpected_backend():
+        pytest.fail("Disabled cursor parking must not open an input session")
+    monkeypatch.setattr(tools.platform, "create_input_backend", unexpected_backend)
+    result = invoke(tools, "game_screenshot", auto_park_cursor=False)
+    assert not result.get("isError")
+    assert tools.platform.captures == 1

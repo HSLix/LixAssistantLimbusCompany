@@ -544,23 +544,23 @@ class RepairTools:
              "signature": str(inspect.signature(action.execute)), "docstring": inspect.getdoc(action.execute)}
             for name, action in application_actions().items()]})
 
-    def capture(self):
+    def capture(self, *, auto_park_cursor: bool = True):
         """每次请求重新发现、恢复并置前唯一窗口；聚焦等待可被取消。"""
         self.checkpoint()
         platform = self.platform if self.platform is not None else WindowsWindowPlatform(checkpoint=self.checkpoint)
         session = FocusedAutomationSession(platform, lambda event, fields: self.log.record({"type": event, **fields}))
-        session.capture()
+        session.capture(auto_park_cursor=auto_park_cursor)
         self.checkpoint()
         path = self.log.path / f"tool-{self.sequence}-screenshot.png"
         metadata = session.save(path)
         self.log.store.register_image(path)
         return session, metadata, path
 
-    def game_screenshot(self):
+    def game_screenshot(self, *, auto_park_cursor: bool = True):
         """返回同次原图、网格图及完整 OCR；识别失败保留图片并说明错误，不支持韩文。"""
         from .recognition import client_image
 
-        session, metadata, path = self.capture()
+        session, metadata, path = self.capture(auto_park_cursor=auto_park_cursor)
         result = self.image(path.read_bytes(), {**metadata, "view": "original"})
         overlay = self.image(self.marked_image(session, grid=True), {"view": "grid", "spacing": 40}, 2)
         result["content"].extend(overlay["content"])

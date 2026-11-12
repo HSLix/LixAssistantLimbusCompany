@@ -316,13 +316,13 @@ class ApplicationService:
         elif self._gate is not None:
             self._gate.checkpoint()
 
-    def _capture_screen(self, save: bool) -> dict[str, Any]:
+    def _capture_screen(self, save: bool, *, auto_park_cursor: bool = True) -> dict[str, Any]:
         """Trusted Action 入口：刷新本次 Run 的内存图像并可显式保存。"""
 
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
         try:
-            result: dict[str, Any] = self._focused_session.capture()
+            result: dict[str, Any] = self._focused_session.capture(auto_park_cursor=auto_park_cursor)
         except WindowError:
             if self._input_session is not None:
                 self._input_session.check()

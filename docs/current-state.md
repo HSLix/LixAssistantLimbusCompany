@@ -1,5 +1,9 @@
 # 当前状态与文档入口
 
+2026-11-12：根据镜牢入口开发日志复盘修订默认 Agent 指导：局部修改分段试跑、稳定后补完整路径，每次运行前明确起点和期望并在结束后核对；通常采用十秒左右到十几秒超时后交给 Recovery Rule，不要求正常轮询检测错误弹窗。Task／Subworkflow 可先观测状态再进入子步骤，现有 observe／control 权限不变。补充中文直接编辑、准确类型示例及按需 OCR 指导，见[开发教程](developer-workflow-tutorial.md)与[默认规范](../src/lalc/skills/workflow-conventions/SKILL.md)。仅修改指导和工具说明；已有数据目录 Skills 不自动覆盖，需人工合并。
+
+2026-11-12：游戏截图默认受控归位鼠标：客户区内鼠标移到窗口右下角外 8 像素，接管后丢弃本次观察，Run 手动恢复后重新检测；`auto_park_cursor=False` 可关闭。手动截图增加接管监测并保留失焦即失败的边界；右下角无桌面空间时明确失败。用法与限制见[开发教程](developer-workflow-tutorial.md#匹配规则)，核心回归见 `tests/test_capture_cursor.py`。相关普通回归 289 passed；另有既存 PNG／AVIF 文件名断言不符的一项测试，单独执行失败后从最终回归排除。未运行真实 pi／模型、Windows 与游戏验收。
+
 2026-11-12：日志诊断改进已本地实施：Run 图片使用 AVIF 65 / speed 8 / 默认色度采样，仅 Match 取消自动截图；Agent Run 元数据、过滤与跨 Run 关键词搜索、共享知识库开关、本轮静态当地时间，以及工具摘要／工作计时、日志滚动与短数组格式同步更新。相关普通回归 366 passed、1 skipped；真实 pi + 本地 HTTP 替身 3 passed。Windows 成品、真实模型和游戏未验收，见[决策](log-diagnostics-decisions.md)与[影响审查及验证](log-diagnostics-impact-review.md)。
 
 2026-11-12：Session 页面增加可复制的完整 UUID；Sharing 导出列表补充 Workflow 附加信息、Session 标题和修改时间，并对齐历史会话顺序。已通过相关 82 项测试；Windows 原生显示未验收，见[决定、影响审查与验证](session-sharing-display-impact-review.md)。
