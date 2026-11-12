@@ -256,7 +256,7 @@ class AgentHistory:
         store = LogStore(root)
         marker = root / "log-format.json"
         events_path = root / "events.jsonl"
-        if marker.is_symlink() or events_path.is_symlink() or json.loads(marker.read_text()) != FORMAT:
+        if marker.is_symlink() or events_path.is_symlink() or json.loads(marker.read_text(encoding="utf-8")) != FORMAT:
             raise ValueError("Invalid Session log format or path")
         versions = {}
         def round_version(number):

@@ -40,9 +40,9 @@ def host_for(tmp_path):
 
 def test_existing_files_editable_despite_validation_failure_and_missing_reference(tmp_path):
     host, _ = host_for(tmp_path)
-    (host.candidate / "manifest.json").write_text("broken json")
-    (host.candidate / "plan.json").write_text("{}")
-    (host.candidate / "temporary.py").write_text("# 临时测试文件")
+    (host.candidate / "manifest.json").write_text("broken json", encoding="utf-8")
+    (host.candidate / "plan.json").write_text("{}", encoding="utf-8")
+    (host.candidate / "temporary.py").write_text("# 临时测试文件", encoding="utf-8")
     expected = tuple(candidate_files(host.candidate))
     assert editable_files(host.candidate) == expected
     assert not host.validate()["ok"]
@@ -56,7 +56,7 @@ def test_existing_files_editable_despite_validation_failure_and_missing_referenc
 def test_manual_validation_immediately_persists_in_current_conversation(tmp_path, valid):
     host, _ = host_for(tmp_path)
     if not valid:
-        (host.candidate / "manifest.json").write_text("broken json")
+        (host.candidate / "manifest.json").write_text("broken json", encoding="utf-8")
     for chat in (host.conversation, host.new_conversation()):
         host.conversation = chat
         result = host.validate()
@@ -71,15 +71,15 @@ def test_manual_validation_immediately_persists_in_current_conversation(tmp_path
 def test_explicit_rebuild_preserves_draft_until_success_and_resets_conversation(tmp_path, monkeypatch):
     host, loaded = host_for(tmp_path)
     draft = host.candidate / "steps.total.py"
-    draft.write_text("unpublished")
+    draft.write_text("unpublished", encoding="utf-8")
     conversation = host.new_conversation()
     metadata = host.metadata.read_bytes()
     with pytest.raises(ValueError):
         host.initialize(loaded.manifest_id)
-    assert draft.read_text() == "unpublished"
+    assert draft.read_text(encoding="utf-8") == "unpublished"
     with pytest.raises(ValueError):
         host.initialize("missing", replace=True)
-    assert draft.read_text() == "unpublished"
+    assert draft.read_text(encoding="utf-8") == "unpublished"
     assert host.conversation is conversation
     assert host.metadata.read_bytes() == metadata
     host.initialize(loaded.manifest_id, replace=True)
@@ -91,14 +91,14 @@ def test_explicit_rebuild_preserves_draft_until_success_and_resets_conversation(
 def test_metadata_failure_restores_previous_candidate(tmp_path, monkeypatch):
     host, loaded = host_for(tmp_path)
     draft = host.candidate / "steps.total.py"
-    draft.write_text("must survive")
+    draft.write_text("must survive", encoding="utf-8")
     metadata = host.metadata.read_bytes()
     def fail(*_):
         raise OSError("disk unavailable")
     monkeypatch.setattr("lalc.developer.atomic_write_json", fail)
     with pytest.raises(OSError):
         host.initialize(loaded.manifest_id, replace=True)
-    assert draft.read_text() == "must survive"
+    assert draft.read_text(encoding="utf-8") == "must survive"
     assert host.metadata.read_bytes() == metadata
 
 
@@ -106,7 +106,7 @@ def test_cumulative_diff_and_new_conversation_keep_baseline(tmp_path):
     host, loaded = host_for(tmp_path)
     assert host.diff() == ""
     source = host.candidate / "steps.total.py"
-    source.write_text(source.read_text().replace("if value > 0", "if value >= 0"))
+    source.write_text(source.read_text(encoding="utf-8").replace("if value > 0", "if value >= 0"), encoding="utf-8")
     first = host.new_conversation()
     first.add_validation({"ok": False, "errors": [{"code": "test"}]})
     diff = host.diff()

@@ -304,7 +304,7 @@ finally:
         client = subprocess.run([sys.executable, '-c', 'from PySide6.QtWidgets import QApplication; from lalc.gui_instance import GuiInstance; app=QApplication([]); assert GuiInstance().forward(True)'],
                                 env=env, capture_output=True, timeout=5)
         assert client.returncode == 0, client.stderr.decode()
-        assert received.read_text() == 'True'
+        assert received.read_text(encoding="utf-8") == 'True'
     finally:
         process.terminate()
         process.communicate(timeout=3)
@@ -328,9 +328,9 @@ def test_latest_version_card_requires_explicit_selection(windows):
     manager = user.host.manager
     original = manager.default_manifest_id()
     candidate = _write_candidate(manager.data_root / "metadata-candidate")
-    data = json.loads(candidate.read_text())
+    data = json.loads(candidate.read_text(encoding="utf-8"))
     data["AdditionalMessage"] = "<b>战斗改进</b>"
-    candidate.write_text(json.dumps(data))
+    candidate.write_text(json.dumps(data), encoding="utf-8")
     result = manager.publish(candidate)
     assert result.ok
     user.refresh_manifest_card()

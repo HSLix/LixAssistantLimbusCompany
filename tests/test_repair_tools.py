@@ -46,12 +46,12 @@ def test_readonly_tree_directory_images_and_actual_action_contracts(tools):
     first = entry(tools.library.data_root, "ui/claim")
     second = entry(tools.library.data_root, "other/button")
     tags = tools.library.path("ui/claim/asset-tag.json")
-    tags.write_text(json.dumps({first["sha256"]: ["zh", "event", "zh"]}))
+    tags.write_text(json.dumps({first["sha256"]: ["zh", "event", "zh"]}), encoding="utf-8")
     before = snapshot(tools.library.root)
     assert "  claim/" in invoke(tools, "asset_tree")["details"]["tree"]
     directory = invoke(tools, "asset_directory", logical_name="ui/claim")["details"]
     assert directory["files"] == sorted([first["sha256"] + ".png", "asset-tag.json"])
-    assert directory["tag_content"] == tags.read_text() and not directory["tags_missing"]
+    assert directory["tag_content"] == tags.read_text(encoding="utf-8") and not directory["tags_missing"]
     missing = invoke(tools, "asset_directory", logical_name="other/button")["details"]
     assert missing["tags_missing"] and missing["tag_content"] is None
     images = [{"logical_name": name, "sha256": item["sha256"]}
@@ -122,11 +122,11 @@ def test_every_capture_refocuses_and_crop_preserves_old_tags_and_source(tools):
     assert reused["tags"] == ["keep", "keep"] and reused["sha256"] == added["sha256"]
     assert snapshot(tools.library.root) == before
     assert tools.platform.focus_calls == tools.platform.captures == 3
-    source = json.loads((tools.library.data_root / "asset-provenance" / f"{reused['provenance_id']}.json").read_text())
+    source = json.loads((tools.library.data_root / "asset-provenance" / f"{reused['provenance_id']}.json").read_text(encoding="utf-8"))
     assert Path(source["source_screenshot"]).is_file()
     assert source["interaction_id"] == tools.log.path.name
     other = crop(tools, logical_name="ui/new", region={"x": 0, "y": 0, "width": 2, "height": 1})["details"]
-    tags = json.loads(tools.library.path("ui/new/asset-tag.json").read_text())
+    tags = json.loads(tools.library.path("ui/new/asset-tag.json").read_text(encoding="utf-8"))
     assert tags == {added["sha256"]: ["keep", "keep"], other["sha256"]: []}
     assert invoke(tools, "asset_images", images=[{"logical_name": "ui/new", "sha256": other["sha256"]}])["details"]["images"]
 

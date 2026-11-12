@@ -30,7 +30,7 @@ def create_page(context):
 def test_snapshot_is_nonexecuting_immutable_and_includes_resource_version(tmp_path):
     package = tmp_path / "sample"
     (package / "assets").mkdir(parents=True)
-    (package / "page.py").write_text("raise AssertionError('must not execute')")
+    (package / "page.py").write_text("raise AssertionError('must not execute')", encoding="utf-8")
     image = package / "assets/banner.png"
     image.write_bytes(b"original image")
     frozen = snapshot_page(package)
@@ -55,7 +55,7 @@ def test_installed_package_loads_real_image_and_preserves_private_settings(tmp_p
     from PySide6.QtGui import QImage
     source = tmp_path / "source"
     (source / "assets").mkdir(parents=True)
-    (source / "page.py").write_text(PAGE)
+    (source / "page.py").write_text(PAGE, encoding="utf-8")
     image = QImage(3, 2, QImage.Format.Format_RGB32)
     image.fill(0xFF112233)
     assert image.save(str(source / "assets/banner.png"))
@@ -180,7 +180,7 @@ def test_linked_resource_is_rejected_before_snapshot_or_lookup(tmp_path):
 def test_legacy_agent_install_checks_directory_page_id_conflicts(drafts):
     package = drafts.installed / "existing"
     package.mkdir(parents=True)
-    (package / "page.py").write_text(SOURCE)
+    (package / "page.py").write_text(SOURCE, encoding="utf-8")
     drafts.create("new.py", SOURCE)
     with pytest.raises(ValueError, match="冲突"):
         drafts.install(drafts.snapshot("new.py"), "sample.page", "sample.task")
@@ -190,8 +190,8 @@ def test_legacy_agent_install_checks_directory_page_id_conflicts(drafts):
 def test_duplicate_ids_across_old_file_and_package_are_not_registered(tmp_path, app):
     pages = tmp_path / "pages"
     (pages / "package").mkdir(parents=True)
-    (pages / "package/page.py").write_text(SOURCE)
-    (pages / "legacy.py").write_text(SOURCE)
+    (pages / "package/page.py").write_text(SOURCE, encoding="utf-8")
+    (pages / "legacy.py").write_text(SOURCE, encoding="utf-8")
     found, errors = discover_pages(pages, UserSettings(tmp_path))
     assert not found and len(errors) == 2
     assert all("冲突" in error for error in errors)

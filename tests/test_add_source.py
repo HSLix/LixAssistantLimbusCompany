@@ -33,11 +33,11 @@ def recover(ctx) -> None:
                                                  ("add_recovery_rule", "recovery_rules", RULE)])
 def test_create_register_and_validate_without_automatically_registering_other_files(tmp_path, tool, section, source):
     host, _ = host_for(tmp_path)
-    (host.candidate / "temporary.py").write_text("# unreferenced")
+    (host.candidate / "temporary.py").write_text("# unreferenced", encoding="utf-8")
     result = invoke(host.conversation.tools, tool, filename="new/source.py", logical_name="new.source", source=source)
     assert not result.get("isError"), result
-    assert (host.candidate / "new/source.py").read_text() == source
-    manifest = json.loads((host.candidate / "manifest.json").read_text())
+    assert (host.candidate / "new/source.py").read_text(encoding="utf-8") == source
+    manifest = json.loads((host.candidate / "manifest.json").read_text(encoding="utf-8"))
     assert manifest[section]["new.source"] == {"source_path": "new/source.py"}
     assert all("temporary" not in entries for entries in (manifest["components"], manifest["recovery_rules"]))
     assert host.conversation.tools.created_files == {"new/source.py"}
@@ -65,9 +65,9 @@ def test_manifest_parse_and_cross_section_conflicts_and_unrelated_errors(tmp_pat
     tools = host.conversation.tools
     assert not invoke(tools, "add_recovery_rule", filename="rule.py", logical_name="rules.test", source=RULE).get("isError")
     assert invoke(tools, "add_component", filename="new.py", logical_name="rules.test", source=COMPONENT)["isError"]
-    (host.candidate / "steps.total.py").write_text("invalid source !")
+    (host.candidate / "steps.total.py").write_text("invalid source !", encoding="utf-8")
     assert not invoke(tools, "add_component", filename="new.py", logical_name="steps.new", source=COMPONENT).get("isError")
-    (host.candidate / "manifest.json").write_text("broken json")
+    (host.candidate / "manifest.json").write_text("broken json", encoding="utf-8")
     assert invoke(tools, "add_component", filename="other.py", logical_name="steps.other", source=COMPONENT)["isError"]
     assert not (host.candidate / "other.py").exists()
 

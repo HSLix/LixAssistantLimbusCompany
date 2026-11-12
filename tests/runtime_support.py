@@ -43,7 +43,7 @@ def add_plan(path, body="    return None\n"):
     from pathlib import Path
     path = Path(path)
     source = '"""测试正式 Python Plan。"""\nfrom typing import Any\nfrom lalc import automation_plan\n\n@automation_plan\ndef execute(ctx) -> None:\n' + body
-    (path.parent / "plan.py").write_text(source)
-    data = json.loads(path.read_text())
+    (path.parent / "plan.py").write_text(source, encoding="utf-8")
+    data = json.loads(path.read_text(encoding="utf-8"))
     data["components"]["plans.default"] = {"source_path": "plan.py"}
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")

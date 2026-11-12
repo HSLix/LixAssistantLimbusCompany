@@ -42,12 +42,12 @@ def interrupted(chat, calls=("publish",)):
 
 def test_sessions_isolate_candidate_and_preserve_manual_source(tmp_path):
     host, loaded = host_for(tmp_path)
-    (host.candidate / "manual.txt").write_text("manual draft")
+    (host.candidate / "manual.txt").write_text("manual draft", encoding="utf-8")
     before = {path: path.read_bytes() for path in host.candidate.rglob("*") if path.is_file()}
     first = DeveloperSession.create(host.service, loaded.manifest_id)
     second = DeveloperSession.create(host.service, loaded.manifest_id)
-    (first.host.candidate / "steps.total.py").write_text("unpublished first")
-    assert (second.host.candidate / "steps.total.py").read_text() != "unpublished first"
+    (first.host.candidate / "steps.total.py").write_text("unpublished first", encoding="utf-8")
+    assert (second.host.candidate / "steps.total.py").read_text(encoding="utf-8") != "unpublished first"
     assert first.host.diff() and not second.host.diff()
     assert {path: path.read_bytes() for path in host.candidate.rglob("*") if path.is_file()} == before
     assert first.host.manager.default_manifest_id() == loaded.manifest_id
@@ -87,7 +87,7 @@ def test_failed_creation_has_no_visible_session_or_changes(session, monkeypatch)
         raise OSError("disk full")
     monkeypatch.setattr("lalc.developer_session.atomic_write_json", fail)
     with pytest.raises(OSError):
-        DeveloperSession.create(session.host.service, json.loads((session.path / "session.json").read_text())["source_manifest_id"])
+        DeveloperSession.create(session.host.service, json.loads((session.path / "session.json").read_text(encoding="utf-8"))["source_manifest_id"])
     assert sorted(session.path.parent.iterdir()) == before
 
 
@@ -279,7 +279,7 @@ def test_cli_chat_releases_lock_while_waiting_and_reloads_other_entry(session, m
             chat.append_user(message("other entry while idle"))
         return "second CLI message"
     monkeypatch.setattr("builtins.input", next_message)
-    source = json.loads((session.path / "session.json").read_text())["source_manifest_id"]
+    source = json.loads((session.path / "session.json").read_text(encoding="utf-8"))["source_manifest_id"]
     assert cli.main(["repair", "--from", source, "--chat", "--problem", "first CLI message",
                      "--base-url", "http://localhost:1/v1", "--model", "test"]) == 0
 

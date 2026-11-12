@@ -1428,7 +1428,7 @@ class RepairPage(QWidget):
     def update_source_label(self):
         """已有 Session 显示固定来源；新对话显示当前选择。"""
         if self.session is not None:
-            source = json.loads((self.session.path / 'session.json').read_text())['source_manifest_id']
+            source = json.loads((self.session.path / 'session.json').read_text(encoding="utf-8"))['source_manifest_id']
         else:
             source = self.baseline.currentData()
         text = tr('Based on Manifest: {0}').format(source or tr('None'))
@@ -1550,7 +1550,7 @@ class RepairPage(QWidget):
                 try:
                     if path.is_symlink() or (path / 'session.json').is_symlink():
                         raise ValueError('Session symlink')
-                    value = json.loads((path / 'session.json').read_text())
+                    value = json.loads((path / 'session.json').read_text(encoding="utf-8"))
                     if value['mode'] not in {'Construct', 'Repair'}:
                         raise ValueError('Invalid Session mode')
                     try:
@@ -1627,7 +1627,7 @@ class RepairPage(QWidget):
         self.history_reader = history_reader
         self.history_rounds = []
         self.mode.setCurrentItem(session.mode)
-        metadata = json.loads((session.path / 'session.json').read_text())
+        metadata = json.loads((session.path / 'session.json').read_text(encoding="utf-8"))
         self.set_manifests(self.host.manager.list_manifests())
         self.baseline.setCurrentIndex(max(0, self.baseline.findData(metadata['source_manifest_id'])))
         self.identity.setToolTip(session.identity)

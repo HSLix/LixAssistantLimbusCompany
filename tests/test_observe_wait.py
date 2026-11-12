@@ -52,12 +52,12 @@ def recover(ctx) -> None:
 ''',
     }
     for name, body in sources.items():
-        (candidate / f'{name}.py').write_text('"""等待权限测试。"""\n' + body)
+        (candidate / f'{name}.py').write_text('"""等待权限测试。"""\n' + body, encoding="utf-8")
     path = candidate / 'manifest.json'
     path.write_text(json.dumps({'schema_version': 2, 'components': {
         'tasks.wait': {'source_path': 'task.py'}, 'sub.flow': {'source_path': 'sub.py'},
         'steps.wait': {'source_path': 'step.py'}},
-        'recovery_rules': {'rules.wait': {'source_path': 'rule.py'}}}))
+        'recovery_rules': {'rules.wait': {'source_path': 'rule.py'}}}), encoding="utf-8")
     add_plan(path)
     return path
 
@@ -92,7 +92,7 @@ def test_wait_executes_in_all_observe_phases_without_injecting_input(tmp_path, f
 def test_old_wait_name_is_rejected_without_rewriting_source(tmp_path):
     path = wait_candidate(tmp_path)
     source = path.parent / 'task.py'
-    source.write_text(source.read_text().replace('observe.wait', 'control.wait'))
+    source.write_text(source.read_text(encoding="utf-8").replace('observe.wait', 'control.wait'), encoding="utf-8")
     before = source.read_bytes()
     result = ManifestManager(tmp_path / 'data').publish(path)
     assert not result.ok
@@ -130,9 +130,9 @@ def test_invalid_wait_duration_is_rejected_before_waiting(monkeypatch, seconds):
 def test_workflow_wait_takeover_preserves_stack_and_can_cancel(tmp_path, monkeypatch, cancel):
     path = wait_candidate(tmp_path)
     task = path.parent / 'task.py'
-    task.write_text(task.read_text().replace(
+    task.write_text(task.read_text(encoding="utf-8").replace(
         '    ctx.action("observe.wait", seconds=0)',
-        '    ctx.call("steps.wait")\n    ctx.action("observe.wait", seconds=0.03)'))
+        '    ctx.call("steps.wait")\n    ctx.action("observe.wait", seconds=0.03)'), encoding="utf-8")
     manager = ManifestManager(tmp_path / 'data')
     published = manager.publish(path)
     assert published.ok, published.errors

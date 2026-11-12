@@ -25,12 +25,12 @@ def test_invalid_skills_root_stops_before_model_request(tmp_path):
     host, _ = host_for(tmp_path / "project")
     path = host.service.data_root / "skills"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("occupied")
+    path.write_text("occupied", encoding="utf-8")
     chat = host.new_conversation()
     result = asyncio.run(chat.run("修复", object()))
     assert result["status"] == "incomplete" and result["requests"] == 0
     assert result["diagnostics"]["stage"] == "skills"
-    assert path.read_text() == "occupied"
+    assert path.read_text(encoding="utf-8") == "occupied"
     assert prompts.user_message_text(chat.history[-1]["content"][0]["text"]) == "修复"
 
 

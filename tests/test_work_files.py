@@ -17,9 +17,9 @@ from lalc.work_files import WorkDirectory, create_work_file, work_file
 def test_directory_cleanup_and_committed_directory_survives(tmp_path):
     with WorkDirectory(dir=tmp_path) as name:
         path = Path(name)
-        (path / 'data').write_text('complete')
+        (path / 'data').write_text('complete', encoding="utf-8")
         path.rename(tmp_path / 'committed')
-    assert (tmp_path / 'committed/data').read_text() == 'complete'
+    assert (tmp_path / 'committed/data').read_text(encoding="utf-8") == 'complete'
     with pytest.raises(RuntimeError), WorkDirectory(dir=tmp_path) as name:
         raise RuntimeError('cancelled')
     assert not Path(name).exists()
@@ -61,7 +61,7 @@ def test_products_and_scripts_do_not_create_tempfile_directories():
     root = Path(__file__).resolve().parents[1]
     forbidden = {'TemporaryDirectory', 'mkdtemp', 'NamedTemporaryFile', 'mkstemp', 'TemporaryFile'}
     for path in [*root.joinpath('src').rglob('*.py'), *root.joinpath('scripts').rglob('*.py')]:
-        tree = ast.parse(path.read_text())
+        tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module == 'tempfile':
                 assert not forbidden.intersection(alias.name for alias in node.names), path

@@ -40,11 +40,11 @@ def test_directory_create_resource_update_remove_and_reopen(drafts):
 def test_old_single_file_session_still_updates_after_target_converts_to_package(drafts):
     drafts.root.mkdir()
     legacy = drafts.root / "sample.py"
-    legacy.write_text(SOURCE)
-    (drafts.root / "sample.json").write_text(json.dumps({"filename": "sample.py", "replace": False}))
+    legacy.write_text(SOURCE, encoding="utf-8")
+    (drafts.root / "sample.json").write_text(json.dumps({"filename": "sample.py", "replace": False}), encoding="utf-8")
     # 模拟旧 Session 留有单文件草稿，而正式页已由其他 Session 换成目录。
     (drafts.installed / "sample").mkdir(parents=True)
-    (drafts.installed / "sample/page.py").write_text(SOURCE)
+    (drafts.installed / "sample/page.py").write_text(SOURCE, encoding="utf-8")
     restored = PageDrafts(DeveloperSession(drafts.session.host.service, drafts.session.identity, entry="gui"))
     restored.update("sample.py", SOURCE.replace('"Sample"', '"Updated"'))
     assert legacy.is_file()

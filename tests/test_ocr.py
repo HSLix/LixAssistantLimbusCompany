@@ -142,10 +142,10 @@ def execute(ctx) -> list[str]:
     ctx.action("observe.capture_screen")
     result = ctx.action("observe.ocr", min_score=0.9)
     return [item["text"] for item in result["items"]]
-''')
+''', encoding="utf-8")
     manifest_path = candidate / "manifest.json"
     manifest_path.write_text(json.dumps({"schema_version": 2, "components": {
-        "steps.ocr": {"source_path": "step.py"}}, "recovery_rules": {}}))
+        "steps.ocr": {"source_path": "step.py"}}, "recovery_rules": {}}), encoding="utf-8")
     from runtime_support import add_plan
     add_plan(manifest_path)
     manager = ManifestManager(tmp_path, actions=application_actions())
@@ -160,7 +160,7 @@ def execute(ctx) -> list[str]:
     run = service.start("steps.ocr", {})
     state = service.wait_for(lambda state: state["phase"] == "finished")
     assert state["result"]["status"] == "success", state["result"]
-    events = [json.loads(line) for line in (tmp_path / "traces" / f"{run}.jsonl").read_text().splitlines()]
+    events = [json.loads(line) for line in (tmp_path / "traces" / f"{run}.jsonl").read_text(encoding="utf-8").splitlines()]
     event = next(event for event in events if event["event"] == "trusted_action_returned"
                  and event["logical_name"] == "observe.ocr")
     assert event["inputs"] == {"region": None, "min_score": 0.9}

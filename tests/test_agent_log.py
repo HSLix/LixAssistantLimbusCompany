@@ -56,7 +56,7 @@ def test_events_keep_identity_live_callback_and_cross_round_storage(tmp_path):
     assert list(read_events(log.path / "events.jsonl"))[0]["event"] == body
     assert not (log.path / "objects").exists()
     assert len(list(root.glob("objects/*.txt"))) == 1
-    assert "test-private-key" not in "".join(p.read_text() for p in root.rglob("*") if p.is_file())
+    assert "test-private-key" not in "".join(p.read_text(encoding="utf-8") for p in root.rglob("*") if p.is_file())
 
 
 def test_literal_marker_is_not_interpreted_as_a_reference(tmp_path):
@@ -71,7 +71,7 @@ def test_literal_marker_is_not_interpreted_as_a_reference(tmp_path):
 def test_corrupt_literal_escape_fails_explicitly(tmp_path, pairs):
     log = RepairLog(tmp_path)
     path = log.path / "corrupted.json"
-    path.write_text(json.dumps({MARKER: {"literal": pairs}}))
+    path.write_text(json.dumps({MARKER: {"literal": pairs}}), encoding="utf-8")
     with pytest.raises(ValueError, match="转义格式"):
         read_json(path)
 
@@ -80,7 +80,7 @@ def test_corrupt_literal_escape_fails_explicitly(tmp_path, pairs):
 def test_invalid_reference_fails_explicitly(tmp_path, fault):
     log = RepairLog(tmp_path)
     log.save_json("value.json", {"message": "x" * 2048})
-    raw = json.loads((log.path / "value.json").read_text())
+    raw = json.loads((log.path / "value.json").read_text(encoding="utf-8"))
     ref = raw["message"][MARKER]
     blob = log.path / ref["path"]
     if fault == "missing":
@@ -94,7 +94,7 @@ def test_invalid_reference_fails_explicitly(tmp_path, fault):
         outside.write_bytes(blob.read_bytes())
         blob.unlink()
         blob.symlink_to(outside)
-    (log.path / "value.json").write_text(json.dumps(raw))
+    (log.path / "value.json").write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ValueError):
         read_json(log.path / "value.json")
 
@@ -122,7 +122,7 @@ def test_conversations_do_not_share_objects_and_old_logs_stay_untouched(tmp_path
     shutil.rmtree(first.path)
     assert read_json(second.path / "value.json") == value
     old = tmp_path / "old.json"
-    old.write_text('{"old":"unchanged"}')
+    old.write_text('{"old":"unchanged"}', encoding="utf-8")
     original = old.read_bytes()
     with pytest.raises(ValueError, match="旧日志"):
         read_json(old)
@@ -138,13 +138,13 @@ def test_payload_ingestion_and_tool_transport_are_separate(tmp_path):
     log.transport_dir = transport
     source = transport / "payloads/request-1.json"
     payload = {"messages": [{"content": "长消息" * 1000}]}
-    source.write_text(json.dumps(payload))
+    source.write_text(json.dumps(payload), encoding="utf-8")
     log.record({"type": "lalc_request", "requests": 1, "payload_path": str(source)})
     assert read_json(log.path / "round-1/request-1.json") == payload
     assert not source.exists()
     result = {"content": [{"type": "text", "text": "完整结果" * 1000}]}
     path = Path(log.tool_result("tool-1.json", result))
-    assert path.parent == transport and json.loads(path.read_text()) == result
+    assert path.parent == transport and json.loads(path.read_text(encoding="utf-8")) == result
     assert read_json(log.path / "tool-1.json") == result
 
 
@@ -156,10 +156,10 @@ def test_expand_command_keeps_existing_output(tmp_path, monkeypatch):
     output = tmp_path / "expanded.json"
     monkeypatch.setattr("sys.argv", ["agent_log", str(log.path / "request.json"), "--output", str(output)])
     main()
-    assert json.loads(output.read_text()) == value
+    assert json.loads(output.read_text(encoding="utf-8")) == value
     with pytest.raises(SystemExit) as error:
         main()
-    assert error.value.code == 1 and json.loads(output.read_text()) == value
+    assert error.value.code == 1 and json.loads(output.read_text(encoding="utf-8")) == value
 
 
 def test_round_reader_is_lazy_incremental_and_keeps_noncontiguous_rounds(tmp_path):
@@ -173,7 +173,7 @@ def test_round_reader_is_lazy_incremental_and_keeps_noncontiguous_rounds(tmp_pat
     log.record({'type': 'lalc_request', 'requests': 3})
     # 历史内容损坏不妨碍索引和读取新轮次，访问该轮时仍必须报错。
     object_path = next(log.root.glob('objects/*.txt'))
-    object_path.write_text('corrupt')
+    object_path.write_text('corrupt', encoding="utf-8")
     reader = RoundEventReader(log.root / 'events.jsonl')
     reader.refresh()
     assert reader.read(2)[0]['event']['requests'] == 3
@@ -191,7 +191,7 @@ def test_round_reader_rejects_event_file_symlink_before_indexing(tmp_path):
     from lalc.agent_log import RoundEventReader
     log = RepairLog(tmp_path)
     outside = tmp_path / 'outside.jsonl'
-    outside.write_text('{"round":1,"event":{}}\n')
+    outside.write_text('{"round":1,"event":{}}\n', encoding="utf-8")
     (log.root / 'events.jsonl').symlink_to(outside)
     with pytest.raises(ValueError, match='符号链接'):
         RoundEventReader(log.root / 'events.jsonl').refresh()

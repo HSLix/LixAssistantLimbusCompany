@@ -62,11 +62,11 @@ def test_incomplete_tool_declarations_rejected_before_request(conversation, tmp_
             command = list(command)
             index = command.index('--extension') + 1
             extension = tmp_path / 'incomplete-tools.ts'
-            source = Path(command[index]).read_text()
+            source = Path(command[index]).read_text(encoding="utf-8")
             mutation = 'delete payload.tools;' if declarations == 'missing' else 'payload.tools?.pop();'
             source = source.replace('const active = new Set(pi.getActiveTools());\n          if (payload.tools)',
                                     mutation + '\n          const active = new Set(pi.getActiveTools());\n          if (payload.tools)')
-            extension.write_text(source)
+            extension.write_text(source, encoding="utf-8")
             command[index] = str(extension)
             yield command, env, temporary, model
 
@@ -104,8 +104,8 @@ def test_single_model_response_can_call_multiple_host_tools(conversation):
 def test_multifile_edit_manifest_and_plan_enforced(conversation):
     chat, options, state = conversation
     candidate = chat.host.candidate
-    manifest = (candidate / "manifest.json").read_text()
-    (candidate / "temporary.py").write_text("# before")
+    manifest = (candidate / "manifest.json").read_text(encoding="utf-8")
+    (candidate / "temporary.py").write_text("# before", encoding="utf-8")
     (candidate / "outside-link.py").symlink_to(candidate.parent / "outside.py")
     # 候选符号链接在进入模型前拒绝，不依赖文件选择。
     with pytest.raises(ValueError):
@@ -121,17 +121,17 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
         tool("validate", {}), answer("need another round")])
     result = asyncio.run(chat.run("edit multiple existing files", options))
     assert result["status"] == "completed", result
-    assert "if value >= 0" in (candidate / "steps.total.py").read_text()
-    assert (candidate / "manifest.json").read_text() == "{invalid json"
-    assert 'ctx.log("plan edited")' in (candidate / "plans.default.py").read_text()
+    assert "if value >= 0" in (candidate / "steps.total.py").read_text(encoding="utf-8")
+    assert (candidate / "manifest.json").read_text(encoding="utf-8") == "{invalid json"
+    assert 'ctx.log("plan edited")' in (candidate / "plans.default.py").read_text(encoding="utf-8")
     assert not (candidate / "new.py").exists()
-    assert 'return "changed"' in (candidate / "steps.unchanged.py").read_text()
-    assert (candidate / "temporary.py").read_text() == "# after"
+    assert 'return "changed"' in (candidate / "steps.unchanged.py").read_text(encoding="utf-8")
+    assert (candidate / "temporary.py").read_text(encoding="utf-8") == "# after"
     assert any(message.get("role") == "toolResult" and message.get("isError") for message in chat.history)
     script(state, [tool("edit", {"path": "manifest.json", "oldText": "{invalid json", "newText": manifest}), answer("repaired")])
     result = asyncio.run(chat.run("fix the invalid manifest", options))
     assert result["status"] == "completed", result
-    assert (candidate / "manifest.json").read_text() == manifest
+    assert (candidate / "manifest.json").read_text(encoding="utf-8") == manifest
     assert chat.host.diff().count("if value >= 0") == 1
 
 
@@ -533,7 +533,7 @@ def test_live_asset_tool_images_retained_across_rounds_without_overwrite(convers
         assert read_json(chat.log.path / f"round-2/request-{index}.json") == chat.log.clean(body)
     assert all(p.read_bytes() == value for p, value in retained.items())
     assert "data:image/png;base64," in json.dumps(state["calls"][-1])
-    mapping = json.loads((chat.host.service.data_root / "assets/ui/new/asset-tag.json").read_text())
+    mapping = json.loads((chat.host.service.data_root / "assets/ui/new/asset-tag.json").read_text(encoding="utf-8"))
     assert list(mapping.values()) == [["keep"]]
 
 
@@ -583,11 +583,11 @@ def test_add_both_source_kinds_then_edit_new_files_in_same_round(conversation):
         tool("validate", {}), answer("created and edited")])
     result = asyncio.run(chat.run("add both kinds", options))
     assert result["status"] == "completed", result
-    assert 'return "edited"' in (chat.host.candidate / "new/step.py").read_text()
-    assert "return True" in (chat.host.candidate / "new/rule.py").read_text()
+    assert 'return "edited"' in (chat.host.candidate / "new/step.py").read_text(encoding="utf-8")
+    assert "return True" in (chat.host.candidate / "new/rule.py").read_text(encoding="utf-8")
     assert chat.host.validate()["ok"]
     assert (chat.log.path / "round-1/final/new/step.py").exists()
-    assert "new/step.py" in (chat.log.path / "round-1/cumulative.diff").read_text()
+    assert "new/step.py" in (chat.log.path / "round-1/cumulative.diff").read_text(encoding="utf-8")
     assert any(message.get("toolName") == "add_component" for message in chat.history)
 
 
@@ -786,7 +786,7 @@ def test_python_plan_edit_publish_and_saved_trial_ignore_unpublished_changes(con
     result = asyncio.run(chat.run("edit, publish and trial Python Plan", options))
     assert result["status"] == "completed", result
     assert chat.host.manager.default_manifest_id() == original
-    assert '{"value": 9}' in (chat.host.candidate / "plans.default.py").read_text()
+    assert '{"value": 9}' in (chat.host.candidate / "plans.default.py").read_text(encoding="utf-8")
 
 
 def test_round_freezes_shared_config_and_auth_until_next_message(conversation):

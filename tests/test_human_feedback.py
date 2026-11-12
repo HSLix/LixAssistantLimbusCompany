@@ -36,7 +36,7 @@ def test_feedback_permissions_validation_and_redaction(tmp_path):
     result = read_json(tools.call('request_feedback', {'message': 'known-secret'}))
     assert result['details']['status'] == 'confirmed'
     assert 'known-secret' not in str(result)
-    assert 'known-secret' not in (log.path / 'events.jsonl').read_text()
+    assert 'known-secret' not in (log.path / 'events.jsonl').read_text(encoding="utf-8")
 
 
 def test_cancel_wakes_tool_and_invalidates_late_response(tmp_path):

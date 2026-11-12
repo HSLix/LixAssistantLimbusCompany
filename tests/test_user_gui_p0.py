@@ -119,7 +119,7 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_p
     assert page.key is None
     assert owner.host.secrets["llama.cpp"] == "saved-key"
     assert page.secret_state.text() == "API Key：已设置"
-    assert "saved-key" not in (owner.service.data_root / "agent-settings.json").read_text()
+    assert "saved-key" not in (owner.service.data_root / "agent-settings.json").read_text(encoding="utf-8")
     dialog, buttons = key_dialog(page)
     assert page.key.text() == ""
     buttons.rejected.emit()

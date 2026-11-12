@@ -68,7 +68,7 @@ def test_invalid_or_credential_bearing_addresses_rejected(address):
 
 
 def test_corrupt_settings_are_not_ignored(tmp_path):
-    (tmp_path / "agent-settings.json").write_text('{"max_requests":true}')
+    (tmp_path / "agent-settings.json").write_text('{"max_requests":true}', encoding="utf-8")
     with pytest.raises(ValueError):
         settings.load_settings(tmp_path)
 
@@ -81,7 +81,7 @@ def test_output_limit_only_supports_server_default_and_legacy_settings(tmp_path)
 
 def test_invalid_saved_limit_can_be_explicitly_reset(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
-    (tmp_path / "agent-settings.json").write_text('{"max_requests":1,"model":"chosen"}')
+    (tmp_path / "agent-settings.json").write_text('{"max_requests":1,"model":"chosen"}', encoding="utf-8")
     assert cli.main(["agent-config", "--max-requests", "2"]) == 0
     assert settings.load_settings(tmp_path)["max_requests"] == 2
 
@@ -203,12 +203,12 @@ def test_pi_version_mismatch_warns_and_continues(monkeypatch, tmp_path, caplog, 
         assert event["type"] == "pi_version_warning"
         assert event["actual_version"] == version and event["expected_version"] == probe.PI_VERSION
         assert caplog.records[0].levelno == logging.WARNING
-        assert version in (log.path / "events.jsonl").read_text()
+        assert version in (log.path / "events.jsonl").read_text(encoding="utf-8")
 
 
 def test_provider_keys_migrate_and_clear_independently(tmp_path):
     path = tmp_path / 'agent-settings.json'
-    path.write_text(json.dumps({'secret_name': 'local-key', 'model': 'local-model'}))
+    path.write_text(json.dumps({'secret_name': 'local-key', 'model': 'local-model'}), encoding="utf-8")
     local = settings.load_settings(tmp_path)
     assert local['provider_secrets'] == {'llama.cpp': 'local-key'}
     cloud = settings.save_settings(tmp_path, {'provider': 'deepseek', 'secret_name': 'cloud-key'})
@@ -220,7 +220,7 @@ def test_provider_keys_migrate_and_clear_independently(tmp_path):
     assert settings.load_settings(tmp_path, {'provider': 'deepseek'})['secret_name'] == 'cloud-key'
     cleared = settings.save_settings(tmp_path, {'provider': 'deepseek'}, clear=True)
     assert cleared['secret_name'] is None and cleared['provider_secrets'] == {'llama.cpp': 'local-key'}
-    assert 'cloud-key' not in path.read_text()
+    assert 'cloud-key' not in path.read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize('values', [
@@ -262,5 +262,5 @@ def test_platform_secret_replacement_and_clear_preserve_other_key(tmp_path, monk
     assert settings.secret_path(tmp_path, local_name).is_file()
     assert not settings.secret_path(tmp_path, replaced['secret_name']).exists()
     assert settings.resolve_key(args, settings.load_settings(tmp_path, {'provider': 'llama.cpp'}), tmp_path) == 'local-api-key'
-    text = (tmp_path / 'agent-settings.json').read_text()
+    text = (tmp_path / 'agent-settings.json').read_text(encoding="utf-8")
     assert 'local-api-key' not in text and 'cloud-api-key' not in text

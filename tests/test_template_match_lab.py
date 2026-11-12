@@ -23,7 +23,7 @@ def test_group_and_single_match_use_formal_rules_without_writes(tmp_path):
     library = host.service.asset_library
     a = entry(host.service.data_root, 'ui/start')
     b = entry(host.service.data_root, 'ui/start', np.full((2, 2, 3), 200, dtype=np.uint8))
-    library.path('ui/start/asset-tag.json').write_text(json.dumps({a['sha256']: ['en'], b['sha256']: ['other']}))
+    library.path('ui/start/asset-tag.json').write_text(json.dumps({a['sha256']: ['en'], b['sha256']: ['other']}), encoding="utf-8")
     snapshot = pixels(screenshot()), (12, 8), 4
     before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob('*') if p.is_file()}
     group = host.match_template_preview(snapshot, 'ui/start', threshold=.999, priority_tags=['en'])
@@ -79,10 +79,10 @@ def test_catalog_checks_metadata_without_reading_contents(tmp_path, monkeypatch)
     first = host.template_catalog()
     assert first[1] == [a['path']] and host.template_catalog() == first
     tags = host.service.asset_library.path('ui/start/asset-tag.json')
-    tags.write_text('{}')
+    tags.write_text('{}', encoding="utf-8")
     second = host.template_catalog()
     assert second[0] != first[0]
-    tags.write_text('{ }')
+    tags.write_text('{ }', encoding="utf-8")
     assert host.template_catalog()[0] != second[0]
     host.service.asset_library.path(a['path']).unlink()
     assert host.template_catalog()[1] == []
@@ -125,7 +125,7 @@ def test_gui_tree_unchanged_and_changed_on_reentry(gui, monkeypatch):
     wait_jobs(app, window)
     assert page.tree.currentItem() is leaf and not ui.isExpanded() and len(reads) == 1
     tags = window.service.asset_library.path('ui/start/asset-tag.json')
-    tags.write_text(json.dumps({a['sha256']: ['en']}))
+    tags.write_text(json.dumps({a['sha256']: ['en']}), encoding="utf-8")
     window.switchTo(window.capture_page)
     window.switchTo(page)
     app.processEvents()

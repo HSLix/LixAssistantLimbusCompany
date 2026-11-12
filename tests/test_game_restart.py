@@ -88,7 +88,7 @@ def environment(tmp_path, monkeypatch):
     executable.touch()
     data = tmp_path / "data"
     data.mkdir()
-    (data / "game-version-settings.json").write_text(json.dumps({"steam_root": str(root)}))
+    (data / "game-version-settings.json").write_text(json.dumps({"steam_root": str(root)}), encoding="utf-8")
     platform = RestartWindow(executable)
     events = []
     emit = lambda event, fields: events.append({"event": event, **fields})

@@ -31,7 +31,7 @@ def put_asset(root, name, content):
     folder = root / "assets" / name
     folder.mkdir(parents=True, exist_ok=True)
     (folder / f"{digest(content)}.png").write_bytes(content)
-    (folder / "asset-tag.json").write_text(json.dumps({digest(content): ["tag"]}))
+    (folder / "asset-tag.json").write_text(json.dumps({digest(content): ["tag"]}), encoding="utf-8")
 
 
 @pytest.fixture
@@ -45,28 +45,28 @@ def source(tmp_path, monkeypatch):
     (manager.components_dir / f"{digest(plan)}.py").write_bytes(plan)
     manifest = {"schema_version": 2, "manifest_id": identity,
                 "components": {"plans.default": {"component_id": "sha256:" + digest(plan)}}, "recovery_rules": {}}
-    (manager.manifests_dir / f"{identity}.json").write_text(json.dumps(manifest))
+    (manager.manifests_dir / f"{identity}.json").write_text(json.dumps(manifest), encoding="utf-8")
     put_asset(root, "ui", png("red"))
     put_asset(root, "ui/child", png("blue"))
     page = root / "pages/sample"
     (page / "assets").mkdir(parents=True)
     marker = tmp_path / "must-not-execute"
-    (page / "page.py").write_text(f'PAGE_ID = "sharing.sample"\nPAGE_NAME = "Sample"\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n')
+    (page / "page.py").write_text(f'PAGE_ID = "sharing.sample"\nPAGE_NAME = "Sample"\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n', encoding="utf-8")
     (page / "assets/banner.png").write_bytes(png("green"))
     session = root / "developer-sessions" / str(uuid.uuid4())
     (session / "candidate").mkdir(parents=True)
     (session / "candidate/plan.py").write_bytes(plan)
-    (session / ".candidate-baseline.json").write_text(json.dumps({"manifest_id": identity, "files": {"plan.py": base64.b64encode(plan).decode()}}))
+    (session / ".candidate-baseline.json").write_text(json.dumps({"manifest_id": identity, "files": {"plan.py": base64.b64encode(plan).decode()}}), encoding="utf-8")
     (session / "page-drafts").mkdir()
-    (session / "page-drafts/draft.py").write_text("# export-time draft")
+    (session / "page-drafts/draft.py").write_text("# export-time draft", encoding="utf-8")
     log = RepairLog(root, path=session / "log")
     log.record({"type": "message_end", "message": {"role": "user", "content": [{"type": "text", "text": "hello history"}]}})
     log.record({"type": "trial_started", "run_id": 1})
     (root / "traces").mkdir()
-    (root / "traces/1.jsonl").write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n")
+    (root / "traces/1.jsonl").write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n", encoding="utf-8")
     (root / "evidence/1").mkdir(parents=True)
     (root / "evidence/1/2.png").write_bytes(png("white"))
-    (root / "user-settings.json").write_text('{"private":"must not export"}')
+    (root / "user-settings.json").write_text('{"private":"must not export"}', encoding="utf-8")
     def forbidden(*args, **kwargs):
         pytest.fail("分享不得执行 Workflow")
     monkeypatch.setattr(ManifestManager, "_load", forbidden)
@@ -123,10 +123,10 @@ def test_four_type_roundtrip_without_execution_or_session_restore(source, tmp_pa
         assert (target.data_root / "pages/sample/assets/banner.png").exists()
         assert not (target.data_root / "developer-sessions").exists()
         imported, = (target.data_root / "knowledge/imported-agent-history").iterdir()
-        assert (imported / "baseline/plan.py").read_text() == EMPTY_PLAN
+        assert (imported / "baseline/plan.py").read_text(encoding="utf-8") == EMPTY_PLAN
         knowledge = KnowledgeLibrary(target.data_root, lambda: None)
         chunks = list((imported / "readable").glob("*.txt"))
-        assert any("hello history" in chunk.read_text() for chunk in chunks)
+        assert any("hello history" in chunk.read_text(encoding="utf-8") for chunk in chunks)
         for chunk in chunks:
             metadata, image = knowledge.read(chunk.relative_to(target.data_root / "knowledge").as_posix())
             assert metadata["text"] and image is None
@@ -140,7 +140,7 @@ def test_uuid_collision_gets_new_identity_without_default_changes(source, tmp_pa
     archive = tmp_path / "share.zip"
     save_package(build_export(manager, {"workflow": [identity]}), archive)
     old = (manager.manifests_dir / f"{identity}.json").read_bytes()
-    (manager.manifests_dir / "default.json").write_text(json.dumps({"manifest_id": identity}))
+    (manager.manifests_dir / "default.json").write_text(json.dumps({"manifest_id": identity}), encoding="utf-8")
     package = SharingPackage(archive)
     try:
         checks = inspect_objects(manager, package)
@@ -241,7 +241,7 @@ def test_unreviewed_requires_confirmation_and_known_id_conflicts_block(source, t
         assert outcome["failed"] and not marker.exists()
         other = target.data_root / "pages/other"
         other.mkdir(parents=True)
-        (other / "page.py").write_text('PAGE_ID="sharing.sample"\nPAGE_NAME="Other"')
+        (other / "page.py").write_text('PAGE_ID="sharing.sample"\nPAGE_NAME="Other"', encoding="utf-8")
         with pytest.raises(ValueError, match="PAGE_ID"):
             import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)
         assert not (target.data_root / "pages/sample").exists()
@@ -381,7 +381,7 @@ def test_history_keeps_invalid_candidate_and_raw_snapshots(source, tmp_path):
         imported, = (target.data_root / "knowledge/imported-agent-history").iterdir()
         assert (imported / "candidate/manifest.json").read_bytes() == b"{broken candidate"
         assert (imported / "page-drafts/binary.txt").read_bytes() == b"\xff\xfe"
-        assert any("{broken candidate" in path.read_text() for path in (imported / "readable").glob("*.txt"))
+        assert any("{broken candidate" in path.read_text(encoding="utf-8") for path in (imported / "readable").glob("*.txt"))
     finally:
         package.close()
 
@@ -395,7 +395,7 @@ def test_history_repeated_reference_expansion_is_bounded(tmp_path, monkeypatch):
     store = LogStore(log)
     leaf = store._put(b"x" * 64, "txt")
     repeated = store._put(json_bytes([leaf] * 10), "json")
-    (log / "events.jsonl").write_text(json.dumps(repeated) + "\n")
+    (log / "events.jsonl").write_text(json.dumps(repeated) + "\n", encoding="utf-8")
     monkeypatch.setattr("lalc.sharing.available_memory", lambda: len(json_bytes([leaf] * 10)) + 100)
     with pytest.raises(ValueError, match="展开超过大小限制"):
         validate_history(root)
@@ -410,7 +410,7 @@ def test_history_repeated_images_are_verified_once(tmp_path, monkeypatch):
     image = png("green")
     stored = LogStore(log)._put(image, "bin")[MARKER]
     reference = {MARKER: {**stored, "base64": True}}
-    (log / "events.jsonl").write_text(json.dumps([reference] * 5) + "\n")
+    (log / "events.jsonl").write_text(json.dumps([reference] * 5) + "\n", encoding="utf-8")
     calls = []
     original = sharing.FileContent.from_path
     def counted(path):
@@ -427,7 +427,7 @@ def test_page_import_preserves_local_availability_and_reserves_disabled_task_ids
     from lalc.user_pages import PageAvailability
     manager, _ = source
     code = 'PAGE_ID="sharing.sample"\nPAGE_NAME="Sample"\nTASKS=[{"id":"first","name":"First","show_task_count":True},{"id":"second","name":"Second","show_task_count":False}]\n'
-    (manager.data_root / 'pages/sample/page.py').write_text(code)
+    (manager.data_root / 'pages/sample/page.py').write_text(code, encoding="utf-8")
     PageAvailability(manager.data_root).set_enabled('sample.py', False)
     archive = tmp_path / 'pages-state.zip'
     save_package(build_export(manager, {'pages': ['sample.py']}), archive)
@@ -445,7 +445,7 @@ def test_page_import_preserves_local_availability_and_reserves_disabled_task_ids
         assert result['failed'] is None and PageAvailability(target.data_root).enabled('sample.py')
         other = target.data_root / 'pages/other'
         other.mkdir()
-        (other / 'page.py').write_text(code.replace('sharing.sample', 'other').replace('"first"', '"third"'))
+        (other / 'page.py').write_text(code.replace('sharing.sample', 'other').replace('"first"', '"third"'), encoding="utf-8")
         PageAvailability(target.data_root).set_enabled('other.py', False)
         with pytest.raises(ValueError, match='TASKS'):
             import_selected(target, package, checks, {0}, asset_actions={}, reviewed={}, allow_unreviewed=True)

@@ -127,7 +127,7 @@ def test_diff_button_reads_current_fixed_baseline(gui):
     app, window = gui
     page = window.repair_page
     file = window.repair_page.host.candidate / "steps.total.py"
-    file.write_text(file.read_text().replace("if value > 0", "if value >= 0"))
+    file.write_text(file.read_text(encoding="utf-8").replace("if value > 0", "if value >= 0"), encoding="utf-8")
     expected = window.repair_page.host.diff()
     page.show_diff()
     wait_jobs(app, window)
@@ -295,9 +295,9 @@ def test_skills_menu_opens_persistent_source_and_preserves_edits(gui, monkeypatc
     assert opened == [str(root)]
     skill = root / 'workflow-development' / 'SKILL.md'
     assert skill.is_file()
-    skill.write_text('custom content')
+    skill.write_text('custom content', encoding="utf-8")
     page.skills_action.trigger()
-    assert opened == [str(root), str(root)] and skill.read_text() == 'custom content'
+    assert opened == [str(root), str(root)] and skill.read_text(encoding="utf-8") == 'custom content'
 
 
 def test_tool_links_follow_reordered_history_entries(gui):

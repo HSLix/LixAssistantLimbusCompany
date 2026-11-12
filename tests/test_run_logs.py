@@ -19,7 +19,7 @@ def write_logs(root, count=2000):
     records = [dict(event='component_log', sequence=i + 1, level='info', logical_name='steps.example',
                     recorded_at=f'2026-11-06T12:{i // 60:02}:{i % 60:02}Z',
                     message=f'中文日志 {i} ' + 'x' * (i % 127)) for i in range(count)]
-    path.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in records))
+    path.write_text(''.join(json.dumps(r, ensure_ascii=False) + '\n' for r in records), encoding="utf-8")
     return path, records
 
 
@@ -53,7 +53,7 @@ def test_snapshot_ignores_partial_tail_and_retains_old_boundary(tmp_path):
     assert len(read_page(tmp_path, 1, old)['rows']) == 2
     added = read_page(tmp_path, 1, current, start=old[2])['rows']
     assert [r['text'] for r in added] == ['new']
-    path.write_text('')
+    path.write_text('', encoding="utf-8")
     with pytest.raises(ValueError, match='truncated'):
         read_page(tmp_path, 1, current)
 
@@ -62,7 +62,7 @@ def test_full_text_filters_and_damaged_records(tmp_path):
     path, _ = write_logs(tmp_path, 2)
     action = dict(event='trusted_action_returned', logical_name='observe.ocr', inputs={},
                   return_value={'items': [{'text': 'buried result'}]})
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write('{broken}\n' + json.dumps(action) + '\n')
     boundary = snapshot(tmp_path, 1)
     assert len(read_page(tmp_path, 1, boundary)['rows']) == 2
@@ -79,7 +79,7 @@ def test_image_evidence_stays_in_run_and_dimensions_are_reserved(tmp_path):
     folder.mkdir(parents=True)
     Image.new('RGB', (160, 90)).save(folder / '1.png')
     image_record = dict(event='component_log', level='info', message='image', evidence_id='1/1')
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write(json.dumps(image_record) + '\n')
     rows = read_page(tmp_path, 1, snapshot(tmp_path, 1), images=True)['rows']
     assert len(rows) == 1 and rows[0]['dimensions'] == (160, 90)
@@ -116,7 +116,7 @@ def log_page(tmp_path, monkeypatch):
 def test_selection_checks_for_updates_without_moving_view(log_page):
     app, page, path, until = log_page
     original = page.model.rows[0]['record']['sequence']
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write(json.dumps(dict(event='component_log', level='info', message='new', sequence=321)) + '\n')
     app.processEvents()
     assert not page.new_logs.isVisible()

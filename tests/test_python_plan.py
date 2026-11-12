@@ -33,12 +33,12 @@ def test_empty_initial_plan_publishes_and_runs(tmp_path):
 def test_exactly_one_plan_required_without_rewriting_candidate(tmp_path, count):
     manager = _publish(tmp_path)
     path = tmp_path / 'candidate-0/manifest.json'
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     if count == 0:
         del data['components']['plans.default']
     else:
         data['components']['plans.other'] = data['components']['plans.default']
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     before = path.read_bytes()
     result = manager.publish(path)
     assert not result.ok and 'unique_plan_required' in {e.code for e in result.errors}
@@ -49,9 +49,9 @@ def test_exactly_one_plan_required_without_rewriting_candidate(tmp_path, count):
 def test_legacy_saved_manifest_and_arbitrary_path_are_rejected_without_run(tmp_path):
     manager = _publish(tmp_path)
     path = manager.manifests_dir / f'{manager.default.manifest_id}.json'
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     del data['components']['plans.default']
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     before = path.read_bytes()
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with pytest.raises(StartError, match='incompatible'):
@@ -80,7 +80,7 @@ def test_plan_cannot_bypass_task_or_literal_call_boundary(tmp_path, body):
 def test_plan_input_snapshot_and_business_output_do_not_replace_statistics(tmp_path):
     manager = _publish(tmp_path, plan_body='    ctx.run_state.settings["page"]["items"].append("local")\n    ctx.call("tasks.double", value=1)\n    return {"items": [], "status": "fake", "configuration": ctx.run_state.settings}\n')
     path = tmp_path / 'candidate-0/plan.py'
-    path.write_text(path.read_text().replace('-> None:', '-> Any:'))
+    path.write_text(path.read_text(encoding="utf-8").replace('-> None:', '-> Any:'), encoding="utf-8")
     saved = manager.publish(path.parent / 'manifest.json')
     assert saved.ok, saved.errors
     service = ApplicationService(tmp_path, manifest_manager=manager)
@@ -144,7 +144,7 @@ def test_published_plan_hash_is_checked_before_start(tmp_path):
     manager = _publish(tmp_path)
     component = manager.default.components['plans.default']
     source = manager.components_dir / (component.component_id.removeprefix('sha256:') + '.py')
-    source.write_text(source.read_text() + '\n# tampered\n')
+    source.write_text(source.read_text(encoding="utf-8") + '\n# tampered\n', encoding="utf-8")
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with pytest.raises(StartError):
         service.start_plan(use_saved_config=False, )
@@ -171,9 +171,9 @@ def test_later_task_missing_from_working_manifest_is_recorded_as_task_failure(tm
     _publish(tmp_path, manager, step_source=replacement)
     candidate = tmp_path / 'candidate-1/manifest.json'
     add_plan(candidate)
-    data = json.loads(candidate.read_text())
+    data = json.loads(candidate.read_text(encoding="utf-8"))
     del data['components']['tasks.double']
-    candidate.write_text(json.dumps(data))
+    candidate.write_text(json.dumps(data), encoding="utf-8")
     saved = manager.publish(candidate)
     assert saved.ok, saved.errors
     choices = iter([saved.loaded.manifest_id])
