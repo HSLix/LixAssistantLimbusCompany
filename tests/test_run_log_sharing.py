@@ -1,4 +1,4 @@
-"""覆盖单日志 ZIP 快照、隔离导入、恶意路径及取消清理。
+"""覆盖单日志 ZIP 快照、隔离导入、安全检查及左侧记录分批加载。
 
 从项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_run_log_sharing.py
@@ -156,3 +156,70 @@ def test_gui_export_then_import_without_review(log_page, tmp_path, monkeypatch):
     until(lambda: page.runs.count() == 2)
     assert len(confirmations) == 1
     assert len(list_logs(tmp_path)) == 2
+
+
+def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
+    from PySide6.QtCore import Qt
+    app, page, path, until = log_page
+    archive = tmp_path / 'log.zip'
+    export_log(tmp_path, 1, archive)
+    imported = import_log(tmp_path, archive)
+    for identity in range(2, 26):
+        (path.parent / f'{identity}.jsonl').write_text(json.dumps(dict(
+            event='component_log', level='info', message=str(identity),
+            recorded_at=f'2026-11-{identity:02}T12:00:00Z')) + '\n')
+    page.refresh_runs()
+    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    keys = lambda: [page.runs.item(i).data(Qt.ItemDataRole.UserRole) for i in range(page.runs.count())]
+    assert keys() == list(range(25, 15, -1))
+    assert len(page.entries) == 10
+    rows = page.model.rows
+    bar = page.runs.verticalScrollBar()
+    app.processEvents()
+    previous_bottom = bar.maximum()
+    bar.setValue(previous_bottom)
+    until(lambda: page.runs.count() == 20)
+    app.processEvents()
+    assert bar.value() == previous_bottom
+    assert keys() == list(range(25, 5, -1))
+    assert page.selected_key == 25 and page.model.rows is rows
+    app.processEvents()
+    bar.setValue(bar.maximum())
+    until(lambda: page.runs.count() == 26)
+    assert len(set(keys())) == 26 and imported in keys()
+    page.append_runs()
+    assert page.runs.count() == 26
+    page.select_run(page.runs.item(19))
+    until(lambda: not page.loading)
+    page.refresh_runs()
+    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    page.select_source('imported')
+    until(lambda: page.runs.count() == 1 and page.selected_key == imported and not page.loading)
+    page.select_source('local')
+    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    page.select_source('imported')
+    page.select_source('local')
+    until(lambda: not page.tasks)
+    assert keys() == list(range(25, 15, -1))
+
+
+def test_gui_run_list_without_scrollbar_accepts_wheel_and_keyboard(log_page, tmp_path):
+    from PySide6.QtCore import QEvent, QPoint, QPointF, Qt
+    from PySide6.QtGui import QKeyEvent, QWheelEvent
+    app, page, path, until = log_page
+    for identity in range(2, 26):
+        (path.parent / f'{identity}.jsonl').write_bytes(path.read_bytes())
+    page.resize(1100, 2600)
+    page.refresh_runs()
+    until(lambda: page.runs.count() == 10 and not page.tasks)
+    assert page.runs.verticalScrollBar().maximum() == 0
+    wheel = QWheelEvent(QPointF(20, 20), QPointF(20, 20), QPoint(), QPoint(0, -120),
+                        Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier,
+                        Qt.ScrollPhase.NoScrollPhase, False)
+    app.sendEvent(page.runs.viewport(), wheel)
+    assert page.runs.count() == 20
+    app.processEvents()
+    assert page.runs.verticalScrollBar().maximum() == 0
+    page.runs.setCurrentRow(19)
+    app.sendEvent(page.runs, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier))
+    assert page.runs.count() == 25

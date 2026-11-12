@@ -6,7 +6,7 @@ from threading import Event
 from pathlib import Path
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable, QRectF,
-                            QSize, Qt, QThreadPool, QTimer, Signal, Slot)
+                            QSize, Qt, QThreadPool, QTimer, QSignalBlocker, QEvent, Signal, Slot)
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption
 from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
@@ -201,6 +201,7 @@ class RunLogPage(QWidget):
         self.setObjectName("run-logs")
         self.root, self.run_id, self.boundary = root, None, None
         self.read_root, self.selected_key, self.entries = root, None, {}
+        self.run_entries = []
         self.cancelled = Event()
         self.generation, self.serial = 0, 0
         self.callbacks, self.tasks = {}, {}
@@ -234,6 +235,9 @@ class RunLogPage(QWidget):
         self.runs.setStyleSheet("QListWidget {border: none; background: transparent;}")
         self.runs.itemClicked.connect(self.select_run)
         self.runs.itemActivated.connect(self.select_run)
+        self.runs.verticalScrollBar().valueChanged.connect(self.runs_scrolled)
+        self.runs.viewport().installEventFilter(self)
+        self.runs.installEventFilter(self)
         sidebar = CardWidget()
         sidebar.setFixedWidth(270)
         side = QVBoxLayout(sidebar)
@@ -340,21 +344,11 @@ class RunLogPage(QWidget):
         def shown(entries):
             if serial != self.listing_serial:
                 return
-            self.entries = {entry['key']: entry for entry in entries}
+            self.run_entries = [entry for entry in entries
+                                if source == 'all' or entry['imported'] == (source == 'imported')]
+            self.entries = {}
             self.runs.clear()
-            for entry in entries:
-                if source == 'local' and entry['imported'] or source == 'imported' and not entry['imported']:
-                    continue
-                title = tr('Log No.{0}').format(entry['run_id'])
-                stamp = log_time(entry['started_at'])
-                item = QListWidgetItem(title + '\n' + (stamp[:13] if stamp != '—' else stamp)
-                                       + (' · ' + tr('Imported') if entry['imported'] else ''))
-                item.setFont(self.run_title.font())
-                item.setSizeHint(QSize(230, 76))
-                item.setData(Qt.ItemDataRole.UserRole, entry['key'])
-                self.runs.addItem(item)
-                if entry['key'] == self.selected_key:
-                    self.runs.setCurrentItem(item)
+            self.append_runs()
             if self.runs.count() and self.runs.currentRow() < 0:
                 self.runs.setCurrentRow(0)
                 self.select_run(self.runs.item(0))
@@ -366,6 +360,42 @@ class RunLogPage(QWidget):
                 self.export_button.setEnabled(False)
                 self.status.setText(tr('No run logs'))
         self.submit(lambda: list_logs(self.root), shown)
+
+    def runs_scrolled(self, value):
+        """用户滚到列表底部时追加下一批，不切换右侧运行。"""
+        bar = self.runs.verticalScrollBar()
+        if bar.maximum() > 0 and value == bar.maximum():
+            self.append_runs()
+
+    def eventFilter(self, watched, event):
+        """首批不足以产生滚动条时，仍允许滚轮和键盘请求较旧记录。"""
+        if self.runs.verticalScrollBar().maximum() == 0:
+            if (watched is self.runs.viewport() and event.type() == QEvent.Type.Wheel
+                    and event.angleDelta().y() < 0):
+                self.append_runs()
+            elif (watched is self.runs and event.type() == QEvent.Type.KeyPress
+                    and event.key() in (Qt.Key.Key_Down, Qt.Key.Key_PageDown, Qt.Key.Key_End)
+                    and self.runs.currentRow() == self.runs.count() - 1):
+                self.append_runs()
+        return super().eventFilter(watched, event)
+
+    def append_runs(self):
+        """每批创建十条列表项，阻止插入引起的滚动信号递归加载。"""
+        # shortcut: 排序仍需后台扫描完整时间目录，目录扫描成为瓶颈时再引入可重建索引。
+        with QSignalBlocker(self.runs.verticalScrollBar()):
+            start = self.runs.count()
+            for entry in self.run_entries[start:start + 10]:
+                self.entries[entry['key']] = entry
+                title = tr('Log No.{0}').format(entry['run_id'])
+                stamp = log_time(entry['started_at'])
+                item = QListWidgetItem(title + '\n' + (stamp[:13] if stamp != '—' else stamp)
+                                       + (' · ' + tr('Imported') if entry['imported'] else ''))
+                item.setFont(self.run_title.font())
+                item.setSizeHint(QSize(230, 76))
+                item.setData(Qt.ItemDataRole.UserRole, entry['key'])
+                self.runs.addItem(item)
+                if entry['key'] == self.selected_key:
+                    self.runs.setCurrentItem(item)
 
     def import_zip(self):
         """选择后直接检查并导入，取消或失败不留下半成品。"""

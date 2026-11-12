@@ -200,6 +200,10 @@ def test_real_process_lock_and_exit_release(session):
         with pytest.raises(OSError):
             session.conversation()
         with pytest.raises(OSError):
+            session.rename('blocked')
+        with pytest.raises(OSError):
+            session.delete()
+        with pytest.raises(OSError):
             asyncio.run(chat.run("blocked", SimpleNamespace()))
         assert not list((session.path / "log").glob("round-*"))
     finally:

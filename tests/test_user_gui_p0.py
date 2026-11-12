@@ -77,7 +77,7 @@ def test_user_groups_navigation_and_developer_lock(owner, app):
     developer = owner.open_window(True)
     assert user.agent_controls.isEnabled()
     assert not page.isEnabled()
-    assert user.edit_owner_notice.text() == "请在 Developer GUI 中修改"
+    assert user.edit_owner_notice.text() == "请在开发者面板中修改"
     assert hasattr(developer.settings_page, "diagnostics")
     assert developer.close()
     assert user.agent_controls.isEnabled()
@@ -262,3 +262,16 @@ def test_task_mismatch_shows_reason_and_resolved_history_is_neutral(owner, monke
     assert not user.warning_button.isHidden()
     assert "当前无配置异常" in user.warning_button.toolTip()
     assert any("missing.task" in entry for entry in user.warning_history)
+
+
+def test_open_developer_directly_without_notice(owner, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox, QPushButton
+    monkeypatch.setattr(QMessageBox, 'information', lambda *args: pytest.fail('打开面板不应弹用途提醒'))
+    button = next(button for button in owner.user.findChildren(QPushButton)
+                  if button.text() == '打开开发者面板')
+    button.click()
+    developer = owner.developer
+    assert developer is not None
+    assert developer.windowTitle() == 'LALC — 开发者面板'
+    button.click()
+    assert owner.developer is developer
