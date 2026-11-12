@@ -366,7 +366,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="585" />
       <source>Developer GUI</source>
-      <translation>开发者界面</translation>
+      <translation>开发者面板</translation>
     </message>
     <message>
       <location filename="../gui.py" line="123" />
@@ -396,7 +396,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="829" />
       <source>Edit in Developer GUI</source>
-      <translation>请在 Developer GUI 中修改</translation>
+      <translation>请在开发者面板中修改</translation>
     </message>
     <message>
       <location filename="../gui.py" line="500" />
@@ -552,7 +552,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="104" />
       <source>LALC — Developer</source>
-      <translation>LALC — 开发者</translation>
+      <translation>LALC — 开发者面板</translation>
     </message>
     <message>
       <location filename="../gui.py" line="534" />
@@ -678,7 +678,7 @@ Log: {1}</source>
     <message>
       <location filename="../gui.py" line="518" />
       <source>Open Developer GUI</source>
-      <translation>打开 Developer GUI</translation>
+      <translation>打开开发者面板</translation>
     </message>
     <message>
       <location filename="../gui.py" line="538" />
@@ -1015,11 +1015,6 @@ Log: {1}</source>
       <location filename="../gui.py" line="469" />
       <source>The software disclaimer is not connected yet</source>
       <translation>软件声明尚未接入</translation>
-    </message>
-    <message>
-      <location filename="../gui.py" line="585" />
-      <source>This interface is for developer observation, Candidate editing and trials.</source>
-      <translation>此界面供开发者观察、编辑 Candidate 和试运行。</translation>
     </message>
     <message>
       <location filename="../repair_chat.py" line="76" />
@@ -2026,5 +2021,45 @@ Original pixel region: {2}</source>
 <message><source>Repaired version is now the default</source><translation>已自动使用修复版本</translation></message>
 <message><source>Could not automatically use the repaired version</source><translation>自动使用修复版本失败</translation></message>
 <message><source>Maximum model requests per recovery</source><translation>每次恢复的模型请求上限</translation></message>
+    <message>
+      <source>Session settings</source>
+      <translation>会话设置</translation>
+    </message>
+    <message>
+      <source>Rename</source>
+      <translation>重命名</translation>
+    </message>
+    <message>
+      <source>Delete</source>
+      <translation>删除</translation>
+    </message>
+    <message>
+      <source>Rename Session</source>
+      <translation>重命名会话</translation>
+    </message>
+    <message>
+      <source>Session title</source>
+      <translation>会话标题</translation>
+    </message>
+    <message>
+      <source>Delete Session</source>
+      <translation>删除会话</translation>
+    </message>
+    <message>
+      <source>Delete this Session and its conversation, attachments and unpublished drafts? This cannot be undone.</source>
+      <translation>确定删除此会话及其对话、附件和未发布草稿吗？删除后不可恢复。</translation>
+    </message>
+    <message>
+      <source>Session removed, but some files could not be deleted: {0}</source>
+      <translation>会话已移除，但部分文件未能删除：{0}</translation>
+    </message>
+    <message>
+      <source>Renaming Session</source>
+      <translation>正在重命名会话</translation>
+    </message>
+    <message>
+      <source>Deleting Session</source>
+      <translation>正在删除会话</translation>
+    </message>
 </context>
 </TS>

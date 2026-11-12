@@ -1027,6 +1027,55 @@ class SettingsPage(QWidget):
         self.model_button.setEnabled(not busy)
 
 
+class SessionHistory(QListWidget):
+    """复用一个悬停菜单按钮；右键或键盘菜单键也可管理当前会话。"""
+
+    menuRequested = Signal(str, QPoint)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMouseTracking(True)
+        self.menu_identity = None
+        self.menu_button = TransparentToolButton(FluentIcon.MORE, self.viewport())
+        self.menu_button.setFixedSize(28, 28)
+        self.menu_button.setToolTip(tr('Session settings'))
+        self.menu_button.setAccessibleName(tr('Session settings'))
+        self.menu_button.hide()
+        style = 'SessionHistory::item { padding-right: 36px; }'
+        CustomStyleSheet(self).setCustomStyleSheet(style, style)
+        self.menu_button.clicked.connect(lambda: self.menuRequested.emit(
+            self.menu_identity, self.menu_button.mapToGlobal(self.menu_button.rect().bottomLeft())))
+        self.verticalScrollBar().valueChanged.connect(lambda *_: self.menu_button.hide())
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        item = self.itemAt(event.position().toPoint())
+        if item is None:
+            self.menu_button.hide()
+            return
+        self.menu_identity = item.data(Qt.ItemDataRole.UserRole)
+        rect = self.visualItemRect(item)
+        self.menu_button.move(rect.right() - 32, rect.center().y() - 14)
+        self.menu_button.show()
+        self.menu_button.raise_()
+
+    def leaveEvent(self, event):
+        self.menu_button.hide()
+        super().leaveEvent(event)
+
+    def contextMenuEvent(self, event):
+        item = self.itemAt(event.pos()) if event.reason() != event.Reason.Keyboard else self.currentItem()
+        if item is not None:
+            self.menuRequested.emit(item.data(Qt.ItemDataRole.UserRole),
+                                    self.viewport().mapToGlobal(self.visualItemRect(item).center()))
+        event.accept()
+
+    def clear(self):
+        self.menu_button.hide()
+        self.menu_identity = None
+        super().clear()
+
+
 class RepairPage(QWidget):
     """统一 Session 工作台；未发送的准备状态不创建或重建 Candidate。"""
 
@@ -1038,6 +1087,7 @@ class RepairPage(QWidget):
         self.history_rounds = []
         self.images, self.manifest_references = [], []
         self.tool_errors, self.titles = {}, {}
+        self.session_menu = self.rename_dialog = None
         self._round_running = False
         self._page_preview_requests = []
         self._auto_collapsed = False
@@ -1058,9 +1108,10 @@ class RepairPage(QWidget):
         row.addWidget(self.refresh_button)
         side.addLayout(row)
         self.new_button = button(tr('New Chat'), self.new, side)
-        self.history = QListWidget()
+        self.history = SessionHistory()
         self.history.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.history.itemClicked.connect(self.open_session)
+        self.history.menuRequested.connect(self.open_session_menu)
         side.addWidget(self.history, 1)
         layout.addWidget(self.sidebar)
         main = QWidget()
@@ -1106,6 +1157,7 @@ class RepairPage(QWidget):
         layout.addWidget(main, 1)
         title_row = QHBoxLayout()
         self.identity = QLabel(tr('New Chat'))
+        self.identity.setTextFormat(Qt.TextFormat.PlainText)
         self.identity.setMinimumWidth(0)
         self.identity.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         title_row.addWidget(self.identity, 1)
@@ -1397,8 +1449,6 @@ class RepairPage(QWidget):
 
     def saved_title(self, path):
         """只读首条用户消息；忙会话使用已有缓存，不阻塞或恢复执行。"""
-        if path.name in self.titles:
-            return self.titles[path.name]
         from .developer_session import DeveloperSession
         from .agent_log import read_events
         events = path / 'log' / 'events.jsonl'
@@ -1406,6 +1456,15 @@ class RepairPage(QWidget):
             raise ValueError('Session log symlink')
         session = DeveloperSession(self.window.service, path.name, entry='gui')
         with session.host.candidate_lock():
+            metadata = json.loads((path / 'session.json').read_text(encoding='utf-8'))
+            if 'title' in metadata:
+                title = metadata['title']
+                if not isinstance(title, str) or not title.strip() or '\n' in title or '\r' in title:
+                    raise ValueError('Invalid Session title')
+                self.titles[path.name] = (title[:39] + '…' if len(title) > 40 else title, title)
+                return self.titles[path.name]
+            if path.name in self.titles:
+                return self.titles[path.name]
             if not events.exists():
                 return '', ''
             for row in read_events(events):
@@ -1423,6 +1482,85 @@ class RepairPage(QWidget):
                         self.titles[path.name] = title
                         return title
         return '', ''
+
+    def open_session_menu(self, identity, position):
+        """菜单开启和执行都检查忙状态，避免对话框期间活动变化绕过门槛。"""
+        if self.is_busy():
+            return
+        if self.session_menu is not None:
+            self.session_menu.close()
+            self.session_menu.deleteLater()
+        menu = RoundMenu(parent=self)
+        rename = Action(tr('Rename'), menu)
+        remove = Action(tr('Delete'), menu)
+        rename.triggered.connect(lambda: self.window._interact(lambda: self.rename_session(identity)))
+        remove.triggered.connect(lambda: self.window._interact(lambda: self.delete_session(identity)))
+        menu.addAction(rename)
+        menu.addAction(remove)
+        self.session_menu = menu
+        menu.exec(position)
+
+    def rename_session(self, identity):
+        """名称只进入会话展示元数据，保存成功后才更新界面。"""
+        if self.is_busy():
+            return
+        from .developer_session import DeveloperSession
+        session = DeveloperSession(self.window.service, identity, entry='gui')
+        title, _ = self.saved_title(session.path)
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr('Rename Session'))
+        dialog.setWindowModality(Qt.WindowModality.WindowModal)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        layout = QVBoxLayout(dialog)
+        editor = QLineEdit(dialog)
+        metadata = json.loads((session.path / 'session.json').read_text(encoding='utf-8'))
+        editor.setText(metadata.get('title', title))
+        editor.setAccessibleName(tr('Session title'))
+        layout.addWidget(editor)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        save = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save.setEnabled(bool(editor.text().strip()))
+        editor.textChanged.connect(lambda text: save.setEnabled(bool(text.strip()) and not self.is_busy()))
+        layout.addWidget(buttons)
+        def confirm():
+            if self.is_busy():
+                return
+            title = editor.text()
+            def renamed(_):
+                if self.rename_dialog is dialog:
+                    dialog.accept()
+                self.titles.pop(identity, None)
+                self.refresh_sessions()
+            self.window.launch(lambda: session.rename(title), renamed)
+        buttons.accepted.connect(confirm)
+        buttons.rejected.connect(dialog.reject)
+        self.rename_dialog = dialog
+        dialog.finished.connect(lambda *_: setattr(self, 'rename_dialog', None))
+        dialog.open()
+        editor.selectAll()
+        editor.setFocus()
+
+    def delete_session(self, identity):
+        """确认后后台删除私有数据，当前会话删除完成才回到空白准备状态。"""
+        if self.is_busy():
+            return
+        answer = QMessageBox.warning(self, tr('Delete Session'),
+            tr('Delete this Session and its conversation, attachments and unpublished drafts? This cannot be undone.'),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel, QMessageBox.StandardButton.Cancel)
+        if answer != QMessageBox.StandardButton.Yes or self.is_busy():
+            return
+        from .developer_session import DeveloperSession
+        session = DeveloperSession(self.window.service, identity, entry='gui')
+        def done(remaining):
+            self.titles.pop(identity, None)
+            if self.session is not None and self.session.identity == identity:
+                self.new()
+            else:
+                self.refresh_sessions()
+            if remaining is not None:
+                QMessageBox.warning(self, tr('Delete Session'),
+                    tr('Session removed, but some files could not be deleted: {0}').format(remaining))
+        self.window.launch(session.delete, done)
 
     def refresh_sessions(self):
         """列表只读取不可变身份；打开时在锁内校验并恢复全部状态。"""
@@ -1835,7 +1973,9 @@ class RepairPage(QWidget):
             self.clear_raw_output()
         status = None
         if kind == 'workbench_session':
-            self.titles[value['session'].identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
+            identity = value['session'].identity
+            if not self.titles.get(identity, ('', ''))[0]:
+                self.titles[identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
             self.activate_session(value['session'], restore_history=False)
             self.chat.add_message('你', value['message'], value['round'])
             self.message.clear()
@@ -1922,6 +2062,14 @@ class RepairPage(QWidget):
         self.window.launch(self.host.publish, lambda identity: self.reload_history())
 
     def render(self, busy):
+        if self.session_menu is not None:
+            for action in self.session_menu.actions():
+                action.setEnabled(not busy)
+        if self.rename_dialog is not None:
+            editor = self.rename_dialog.findChild(QLineEdit)
+            buttons = self.rename_dialog.findChild(QDialogButtonBox)
+            buttons.button(QDialogButtonBox.StandardButton.Save).setEnabled(not busy and bool(editor.text().strip()))
+            buttons.button(QDialogButtonBox.StandardButton.Cancel).setEnabled(not busy)
         if not self.window.jobs:
             self.clear_raw_output()
             if self._round_running and self.status.text() == tr('Cancelling…'):

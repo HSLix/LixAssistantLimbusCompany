@@ -90,7 +90,7 @@ The unified developer-directed workspace for constructing, extending and repairi
 _Avoid_: Unrestricted coding agent, Runtime Agent Session, shared global Agent Candidate
 
 **Developer Session**:
-A persistent, resumable Agent conversation with its own Candidate, fixed comparison baseline, page drafts where authorized, and a fixed Construct or Repair mode. Stage 6 uses the same Session for runtime Repair initialized from the active Manifest and subsequent developer continuation; the current entry determines tool authority, and retaining the conversation does not retain a live Run.
+A persistent, resumable Agent conversation with its own Candidate, fixed comparison baseline, page drafts where authorized, and a fixed Construct or Repair mode. Stage 6 uses the same Session for runtime Repair initialized from the active Manifest and subsequent developer continuation; the current entry determines tool authority, and retaining the conversation does not retain a live Run. Its display title is initialized from the first user request and remains fixed unless manually renamed; the title does not define its identity. Deleting a Session removes its private conversation and unpublished drafts while preserving independently published or installed capabilities.
 _Avoid_: Separate runtime session store, model request, global Candidate
 
 **Manifest Reference Attachment**:

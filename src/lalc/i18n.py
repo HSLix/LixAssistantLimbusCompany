@@ -80,4 +80,5 @@ def activity_text(name: str) -> str:
         "Capture 保存": tr("Saving Asset"), "Candidate 初始化": tr("Initializing Candidate"),
         "Candidate 校验": tr("Validating Candidate"), "Candidate 发布": tr("Publishing Candidate"),
         "Candidate Diff": tr("Viewing Diff"), "新对话": tr("New Conversation"), "Agent Settings 检查": tr("Checking Agent settings"),
+        "Session rename": tr("Renaming Session"), "Session delete": tr("Deleting Session"),
     }.get(name, name)

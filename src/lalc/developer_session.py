@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 from pathlib import Path
 import re
+import shutil
 import uuid
 
 from .agent_log import FORMAT, read_events
 from .agent_policy import allowed_tools
 from .developer import DeveloperHost, candidate_files
 from .runtime import atomic_write_json, staging_directory
+from .work_files import create_work_directory
 
 
 def restored_history(events):
@@ -125,6 +128,9 @@ class DeveloperSession:
         if source is not None and str(uuid.UUID(source)) != source:
             raise ValueError("Session 来源必须是标准 Manifest UUID。")
         allowed_tools(metadata["mode"], self.entry)
+        if 'title' in metadata and (not isinstance(metadata['title'], str) or not metadata['title'].strip()
+                                    or '\n' in metadata['title'] or '\r' in metadata['title']):
+            raise ValueError("Session 标题必须是非空单行文字。")
         self.mode = metadata["mode"]
         if json.loads((self.path / "log/log-format.json").read_text(encoding="utf-8")) != FORMAT:
             raise ValueError("不支持该 Session 日志格式。")
@@ -140,6 +146,47 @@ class DeveloperSession:
             base64.b64decode(content, validate=True)
         candidate_files(self.host.candidate)
         return metadata
+
+    def rename(self, title):
+        """只保存展示名称，不改身份、日志、模式或来源；忙碌和锁竞争时拒绝。"""
+        if not isinstance(title, str) or not title.strip() or '\n' in title or '\r' in title:
+            raise ValueError("Session 标题必须是非空单行文字。")
+        with self.host.candidate_activity('Session rename'):
+            metadata = self.check()
+            metadata['title'] = title.strip()
+            stamp = self.path.stat()
+            atomic_write_json(self.path / 'session.json', metadata)
+            os.utime(self.path, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+        return metadata['title']
+
+    def delete(self):
+        """删除私有目录和历史索引；提交前失败恢复，提交后清理失败返回残留位置。"""
+        from .agent_history import AgentHistory
+        history = AgentHistory(self.host.service.data_root)
+        with self.host.candidate_activity('Session delete'), history.lock():
+            self.check()
+            stage = None
+            try:
+                with history.connection(write=history.database.exists()) as connection:
+                    stage = Path(create_work_directory(dir=self.path.parent, prefix='.delete-'))
+                    self.path.replace(stage / 'session')
+                    if connection is not None:
+                        connection.execute('DELETE FROM rounds WHERE session_id=?', (self.identity,))
+            except BaseException:
+                if stage is not None:
+                    if (stage / 'session').exists():
+                        # 恢复失败时保留隔离目录中的唯一旧副本，不交给自动清理。
+                        try:
+                            (stage / 'session').replace(self.path)
+                        except OSError as error:
+                            raise OSError(f'Session recovery failed; retained data: {stage / "session"}') from error
+                    stage.rmdir()
+                raise
+            try:
+                shutil.rmtree(stage)
+            except OSError:
+                return stage
+        return None
 
     def conversation(self, *, load_history=True):
         """打开只恢复已保存状态；GUI 浏览可延后模型历史，执行前仍完整恢复。"""

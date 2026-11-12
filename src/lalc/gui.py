@@ -698,7 +698,6 @@ class UserWindow(MainWindow):
         self.steam_directory.setText(directory)
 
     def open_developer(self):
-        QMessageBox.information(self, tr('Developer GUI'), tr('This interface is for developer observation, Candidate editing and trials.'))
         self.coordinator.open_window(True)
 
     @staticmethod

@@ -17,7 +17,7 @@ Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保
 
 ## 工作台与运行入口
 
-#336 聊天交互重构已本地实施，当前界面使用分段模式选择、底部集成输入 / 取消 / 附件及 More 工具菜单；来源仅在新聊天上下文中显示，已开始会话使用只读模式标识。历史标题从首条实际用户消息本地提取，不调用模型。当前操作和验证见[实施记录](stage-5-336-chat-ui-implementation.md)，决定及边界见[对齐记录](stage-5-336-chat-ui-decisions.md)。
+#336 聊天交互重构已本地实施，当前界面使用分段模式选择、底部集成输入 / 取消 / 附件及 More 工具菜单；来源仅在新聊天上下文中显示，已开始会话使用只读模式标识。历史标题从首条实际用户消息本地提取，后续消息不自动覆盖，不调用模型。2026-11-11 增加持久重命名与彻底删除：悬停会话项右侧显示子设置，运行／试跑／等待反馈／取消清理期间统一禁用；删除前提示不可恢复，清除会话私有草稿、对话及历史检索记录，保留已发布版本、已安装页及共享素材。删除当前会话后回到空白新建聊天。完整规则与验证见[确认记录](session-management-decisions.md)及[影响审查](session-management-impact-review.md)。当前操作和验证见[实施记录](stage-5-336-chat-ui-implementation.md)，决定及边界见[对齐记录](stage-5-336-chat-ui-decisions.md)。
 
 - 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建入口使用 New Chat，历史侧栏可折叠。保留图片 / Manifest 参考附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
 - 新建并选好 Construct / Repair 模式和来源后，首条用户消息提交前仍可调整两者；首次提交时固定模式、来源及其对应 Candidate / Diff 基线。开始对话后，更换模式或来源须新建 Session。打开历史 Session 显示其真实模式。

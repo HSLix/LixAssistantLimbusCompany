@@ -1,5 +1,9 @@
 # 当前状态与文档入口
 
+2026-11-11：开发者面板的会话标题首次初始化后固定；历史会话增加悬停子设置、持久重命名及确认后彻底删除，忙碌及清理期间禁用入口。设计、故障边界与验证见[专项审查](session-management-impact-review.md)。
+
+2026-11-11：移除 User GUI 打开开发界面的用途提醒，中文名统一为“开发者面板”；运行记录左侧每批显示 10 条、滚动追加，后台仍扫描时间目录。设计与验证见[专项记录](developer-panel-run-list-impact-review.md)。
+
 2026-11-11 Stage 6 已完成本地实施：RunState、Plan／Workflow／Step 各自恢复、同一 Repair Session 的 Publish → Recheck 循环、开关与结束时 Default 选择已接线。Plan 正常结束即可自动使用最终 Working Manifest，不要求所有 Task 成功。设计见[影响审查](stage-6-design-impact-review.md)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，接口、迁移及验证边界见[实施记录](stage-6-implementation.md)。未创建 tickets；Windows、真实模型与游戏尚未验收。
 
 2026-11-11 Developer GUI 打开期间，User GUI 的 User Agent 启用开关保持可用，仅具体 Agent 配置表单冻结；交接保存及关闭后重读共享值保持。影响与验证见[专项记录](user-agent-toggle-design-impact-review.md)。
