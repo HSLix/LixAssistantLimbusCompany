@@ -10,7 +10,7 @@ root = Path(SPECPATH)
 a = Analysis(
     [str(root / "packaging_entry.py")],
     pathex=[str(root / "src")],
-    binaries=collect_dynamic_libs("onnxruntime"),
+    binaries=collect_dynamic_libs("onnxruntime") + collect_dynamic_libs("PIL"),
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
            (str(root / "MagicAndWonder.ico"), "lalc"),
            (str(root / "src/lalc/pi_probe.ts"), "lalc"),
@@ -27,7 +27,7 @@ a = Analysis(
         "PySideSix-Frameless-Window", "darkdetect",
         "rapidocr", "onnxruntime",
     )), []),
-    hiddenimports=["onnxruntime", "rapidocr.inference_engine.onnxruntime", "UnityPy.resources"],
+    hiddenimports=["onnxruntime", "rapidocr.inference_engine.onnxruntime", "UnityPy.resources", "PIL.AvifImagePlugin"],
     hookspath=[str(root / "packaging_hooks")],
     hooksconfig={},
     runtime_hooks=[],

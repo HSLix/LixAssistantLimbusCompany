@@ -754,7 +754,8 @@ class SettingsPage(QWidget):
         self.revision = 0
         layout = QVBoxLayout(self)
         self.global_controls = {}
-        option_labels = ({"history_enabled": tr('Allow searching Agent history')} if side == "developer" else {
+        option_labels = ({"history_enabled": tr('Allow searching Agent history'),
+                          "knowledge_enabled": tr('Allow querying external knowledge')} if side == "developer" else {
             "automatic_repair_default": tr('Automatically use the repaired version after normal completion'),
             "runtime_feedback_enabled": tr('Allow requesting human feedback'),
         })
@@ -1842,6 +1843,7 @@ class RepairPage(QWidget):
         self.window._interact(action)
 
     def answered(self, result):
+        self.chat.stop_work()
         expanded = {number: activity['expanded'] for number, activity in self.chat.activities.items()}
         self.reload_history()
         for number, activity in self.chat.activities.items():
@@ -1956,6 +1958,7 @@ class RepairPage(QWidget):
                 self.titles[identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
             self.activate_session(value['session'], restore_history=False)
             self.chat.add_message('你', value['message'], value['round'])
+            self.chat.start_work(value['round'])
             self.message.clear()
             self.clear_image()
             return
@@ -2054,6 +2057,7 @@ class RepairPage(QWidget):
                 self.set_status(tr('Round cancelled'))
                 self.status.setToolTip(self.status.text())
             self._round_running = False
+            self.chat.stop_work()
         for control in (self.new_button, self.refresh_button, self.history, self.message, self.attach):
             control.setEnabled(not busy)
         preparing = self.session is None

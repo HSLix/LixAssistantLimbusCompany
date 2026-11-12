@@ -873,3 +873,40 @@ def test_live_raw_output_is_forwarded_without_preflight_or_history_storage(conve
     assert not any(row['event']['type'] in {'raw_output', 'message_update', 'model_check_started'} for row in saved)
     assert not (chat.log.root / 'round-1/events.jsonl').exists()
     assert (chat.log.root / 'round-1/request-1.json').exists()
+
+
+def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation, monkeypatch):
+    """真实 pi 验证新工具声明与每轮快照；不调用真实模型。"""
+    from lalc.agent_policy import KNOWLEDGE_TOOLS
+    from lalc.agent_settings import save_options
+    from lalc import agent_prompts
+    chat, options, state = conversation
+    chat.entry = 'gui'
+    root = chat.host.service.data_root
+    save_options(root, knowledge_enabled=False)
+    ticks = iter([{'now': '2026-11-12T10:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'},
+                  {'now': '2026-11-12T11:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'}])
+    monkeypatch.setattr(agent_prompts, 'local_time_snapshot', lambda: next(ticks))
+    def respond(body):
+        names = {item['function']['name'] for item in body['tools']}
+        assert 'search_run_logs' in names
+        if len(state['calls']) <= 2:
+            assert not names & set(KNOWLEDGE_TOOLS)
+        if len(state['calls']) == 1:
+            save_options(root, knowledge_enabled=True)
+            return tool('action_contracts', {})
+        return answer()
+    state['respond'] = respond
+    assert asyncio.run(chat.run('first', options))['status'] == 'completed'
+    first_input = read_json(chat.log.root / 'round-1/input.json')
+    first_user = next(item for item in chat.history if item.get('role') == 'user')
+    original = json.dumps(first_user, sort_keys=True)
+    assert asyncio.run(chat.run('second', options))['status'] == 'completed'
+    assert set(KNOWLEDGE_TOOLS) <= {item['function']['name'] for item in state['calls'][-1]['tools']}
+    assert json.dumps(next(item for item in chat.history if item.get('role') == 'user'), sort_keys=True) == original
+    second_input = read_json(chat.log.root / 'round-2/input.json')
+    assert first_input['system_prompt'] == second_input['system_prompt']
+    assert '10:00:00' in first_input['prompt']['message']
+    assert '11:00:00' in second_input['prompt']['message']
+    functions = {item['function']['name']: item['function'] for item in state['calls'][0]['tools']}
+    assert {'levels', 'logical_name'} <= functions['read_run_log']['parameters']['properties'].keys()

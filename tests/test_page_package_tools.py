@@ -91,6 +91,11 @@ def test_resource_tool_copies_only_bounded_sources_and_never_writes_installed(dr
             "copy_from": {"scope": "knowledge", "path": "info.txt"}}
     assert not read_json(tools.call("page_resource", args)).get("isError")
     assert drafts.file_bytes("drafts", "sample.py", "assets/info.txt") == b"reference"
+    allowed = tools.allowed
+    tools.allowed = allowed - {"knowledge_read"}
+    assert read_json(tools.call("page_resource", args))["isError"]
+    assert drafts.file_bytes("drafts", "sample.py", "assets/info.txt") == b"reference"
+    tools.allowed = allowed
     asset_content = b"asset bytes"
     digest = sha256_bytes(asset_content)
     asset = tools.library.root / "sample" / f"{digest}.png"

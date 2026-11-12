@@ -258,6 +258,7 @@ class RunLogPage(QWidget):
         body.addWidget(sidebar)
         self.view = QListView()
         self.view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.view.verticalScrollBar().setSingleStep(20)
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.model = LogModel(self)
         self.view.setModel(self.model)

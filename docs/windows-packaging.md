@@ -1,5 +1,7 @@
 # Windows x64 本地构建和 #334 验收
 
+2026-11-12：Run 日志图片采用 AVIF，`LALC.spec` 显式包含 Pillow AVIF 插件及 PIL 动态库；日志预览经 Pillow 解码为 JPEG 后由 Qt 显示，不依赖 Qt 原生 AVIF 插件。源码环境检查不替代 Windows 成品的编解码与日志预览验收。
+
 2026-11-05 双包更新：以下 with-pi／without-pi 命名由 with-agent／without-agent 替代，两包仍共用相同应用。新增输入和当前行为如下；原 #334 验收数字仅为历史。
 
 需另外准备官方 codesearch 1.7.9 基础版 `codesearch_resources/codesearch-windows-x86_64.zip`，SHA-256 为 `235d47228f53b6cc822a6cf924f83011aefc0f098fd8fb9f8f8c8f9091e20f6a`，以及 `codesearch_resources/models/models--Xenova--all-MiniLM-L6-v2/snapshots/751bff37182d3f1213fa05d7196b954e230abad9/` 的固定模型文件，清单与哈希见 `src/lalc/codesearch.py:MODEL_FILES`。资源目录被 Git 忽略，需要复制到 Windows 构建机，不会由普通启动下载。可用 `--codesearch-zip` 和 `--models` 指定离线资源路径。

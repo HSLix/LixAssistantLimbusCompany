@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-12：日志诊断改进已本地实施：Run 图片使用 AVIF 65 / speed 8 / 默认色度采样，仅 Match 取消自动截图；Agent Run 元数据、过滤与跨 Run 关键词搜索、共享知识库开关、本轮静态当地时间，以及工具摘要／工作计时、日志滚动与短数组格式同步更新。相关普通回归 366 passed、1 skipped；真实 pi + 本地 HTTP 替身 3 passed。Windows 成品、真实模型和游戏未验收，见[决策](log-diagnostics-decisions.md)与[影响审查及验证](log-diagnostics-impact-review.md)。
+
 2026-11-12：Session 页面增加可复制的完整 UUID；Sharing 导出列表补充 Workflow 附加信息、Session 标题和修改时间，并对齐历史会话顺序。已通过相关 82 项测试；Windows 原生显示未验收，见[决定、影响审查与验证](session-sharing-display-impact-review.md)。
 
 2026-11-11：开发者面板的会话标题首次初始化后固定；历史会话增加悬停子设置、持久重命名及确认后彻底删除，忙碌及清理期间禁用入口。设计、故障边界与验证见[专项审查](session-management-impact-review.md)。

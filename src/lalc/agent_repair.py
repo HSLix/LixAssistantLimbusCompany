@@ -245,7 +245,8 @@ class RepairConversation:
         from .agent_settings import settings_document
         options = settings_document(host.service.data_root)
         self.allowed = allowed_tools(self.mode, entry, history_enabled=options["history_enabled"],
-                                     runtime_feedback_enabled=options["runtime_feedback_enabled"])
+                                     runtime_feedback_enabled=options["runtime_feedback_enabled"],
+                                     knowledge_enabled=options["knowledge_enabled"])
         self.system_prompt = system_prompt(self.mode)
         if entry == "runtime":
             from .agent_prompts import RUNTIME_GUIDANCE
@@ -280,7 +281,8 @@ class RepairConversation:
             from .agent_settings import settings_document
             options = settings_document(self.host.service.data_root)
             self.allowed = allowed_tools(self.mode, self.entry, history_enabled=options["history_enabled"],
-                                         runtime_feedback_enabled=options["runtime_feedback_enabled"])
+                                         runtime_feedback_enabled=options["runtime_feedback_enabled"],
+                                         knowledge_enabled=options["knowledge_enabled"])
             self.tools.allowed = frozenset(self.allowed)
             references = list(dict.fromkeys(manifest_references))
             for identity in references:
@@ -327,6 +329,8 @@ class RepairConversation:
                                "game_version_observation": observation,
                                "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
                                "editable_files": names, "manifest_references": references}
+            from .agent_prompts import local_time_snapshot
+            runtime_context["local_time"] = local_time_snapshot()
             prompt = {"type": "prompt", "message": "<runtime_context>\n"
                       + json.dumps(runtime_context, ensure_ascii=False)
                       + "\n</runtime_context>\n<user_request>\n" + message + "\n</user_request>"}

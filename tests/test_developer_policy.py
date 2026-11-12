@@ -31,7 +31,10 @@ def test_publish_trial_uses_saved_version_and_retained_logs(tmp_path, monkeypatc
         second = tools.trial_run(updated, logical_name="steps.total", inputs={"values": [1, -2]})["details"]
         assert second["result"]["output"] == -1
         assert second["run_id"] != first["run_id"]
-        assert tools.list_runs(limit=1)["details"] == {"run_ids": [second["run_id"]], "next_offset": 1}
+        listing = tools.list_runs(limit=1)["details"]
+        assert listing['run_ids'] == [second['run_id']] and listing['next_offset'] == 1
+        assert listing['runs'][0]['source'] == 'agent_trial'
+        assert listing['runs'][0]['logical_name'] == 'steps.total'
         page = tools.read_run_log(first["run_id"], limit=1)["details"]
         assert page["events"][0]["event"] == "run_started" and page["next_sequence"] == 2
         with pytest.raises(StartError):

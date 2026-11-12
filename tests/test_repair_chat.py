@@ -11,6 +11,31 @@ import pytest
 from test_developer_gui import gui, wait_jobs
 
 
+def test_tool_summary_and_live_working_clock(gui, monkeypatch):
+    """折叠摘要包含文件名；单调计时跨状态变化累积，历史不自动开始。"""
+    from lalc import repair_chat
+    from lalc.i18n import tr
+    app, _ = gui
+    chat = repair_chat.RepairChat()
+    now = [100.0]
+    monkeypatch.setattr(repair_chat.time, 'monotonic', lambda: now[0])
+    entry = chat.upsert_tool(1, 'read-1', 'read', 'tool_execution_start', {'args': {'path': '<unsafe>/plan.py'}})
+    assert '&lt;unsafe&gt;/plan.py' in chat.tool_html(entry)
+    assert 'Working for' not in chat.activity_html(1)
+    chat.start_work(1)
+    chat.set_activity('Thinking', 1)
+    now[0] += 65
+    assert tr('Working for {0}').format(repair_chat.working_duration(65)) in chat.activity_html(1)
+    chat.set_activity('Calling tool', 1)
+    now[0] += 3600
+    assert tr('Working for {0}').format(repair_chat.working_duration(3665)) in chat.activity_html(1)
+    chat.stop_work()
+    assert not chat.working_timer.isActive()
+    assert 'Working for' not in chat.activity_html(1)
+    assert repair_chat.working_duration(59) == tr('{0}s').format(59)
+    chat.deleteLater()
+
+
 def test_tool_details_wrap_with_viewport_and_preserve_json(gui):
     """工具详情中的长参数与返回值不撑宽聊天区，缩放后仍完整可读。"""
     import json
@@ -247,7 +272,7 @@ def test_process_timeline_orders_thinking_and_tools_with_nested_collapse(gui):
     chat.open_link(QUrl('raw:1'))
     text = chat.toPlainText()
     assert text.index('first thought') < text.index('read') < text.index('second thought') < text.index('final answer')
-    assert 'secret argument' not in text and 'failure body' not in text
+    assert 'secret argument' in text and 'failure body' not in text
     assert '#9e1c1c' in chat.toHtml() and '失败' in text
     chat.open_link(QUrl('tool:1'))
     assert 'secret argument' in chat.toPlainText() and 'failure body' in chat.toPlainText()

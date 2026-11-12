@@ -119,7 +119,7 @@ class FocusedAutomationSession:
         return result
 
     def save(self, path: Path, *, evidence_id: str | None = None) -> dict[str, Any]:
-        """将当前有效截图保存为 PNG，不再调用截图 API。"""
+        """保存当前帧；Run 诊断可选 AVIF，素材及现场截图仍用无损 PNG。"""
 
         observation = self.observation
         self.check()
@@ -136,15 +136,23 @@ class FocusedAutomationSession:
         def chunk(kind: bytes, data: bytes) -> bytes:
             return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
 
-        png = (b"\x89PNG\r\n\x1a\n"
-               + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-               + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b""))
+        if path.suffix == ".avif":
+            from io import BytesIO
+            from PIL import Image
+            output = BytesIO()
+            Image.frombytes("RGB", (width, height), bytes(rgb)).save(
+                output, format="AVIF", quality=65, speed=8)
+            content = output.getvalue()
+        else:
+            content = (b"\x89PNG\r\n\x1a\n"
+                       + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+                       + chunk(b"IDAT", zlib.compress(pixels)) + chunk(b"IEND", b""))
         path.parent.mkdir(parents=True, exist_ok=True)
         result = {"observation": self.observation, "path": str(path), "width": width, "height": height}
         if evidence_id is not None:
             result["evidence_id"] = evidence_id
         try:
-            path.write_bytes(png)
+            path.write_bytes(content)
             self.emit("screenshot_saved", result)
         except Exception:
             path.unlink(missing_ok=True)

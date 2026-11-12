@@ -256,8 +256,10 @@ def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) ->
     output = state["result"]["output"]
     assert output["observation"] == 1
     assert output["evidence_id"] == f"{run_id}/1"
-    assert Path(output["evidence_path"]).suffix == ".png"
-    assert png_image(Path(output["evidence_path"])) == ((2, 2), bytes([0, 3, 2, 1, 3, 2, 1]) * 2)
+    assert Path(output["evidence_path"]).suffix == ".avif"
+    from PIL import Image
+    with Image.open(output["evidence_path"]) as image:
+        assert image.format == "AVIF" and image.size == (2, 2)
     events = [item["event"] for item in state["trace"]]
     assert events.index("target_window_connected") < events.index("screenshot_refreshed")
     assert events.index("screenshot_refreshed") < events.index("screenshot_saved")

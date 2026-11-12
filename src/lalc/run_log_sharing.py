@@ -12,7 +12,7 @@ import zipfile
 from .work_files import WorkDirectory
 from .file_content import (FileContent, checkpoint, copy_content, require_disk, require_memory)
 from .page_packages import real_directory
-from .run_logs import lines, snapshot, trace_path
+from .run_logs import image_path, lines, snapshot, trace_path
 from .sharing import strict_json, json_bytes
 from threading import Event
 
@@ -103,10 +103,12 @@ def export_log(root, run_id, destination, boundary=None):
                 continue
             for identity in _evidence(record):
                 if re.fullmatch(fr'{run_id}/[0-9]+', identity):
-                    image = root / 'evidence' / (identity + '.png')
+                    image = image_path(root, run_id, {"evidence_id": identity})
+                    if image is None:
+                        raise ValueError('Invalid evidence path.')
                     real_directory(image.parent)
                     if image.is_file():
-                        files['evidence/' + identity + '.png'] = FileContent.from_path(image)
+                        files['evidence/' + identity + image.suffix] = FileContent.from_path(image)
         metadata = dict(format='lalc-run-log', version=1, run_id=run_id,
                         files={name: dict(size=len(content), sha256=content.sha256) for name, content in files.items()})
         require_disk([(destination.parent, sum(len(content) + 1024 for content in files.values()))])
@@ -159,7 +161,7 @@ def import_log(root, archive_path):
             if trace_name not in files or set(names) != {'run.json', *files}:
                 raise ValueError('ZIP contents do not match index.')
             for name, record in files.items():
-                if (name != trace_name and not re.fullmatch(fr'evidence/{identity}/[0-9]+\.png', name)):
+                if (name != trace_name and not re.fullmatch(fr'evidence/{identity}/[0-9]+\.(png|avif)', name)):
                     raise ValueError('Unexpected ZIP path.')
                 if (type(record) is not dict or set(record) != {'size', 'sha256'}
                         or type(record['size']) is not int or record['size'] < 0

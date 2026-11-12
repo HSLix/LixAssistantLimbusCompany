@@ -223,8 +223,7 @@ class ApplicationService:
                 raise StartError("inputs_invalid", str(error)) from error
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
-            if _developer_trial:
-                entry["developer_trial"] = True
+            entry["developer_trial"] = _developer_trial
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs, run_state, use_saved_config)
             self._run_options = options
             self._runtime_allowed = options["user_enabled"] and not _developer_trial
@@ -342,7 +341,7 @@ class ApplicationService:
             run_id = self._state["run_id"]
             assert run_id is not None
             observation = session.observation
-            path = self.data_root / "evidence" / str(run_id) / f"{observation}.png"
+            path = self.data_root / "evidence" / str(run_id) / f"{observation}.avif"
             evidence_id = f"{run_id}/{observation}"
             if path.is_symlink() or (path.exists() and not path.is_file()):
                 raise WindowError("Screenshot evidence path is not a regular file.")

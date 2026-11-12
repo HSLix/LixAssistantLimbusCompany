@@ -85,6 +85,20 @@ def test_operation_logs_remain_discoverable_and_exportable(source, category):
     assert 'log/events.jsonl' in objects[0]['files']
 
 
+def test_session_export_carries_avif_evidence(source):
+    """新 Run 证据按 AVIF 原字节分享，旧 PNG 路径不被伪造。"""
+    manager, _ = source
+    png_path = manager.data_root / 'evidence/1/2.png'
+    avif_path = png_path.with_suffix('.avif')
+    with Image.open(png_path) as image:
+        image.save(avif_path, quality=65, speed=8)
+    png_path.unlink()
+    objects = build_export(manager, catalog(manager))
+    history, = [obj for obj in objects if obj['kind'] == 'history']
+    assert 'runs/1/evidence/2.avif' in history['files']
+    assert 'runs/1/evidence/2.png' not in history['files']
+
+
 def test_four_type_roundtrip_without_execution_or_session_restore(source, tmp_path):
     manager, marker = source
     selected = catalog(manager)
