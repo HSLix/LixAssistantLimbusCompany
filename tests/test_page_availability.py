@@ -27,7 +27,7 @@ def source(tasks=TASKS):
 
 def install_source(drafts, code=None):
     drafts.installed.mkdir(parents=True, exist_ok=True)
-    (drafts.installed / 'sample.py').write_text(code or source())
+    (drafts.installed / 'sample.py').write_text(code or source(), encoding="utf-8")
     package = snapshot_page(drafts.package_path('sample.py', 'installed'))
     return {'filename': 'sample.py', 'sha256': package.sha256, 'package': package}
 
@@ -52,7 +52,7 @@ def test_multiple_tasks_disable_restore_and_reserve_ids(drafts, app):
     repetitions, settings, _ = task_inputs(pages, ('first', 'second'), store)
     assert repetitions == {'first': 0, 'second': 0}
     assert settings['sample.page'] == {'field': 'saved'}
-    (drafts.installed / 'other.py').write_text(source().replace('sample.page', 'other.page'))
+    (drafts.installed / 'other.py').write_text(source().replace('sample.page', 'other.page'), encoding="utf-8")
     pages, errors = discover_pages(drafts.installed, store)
     assert not pages and len(errors) == 2
     (drafts.installed / 'other.py').unlink()
@@ -101,7 +101,7 @@ def test_dedicated_availability_confirmation(drafts, app, decision):
         dialog.apply_change()
         assert request.result is None
     else:
-        (drafts.installed / 'sample.py').write_text(source() + '\n# new version\n')
+        (drafts.installed / 'sample.py').write_text(source() + '\n# new version\n', encoding="utf-8")
         dialog.apply_change()
         assert request.result['status'] == 'failed'
     assert PageAvailability(drafts.installed.parent).enabled('sample.py') is (decision != 'confirm')

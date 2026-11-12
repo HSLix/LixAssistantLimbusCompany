@@ -30,10 +30,10 @@ def app():
 def test_documented_minimal_page_loads_and_submits_empty_config(tmp_path, app):
     """文档中的标签页示例完整可加载，无 Task 也提供实例 submit。"""
     document = Path(__file__).resolve().parents[1] / "example/pages/README.md"
-    source = document.read_text().split("```python\n", 1)[1].split("```", 1)[0]
+    source = document.read_text(encoding="utf-8").split("```python\n", 1)[1].split("```", 1)[0]
     directory = tmp_path / "pages"
     directory.mkdir()
-    (directory / "notice.py").write_text(source)
+    (directory / "notice.py").write_text(source, encoding="utf-8")
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(directory, store)
     assert not errors and len(pages) == 1
@@ -116,9 +116,9 @@ def test_pages_run_real_plan_with_pure_settings_and_independent_snapshot(owner, 
 def test_discovery_isolates_import_create_and_all_conflicting_registrations(tmp_path, app):
     pages = tmp_path / "pages"
     shutil.copytree(PAGES, pages)
-    (pages / "bad_import.py").write_text('raise ValueError("import broke")')
-    (pages / "bad_create.py").write_text('PAGE_ID="broken"\nPAGE_NAME="broken"\ndef create_page(ctx):\n    raise ValueError("create broke")\n')
-    (pages / "duplicate.py").write_text((pages / "loop.py").read_text())
+    (pages / "bad_import.py").write_text('raise ValueError("import broke")', encoding="utf-8")
+    (pages / "bad_create.py").write_text('PAGE_ID="broken"\nPAGE_NAME="broken"\ndef create_page(ctx):\n    raise ValueError("create broke")\n', encoding="utf-8")
+    (pages / "duplicate.py").write_text((pages / "loop.py").read_text(encoding="utf-8"), encoding="utf-8")
     found, errors = discover_pages(pages, UserSettings(tmp_path))
     assert [page.page_id for page in found] == ["sample.general"]
     assert len(errors) == 4
@@ -138,7 +138,7 @@ def test_page_icon_metadata_defaults_and_invalid_values_keep_page_usable(tmp_pat
     from qfluentwidgets import FluentIcon
     directory = tmp_path / "pages"
     directory.mkdir()
-    (directory / "loop.py").write_text((PAGES / "loop.py").read_text() + "\n" + declaration + "\n")
+    (directory / "loop.py").write_text((PAGES / "loop.py").read_text(encoding="utf-8") + "\n" + declaration + "\n", encoding="utf-8")
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(directory, store)
     assert not errors and len(pages) == 1
@@ -202,7 +202,7 @@ def test_invalid_plan_support_declaration_rejected(declaration, tmp_path):
     candidate = tmp_path / "candidate"
     shutil.copytree(EXAMPLE, candidate)
     path = candidate / "plan.py"
-    path.write_text(path.read_text().replace('["sample.loop"]', declaration))
+    path.write_text(path.read_text(encoding="utf-8").replace('["sample.loop"]', declaration), encoding="utf-8")
     result = ManifestManager(tmp_path / "data").publish(candidate / "manifest.json")
     assert not result.ok and any(error.code == "plan_tasks_invalid" for error in result.errors)
 
@@ -268,7 +268,7 @@ def test_settings_can_save_during_agent_activity(owner):
 def test_profile_migration_and_auth_snapshot_survive_clear(tmp_path):
     from types import SimpleNamespace
     path = tmp_path / "agent-settings.json"
-    path.write_text('{"model":"legacy","base_url":"http://old/v1","max_requests":9}')
+    path.write_text('{"model":"legacy","base_url":"http://old/v1","max_requests":9}', encoding="utf-8")
     before = path.read_bytes()
     assert load_settings(tmp_path)["model"] == "legacy"
     assert path.read_bytes() == before
@@ -282,7 +282,7 @@ def test_profile_migration_and_auth_snapshot_survive_clear(tmp_path):
     assert not keys
     assert load_settings(tmp_path)["base_url"] == "http://old/v1"
     assert load_settings(tmp_path, side="user")["max_requests"] == 5
-    assert "example-old-secret" not in path.read_text()
+    assert "example-old-secret" not in path.read_text(encoding="utf-8")
 
 
 def test_validation_failure_does_not_start_or_schedule_restart(owner):
@@ -323,7 +323,7 @@ def test_warning_latches_across_window_close_until_new_application(owner):
     pages = user.business_pages
     user.add_warning("previous mismatch")
     user.close()
-    (owner.service.data_root / "pages/added.py").write_text((PAGES / "loop.py").read_text())
+    (owner.service.data_root / "pages/added.py").write_text((PAGES / "loop.py").read_text(encoding="utf-8"), encoding="utf-8")
     reopened = owner.open_window()
     assert reopened.business_pages is pages and len(pages) == 2
     assert "previous mismatch" in reopened.warning_history
@@ -441,8 +441,8 @@ def create_page(context):
             assert context.language == "en_US"
             assert owner.user.start_button.text() == "Start Plan"
             assert not hasattr(owner.developer, "trial_button")
-            atexit.register(lambda: (root / "clean-exit").write_text("normal"))
-            (root / "ready").write_text("restored-and-rescanned")
+            atexit.register(lambda: (root / "clean-exit").write_text("normal", encoding="utf-8"))
+            (root / "ready").write_text("restored-and-rescanned", encoding="utf-8")
             def close_when_requested():
                 if not (root / "close-now").exists():
                     return QTimer.singleShot(20, close_when_requested)
@@ -455,14 +455,14 @@ def create_page(context):
             assert context.language == "zh_CN"
             owner.user.language_choice.setCurrentIndex(owner.user.language_choice.findData("en_US"))
             assert owner.user.start_button.text() == "开始运行 Plan"
-            (root / "pages/new.py").write_text('from PySide6.QtWidgets import QWidget\\nPAGE_ID="new"\\nPAGE_NAME="new"\\nclass P(QWidget):\\n    def submit(self): return {}\\ndef create_page(ctx): return P()\\n')
+            (root / "pages/new.py").write_text('from PySide6.QtWidgets import QWidget\\nPAGE_ID="new"\\nPAGE_NAME="new"\\nclass P(QWidget):\\n    def submit(self): return {}\\ndef create_page(ctx): return P()\\n', encoding="utf-8")
             owner.request_reload()
     second = marker.exists()
     marker.touch()
     QTimer.singleShot(50, verify)
     return Page()
 """
-    (root / "pages/probe.py").write_text(page)
+    (root / "pages/probe.py").write_text(page, encoding="utf-8")
     env = {**os.environ, "HOME": str(tmp_path), "USERPROFILE": str(tmp_path),
            "LOCALAPPDATA": str(tmp_path), "QT_QPA_PLATFORM": "cocoa" if sys.platform == "darwin" else "offscreen",
            "PYTHONFAULTHANDLER": "1"}
@@ -478,7 +478,7 @@ def create_page(context):
         (root / "close-now").touch()
         output, error = process.communicate(timeout=10)
         assert process.returncode == 0, error.decode()
-        assert (root / "ready").read_text() == "restored-and-rescanned", error.decode()
+        assert (root / "ready").read_text(encoding="utf-8") == "restored-and-rescanned", error.decode()
         assert "Fatal Python error" not in error.decode()
         assert (root / "clean-exit").exists()
     finally:
@@ -491,7 +491,7 @@ def create_page(context):
 def test_page_count_visibility_preserves_saved_count_and_controls_inputs(tmp_path, app, show):
     pages_dir = tmp_path / 'pages'
     shutil.copytree(PAGES, pages_dir)
-    with (pages_dir / 'loop.py').open('a') as stream:
+    with (pages_dir / 'loop.py').open('a', encoding="utf-8") as stream:
         stream.write(f'\nTASKS[0]["show_task_count"] = {show!r}\n')
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(pages_dir, store)
@@ -512,7 +512,7 @@ def test_page_count_visibility_preserves_saved_count_and_controls_inputs(tmp_pat
 def test_invalid_count_declaration_isolates_page(tmp_path, app):
     pages_dir = tmp_path / 'pages'
     shutil.copytree(PAGES, pages_dir)
-    with (pages_dir / 'loop.py').open('a') as stream:
+    with (pages_dir / 'loop.py').open('a', encoding="utf-8") as stream:
         stream.write('\nTASKS[0]["show_task_count"] = "false"\n')
     pages, errors = discover_pages(pages_dir, UserSettings(tmp_path))
     assert all(not page.tasks for page in pages)

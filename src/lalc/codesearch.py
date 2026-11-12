@@ -124,7 +124,7 @@ class CodeSearch:
             shutil.copyfile(original, destination)
         refs = real_directory(self.root / "models" / MODEL_REPO / "refs")
         refs.mkdir(parents=True, exist_ok=True)
-        (refs / "main").write_text(MODEL_REVISION)
+        (refs / "main").write_text(MODEL_REVISION, encoding="utf-8")
         runtime.mkdir(exist_ok=True)
         executable = runtime / name
         if not executable.is_file() or digest(executable) != digest(selected):

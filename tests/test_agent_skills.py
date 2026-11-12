@@ -28,19 +28,19 @@ def test_snapshot_freezes_references_and_skips_links(tmp_path):
     root = tmp_path / "skills"
     root.mkdir()
     file = root / "reference.txt"
-    file.write_text("old")
+    file.write_text("old", encoding="utf-8")
     outside = tmp_path / "outside"
     outside.mkdir()
-    (outside / "secret.txt").write_text("must not be copied")
+    (outside / "secret.txt").write_text("must not be copied", encoding="utf-8")
     (root / "escape").symlink_to(outside, target_is_directory=True)
     async def check():
         async with skills.skill_snapshot(tmp_path) as (fixed, diagnostics):
             assert diagnostics and not (fixed / "escape").exists()
-            file.write_text("new")
-            assert (fixed / "reference.txt").read_text() == "old"
+            file.write_text("new", encoding="utf-8")
+            assert (fixed / "reference.txt").read_text(encoding="utf-8") == "old"
         assert not fixed.exists()
         async with skills.skill_snapshot(tmp_path) as (next_root, _):
-            assert (next_root / "reference.txt").read_text() == "new"
+            assert (next_root / "reference.txt").read_text(encoding="utf-8") == "new"
     asyncio.run(check())
 
 
@@ -70,11 +70,11 @@ def test_initialization_exclusion_does_not_modify_existing_directory(tmp_path):
     root = tmp_path / "skills"
     root.mkdir()
     file = root / "custom.txt"
-    file.write_text("custom")
+    file.write_text("custom", encoding="utf-8")
     with ProcessLock(f"skills-init:{tmp_path}"):
         with pytest.raises(OSError):
             skills.initialize_skills(tmp_path)
-    assert file.read_text() == "custom"
+    assert file.read_text(encoding="utf-8") == "custom"
     assert list(root.iterdir()) == [file]
 
 
@@ -106,11 +106,11 @@ def test_snapshot_rejects_changed_source(tmp_path, monkeypatch):
     root = tmp_path / "skills"
     root.mkdir()
     file = root / "reference.txt"
-    file.write_text("old")
+    file.write_text("old", encoding="utf-8")
     original = skills.copy_files
     def changing(files, destination):
         original(files, destination)
-        file.write_text("changed while copying")
+        file.write_text("changed while copying", encoding="utf-8")
     monkeypatch.setattr(skills, "copy_files", changing)
     async def check():
         async with skills.skill_snapshot(tmp_path):

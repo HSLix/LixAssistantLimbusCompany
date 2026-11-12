@@ -50,14 +50,14 @@ def make_service(tmp_path, source):
     candidate = tmp_path / 'candidate'
     candidate.mkdir()
     (candidate / 'step.py').write_text('"""测试语义日志。"""\nfrom lalc import step, RunContext\n'
-        '@step\ndef execute(ctx: RunContext) -> None:\n' + source)
+        '@step\ndef execute(ctx: RunContext) -> None:\n' + source, encoding="utf-8")
     (candidate / 'task.py').write_text('"""测试日志所属任务。"""\nfrom lalc import task_workflow, RunContext\n'
         '@task_workflow\ndef execute(ctx: RunContext) -> None:\n'
-        '    ctx.log("开始选择 Drive")\n    ctx.call("steps.drive")\n')
+        '    ctx.log("开始选择 Drive")\n    ctx.call("steps.drive")\n', encoding="utf-8")
     manifest = {'schema_version': 2, 'components': {
         'steps.drive': {'source_path': 'step.py'}, 'tasks.drive': {'source_path': 'task.py'}},
         'recovery_rules': {}}
-    (candidate / 'manifest.json').write_text(json.dumps(manifest))
+    (candidate / 'manifest.json').write_text(json.dumps(manifest), encoding="utf-8")
     from runtime_support import add_plan
     add_plan(candidate / 'manifest.json', '    ctx.call("tasks.drive")\n')
     manager = ManifestManager(tmp_path)
@@ -92,7 +92,7 @@ def test_logs_attach_same_screenshot_and_keep_call_identity(tmp_path, plan):
     with Image.open(logs[1]['evidence_path']) as image:
         assert image.format == 'AVIF' and image.size == (window.image.shape[1], window.image.shape[0])
     assert len(list((tmp_path / 'evidence' / str(run)).glob('*.avif'))) == 1
-    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
+    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text(encoding="utf-8").splitlines()]
     assert [event for event in persisted if event['event'] == 'component_log'] == logs
 
 
@@ -104,7 +104,7 @@ def test_log_levels_are_normalized_and_persisted_without_failing_task(tmp_path, 
     assert state['result']['status'] == 'success'
     logs = [event for event in state['trace'] if event['event'] == 'component_log']
     assert len(logs) == 1 and logs[0]['level'] == level.lower()
-    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text().splitlines()]
+    persisted = [json.loads(line) for line in (tmp_path / 'traces' / f'{run}.jsonl').read_text(encoding="utf-8").splitlines()]
     assert [event for event in persisted if event['event'] == 'component_log'] == logs
     assert window.captures == 0
 

@@ -22,9 +22,9 @@ def steam_install(root, library=None, build="26156805"):
     game = library / "steamapps/common/Limbus Company"
     game.mkdir(parents=True, exist_ok=True)
     escaped = str(library).replace("\\", "\\\\")
-    (root / "steamapps/libraryfolders.vdf").write_text('"libraryfolders" {"0" {"path" "' + escaped + '"}}')
+    (root / "steamapps/libraryfolders.vdf").write_text('"libraryfolders" {"0" {"path" "' + escaped + '"}}', encoding="utf-8")
     manifest = library / "steamapps/appmanifest_1973530.acf"
-    manifest.write_text('"AppState" {"appid" "1973530" "installdir" "Limbus Company" "buildid" "' + build + '"}')
+    manifest.write_text('"AppState" {"appid" "1973530" "installdir" "Limbus Company" "buildid" "' + build + '"}', encoding="utf-8")
     return game, manifest
 
 
@@ -72,7 +72,7 @@ def test_cached_client_preferred_and_invalid_cache_rediscovered(tmp_path, monkey
     steam_install(second, build="42")
     data = tmp_path / "data"
     data.mkdir()
-    (data / versions.SETTINGS).write_text(json.dumps({"steam_root": str(first)}))
+    (data / versions.SETTINGS).write_text(json.dumps({"steam_root": str(first)}), encoding="utf-8")
     windows(monkeypatch, [first, second])
     monkeypatch.setattr(versions, "read_game_version", lambda _: "1.118.0")
     assert versions.observe_game_version(data)["steam_build_id"] == "26156805"
@@ -105,7 +105,7 @@ def test_bad_manual_setting_preserves_previous_and_manifest_escape_rejected(tmp_
     with pytest.raises((OSError, ValueError)):
         versions.save_steam_root(data, tmp_path / "missing")
     assert (data / versions.SETTINGS).read_bytes() == previous
-    manifest.write_text('"AppState" {"appid" "1973530" "installdir" "..\\\\outside"}')
+    manifest.write_text('"AppState" {"appid" "1973530" "installdir" "..\\\\outside"}', encoding="utf-8")
     with pytest.raises(ValueError, match="directory"):
         versions.installation(root)
 

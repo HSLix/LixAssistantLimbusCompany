@@ -21,7 +21,7 @@ pytestmark = pytest.mark.agent
 def write_skill(root, folder="demo", name="demo", description="CATALOG_V1", body="BODY_V1"):
     path = root / folder / "SKILL.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(f"---\nname: {name}\ndescription: {description}\n---\n{body}")
+    path.write_text(f"---\nname: {name}\ndescription: {description}\n---\n{body}", encoding="utf-8")
     return path
 
 
@@ -39,9 +39,9 @@ def test_skill_reads_are_frozen_readonly_and_refresh_without_restarting_pi(conve
     source = write_skill(root)
     unread = write_skill(root, "unread", "unread", body="UNREAD_BODY_SECRET")
     reference = source.with_name("reference.txt")
-    reference.write_text("REFERENCE_V1")
+    reference.write_text("REFERENCE_V1", encoding="utf-8")
     outside = tmp_path / "outside.txt"
-    outside.write_text("OUTSIDE_SECRET")
+    outside.write_text("OUTSIDE_SECRET", encoding="utf-8")
     calls = []
     def respond(body):
         path = skill_path(body)
@@ -50,8 +50,8 @@ def test_skill_reads_are_frozen_readonly_and_refresh_without_restarting_pi(conve
         assert "CATALOG_V1" in system and "BODY_V1" not in system and "UNREAD_BODY_SECRET" not in system
         assert {item["function"]["name"] for item in body["tools"]} == set(chat.allowed)
         if len(calls) == 1:
-            source.write_text(source.read_text().replace("V1", "V2"))
-            reference.write_text("REFERENCE_V2")
+            source.write_text(source.read_text(encoding="utf-8").replace("V1", "V2"), encoding="utf-8")
+            reference.write_text("REFERENCE_V2", encoding="utf-8")
             return tool("read", {"path": str(path)})
         requests = [tool("read", {"path": str(path.with_name("reference.txt"))}),
                     tool("edit", {"path": str(path), "oldText": "BODY_V1", "newText": "ILLEGAL_EDIT"}),
@@ -65,7 +65,7 @@ def test_skill_reads_are_frozen_readonly_and_refresh_without_restarting_pi(conve
     fixed = Path(next(row["event"]["skills_root"] for row in read_events(chat.log.root / "events.jsonl")
                       if row["event"].get("type") == "lalc_ready"))
     assert not fixed.exists()
-    assert "BODY_V2" in source.read_text() and "ILLEGAL_EDIT" not in source.read_text()
+    assert "BODY_V2" in source.read_text(encoding="utf-8") and "ILLEGAL_EDIT" not in source.read_text(encoding="utf-8")
     returned = [item for item in chat.history if item.get("role") == "toolResult"]
     assert sum(bool(item.get("isError")) for item in returned) == 2
     assert "BODY_V1" in str(returned) and "REFERENCE_V1" in str(returned)
@@ -102,13 +102,13 @@ def test_native_skill_diagnostics_and_empty_directory_do_not_stop_round(conversa
     write_skill(root, "two")
     broken = root / "broken/SKILL.md"
     broken.parent.mkdir()
-    broken.write_text("---\nname: broken\n---\nMISSING_DESCRIPTION_BODY")
+    broken.write_text("---\nname: broken\n---\nMISSING_DESCRIPTION_BODY", encoding="utf-8")
     events = []
     assert asyncio.run(chat.run("查看目录", options, on_event=events.append))["status"] == "completed"
     warnings = [row["event"]["message"] for row in events if row["event"].get("type") == "skill_warning"]
     assert any("description" in message for message in warnings)
     assert any("collision" in message for message in warnings)
-    assert broken.read_text().endswith("MISSING_DESCRIPTION_BODY")
+    assert broken.read_text(encoding="utf-8").endswith("MISSING_DESCRIPTION_BODY")
     for path in root.glob("*/SKILL.md"):
         path.unlink()
     for path in root.iterdir():

@@ -568,7 +568,7 @@ def test_ctrl_c_in_qt_event_filter_shows_one_dialog_and_exits(tmp_path, monkeypa
     assert filtered == ["returned normally"]
     assert len(reports) == 1 and "KeyboardInterrupt" in reports[0]
     assert signal.getsignal(signal.SIGINT) == previous
-    assert "KeyboardInterrupt" in (tmp_path / "logs/lalc.log").read_text()
+    assert "KeyboardInterrupt" in (tmp_path / "logs/lalc.log").read_text(encoding="utf-8")
 
 
 def test_neutral_details_dialog_copies_without_error_prompt():

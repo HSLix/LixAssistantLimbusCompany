@@ -22,12 +22,12 @@ def workflow(tmp_path, monkeypatch):
     (root / "components").mkdir()
     digest = sha256_bytes(EMPTY_PLAN.encode())
     component = root / "components" / f"{digest}.py"
-    component.write_text(EMPTY_PLAN)
+    component.write_text(EMPTY_PLAN, encoding="utf-8")
     identity = str(uuid.uuid4())
     manifest = {"schema_version": 2, "manifest_id": identity,
                 "components": {"plans.default": {"component_id": f"sha256:{digest}"}},
                 "recovery_rules": {}}
-    (root / "manifests" / f"{identity}.json").write_text(json.dumps(manifest))
+    (root / "manifests" / f"{identity}.json").write_text(json.dumps(manifest), encoding="utf-8")
     manager = ManifestManager(tmp_path / "local")
     def forbidden(*args, **kwargs):
         pytest.fail("导入不得加载 Python 源码")
@@ -57,7 +57,7 @@ def test_collision_allocates_new_uuid_and_preserves_default_and_components(workf
     commit(manager, root, inspect_workflow_import(manager, root, identity))
     original = (manager.manifests_dir / f"{identity}.json").read_bytes()
     default = manager.manifests_dir / "default.json"
-    default.write_text(json.dumps({"manifest_id": identity}))
+    default.write_text(json.dumps({"manifest_id": identity}), encoding="utf-8")
     stored = manager.components_dir / component.name
     modified = stored.stat().st_mtime_ns
     proposal = inspect_workflow_import(manager, root, identity)
@@ -114,7 +114,7 @@ def test_changed_manifest_requires_new_confirmation(workflow):
     path = root / "manifests" / f"{identity}.json"
     manifest = json.loads(path.read_bytes())
     manifest["components"]["plans.other"] = manifest["components"].pop("plans.default")
-    path.write_text(json.dumps(manifest))
+    path.write_text(json.dumps(manifest), encoding="utf-8")
     with pytest.raises(ValueError, match="内容已变化"):
         commit(manager, root, proposal)
     assert not manager.data_root.exists()
@@ -124,7 +124,7 @@ def test_dangling_default_uuid_is_reserved_to_prevent_implicit_activation(workfl
     manager, root, identity, _ = workflow
     manager.manifests_dir.mkdir(parents=True)
     default = manager.manifests_dir / "default.json"
-    default.write_text(json.dumps({"manifest_id": identity}))
+    default.write_text(json.dumps({"manifest_id": identity}), encoding="utf-8")
     original = default.read_bytes()
     proposal = inspect_workflow_import(manager, root, identity)
     assert proposal["uuid_conflict"] and proposal["manifest_id"] != identity

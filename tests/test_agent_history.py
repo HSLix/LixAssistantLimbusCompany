@@ -145,7 +145,7 @@ def test_failed_rebuild_preserves_original_database_and_symlinks_rejected(tmp_pa
     index = AgentHistory(tmp_path)
     previous = index.database.read_bytes()
     path = log.root / "version-observations/1.json"
-    path.write_text("bad")
+    path.write_text("bad", encoding="utf-8")
     with pytest.raises(ValueError):
         index.rebuild()
     assert index.database.read_bytes() == previous

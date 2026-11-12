@@ -500,14 +500,14 @@ def test_execute_docstring_replaces_module_docstring(tmp_path, filename, has_doc
 
     candidate = _write_candidate(tmp_path / "candidate")
     path = candidate.parent / filename
-    source = path.read_text()
+    source = path.read_text(encoding="utf-8")
     tree = ast.parse(source)
     lines = source.splitlines(keepends=True)
     if has_doc:
         execute = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "execute")
         lines.insert(execute.body[0].lineno - 1, '    """入口说明。"""\n')
     del lines[:tree.body[0].end_lineno]
-    path.write_text("".join(lines))
+    path.write_text("".join(lines), encoding="utf-8")
     manager = ManifestManager(tmp_path / "formal")
     result = manager.publish(candidate)
     if has_doc:
@@ -534,9 +534,9 @@ def test_version_metadata_roundtrip_and_legacy(tmp_path):
     from datetime import datetime
     from lalc.workflow_sharing import inspect_workflow_import, import_workflow
     candidate = _write_candidate(tmp_path / "candidate")
-    data = json.loads(candidate.read_text())
+    data = json.loads(candidate.read_text(encoding="utf-8"))
     data["AdditionalMessage"] = "优化战斗流程"
-    candidate.write_text(json.dumps(data))
+    candidate.write_text(json.dumps(data), encoding="utf-8")
     manager = ManifestManager(tmp_path / "formal")
     result = manager.publish(candidate)
     assert result.ok
@@ -550,16 +550,16 @@ def test_version_metadata_roundtrip_and_legacy(tmp_path):
     os.utime(path, (1, 1))
     assert manager.list_manifests()[0]["saved_at"] == item["saved_at"]
     assert not manager.initialize_candidate(tmp_path / "next", manifest_id=identity)
-    assert json.loads((tmp_path / "next/manifest.json").read_text())["AdditionalMessage"] == "优化战斗流程"
+    assert json.loads((tmp_path / "next/manifest.json").read_text(encoding="utf-8"))["AdditionalMessage"] == "优化战斗流程"
     target = ManifestManager(tmp_path / "imported")
     check = inspect_workflow_import(target, manager.data_root, identity)
     import_workflow(target, manager.data_root, identity, manifest_id=check["manifest_id"],
                     manifest_sha256=check["manifest_sha256"])
     assert target.list_manifests() == manager.list_manifests()
-    legacy = json.loads(path.read_text())
+    legacy = json.loads(path.read_text(encoding="utf-8"))
     del legacy["published_at"]
     del legacy["AdditionalMessage"]
-    path.write_text(json.dumps(legacy))
+    path.write_text(json.dumps(legacy), encoding="utf-8")
     os.utime(path, (1, 1))
     assert manager.load(identity).ok
     assert manager.list_manifests()[0]["saved_at"] == 1
@@ -569,9 +569,9 @@ def test_version_metadata_roundtrip_and_legacy(tmp_path):
 @pytest.mark.parametrize("message", [None, 1, [], {}])
 def test_version_message_rejects_non_string(tmp_path, message):
     candidate = _write_candidate(tmp_path / "candidate")
-    data = json.loads(candidate.read_text())
+    data = json.loads(candidate.read_text(encoding="utf-8"))
     data["AdditionalMessage"] = message
-    candidate.write_text(json.dumps(data))
+    candidate.write_text(json.dumps(data), encoding="utf-8")
     assert "manifest_field_type_invalid" in _codes(ManifestManager(tmp_path / "formal").publish(candidate))
 
 
@@ -580,8 +580,8 @@ def test_saved_version_rejects_invalid_publication_time(tmp_path, stamp):
     manager = ManifestManager(tmp_path / "formal")
     result = manager.publish(_write_candidate(tmp_path / "candidate"))
     path = manager.manifests_dir / f"{result.loaded.manifest_id}.json"
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     data["published_at"] = stamp
-    path.write_text(json.dumps(data))
+    path.write_text(json.dumps(data), encoding="utf-8")
     assert "manifest_field_type_invalid" in _codes(manager.load(result.loaded.manifest_id))
     assert manager.list_manifests() == []

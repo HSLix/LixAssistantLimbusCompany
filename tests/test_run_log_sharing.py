@@ -24,11 +24,11 @@ def package(root, destination):
     image = root / 'evidence/1/1.png'
     image.parent.mkdir(parents=True)
     Image.new('RGB', (20, 10)).save(image)
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write(json.dumps(dict(event='component_log', level='info', message='image',
                                     evidence_id='1/1', recorded_at='2026-11-06T12:00:02Z')) + '\n')
     boundary = snapshot(root, 1)
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write('{"message":"partial')
     export_log(root, 1, destination, boundary)
     return path
@@ -163,13 +163,13 @@ def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
     app, page, path, until = log_page
     archive = tmp_path / 'log.zip'
     # 导入副本早于后续 Run，避免同一时间的 UUID 排序影响批次数量断言。
-    path.write_text(path.read_text().replace('2026-11-06T', '2026-11-01T'))
+    path.write_text(path.read_text(encoding="utf-8").replace('2026-11-06T', '2026-11-01T'), encoding="utf-8")
     export_log(tmp_path, 1, archive)
     imported = import_log(tmp_path, archive)
     for identity in range(2, 26):
         (path.parent / f'{identity}.jsonl').write_text(json.dumps(dict(
             event='component_log', level='info', message=str(identity),
-            recorded_at=f'2026-11-{identity:02}T12:00:00Z')) + '\n')
+            recorded_at=f'2026-11-{identity:02}T12:00:00Z')) + '\n', encoding="utf-8")
     page.refresh_runs()
     until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
     keys = lambda: [page.runs.item(i).data(Qt.ItemDataRole.UserRole) for i in range(page.runs.count())]

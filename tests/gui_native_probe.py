@@ -64,7 +64,7 @@ def main():
             "shared_service": user.service is developer.service,
             "output": str(output),
         }
-        (output / "native-probe.json").write_text(json.dumps(result, ensure_ascii=False, indent=2))
+        (output / "native-probe.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps(result, ensure_ascii=False, indent=2))
         user.switchTo(user.pages.widget(0))
         if options.show:

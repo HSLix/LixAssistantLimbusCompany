@@ -327,7 +327,7 @@ class RepairConversation:
             skill_resources = AsyncExitStack()
             runtime_context = {"mode": self.mode, "entry": self.entry,
                                "game_version_observation": observation,
-                               "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text())["manifest_id"],
+                               "candidate": ".", "source_manifest_id": json.loads(self.host.metadata.read_text(encoding="utf-8"))["manifest_id"],
                                "editable_files": names, "manifest_references": references}
             from .agent_prompts import local_time_snapshot
             runtime_context["local_time"] = local_time_snapshot()

@@ -56,7 +56,7 @@ def test_persistent_drafts_readonly_source_settings_and_permissions(drafts):
     installed.mkdir()
     marker = root / "must-not-execute"
     code = f'from pathlib import Path\nPath({str(marker)!r}).touch()\n' + SOURCE
-    (installed / "sample.py").write_text(code)
+    (installed / "sample.py").write_text(code, encoding="utf-8")
     UserSettings(root).save("pages", "sample.page", {"field": "old"})
     assert drafts.list()["items"][0]["filename"] == "sample.py"
     first = drafts.read(filename="sample.py", limit=10)
@@ -94,7 +94,7 @@ def test_existing_unicode_filename_and_settings_symlink(drafts, tmp_path):
     drafts.create("镜牢设置.py", SOURCE)
     assert drafts.list("drafts")["items"][0]["filename"] == "镜牢设置.py"
     outside = tmp_path / "settings.json"
-    outside.write_text('{"secret": "must not read"}')
+    outside.write_text('{"secret": "must not read"}', encoding="utf-8")
     (drafts.session.host.service.data_root / "user-settings.json").symlink_to(outside)
     with pytest.raises(ValueError, match="符号链接"):
         drafts.read("settings")
@@ -115,7 +115,7 @@ def test_creation_update_failure_and_symlinks_preserve_files(drafts, tmp_path, m
     assert not (drafts.root / "failed.json").exists()
     assert drafts.snapshot("new.py") == original
     outside = tmp_path / "outside.py"
-    outside.write_text(SOURCE)
+    outside.write_text(SOURCE, encoding="utf-8")
     (drafts.root / "link.py").symlink_to(outside)
     with pytest.raises(ValueError, match="符号链接"):
         drafts.read("drafts", "link.py")
@@ -123,7 +123,7 @@ def test_creation_update_failure_and_symlinks_preserve_files(drafts, tmp_path, m
     # 旧元数据已不参与任何草稿操作，连符号链接也不会读取。
     (drafts.root / "new.json").symlink_to(outside)
     assert drafts.snapshot("new.py") == original
-    assert outside.read_text() == SOURCE
+    assert outside.read_text(encoding="utf-8") == SOURCE
 
 
 def test_repeated_install_snapshot_conflict_and_failed_replace(drafts, monkeypatch):
@@ -171,7 +171,7 @@ def preview(gui, drafts, source=SOURCE, old=None):
     app, window = gui
     if old is not None:
         drafts.installed.mkdir(exist_ok=True)
-        (drafts.installed / "sample.py").write_text(old)
+        (drafts.installed / "sample.py").write_text(old, encoding="utf-8")
         drafts.create("sample.py", copy_from="sample.py")
         drafts.update("sample.py", source)
     else:
@@ -218,7 +218,7 @@ def test_preview_independent_memory_no_submit_and_install_exact_version(gui, dra
         drafts.update("sample.py", SOURCE.replace('"Sample"', '"Future"'))
         dialog.install_button.click()
         assert request.result["status"] == "installed"
-        assert drafts.path("sample.py", "installed").read_text() == SOURCE
+        assert drafts.path("sample.py", "installed").read_text(encoding="utf-8") == SOURCE
         assert store.path.read_bytes() == config
     finally:
         dialog.close()
@@ -261,7 +261,7 @@ def test_invalid_proposed_never_shows_approval(gui, drafts, source, expected):
     assert not dialog.ready and request.done.is_set()
     assert request.result['status'] == 'preview_failed'
     assert expected in request.result['error']
-    assert (drafts.installed / 'sample.py').read_text() == SOURCE
+    assert (drafts.installed / 'sample.py').read_text(encoding="utf-8") == SOURCE
     assert dialog.current is None  # 拟安装页失败时，不再执行旧页。
     assert app.activeModalWidget() is None
 
@@ -272,7 +272,7 @@ def test_registration_failure_returns_before_approval(gui, drafts, conflict):
     app, _ = gui
     drafts.installed.mkdir()
     other = SOURCE.replace('"sample.task"', '"other.task"') if conflict == 'page' else SOURCE.replace('"sample.page"', '"other.page"')
-    (drafts.installed / 'other.py').write_text(other)
+    (drafts.installed / 'other.py').write_text(other, encoding="utf-8")
     request, dialog = preview(gui, drafts)
     assert not dialog.ready and request.result['status'] == 'preview_failed'
     assert '冲突' in request.result['error']
@@ -343,7 +343,7 @@ def test_preview_install_failure_redacted_then_reopen_current_bytes(gui, drafts,
         dialog.install_button.click()
     assert not request.done.is_set()
     assert dialog.isVisible() and 'sensitive-value' not in dialog.status.text()
-    assert (drafts.installed / 'sample.py').read_text() == SOURCE
+    assert (drafts.installed / 'sample.py').read_text(encoding="utf-8") == SOURCE
     dialog.close_button.click()
     assert request.result['status'] == 'not_installed'
     assert 'install' in request.result['errors'] and 'sensitive-value' not in str(request.result)
@@ -416,7 +416,7 @@ def test_installed_page_reload_and_real_plan_keep_formal_configuration(owner, ap
     developer.repair_page.activate_session(session)
     drafts = PageDrafts(session)
     drafts.create("loop.py", copy_from="loop.py")
-    drafts.update("loop.py", (drafts.installed / "loop.py").read_text() + '\nPAGE_NAME = "Installed settings"\n')
+    drafts.update("loop.py", (drafts.installed / "loop.py").read_text(encoding="utf-8") + '\nPAGE_NAME = "Installed settings"\n')
     request = PreviewRequest(drafts, drafts.snapshot("loop.py"), "仅修改页面显示名，字段与 Plan 不变。", (session.identity, 0, 1))
     dialog = PagePreviewDialog(request, developer)
     dialog.show()

@@ -69,7 +69,7 @@ def test_remove_archives_raw_image_tags_and_fresh_screenshot_preserving_other_na
     assert not tools.library.path(saved["path"]).exists()
     assert tools.library._tag_mapping("ui/claim") == {}
     assert other.read_bytes() == raw_asset and tools.library._tag_mapping("other/name") == {saved["sha256"]: ["other"]}
-    assert json.loads((archive / "record.json").read_text())["state"] == "completed"
+    assert json.loads((archive / "record.json").read_text(encoding="utf-8"))["state"] == "completed"
     assert tools.library.match("ui/claim", bytes([0, 0, 0, 255]) * 4, (2, 2), run_id=1, observation=1, emit=lambda *args: None) == []
 
 
@@ -107,7 +107,7 @@ def test_remove_record_sync_requires_write_access_and_preserves_asset_on_failure
         assert snapshot(tools.library.root) == before
     else:
         assert not result.get("isError")
-        record = json.loads((Path(result["details"]["archive_path"]) / "record.json").read_text())
+        record = json.loads((Path(result["details"]["archive_path"]) / "record.json").read_text(encoding="utf-8"))
         assert record["state"] == "completed" and record["sha256"] == saved["sha256"]
         assert record["tags"] == ["en", "en"]
         assert not tools.library.path(saved["path"]).exists()

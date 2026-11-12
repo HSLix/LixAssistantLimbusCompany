@@ -19,7 +19,7 @@ from test_agent_repair import host_for, candidate_files
 
 def test_old_settings_keep_complete_path_and_secret_reference(tmp_path):
     path = tmp_path / "agent-settings.json"
-    path.write_text(json.dumps({"base_url": "http://host/custom/api", "model": "Gemma4", "secret_name": "old"}))
+    path.write_text(json.dumps({"base_url": "http://host/custom/api", "model": "Gemma4", "secret_name": "old"}), encoding="utf-8")
     before = path.read_bytes()
     settings = load_settings(tmp_path)
     assert settings["provider"] == "llama.cpp"
@@ -45,7 +45,7 @@ def test_status_check_is_read_only_and_records_unknown_state(tmp_path, monkeypat
     assert not (tmp_path / "developer-operations").exists()
     assert not (tmp_path / "candidate").exists()
     assert len(list(tmp_path.rglob("result.json"))) == 1
-    assert "test-secret" not in "".join(p.read_text() for p in tmp_path.rglob("*.json*"))
+    assert "test-secret" not in "".join(p.read_text(encoding="utf-8") for p in tmp_path.rglob("*.json*"))
 
 
 def test_connection_does_not_require_model_but_model_check_does(tmp_path, monkeypatch):
@@ -68,7 +68,7 @@ def test_http_details_keep_body_cause_and_redact_before_logging(tmp_path, monkey
     assert error["http_status"] == code and error["stage"] == "service_check"
     assert "upstream says" in error["response_body"] and "HTTPError" in error["traceback"]
     assert "direct cause" in error["traceback"]
-    text = json.dumps(result) + caplog.text + "".join(p.read_text() for p in tmp_path.rglob("*.json*"))
+    text = json.dumps(result) + caplog.text + "".join(p.read_text(encoding="utf-8") for p in tmp_path.rglob("*.json*"))
     assert "test-secret" not in text and "other-token" not in text
     assert "ERROR" in caplog.text
 
@@ -112,7 +112,7 @@ def test_repair_failure_preserves_candidate_context_and_full_details(tmp_path, m
     assert candidate_files(host.candidate) == before and chat.history[0] == history
     assert host.conversation is chat and result["requests"] == 0
     assert "test-secret" not in json.dumps(result) + caplog.text
-    assert "test-secret" not in "".join(p.read_text() for p in chat.log.path.rglob("*.json*"))
+    assert "test-secret" not in "".join(p.read_text(encoding="utf-8") for p in chat.log.path.rglob("*.json*"))
     assert list(chat.log.path.glob("round-1/result.json"))
 
 

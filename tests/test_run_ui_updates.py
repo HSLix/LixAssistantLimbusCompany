@@ -22,7 +22,7 @@ def test_snapshot_and_notifications_never_copy_historical_trace(tmp_path):
                       {"message": str(i)})
     assert len(notifications) == 10350
     assert len(service._live_logs) == 300
-    saved = [json.loads(line) for line in service._trace_path.read_text().splitlines()]
+    saved = [json.loads(line) for line in service._trace_path.read_text(encoding="utf-8").splitlines()]
     assert saved == service.state["trace"]
 
     class NoCopyTrace(list):

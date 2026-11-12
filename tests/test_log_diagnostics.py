@@ -20,7 +20,7 @@ from test_workflow_observability import make_service, finish
 def write_trace(root, run_id, records):
     path = root / 'traces' / f'{run_id}.jsonl'
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(''.join(json.dumps(record, ensure_ascii=False) + '\n' for record in records))
+    path.write_text(''.join(json.dumps(record, ensure_ascii=False) + '\n' for record in records), encoding="utf-8")
     return path
 
 
@@ -28,7 +28,7 @@ def test_filtered_paging_cross_run_search_and_incomplete_records(tmp_path):
     records = [dict(sequence=i, event='component_log', logical_name='steps.test',
                     level='error' if i % 2 else 'info', message='MiXeD 关键字') for i in range(1, 8)]
     path = write_trace(tmp_path, 2, records)
-    with path.open('a') as stream:
+    with path.open('a', encoding="utf-8") as stream:
         stream.write('broken\n{"sequence":8')
     write_trace(tmp_path, 1, [dict(records[0], message='mixed older')])
     first = query_trace(tmp_path, [2, 1], keyword='mixed', levels=['error'], logical_name='steps.test', limit=2)

@@ -167,7 +167,7 @@ def test_review_approval_does_not_install_until_import_selected(window, source, 
         monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
         dialog.submit()
         assert dialog.result_data["failed"] is None
-        assert (window.service.data_root / "pages/sample/page.py").read_text() == SOURCE
+        assert (window.service.data_root / "pages/sample/page.py").read_text(encoding="utf-8") == SOURCE
     finally:
         dialog.close()
         package.close()
@@ -293,7 +293,7 @@ def test_skill_import_defaults_and_asset_tree_depth(window, source, tmp_path):
     manager, _ = source
     folder = manager.data_root / 'skills/custom'
     folder.mkdir(parents=True)
-    (folder / 'SKILL.md').write_text('guidance')
+    (folder / 'SKILL.md').write_text('guidance', encoding="utf-8")
     path = tmp_path / 'skill.zip'
     save_package(build_export(manager, {'skills': ['custom']}), path)
     package = SharingPackage(path)
@@ -325,10 +325,10 @@ def test_export_labels_keep_ids_and_match_session_history_order(window, source, 
     window.host.manager = manager
     manifest_id = catalog(manager)["workflow"][0]
     manifest_path = manager.manifests_dir / f"{manifest_id}.json"
-    metadata = json.loads(manifest_path.read_text())
+    metadata = json.loads(manifest_path.read_text(encoding="utf-8"))
     if additional:
         metadata["AdditionalMessage"] = additional
-    manifest_path.write_text(json.dumps(metadata))
+    manifest_path.write_text(json.dumps(metadata), encoding="utf-8")
     os.utime(manifest_path, (100, 100))
     root = manager.data_root
     sessions = []
@@ -337,7 +337,7 @@ def test_export_labels_keep_ids_and_match_session_history_order(window, source, 
                                     ("00000000-0000-4000-8000-000000000000", None, 200)):
         path = root / "developer-sessions" / identity
         path.mkdir()
-        (path / "session.json").write_text(json.dumps({"title": title} if title else {}))
+        (path / "session.json").write_text(json.dumps({"title": title} if title else {}), encoding="utf-8")
         log = RepairLog(root, path=path / "log")
         log.record({"type": "session_message", "message": {"role": "user", "content": [
             {"type": "text", "text": "旧会话首条请求。后续内容"}]}})
@@ -349,7 +349,7 @@ def test_export_labels_keep_ids_and_match_session_history_order(window, source, 
     for category in ("developer-operations", "agent-interactions"):
         path = root / category / "day" / "operation"
         path.mkdir(parents=True)
-        (path / "events.jsonl").write_text("")
+        (path / "events.jsonl").write_text("", encoding="utf-8")
         os.utime(path, (500, 500))
     dialog = ExportDialog(window)
     try:

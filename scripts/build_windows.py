@@ -127,7 +127,7 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
             shutil.copyfile(models / snapshot / filename, target)
         refs = agent / "models" / MODEL_REPO / "refs"
         refs.mkdir(parents=True)
-        (refs / "main").write_text(MODEL_REVISION)
+        (refs / "main").write_text(MODEL_REVISION, encoding="utf-8")
         for name in ("codesearch-LICENSE.txt", "MiniLM-LICENSE.txt", "agent-resources-NOTICE.txt"):
             shutil.copyfile(ROOT / "packaging" / name, agent / name)
 

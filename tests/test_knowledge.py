@@ -51,7 +51,7 @@ def repository(library):
     git(repo, "config", "user.name", "Test")
     ids = []
     for n in range(3):
-        (repo / "guide.md").write_text(f"version {n}\nneedle\n")
+        (repo / "guide.md").write_text(f"version {n}\nneedle\n", encoding="utf-8")
         git(repo, "add", ".")
         git(repo, "commit", "-m", f"version {n}")
         ids.append(git(repo, "rev-parse", "HEAD"))
@@ -76,7 +76,7 @@ def test_list_read_search_and_continuation(library):
     last = library.search("needle", offset=1, version=found["version"])
     assert "needle" in last["items"][0]["excerpt"]
     assert library.read("manual.pdf")[0]["unsupported"]
-    (library.root / "guide.md").write_text("changed")
+    (library.root / "guide.md").write_text("changed", encoding="utf-8")
     with pytest.raises(ValueError, match="变化"):
         library.read("guide.md", offset=3, version=first["version"])
     with pytest.raises(ValueError, match="变化"):
@@ -126,7 +126,7 @@ def test_git_full_interval_head_worktree_and_once_per_round(library, repository,
     monkeypatch.setattr(library, "_run", run)
     library.list("repo")
     assert not fetches
-    (repo / "guide.md").write_text("local uncommitted\n")
+    (repo / "guide.md").write_text("local uncommitted\n", encoding="utf-8")
     read, _ = library.read("repo/guide.md")
     sync = read["sync"]
     assert sync["before"] == ids[0] and sync["after"] == ids[2] and sync["status"]["ok"]
@@ -144,7 +144,7 @@ def test_git_full_interval_head_worktree_and_once_per_round(library, repository,
     library.begin_round()
     library.read("repo/guide.md")
     assert len(fetches) == 3
-    assert (repo / "guide.md").read_text() == "local uncommitted\n"
+    assert (repo / "guide.md").read_text(encoding="utf-8") == "local uncommitted\n"
 
 
 def test_failed_fetch_still_status_local_and_no_retry(library, repository, monkeypatch):
@@ -200,8 +200,8 @@ def test_git_view_never_runs_textconv_or_clean_filters(library, repository, monk
     git(repo, "config", "diff.danger.textconv", command)
     git(repo, "config", "filter.danger.clean", command)
     git(repo, "config", "filter.danger.process", command)
-    (repo / ".gitattributes").write_text("*.md diff=danger filter=danger\n")
-    (repo / "guide.md").write_text("dirty\n")
+    (repo / ".gitattributes").write_text("*.md diff=danger filter=danger\n", encoding="utf-8")
+    (repo / "guide.md").write_text("dirty\n", encoding="utf-8")
     # 不调用远端；保留真实 status / diff / show / log 的执行路径。
     library.attempted["repo"] = {"checked_remote": False}
     for operation in ("show", "diff", "log"):
@@ -214,7 +214,7 @@ def test_timeout_and_cancel_reap_process(library, tmp_path):
     if os.name == "nt":
         pytest.skip("POSIX 假 Git 脚本；Windows 进程树另验收")
     command = tmp_path / "fake-git"
-    command.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(60)\n")
+    command.write_text(f"#!{sys.executable}\nimport time\ntime.sleep(60)\n", encoding="utf-8")
     command.chmod(0o755)
     library.git = str(command)
     started = time.monotonic()
@@ -283,7 +283,7 @@ def test_search_each_involved_repo_once_and_git_cannot_escape(library, repositor
     for path in ('../guide.md', '/etc/passwd', '.git/config'):
         with pytest.raises(ValueError):
             library.git_operation('repo', 'show', path=path)
-    (repo / '.git/commondir').write_text(str(tmp_path))
+    (repo / '.git/commondir').write_text(str(tmp_path), encoding="utf-8")
     with pytest.raises(ValueError):
         library.read('repo/guide.md')
 
@@ -312,7 +312,7 @@ def test_git_log_continues_and_output_has_version(library, repository):
     assert ids[2] not in history['text'] and ids[1] in history['text']
     assert history['next_history_offset'] is None
     before = library.git_operation('repo', 'diff')
-    (repo / 'guide.md').write_text('different worktree\n')
+    (repo / 'guide.md').write_text('different worktree\n', encoding="utf-8")
     with pytest.raises(ValueError, match='变化'):
         library.git_operation('repo', 'diff', offset=10, version=before['version'])
 
@@ -322,13 +322,13 @@ def test_git_output_limit_and_diagnostic_redaction(library, tmp_path, monkeypatc
     if os.name == 'nt':
         pytest.skip('POSIX 假 Git 脚本')
     command = tmp_path / 'fake-git'
-    command.write_text(f'#!{sys.executable}\nimport sys\nsys.stderr.write("https://user:password@example.invalid/?token=hidden")\nsys.exit(1)\n')
+    command.write_text(f'#!{sys.executable}\nimport sys\nsys.stderr.write("https://user:password@example.invalid/?token=hidden")\nsys.exit(1)\n', encoding="utf-8")
     command.chmod(0o755)
     library.git = str(command)
     result = library._run(library.root, ['show'])
     assert not result['ok'] and 'password' not in result['error'] and 'hidden' not in result['error']
     monkeypatch.setattr(knowledge, 'MAX_OUTPUT', 128)
-    command.write_text(f'#!{sys.executable}\nprint("x" * 8192)\n')
+    command.write_text(f'#!{sys.executable}\nprint("x" * 8192)\n', encoding="utf-8")
     with pytest.raises(ValueError, match='输出超过'):
         library._run(library.root, ['show'])
 
@@ -358,7 +358,7 @@ def test_disk_failure_keeps_a_and_reports_error(library, repository, monkeypatch
     assert not result['update']['ok'] and '磁盘空间不足' in result['error']
     assert result['available_commit'] == record['commit']
     assert (library.version_home(repo) / 'active.json').read_bytes() == before
-    assert library.read('repo/guide.md')[0]['text'] == (active / 'guide.md').read_text()
+    assert library.read('repo/guide.md')[0]['text'] == (active / 'guide.md').read_text(encoding="utf-8")
     assert len([p for p in library.version_home(repo).iterdir() if p.is_dir()]) == 1
 
 
@@ -401,7 +401,7 @@ def test_hybrid_returns_hash_bound_reads_and_rejects_changed_content(library, re
     result = library.search_hybrid('documentation')
     hit = result['items'][0]
     assert library.read(**hit['read_arguments'])[0]['sha256'] == hit['sha256']
-    library.path('repo/guide.md').write_text('changed')
+    library.path('repo/guide.md').write_text('changed', encoding="utf-8")
     with pytest.raises(ValueError, match='过期'):
         library.search_hybrid('documentation')
     with pytest.raises(ValueError, match='变化'):
@@ -421,7 +421,7 @@ def test_reference_links_are_excluded_before_indexing(library, repository, monke
     repo, ids = repository
     outside = tmp_path / 'outside'
     outside.mkdir()
-    (outside / 'secret.md').write_text('must not index')
+    (outside / 'secret.md').write_text('must not index', encoding="utf-8")
     (repo / 'icon').symlink_to('guide.md')
     (repo / 'broken').symlink_to('missing.md')
     (repo / 'external').symlink_to(outside, target_is_directory=True)
@@ -434,7 +434,7 @@ def test_reference_links_are_excluded_before_indexing(library, repository, monke
             link = repo / name
             target = os.readlink(link)
             link.unlink()
-            link.write_text(target)
+            link.write_text(target, encoding="utf-8")
     (repo / 'untracked').symlink_to(outside, target_is_directory=True)
     def build(candidate, checkpoint):
         assert not any(path.is_symlink() or path.is_junction() for path in candidate.rglob('*'))
@@ -447,7 +447,7 @@ def test_reference_links_are_excluded_before_indexing(library, repository, monke
     active, record = library.active(repo)
     assert record['excluded_links'] == sync['excluded_links']
     assert set(record['files']) == {'guide.md'}
-    assert (repo / 'icon').exists() and (outside / 'secret.md').read_text() == 'must not index'
+    assert (repo / 'icon').exists() and (outside / 'secret.md').read_text(encoding="utf-8") == 'must not index'
     assert library.read('repo/guide.md')[0]['text'].startswith('version 2')
     assert library.search('must not index')['total'] == 0
     again = library.synchronize(repo, explicit=True)
@@ -461,7 +461,7 @@ def test_link_replaced_by_regular_file_is_included(library, repository, monkeypa
     git(repo, 'add', 'icon')
     git(repo, 'commit', '-m', 'link')
     (repo / 'icon').unlink()
-    (repo / 'icon').write_text('regular content')
+    (repo / 'icon').write_text('regular content', encoding="utf-8")
     git(repo, 'add', 'icon')
     git(repo, 'commit', '-m', 'regular file')
     ids[2] = git(repo, 'rev-parse', 'HEAD')
@@ -469,7 +469,7 @@ def test_link_replaced_by_regular_file_is_included(library, repository, monkeypa
     (repo / 'icon').symlink_to('guide.md')
     prepare_version(library, repository, monkeypatch)
     active, record = library.active(repo)
-    assert (active / 'icon').read_text() == 'regular content'
+    assert (active / 'icon').read_text(encoding="utf-8") == 'regular content'
     assert 'icon' in record['files'] and 'icon' not in record['excluded_links']
 
 
@@ -478,7 +478,7 @@ def test_metadata_link_update_failure_preserves_a(library, repository, monkeypat
     active, record = library.active(repo)
     pointer = (library.version_home(repo) / 'active.json').read_bytes()
     outside = tmp_path / 'metadata'
-    outside.write_text('private')
+    outside.write_text('private', encoding="utf-8")
     (active / '.git/unsafe').symlink_to(outside)
     result = library.synchronize(repo, explicit=True)
     assert not result['update']['ok'] and 'Git 元数据' in result['error']
@@ -490,7 +490,7 @@ def test_legacy_version_is_rebuilt_with_link_exclusions(library, repository, mon
     repo = prepare_version(library, repository, monkeypatch)
     active, record = library.active(repo)
     del record['excluded_links']
-    (library.version_home(repo) / 'active.json').write_text(json.dumps(record))
+    (library.version_home(repo) / 'active.json').write_text(json.dumps(record), encoding="utf-8")
     result = library.synchronize(repo, explicit=True)
     assert result['update']['ok'] and not result['update'].get('unchanged')
     assert library.active(repo)[0] != active

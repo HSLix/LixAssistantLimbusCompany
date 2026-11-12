@@ -172,11 +172,11 @@ def test_capture_preview_saves_exact_original_without_recapture(tmp_path):
 def test_removed_runner_preferences_are_ignored(gui):
     app, window = gui
     preferences = window.service.data_root / 'developer-settings.json'
-    preferences.write_text('old invalid settings')
+    preferences.write_text('old invalid settings', encoding="utf-8")
     window.repair_page.new()
     assert not hasattr(window, 'runner_manifest')
     assert not hasattr(window, 'trial_button')
-    assert preferences.read_text() == 'old invalid settings'
+    assert preferences.read_text(encoding="utf-8") == 'old invalid settings'
 
 
 def test_gui_blank_secret_preserves_and_explicit_clear_removes_reference(tmp_path, monkeypatch):
@@ -188,7 +188,7 @@ def test_gui_blank_secret_preserves_and_explicit_clear_removes_reference(tmp_pat
     assert saved["secret_name"] == "existing"
     saved = settings.save_settings(tmp_path, {}, clear=True)
     assert saved["secret_name"] is None
-    assert "test-secret" not in (tmp_path / "agent-settings.json").read_text()
+    assert "test-secret" not in (tmp_path / "agent-settings.json").read_text(encoding="utf-8")
 
 
 @pytest.fixture
@@ -307,10 +307,10 @@ def test_required_pages_ocr_after_capture_scaled_crop_and_no_implicit_selection(
     view.set_image(bytes(200 * 100 * 4), (200, 100))
     assert view.pixel(QPointF(100, 50)) == (50, 25)
     session = window.repair_page.session
-    (session.host.candidate / "manifest.json").write_text("invalid")
+    (session.host.candidate / "manifest.json").write_text("invalid", encoding="utf-8")
     window.repair_page.new()
     assert window.repair_page.session is None
-    assert (session.host.candidate / "manifest.json").read_text() == "invalid"
+    assert (session.host.candidate / "manifest.json").read_text(encoding="utf-8") == "invalid"
 
 
 def test_async_operation_and_host_busy_state(gui):
@@ -403,7 +403,7 @@ def test_rebuild_log_creation_failure_preserves_draft_and_conversation(tmp_path,
     host, loaded = host_for(tmp_path)
     previous = host.conversation
     source = host.candidate / "steps.total.py"
-    source.write_text("keep me")
+    source.write_text("keep me", encoding="utf-8")
     metadata = host.metadata.read_bytes()
     def fail(*args):
         raise OSError("cannot save new conversation")
@@ -411,7 +411,7 @@ def test_rebuild_log_creation_failure_preserves_draft_and_conversation(tmp_path,
     with pytest.raises(OSError):
         host.initialize(loaded.manifest_id, replace=True)
     assert host.conversation is previous
-    assert source.read_text() == "keep me"
+    assert source.read_text(encoding="utf-8") == "keep me"
     assert host.metadata.read_bytes() == metadata
 
 
@@ -499,7 +499,7 @@ def test_capture_save_accepts_unquoted_tags_and_preserves_preview(gui, monkeypat
     images = list(directory.glob("*.png"))
     assert len(images) == 1
     assert images[0].read_bytes() == AssetLibrary.crop_content(pixels, size, region)[0]
-    assert json.loads((directory / "asset-tag.json").read_text()) == {
+    assert json.loads((directory / "asset-tag.json").read_text(encoding="utf-8")) == {
         images[0].stem: ["en", "default", "en"]}
     assert "已保存" in page.region_label.text()
 
@@ -537,7 +537,7 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     wait_jobs(app, window)
     assert "未加载" in page.check_status.text()
     assert page.diagnostics.path.is_dir()
-    assert "gui-secret" not in (page.diagnostics.path / "result.json").read_text()
+    assert "gui-secret" not in (page.diagnostics.path / "result.json").read_text(encoding="utf-8")
     page.url.setText("http://host/another/api")
     assert "设置已变更" in page.check_status.text()
 
@@ -614,7 +614,7 @@ def test_manual_validate_displays_once_and_persists_context(gui, monkeypatch, ph
         page.activate_session(page.session)
         chat = page.host.conversation
     if not valid:
-        (page.host.candidate / "manifest.json").write_text("broken json")
+        (page.host.candidate / "manifest.json").write_text("broken json", encoding="utf-8")
     opened = []
     monkeypatch.setattr(page.diagnostics, "show_error", lambda: opened.append(True))
     page.validate()
@@ -678,7 +678,7 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     page.save(secret='cloud-temporary-key')
     wait_jobs(app, window)
     assert window.host.secret == 'cloud-temporary-key'
-    saved = json.loads((window.service.data_root / 'agent-settings.json').read_text())
+    saved = json.loads((window.service.data_root / 'agent-settings.json').read_text(encoding="utf-8"))
     assert saved['thinking'] is False and saved['reasoning_effort'] == 'high'
     assert 'cloud-temporary-key' not in json.dumps(saved)
     assert 'local-temporary-key' not in json.dumps(saved)
@@ -728,21 +728,21 @@ def test_capture_creates_asset_directory_before_opening(gui, monkeypatch, case):
     assert not directory.exists()
     if case == "existing":
         directory.mkdir(parents=True)
-        (directory / "keep.txt").write_text("keep")
+        (directory / "keep.txt").write_text("keep", encoding="utf-8")
     elif case == "path_is_file":
         directory.parent.mkdir(parents=True, exist_ok=True)
-        directory.write_text("keep")
+        directory.write_text("keep", encoding="utf-8")
     opened, errors = [], []
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toLocalFile()) or case != "system_refused")
     monkeypatch.setattr(ErrorDialog, "open", lambda dialog: errors.append(dialog.details.toPlainText()))
     window.capture_page.open_assets()
     assert bool(errors) == (case in {"system_refused", "path_is_file"})
     if case == "path_is_file":
-        assert directory.read_text() == "keep" and not opened
+        assert directory.read_text(encoding="utf-8") == "keep" and not opened
     else:
         assert directory.is_dir() and opened == [str(directory.absolute())]
         if case == "existing":
-            assert (directory / "keep.txt").read_text() == "keep"
+            assert (directory / "keep.txt").read_text(encoding="utf-8") == "keep"
 
 
 def test_trial_caps_logs_and_preserves_surviving_scroll_anchor(gui):

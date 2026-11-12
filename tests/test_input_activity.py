@@ -211,7 +211,7 @@ def test_wait_log_is_readable_in_default_info_view(session, tmp_path):
     env.inputs.check()
     directory = tmp_path / "traces"
     directory.mkdir()
-    (directory / "1.jsonl").write_text("".join(json.dumps(e) + "\n" for e in env.events))
+    (directory / "1.jsonl").write_text("".join(json.dumps(e) + "\n" for e in env.events), encoding="utf-8")
     boundary = run_logs.snapshot(tmp_path, 1)
     result = run_logs.read_page(tmp_path, 1, boundary, levels={"info"})
     assert len(result["rows"]) == 2

@@ -27,7 +27,7 @@ def test_construct_empty_ignores_default_and_cli_cannot_resume(tmp_path):
     original = {str(path): path.read_bytes() for path in host.candidate.rglob('*') if path.is_file()}
     session = DeveloperSession.create(host.service, None, mode='Construct', entry='gui')
     chat = session.conversation()
-    manifest = json.loads((session.host.candidate / 'manifest.json').read_text())
+    manifest = json.loads((session.host.candidate / 'manifest.json').read_text(encoding="utf-8"))
     assert list(manifest['components']) == ['plans.default'] and not manifest['recovery_rules']
     assert session.host.baseline() == {'manifest.json': (session.host.candidate / 'manifest.json').read_bytes(),
                                        'plan.py': (session.host.candidate / 'plan.py').read_bytes()}
@@ -69,18 +69,18 @@ def test_knowledge_directory_creates_without_session_and_preserves_content(gui, 
     assert not root.exists()
     page.knowledge_action.trigger()
     assert root.is_dir() and opened == [str(root)]
-    (root / 'keep.md').write_text('keep')
+    (root / 'keep.md').write_text('keep', encoding="utf-8")
     page.knowledge_action.trigger()
-    assert (root / 'keep.md').read_text() == 'keep' and len(opened) == 2
+    assert (root / 'keep.md').read_text(encoding="utf-8") == 'keep' and len(opened) == 2
     assert page.session is None
 
 
 def test_knowledge_directory_file_collision_preserves_original(gui, caplog):
     app, window = gui
     root = window.service.data_root / 'knowledge'
-    root.write_text('original')
+    root.write_text('original', encoding="utf-8")
     window.repair_page.open_knowledge()
-    assert root.read_text() == 'original' and '普通文件' in caplog.text
+    assert root.read_text(encoding="utf-8") == 'original' and '普通文件' in caplog.text
 
 
 def test_manifest_reference_is_versioned_paged_and_never_imports(tmp_path, monkeypatch):
@@ -88,7 +88,7 @@ def test_manifest_reference_is_versioned_paged_and_never_imports(tmp_path, monke
     reader = ManifestReference(host.manager)
     first_source = reader.source(first.manifest_id, 'components', 'steps.total')
     path = host.candidate / 'steps.total.py'
-    path.write_text(path.read_text().replace('if value > 0', 'if value >= 0'))
+    path.write_text(path.read_text(encoding="utf-8").replace('if value > 0', 'if value >= 0'), encoding="utf-8")
     second_id = host.publish()
     second_source = reader.source(second_id, 'components', 'steps.total')
     assert first_source['component_id'] != second_source['component_id']
@@ -119,7 +119,7 @@ def test_manifest_reference_rejects_corrupt_identity_and_paths(tmp_path, failure
     digest = value['components']['steps.total']['component_id'].removeprefix('sha256:')
     source_path = host.manager.components_dir / f'{digest}.py'
     if failure == 'hash':
-        source_path.write_text('corrupted')
+        source_path.write_text('corrupted', encoding="utf-8")
     elif failure == 'source_symlink':
         content = source_path.read_bytes()
         source_path.unlink()
@@ -134,7 +134,7 @@ def test_manifest_reference_rejects_corrupt_identity_and_paths(tmp_path, failure
         manifest_path.symlink_to(outside)
     else:
         value['manifest_id'] = str(uuid.uuid4())
-        manifest_path.write_text(json.dumps(value))
+        manifest_path.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(ValueError):
         reader.source(loaded.manifest_id, 'components', 'steps.total')
 
@@ -147,7 +147,7 @@ def test_reference_read_does_not_execute_even_registered_side_effect_source(tmp_
     digest = hashlib.sha256(content).hexdigest()
     (host.manager.components_dir / f'{digest}.py').write_bytes(content)
     value['components']['steps.total']['component_id'] = 'sha256:' + digest
-    (host.manager.manifests_dir / f'{loaded.manifest_id}.json').write_text(json.dumps(value))
+    (host.manager.manifests_dir / f'{loaded.manifest_id}.json').write_text(json.dumps(value), encoding="utf-8")
     assert reader.source(loaded.manifest_id, 'components', 'steps.total')['source'] == content.decode()
 
 
@@ -176,7 +176,7 @@ def test_first_send_uses_final_choices_and_preserves_manual_candidate(gui, monke
     assert page.session is not None and not page.mode.isEnabled() and not page.baseline.isEnabled()
     assert page.host.secrets is window.host.secrets
     assert all(path.read_bytes() == value for path, value in manual.items())
-    assert json.loads((page.host.candidate / 'manifest.json').read_text())['components'].keys() == {'plans.default'}
+    assert json.loads((page.host.candidate / 'manifest.json').read_text(encoding="utf-8"))['components'].keys() == {'plans.default'}
     identity = page.session.identity
     page.new()
     item = next(page.history.item(i) for i in range(page.history.count())

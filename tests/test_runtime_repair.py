@@ -47,8 +47,8 @@ def test_old_plan_signature_is_rejected_without_compatibility(tmp_path):
     manager = ManifestManager(tmp_path)
     _publish(tmp_path, manager, step_source=NEW_STEP)
     path = tmp_path / "candidate-0" / "plan.py"
-    path.write_text(path.read_text().replace("execute(ctx)",
-        "execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any])"))
+    path.write_text(path.read_text(encoding="utf-8").replace("execute(ctx)",
+        "execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any])"), encoding="utf-8")
     rejected = manager.publish(path.parent / "manifest.json")
     assert not rejected.ok and "signature_invalid" in {error.code for error in rejected.errors}
 
@@ -59,12 +59,12 @@ def test_old_published_plan_can_be_copied_for_repair_without_loading_code(tmp_pa
     manager = ManifestManager(tmp_path)
     identity = _publish(tmp_path, manager, step_source=NEW_STEP)
     path = manager.manifests_dir / f"{identity}.json"
-    value = json.loads(path.read_text())
+    value = json.loads(path.read_text(encoding="utf-8"))
     old = b'"""Old Plan."""\nfrom typing import Any\nfrom lalc import automation_plan\n@automation_plan\ndef execute(ctx, *, task_repetitions: dict[str, int], settings: dict[str, Any]) -> None:\n    return None\n'
     digest = hashlib.sha256(old).hexdigest()
     (manager.components_dir / f"{digest}.py").write_bytes(old)
     value["components"]["plans.default"]["component_id"] = f"sha256:{digest}"
-    path.write_text(json.dumps(value))
+    path.write_text(json.dumps(value), encoding="utf-8")
     assert not manager.load(identity).ok
     service = ApplicationService(tmp_path, manifest_manager=manager)
     with monkeypatch.context() as patch:
@@ -98,7 +98,7 @@ def test_each_entry_repairs_its_own_failure_and_preserves_waiting_caller(tmp_pat
         candidate = tmp_path / "candidate-0" / "manifest.json"
         add_plan(candidate, failure)
         plan = candidate.with_name("plan.py")
-        plan.write_text(plan.read_text().replace("from lalc import automation_plan", "from lalc import automation_plan, ExecutionFailure"))
+        plan.write_text(plan.read_text(encoding="utf-8").replace("from lalc import automation_plan", "from lalc import automation_plan, ExecutionFailure"), encoding="utf-8")
         base = manager.publish(candidate).loaded.manifest_id
     selected = _publish(tmp_path, manager, step_source=NEW_STEP)
     seen = []
@@ -114,7 +114,7 @@ def test_each_entry_repairs_its_own_failure_and_preserves_waiting_caller(tmp_pat
         assert state["result"]["output"] == ["task-old", "step-new:4", "sub-old"]
         task_starts = [row for row in state["trace"] if row["event"] == "component_started" and row.get("logical_name") == "tasks.run"]
         assert len(task_starts) == (2 if role == "task" else 1)
-        ledger = json.loads((tmp_path / "ledger" / f'{state["run_id"]}.json').read_text())
+        ledger = json.loads((tmp_path / "ledger" / f'{state["run_id"]}.json').read_text(encoding="utf-8"))
         tasks = [row for row in ledger["records"] if row["workflow_kind"] == "task"]
         assert len(tasks) == 1 and len(tasks[0]["attempts"]) == len(task_starts)
 
@@ -140,7 +140,7 @@ def execute(ctx, *, value: int) -> str:
         self.tools.cancelled.clear()
         seen.append((self.session.identity, request_limit, self.tools.read_run_state()["details"]))
         if len(seen) == 2:
-            (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text())["components"]["steps.break"]["source_path"]).write_text(NEW_STEP)
+            (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text(encoding="utf-8"))["components"]["steps.break"]["source_path"]).write_text(NEW_STEP, encoding="utf-8")
         published = read_json(self.tools.call("publish", {"summary": "修复失败入口"}))
         assert published["details"]["ok"]
         selected = published["details"]["manifest_id"]
@@ -175,7 +175,7 @@ def test_rule_limit_hands_off_and_step_success_resets_counter(tmp_path, monkeypa
     counts = []
     async def round(self, message, args, **kwargs):
         counts.append(self.tools.run_state.recovery_count)
-        (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text())["components"]["steps.break"]["source_path"]).write_text(NEW_STEP)
+        (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text(encoding="utf-8"))["components"]["steps.break"]["source_path"]).write_text(NEW_STEP, encoding="utf-8")
         saved = read_json(self.tools.call("publish", {"summary": "修复反复失败"}))["details"]["manifest_id"]
         return {"status": "recheck", "manifest_id": saved, "requests": 1}
     monkeypatch.setattr(RepairConversation, "run", round)
@@ -200,7 +200,7 @@ def test_default_selection_uses_plan_completion_not_all_task_success(tmp_path, f
             '    ctx.call("tasks.run", value=-1)\n')
     add_plan(candidate, '    ctx.call("tasks.run", value=1)\n' + tail)
     plan = candidate.with_name("plan.py")
-    plan.write_text(plan.read_text().replace("from lalc import automation_plan", "from lalc import automation_plan, ExecutionFailure, UserInterruption"))
+    plan.write_text(plan.read_text(encoding="utf-8").replace("from lalc import automation_plan", "from lalc import automation_plan, ExecutionFailure, UserInterruption"), encoding="utf-8")
     base = manager.publish(candidate).loaded.manifest_id
     repaired = NEW_STEP.replace('    return f"step-new:{value}"', '    if value < 0:\n        raise ExecutionFailure("task failed")\n    return f"step-new:{value}"').replace("from lalc import step", "from lalc import step, ExecutionFailure")
     selected = _publish(tmp_path, manager, step_source=repaired)

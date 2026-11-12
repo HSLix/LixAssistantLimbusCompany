@@ -103,7 +103,7 @@ def test_pi_reuse_reconfigures_round_and_recovers_after_abort(agent_server, reta
     source.mkdir()
     for name in ("a", "b"):
         (source / name).mkdir()
-        (source / name / "sample.txt").write_text("CONTENT_" + name.upper())
+        (source / name / "sample.txt").write_text("CONTENT_" + name.upper(), encoding="utf-8")
 
     async def run():
         with configured_pi(options, source, "lalc-no-key", "startup-system", require_image=False) as (command, env, cwd, _):
@@ -209,7 +209,7 @@ def serve(binary, env, folder):
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     base = f"http://127.0.0.1:{port}"
-    with (folder / f"serve-{time.time_ns()}.log").open("w") as log:
+    with (folder / f"serve-{time.time_ns()}.log").open("wb") as log:
         process = subprocess.Popen([str(binary), "serve", "--host", "127.0.0.1", "--port", str(port),
                                     "--no-tui", "--quiet", "true"], env=env, stdout=log,
                                    stderr=subprocess.STDOUT, start_new_session=True)
@@ -250,11 +250,11 @@ def test_codesearch_offline_readonly_generations_and_failed_publication(retained
     git(repo, "config", "user.name", "Validation")
     git(repo, "config", "user.email", "validation@example.invalid")
     source = repo / "sample.py"
-    source.write_text('def acquire_resource():\n    """Acquire resource using version ALPHA_ONLY."""\n    return "ALPHA_ONLY"\n')
+    source.write_text('def acquire_resource():\n    """Acquire resource using version ALPHA_ONLY."""\n    return "ALPHA_ONLY"\n', encoding="utf-8")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "A")
     a = git(repo, "rev-parse", "HEAD")
-    source.write_text('def acquire_resource():\n    """Acquire resource using version BRAVO_ONLY."""\n    return "BRAVO_ONLY"\n')
+    source.write_text('def acquire_resource():\n    """Acquire resource using version BRAVO_ONLY."""\n    return "BRAVO_ONLY"\n', encoding="utf-8")
     git(repo, "add", ".")
     git(repo, "commit", "-q", "-m", "B")
     b = git(repo, "rev-parse", "HEAD")
@@ -283,16 +283,16 @@ def test_codesearch_offline_readonly_generations_and_failed_publication(retained
     publish("a")
     failed_b = retained / "failed-b"
     failed_b.mkdir()
-    (failed_b / "sample.py").write_text(source.read_text())
+    (failed_b / "sample.py").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     # 模拟 B 构建失败／构建中宿主退出：不发布新指针，旧文件和旧索引不被修改。
-    assert json.loads(active.read_text())["generation"] == "a"
-    assert "ALPHA_ONLY" in (versions["a"] / "sample.py").read_text()
+    assert json.loads(active.read_text(encoding="utf-8"))["generation"] == "a"
+    assert "ALPHA_ONLY" in (versions["a"] / "sample.py").read_text(encoding="utf-8")
     records = []
     db_before = {}
     for name in ("a", "b"):
         if name == "b":
             publish("b")
-        selected = Path(json.loads(active.read_text())["root"])
+        selected = Path(json.loads(active.read_text(encoding="utf-8"))["root"])
         config = {"repos": {"reference": str(selected)}, "groups": {}, "repo_read_only": {"reference": True}}
         save(state, "repos.json", config)
         db = selected / ".codesearch.db/data.mdb"
@@ -305,7 +305,7 @@ def test_codesearch_offline_readonly_generations_and_failed_publication(retained
             expected = "ALPHA_ONLY" if name == "a" else "BRAVO_ONLY"
             other = "BRAVO_ONLY" if name == "a" else "ALPHA_ONLY"
             assert expected in chunk["content"] and other not in chunk["content"], chunk
-            assert expected in (selected / "sample.py").read_text()
+            assert expected in (selected / "sample.py").read_text(encoding="utf-8")
             try:
                 reindex = http(base, "/repos/reference/reindex", {})
             except urllib.error.HTTPError as error:
@@ -314,7 +314,7 @@ def test_codesearch_offline_readonly_generations_and_failed_publication(retained
             records.append(dict(generation=name, pid=process.pid, initial=initial, result=result, chunk=chunk,
                                 reindex=reindex, commit=git(selected, "rev-parse", "HEAD")))
         assert hashlib.sha256(db.read_bytes()).hexdigest() == db_before[name]
-    assert json.loads(active.read_text())["generation"] == "b"
+    assert json.loads(active.read_text(encoding="utf-8"))["generation"] == "b"
     save(retained, "generation-results.json", records)
     save(retained, "summary.json", {"a": a, "b": b, "failure_injection": "unpublished B directory, no actual index corruption",
                                     "offline_endpoint": env["HF_ENDPOINT"], "disk_index_unchanged": True})
@@ -327,11 +327,11 @@ def test_codesearch_readonly_does_not_disable_background_symbol_helper(retained)
         pytest.skip("显式准备 codesearch 实验资源后运行")
     reference = retained / "reference"
     shutil.copytree(EXPERIMENT / "corpus/runtime-reference", reference)
-    (reference / "tsconfig.json").write_text('{"compilerOptions":{},"include":["sample.ts"]}')
-    (reference / "sample.ts").write_text('export const value = "sentinel";')
+    (reference / "tsconfig.json").write_text('{"compilerOptions":{},"include":["sample.ts"]}', encoding="utf-8")
+    (reference / "sample.ts").write_text('export const value = "sentinel";', encoding="utf-8")
     marker = retained / "helper-invoked.json"
     helper = retained / "fake-scip-typescript"
-    helper.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\nPath({str(marker)!r}).write_text(json.dumps(sys.argv))\nraise SystemExit(3)\n')
+    helper.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\nPath({str(marker)!r}).write_text(json.dumps(sys.argv), encoding="utf-8")\nraise SystemExit(3)\n', encoding="utf-8")
     helper.chmod(0o755)
     state = retained / "state"
     state.mkdir()
@@ -390,11 +390,11 @@ def test_codesearch_chunk_staleness_is_not_a_hash_check(retained):
         assert before.get("content"), before
         path = reference / "knowledge.py"
         old = path.stat()
-        path.write_text('def git_diagnostic(text):\n    return "CHANGED_AFTER_INDEX"\n')
+        path.write_text('def git_diagnostic(text):\n    return "CHANGED_AFTER_INDEX"\n', encoding="utf-8")
         os.utime(path, ns=(old.st_atime_ns, old.st_mtime_ns))
         after = http(base, f"/chunk/{chunk_id}?project=reference")
         save(retained, "staleness-results.json", {"before": before, "after": after,
-                                                  "disk": path.read_text(), "mtime_preserved": True})
+                                                  "disk": path.read_text(encoding="utf-8"), "mtime_preserved": True})
         assert "CHANGED_AFTER_INDEX" not in after["content"]
         assert not after.get("note"), after
 
@@ -412,7 +412,7 @@ def test_failed_and_killed_index_leave_retained_a_usable(retained):
     broken = retained / "candidate-b-error"
     broken.mkdir()
     git(broken, "init", "-q")
-    (broken / "sample.py").write_text('def b():\n    return "B"\n')
+    (broken / "sample.py").write_text('def b():\n    return "B"\n', encoding="utf-8")
     empty_state = retained / "empty-state"
     empty_state.mkdir()
     env = dict(os.environ, CODESEARCH_HOME=str(empty_state), HF_ENDPOINT="http://127.0.0.1:9", HF_HUB_OFFLINE="1")
@@ -430,19 +430,19 @@ def test_failed_and_killed_index_leave_retained_a_usable(retained):
     interrupted.mkdir()
     git(interrupted, "init", "-q")
     (interrupted / "sample.py").write_text("\n".join(
-        f'def method_{n}(value):\n    """Process item number {n}."""\n    return value + {n}\n' for n in range(2000)))
+        f'def method_{n}(value):\n    """Process item number {n}."""\n    return value + {n}\n' for n in range(2000)), encoding="utf-8")
     stdout_path = retained / "killed-index-stdout.log"
-    with stdout_path.open("w") as output:
+    with stdout_path.open("wb") as output:
         process = subprocess.Popen([str(binary), "index", "add", str(interrupted), "--local", "--log-file",
                                     str(retained / "killed-build.log")], env=env, stdout=output,
                                    stderr=subprocess.STDOUT, start_new_session=True)
         try:
             deadline = time.monotonic() + 10
-            while "Phase 2" not in stdout_path.read_text():
-                assert process.poll() is None, stdout_path.read_text()
+            while "Phase 2" not in stdout_path.read_text(encoding="utf-8"):
+                assert process.poll() is None, stdout_path.read_text(encoding="utf-8")
                 assert time.monotonic() < deadline
                 time.sleep(.01)
-            assert f"Database: {interrupted / '.codesearch.db'}" in stdout_path.read_text()
+            assert f"Database: {interrupted / '.codesearch.db'}" in stdout_path.read_text(encoding="utf-8")
             assert process.poll() is None
             os.killpg(process.pid, signal.SIGKILL)
             assert process.wait(timeout=5) != 0
@@ -450,7 +450,7 @@ def test_failed_and_killed_index_leave_retained_a_usable(retained):
             if process.poll() is None:
                 os.killpg(process.pid, signal.SIGKILL)
                 process.wait(timeout=5)
-    assert json.loads((retained / "active.json").read_text())["version"] == "A"
+    assert json.loads((retained / "active.json").read_text(encoding="utf-8"))["version"] == "A"
     assert hashlib.sha256((active / "knowledge.py").read_bytes()).hexdigest() == before_file
     assert hashlib.sha256((active / ".codesearch.db/data.mdb").read_bytes()).hexdigest() == before_db
     save(state, "repos.json", {"repos": {"reference": str(active)}, "groups": {}, "repo_read_only": {"reference": True}})

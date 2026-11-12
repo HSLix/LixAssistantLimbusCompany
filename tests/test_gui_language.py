@@ -56,7 +56,7 @@ def test_language_file_is_independent_and_failed_write_preserves_choice(tmp_path
 @pytest.mark.parametrize("value", [{"language": "bad"}, {"language": []}, {}, [], {"language": "en_US", "pages": {}}])
 def test_invalid_language_file_is_preserved(tmp_path, value):
     path = tmp_path / "gui-settings.json"
-    path.write_text(json.dumps(value))
+    path.write_text(json.dumps(value), encoding="utf-8")
     before = path.read_bytes()
     with pytest.raises(ValueError):
         load_language(tmp_path)
@@ -194,7 +194,7 @@ def test_catalog_covers_literal_gui_messages_and_preserves_format_fields(app):
     fields = lambda value: sorted(field for _, field, _, _ in Formatter().parse(value) if field is not None)
     install_translations(app, "zh_CN")
     for filename in ("gui.py", "developer_gui.py", "template_match_gui.py", "run_log_gui.py", "repair_chat.py", "page_preview.py", "sharing_gui.py", "lifecycle.py", "i18n.py"):
-        for node in ast.walk(ast.parse((root / filename).read_text())):
+        for node in ast.walk(ast.parse((root / filename).read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr":
                 assert isinstance(node.args[0], ast.Constant), (filename, node.lineno)
                 source = node.args[0].value
@@ -216,8 +216,8 @@ class Page(QWidget):
     def submit(self): return {}
 def create_page(context): return Page()
 '''
-    (directory / "partial.py").write_text(source)
-    (directory / "bad.py").write_text(source.replace('"partial"', '"bad"').replace('{"zh_CN": "中文名称"}', '{"en_US": ""}'))
+    (directory / "partial.py").write_text(source, encoding="utf-8")
+    (directory / "bad.py").write_text(source.replace('"partial"', '"bad"').replace('{"zh_CN": "中文名称"}', '{"en_US": ""}'), encoding="utf-8")
     pages, errors = discover_pages(directory, UserSettings(tmp_path))
     assert len(pages) == 1 and pages[0].name == "Original name"
     assert len(errors) == 1 and "PAGE_NAMES" in errors[0]

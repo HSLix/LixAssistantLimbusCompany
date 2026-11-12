@@ -21,7 +21,7 @@ def test_publish_trial_uses_saved_version_and_retained_logs(tmp_path, monkeypatc
     source = host.candidate / "steps.total.py"
     with host.service.activity("Agent"):
         saved = tools.publish()["details"]["manifest_id"]
-        source.write_text(source.read_text().replace(" if value > 0", ""))
+        source.write_text(source.read_text(encoding="utf-8").replace(" if value > 0", ""), encoding="utf-8")
         with monkeypatch.context() as patch:
             patch.setattr(type(host.service), "state", property(lambda _: pytest.fail("Trial copied full Trace")))
             first = tools.trial_run(saved, logical_name="steps.total", inputs={"values": [1, -2]})["details"]
@@ -51,7 +51,7 @@ def test_rejected_start_has_no_run_and_failure_keeps_trace(tmp_path, monkeypatch
         assert result["status"] == "rejected" and result["run_id"] is None
         assert host.service.state["run_id"] is None
         assert "再次调用" in result["feedback"]
-        (host.candidate / "plans.default.py").write_text("broken")
+        (host.candidate / "plans.default.py").write_text("broken", encoding="utf-8")
         result = tools.trial_run(saved.manifest_id)["details"]
         assert result["result"]["status"] == "completed"
         assert tools.read_run_log(result["run_id"])["details"]["events"]
@@ -77,7 +77,7 @@ def execute(ctx, *, n: int) -> int:
     tools.add_component("entry.py", name, source)
     if role == "plan":
         source = host.candidate / "plans.default.py"
-        source.write_text(source.read_text().replace("    return None", '    ctx.call("entry.compute", n=2)'))
+        source.write_text(source.read_text(encoding="utf-8").replace("    return None", '    ctx.call("entry.compute", n=2)'), encoding="utf-8")
     with host.service.activity("Agent"):
         identity = tools.publish()["details"]["manifest_id"]
         if role == "plan":
@@ -133,7 +133,7 @@ def test_log_evidence_is_bound_to_run_and_missing_is_explicit(tmp_path):
     root = host.service.data_root
     trace = root / "traces" / "1.jsonl"
     trace.parent.mkdir(exist_ok=True)
-    trace.write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n")
+    trace.write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n", encoding="utf-8")
     image = root / "evidence" / "1" / "2.png"
     image.parent.mkdir(parents=True)
     Image.new("RGB", (4, 4)).save(image)

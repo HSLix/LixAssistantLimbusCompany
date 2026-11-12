@@ -143,7 +143,7 @@ def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_fir
         window.cancel_operation()
         wait_jobs(app, window)
     assert len(seen) == 1 and seen[0].result['status'] == 'installed'
-    assert (window.service.data_root / 'pages/sample/page.py').read_text() == SOURCE
+    assert (window.service.data_root / 'pages/sample/page.py').read_text(encoding="utf-8") == SOURCE
     assert read_json(session.path / 'log/result.json')['status'] == 'completed'
     assert any(message.get('role') == 'tool' and 'reload_required' in str(message) for message in state['calls'][-1]['messages'])
     notice = window.page_installed_dialog
@@ -379,7 +379,7 @@ def test_gui_knowledge_tools_images_and_cli_permissions(conversation, tmp_path, 
     gui_chat = session.conversation()
     root = chat.host.service.data_root / 'knowledge'
     root.mkdir()
-    (root / 'guide.md').write_text('Knowledge evidence needle\n')
+    (root / 'guide.md').write_text('Knowledge evidence needle\n', encoding="utf-8")
     Image.new('RGB', (3, 2), 'red').save(root / 'reference.jpg')
     before = {p: p.read_bytes() for p in session.host.candidate.rglob('*') if p.is_file()}
     script(state, [tool('knowledge_list', {}), tool('knowledge_read', {'path': 'guide.md'}),
@@ -409,7 +409,7 @@ def test_gui_knowledge_tools_images_and_cli_permissions(conversation, tmp_path, 
 
 def persistent(conversation):
     chat, options, state = conversation
-    source = json.loads(chat.host.metadata.read_text())["manifest_id"]
+    source = json.loads(chat.host.metadata.read_text(encoding="utf-8"))["manifest_id"]
     session = DeveloperSession.create(chat.host.service, source)
     return session, session.conversation(), options, state
 
@@ -477,7 +477,7 @@ def test_cli_creates_and_resumes_without_manual_candidate(conversation, monkeypa
     session, _, options, state = persistent(conversation)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "default_data_root", lambda: session.host.service.data_root)
-    source = json.loads((session.path / "session.json").read_text())["source_manifest_id"]
+    source = json.loads((session.path / "session.json").read_text(encoding="utf-8"))["source_manifest_id"]
     common = ["--base-url", options.base_url, "--model", options.model, "--max-requests", "5"]
     state["respond"] = lambda body: answer("CLI first answer")
     assert cli.main(["repair", "--from", source, "--problem", "CLI first message", *common]) == 0
@@ -622,7 +622,7 @@ def test_page_availability_tool_roundtrip(conversation, enabled):
     chat = session.conversation()
     drafts = PageDrafts(session)
     drafts.installed.mkdir(parents=True, exist_ok=True)
-    (drafts.installed / 'sample.py').write_text(SOURCE)
+    (drafts.installed / 'sample.py').write_text(SOURCE, encoding="utf-8")
     PageAvailability(drafts.installed.parent).set_enabled('sample.py', not enabled)
     seen = []
     def confirm(request):

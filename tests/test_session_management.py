@@ -26,14 +26,14 @@ def index_session(session):
                   observation=dict(game_version='1.118.0', steam_build_id='123', observed_at='2026-11-11T00:00:00Z'))
     directory = session.path / 'log/version-observations'
     directory.mkdir()
-    (directory / '1.json').write_text(json.dumps(record))
+    (directory / '1.json').write_text(json.dumps(record), encoding="utf-8")
     history.add(record, directory.parent)
     return history
 
 
 def test_rename_is_persistent_atomic_and_preserves_identity_and_order(session, monkeypatch):
     metadata = session.path / 'session.json'
-    before = json.loads(metadata.read_text())
+    before = json.loads(metadata.read_text(encoding="utf-8"))
     stamp = session.path.stat().st_mtime_ns
     assert session.rename('  我的会话  ') == '我的会话'
     renamed = session.check()
@@ -58,20 +58,20 @@ def test_delete_removes_private_data_and_index_but_keeps_published_and_other_ses
     index_session(other)
     draft = session.path / 'page-drafts/example'
     draft.mkdir(parents=True)
-    (draft / 'page.py').write_text('private draft')
+    (draft / 'page.py').write_text('private draft', encoding="utf-8")
     manifest = service.manifest_manager.default_manifest_id()
     shared = service.data_root / 'assets/shared.txt'
     installed = service.data_root / 'pages/installed.py'
     for path in (shared, installed):
         path.parent.mkdir(exist_ok=True)
-        path.write_text('retained')
+        path.write_text('retained', encoding="utf-8")
     assert session.delete() is None
     assert not session.path.exists() and other.path.exists()
     assert [row['session_id'] for row in history.search()['sessions']] == [other.identity]
     assert history.rebuild()['observations'] == 1
     assert service.manifest_manager.default_manifest_id() == manifest
     assert any(item['manifest_id'] == manifest for item in service.manifest_manager.list_manifests())
-    assert shared.read_text() == installed.read_text() == 'retained'
+    assert shared.read_text(encoding="utf-8") == installed.read_text(encoding="utf-8") == 'retained'
     assert not list(session.path.parent.glob('.delete-*'))
 
 
@@ -123,7 +123,7 @@ def test_delete_failed_restore_preserves_only_copy(session, monkeypatch):
         session.delete()
     assert not session.path.exists()
     retained = list(session.path.parent.glob('.delete-*/session/session.json'))
-    assert len(retained) == 1 and json.loads(retained[0].read_text())['session_id'] == session.identity
+    assert len(retained) == 1 and json.loads(retained[0].read_text(encoding="utf-8"))['session_id'] == session.identity
 
 
 def test_delete_cleanup_failure_returns_retained_location(session, monkeypatch):
@@ -148,7 +148,11 @@ def test_management_rejects_busy_or_locked_session(session, operation):
     assert session.check()
 
 
-def test_live_title_is_fixed_across_rounds_and_manual_title_survives_reopen(gui):
+def test_live_title_is_fixed_across_rounds_and_manual_title_survives_reopen(gui, monkeypatch):
+    import io
+
+    # 模拟中文 Windows 默认编码，避免 UTF-8 开发机掩盖遗漏的文件编码。
+    monkeypatch.setattr(io, 'text_encoding', lambda encoding, stacklevel=2: encoding or 'gbk')
     app, window = gui
     page = window.repair_page
     current = page.session
@@ -159,6 +163,8 @@ def test_live_title_is_fixed_across_rounds_and_manual_title_survives_reopen(gui)
     assert not page.session_uuid.isHidden()
     assert page.session_uuid.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
     current.rename('人工名称' * 20)
+    page.update_source_label()
+    assert current.check()['source_manifest_id'] in page.source_label.text()
     page.titles.clear()
     page.refresh_sessions()
     assert page.identity.text().endswith('…')
