@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-12：Session 页面增加可复制的完整 UUID；Sharing 导出列表补充 Workflow 附加信息、Session 标题和修改时间，并对齐历史会话顺序。已通过相关 82 项测试；Windows 原生显示未验收，见[决定、影响审查与验证](session-sharing-display-impact-review.md)。
+
 2026-11-11：开发者面板的会话标题首次初始化后固定；历史会话增加悬停子设置、持久重命名及确认后彻底删除，忙碌及清理期间禁用入口。设计、故障边界与验证见[专项审查](session-management-impact-review.md)。
 
 2026-11-11：移除 User GUI 打开开发界面的用途提醒，中文名统一为“开发者面板”；运行记录左侧每批显示 10 条、滚动追加，后台仍扫描时间目录。设计与验证见[专项记录](developer-panel-run-list-impact-review.md)。

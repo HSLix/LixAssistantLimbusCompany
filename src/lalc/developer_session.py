@@ -17,6 +17,44 @@ from .runtime import atomic_write_json, staging_directory
 from .work_files import create_work_directory
 
 
+def saved_session_title(path, titles):
+    """只读保存标题或首条用户消息；缓存由调用方持有，不恢复会话或执行工具。"""
+    from .agent_prompts import chat_title
+    from .process_lock import ProcessLock
+    if str(uuid.UUID(path.name)) != path.name or path.is_symlink() or (path / 'session.json').is_symlink():
+        raise ValueError('Invalid Session identity or symlink')
+    events = path / 'log' / 'events.jsonl'
+    if (path / 'log').is_symlink() or events.is_symlink():
+        raise ValueError('Session log symlink')
+    with ProcessLock('candidate:' + str((path / 'candidate').resolve())):
+        metadata = json.loads((path / 'session.json').read_text(encoding='utf-8'))
+        if 'title' in metadata:
+            title = metadata['title']
+            if not isinstance(title, str) or not title.strip() or '\n' in title or '\r' in title:
+                raise ValueError('Invalid Session title')
+            titles[path.name] = (title[:39] + '…' if len(title) > 40 else title, title)
+            return titles[path.name]
+        if path.name in titles:
+            return titles[path.name]
+        if not events.exists():
+            return '', ''
+        for row in read_events(events):
+            if not isinstance(row, dict) or not isinstance(row.get('event'), dict):
+                raise ValueError('Invalid Session event')
+            value = row['event']
+            if value.get('type') == 'session_message' and (not isinstance(value.get('message'), dict)
+                    or not isinstance(value['message'].get('content'), list)
+                    or any(not isinstance(part, dict) for part in value['message']['content'])):
+                raise ValueError('Invalid Session message')
+            if value.get('type') == 'session_message' and value['message'].get('role') == 'user':
+                text = '\n'.join(part.get('text', '') for part in value['message'].get('content', []) if part.get('type') == 'text')
+                title = chat_title(text)
+                if title[0]:
+                    titles[path.name] = title
+                    return title
+    return '', ''
+
+
 def restored_history(events):
     """从已保存事件重建消息；缺失的工具结果明确标为未知，不执行任何工具。"""
     history, pending, results = [], {}, {}
