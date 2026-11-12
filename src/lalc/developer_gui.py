@@ -22,7 +22,7 @@ from qfluentwidgets import (
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
     TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
-    CustomStyleSheet, setStyleSheet as setFluentStyleSheet,
+    CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
 )
 
 from .run_logs import LIVE_LOG_LIMIT
@@ -1201,13 +1201,15 @@ class RepairPage(QWidget):
         self.status.hide()
         self.composer = QWidget()
         self.composer.setObjectName('chatComposer')
-        self.composer.setStyleSheet('#chatComposer { background: rgba(128,128,128,0.07); border: 1px solid rgba(128,128,128,0.25); border-radius: 18px; }')
         composer_layout = QVBoxLayout(self.composer)
         composer_layout.setContentsMargins(12, 8, 12, 10)
         composer_layout.setSpacing(4)
         self.message = ChatInput()
+        self.message.focusChanged.connect(self.update_composer_focus)
+        qconfig.themeColorChanged.connect(self.update_composer_focus)
+        qconfig.themeChanged.connect(self.update_composer_focus)
+        self.update_composer_focus()
         self.message.setPlaceholderText(tr('Message the Agent…'))
-        self.message.setStyleSheet('QPlainTextEdit { border: none; background: transparent; }')
         self.message.sendRequested.connect(self.send)
         composer_layout.addWidget(self.message)
         self.attachment_notice = QLabel()
@@ -1241,6 +1243,13 @@ class RepairPage(QWidget):
         self.refresh_sessions()
         self.set_manifests(self.host.manager.list_manifests())
         self.show_empty_chat()
+
+    def update_composer_focus(self, *_):
+        """输入框聚焦时高亮整个消息区，失焦后恢复普通边框。"""
+        border = themeColor().name() if self.message.hasFocus() else 'rgba(128,128,128,0.25)'
+        self.composer.setStyleSheet(
+            '#chatComposer { background: rgba(128,128,128,0.07); '
+            f'border: 1px solid {border}; border-radius: 18px; }}')
 
     def set_status(self, text, tooltip=None):
         """保留状态读取接口，将可见状态统一呈现在当前轮回复顶部。"""

@@ -138,6 +138,65 @@ def test_input_grows_to_a_limit_and_shrinks_after_clear(gui):
     editor.close()
 
 
+def test_input_theme_caret_blinks_and_preserves_plain_text(gui):
+    from qfluentwidgets import themeColor
+
+    app, _ = gui
+    editor = ChatInput()
+    editor.setPlainText('中文 input')
+    cursor = editor.textCursor()
+    cursor.movePosition(cursor.MoveOperation.End)
+    editor.setTextCursor(cursor)
+    editor.show()
+    editor.activateWindow()
+    editor.setFocus()
+    app.processEvents()
+    editor.reset_caret()
+    rect = editor.cursorRect()
+    position = QPoint(rect.x() + 1, rect.center().y())
+    assert editor.hasFocus() and editor.layer.isHidden()
+    assert editor.viewport().grab().toImage().pixelColor(position).rgba() == themeColor().rgba()
+    editor.blink_caret()
+    assert editor.viewport().grab().toImage().pixelColor(position).rgba() != themeColor().rgba()
+    editor.reset_caret()
+    assert editor.viewport().grab().toImage().pixelColor(position).rgba() == themeColor().rgba()
+    assert editor.toPlainText() == '中文 input' and not editor.document().isUndoAvailable()
+    editor.clearFocus()
+    assert not editor._caret_timer.isActive()
+    assert editor.viewport().grab().toImage().pixelColor(position).rgba() != themeColor().rgba()
+    editor.close()
+
+
+def test_composer_border_tracks_input_focus(gui):
+    from qfluentwidgets import Theme, qconfig, setTheme, themeColor
+
+    app, window = gui
+    page = window.repair_page
+    window.show()
+    window.switchTo(page)
+    window.activateWindow()
+    page.message.setFocus()
+    app.processEvents()
+    assert page.message.hasFocus()
+    assert f'border: 1px solid {themeColor().name()}' in page.composer.styleSheet()
+    original_theme = qconfig.theme
+    try:
+        setTheme(Theme.DARK)
+        app.processEvents()
+        assert f'border: 1px solid {themeColor().name()}' in page.composer.styleSheet()
+        page.message.reset_caret()
+        rect = page.message.cursorRect()
+        pixel = page.message.viewport().grab().toImage().pixelColor(rect.x() + 1, rect.center().y())
+        assert pixel.rgba() == themeColor().rgba()
+        image = page.message.grab().toImage()
+        assert image.pixelColor(image.width() // 2, 0) == image.pixelColor(image.width() // 2, image.height() - 1)
+    finally:
+        setTheme(original_theme)
+    page.attach.setFocus()
+    app.processEvents()
+    assert 'border: 1px solid rgba(128,128,128,0.25)' in page.composer.styleSheet()
+
+
 def test_single_button_cancels_once_and_waits_for_actual_cleanup(gui, monkeypatch):
     from lalc.agent_repair import RepairConversation
     app, window = gui
