@@ -100,7 +100,7 @@ def test_exit_after_agent_end_without_settled_fails(tmp_path):
     async def exercise():
         process = PiProcess()
         command = ["pi", "--tools", "read", "--system-prompt", "test"]
-        process.signature = (tuple(["pi", "--tools", "read", "--system-prompt", "<round>"]), None, None, None)
+        process.signature = (tuple(["pi", "--tools", "read", "--system-prompt", "<round>"]), None, None, None, None)
         process.directory = SimpleNamespace(name=str(tmp_path))
         process.process = SimpleNamespace(pid=123, poll=lambda: None, stdin=io.BytesIO(), wait=lambda: 0)
         process.close = lambda **kwargs: None

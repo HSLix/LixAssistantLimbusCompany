@@ -33,7 +33,7 @@ def answer(text="answered"):
 def conversation(agent_server, tmp_path):
     address, state, _ = agent_server
     host, _ = host_for(tmp_path / "project")
-    options = SimpleNamespace(pi="pi", ask_api_key=False,
+    options = SimpleNamespace(pi="pi", ask_api_key=False, provider="llama.cpp",
                              base_url=address, model="gemma4-test", max_requests=20)
     state["respond"] = lambda body: answer()
     try:
@@ -44,7 +44,8 @@ def conversation(agent_server, tmp_path):
 
 def script(state, steps):
     iterator = iter(steps)
-    state["respond"] = lambda body: next(iterator)
+    state["respond"] = lambda body: ({"role": "assistant", "content": "保留当前目标、约束和已保存改动；继续本轮任务。"}, "stop") \
+        if "LALC 工作交接摘要器" in str(body.get("messages", [{}])[0].get("content", "")) else next(iterator)
 
 
 @pytest.mark.parametrize('declarations', ['missing', 'partial'])
@@ -62,10 +63,11 @@ def test_incomplete_tool_declarations_rejected_before_request(conversation, tmp_
             command = list(command)
             index = command.index('--extension') + 1
             extension = tmp_path / 'incomplete-tools.ts'
+            (tmp_path / 'pi_context.ts').write_text(Path(command[index]).with_name('pi_context.ts').read_text(), encoding='utf-8')
             source = Path(command[index]).read_text(encoding="utf-8")
             mutation = 'delete payload.tools;' if declarations == 'missing' else 'payload.tools?.pop();'
-            source = source.replace('const active = new Set(pi.getActiveTools());\n          if (payload.tools)',
-                                    mutation + '\n          const active = new Set(pi.getActiveTools());\n          if (payload.tools)')
+            source = source.replace('const active = new Set(summaryRequest ? [] : pi.getActiveTools());\n          if (payload.tools)',
+                                    mutation + '\n          const active = new Set(summaryRequest ? [] : pi.getActiveTools());\n          if (payload.tools)')
             extension.write_text(source, encoding="utf-8")
             command[index] = str(extension)
             yield command, env, temporary, model
@@ -335,7 +337,7 @@ def live_conversation(tmp_path):
     if not endpoint or not model:
         pytest.skip("Set LALC_REPAIR_TEST_BASE_URL and LALC_REPAIR_TEST_MODEL for real-model acceptance")
     host, _ = host_for(tmp_path)
-    options = SimpleNamespace(pi="pi", ask_api_key=False, base_url=endpoint, model=model, max_requests=20)
+    options = SimpleNamespace(pi="pi", ask_api_key=False, provider="llama.cpp", base_url=endpoint, model=model, max_requests=20)
     return host.conversation, options
 
 
@@ -554,7 +556,7 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
         assert "当前对话第" not in system
         assert "<cwd>" not in system and "lalc-pi-" not in system
         assert "达到上限后必须停止" in system
-    assert first_calls[1]["messages"][:len(first_calls[0]["messages"])] == first_calls[0]["messages"]
+    assert first_calls[1]["messages"][:len(first_calls[0]["messages"]) - 1] == first_calls[0]["messages"][:-1]
     assert first_calls[0]["messages"][0] == first_calls[1]["messages"][0]
     requests = [event["event"] for event in events if event["event"]["type"] == "lalc_request"]
     assert [(value["requests"], value["request_limit"]) for value in requests] == [(1, 3), (2, 3)]
@@ -566,7 +568,8 @@ def test_each_request_sees_current_budget_and_next_message_resets(conversation):
         system = "\n".join(message["content"] for message in payload["messages"] if message["role"] == "system")
         assert f"当前对话第 2 轮；本轮模型请求第 {index}/2 次" in json.dumps(payload["messages"][-1], ensure_ascii=False)
         assert "当前对话第" not in system
-    assert state["calls"][-1]["messages"][:len(first_calls[-1]["messages"])] == first_calls[-1]["messages"]
+    assert "inspect then answer" in json.dumps(state["calls"][-1]["messages"])
+    assert "当前对话第 1 轮" not in json.dumps(state["calls"][-1]["messages"], ensure_ascii=False)
     budgets = [message for message in chat.history if "LALC_REQUEST_BUDGET" in json.dumps(message)]
     assert len(budgets) == 3  # 所有正式请求的通知均进入修复历史。
     assert read_json(chat.log.path / "context.json") == chat.history
@@ -615,7 +618,8 @@ def test_multiple_image_formats_are_forwarded_without_conversion_and_retained(co
     assert result["status"] == "completed", result
     urls = [part["image_url"]["url"] for message in state["calls"][-1]["messages"] if isinstance(message.get("content"), list)
             for part in message["content"] if part["type"] == "image_url"]
-    assert len(urls) == len(paths)
+    assert urls == []
+    assert "image_id=" in json.dumps(state["calls"][-1])
     assert all(path.read_bytes() == value for path, value in originals.items())
 
 
@@ -741,9 +745,11 @@ def test_deepseek_thinking_survives_tools_and_next_round(conversation, tmp_path,
     assert [m['reasoning_content'] for m in assistant] == [
         'Inspect source before answering.', 'Check available actions too.', 'Source inspection completed.']
     # 连续工具调用及新一轮均完整保留先前实际请求的消息前缀。
-    for previous, current in ((0, 1), (1, 2), (2, 3)):
-        before = state['calls'][previous]['messages']
+    for previous, current in ((0, 1), (1, 2)):
+        before = state['calls'][previous]['messages'][:-1]
         assert state['calls'][current]['messages'][:len(before)] == before
+    assert 'image_id=' in json.dumps(state['calls'][-1])
+    assert 'data:image/' not in json.dumps(state['calls'][-1])
     for payload in state['calls']:
         assert payload['model'] == 'deepseek-flash'
         assert payload['thinking'] == {'type': 'enabled' if thinking else 'disabled'}
@@ -794,7 +800,7 @@ def test_round_freezes_shared_config_and_auth_until_next_message(conversation):
     from lalc.agent_settings import save_settings
     chat, original, state = conversation
     root, keys = chat.host.service.data_root, chat.host.secrets
-    save_settings(root, {"base_url": original.base_url, "model": original.model, "max_requests": 6},
+    save_settings(root, {"provider": "llama.cpp", "base_url": original.base_url, "model": original.model, "max_requests": 6},
                   secret="example-round-A", temporary_keys=keys)
     seen = []
     def respond(body):

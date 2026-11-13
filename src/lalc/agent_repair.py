@@ -45,6 +45,9 @@ class RepairLog:
         self.transport_error = None
         self.on_event = on_event
         self.raw_content = {}
+        self.image_index_path = None
+        self.image_ids = {}
+        self.event_sequence = sum(1 for _ in (self.path / "events.jsonl").open(encoding="utf-8")) if (self.path / "events.jsonl").exists() else 0
 
     @property
     def key(self):
@@ -64,13 +67,15 @@ class RepairLog:
             self.raw_content.clear()
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
-        if value.get("type") == "lalc_request":
+        if value.get("type") == "lalc_compaction_request":
+            self.compaction_requests = value["requests"]
+        if value.get("type") in {"lalc_request", "lalc_compaction_request"}:
             self.transport_error = None
             if value.get("payload_path"):
                 source = Path(value["payload_path"])
                 if (self.transport_dir is None or source.resolve().parent != (self.transport_dir / "payloads").resolve()
                         or type(value.get("requests")) is not int or value["requests"] < 1
-                        or source.name != f"request-{value['requests']}.json"):
+                        or source.name != f"{'compact' if value.get('type') == 'lalc_compaction_request' else 'request'}-{value['requests']}.json"):
                     raise ValueError("模型请求快照必须来自本轮临时传输目录。")
                 target = self.root / f"round-{self.group}" / source.name
                 self.store.write_json(target, self.clean(json.loads(source.read_text(encoding="utf-8"))))
@@ -78,7 +83,33 @@ class RepairLog:
                 value = {**value, "payload_path": str(target)}
         elif value.get("type") == "lalc_transport_error":
             self.transport_error = self.clean(value)
-        event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "round": self.group, "event": value})
+        self.event_sequence += 1
+        image_number = 0
+        def index_images(item):
+            nonlocal image_number
+            import hashlib
+            if isinstance(item, dict):
+                for name, part in item.items():
+                    if name == "data" and item.get("type") == "image" and isinstance(part, str):
+                        digest = hashlib.sha256(base64.b64decode(part, validate=True)).hexdigest()
+                        self.image_ids.setdefault(digest, f"{self.event_sequence}:{image_number}")
+                        image_number += 1
+                    else:
+                        index_images(part)
+            elif isinstance(item, list):
+                for part in item:
+                    index_images(part)
+            elif isinstance(item, str) and item.startswith("data:image/") and ";base64," in item:
+                try:
+                    content = base64.b64decode(item.split(";base64,", 1)[1], validate=True)
+                except ValueError:
+                    return
+                self.image_ids.setdefault(hashlib.sha256(content).hexdigest(), f"{self.event_sequence}:{image_number}")
+                image_number += 1
+        index_images(value)
+        if image_number and self.image_index_path:
+            self.image_index_path.write_text(json.dumps(self.image_ids), encoding="utf-8")
+        event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "conversation": self.identity, "round": self.group, "event": value})
         with (self.path / "events.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(self.store.pack(event), ensure_ascii=False) + "\n")
         if (value.get("type") == "tool_execution_end" and value.get("isError")
@@ -187,7 +218,7 @@ def model_error(message, stage, requests, request_limit, transport=None):
 
 
 async def configure_session(send, event, log, expected_tools):
-    """正式请求前确认实际工具集，并关闭自动重试和压缩。"""
+    """确认工具集并关闭原生重试／压缩，压缩由 LALC 扩展策略控制。"""
     while True:
         item = await rpc_event(event, "就绪事件 lalc_ready")
         log.record(item)
@@ -260,8 +291,7 @@ class RepairConversation:
     def append_user(self, message):
         """Session 的主动输入先记入持久事件，恢复不依赖轮末快照。"""
         message = self.log.clean(message)
-        if self.session:
-            self.log.record({"type": "session_message", "message": message})
+        self.log.record({"type": "session_message", "message": message})
         self.history.append(message)
 
     def add_validation(self, result):
@@ -295,6 +325,7 @@ class RepairConversation:
             self.log.on_event = on_event
             self.log.group += 1
             self.log.requests = 0
+            self.log.compaction_requests = 0
             prefix = f"round-{self.log.group}"
             round_path = self.log.path / prefix
             round_path.mkdir()
@@ -324,6 +355,7 @@ class RepairConversation:
             tools.created_files.clear()
             tools.knowledge.begin_round()
             prior_history = list(self.history)
+            context_options = dict(options)
             stage = "attachments"
             submitted = False
             skill_resources = AsyncExitStack()
@@ -352,6 +384,9 @@ class RepairConversation:
                 for diagnostic in diagnostics:
                     self.log.record({"type": "skill_warning", "message": f"{diagnostic['path']}: {diagnostic['message']}"})
                 self.system_prompt = system_prompt(self.mode)
+                if self.entry == "runtime":
+                    from .agent_prompts import RUNTIME_GUIDANCE
+                    self.system_prompt += "\n" + RUNTIME_GUIDANCE
                 stage = "attachments"
                 attachments, attachment_records = image_attachments(images, round_path)
                 for attachment in attachment_records:
@@ -373,7 +408,7 @@ class RepairConversation:
                 submitted = True
                 input_record = {"policy": "runtime" if self.entry == "runtime" else "developer", "prompt": prompt, "settings": settings,
                                     "game_version_observation": observation,
-                                    "attachments": attachment_records, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
+                                    "attachments": attachment_records, "context_policy": context_options, "editable_files": names, "source_manifest_id": runtime_context["source_manifest_id"],
                                     "pi": None, "tested_pi_version": PI_VERSION, "system_prompt": self.system_prompt, "mode": self.mode, "entry": self.entry,
                                     "manifest_references": references}
                 self.log.save_json(f"{prefix}/input.json", input_record)
@@ -401,6 +436,20 @@ class RepairConversation:
                     env["LALC_PI_HISTORY"] = str(history_path)
                     env["LALC_PI_SKILLS_ROOT"] = str(skills_root)
                     env["LALC_PI_SKILLS_SOURCE"] = str(self.host.service.data_root.resolve() / "skills")
+                    from .agent_context import context_bootstrap, checked_session_file
+                    bootstrap = context_bootstrap(self.log, prior_history, context_options)
+                    bootstrap_path = Path(temporary) / "context-bootstrap.json"
+                    bootstrap_path.write_text(json.dumps(bootstrap, ensure_ascii=False), encoding="utf-8")
+                    self.log.image_ids.update(bootstrap["image_ids"])
+                    self.log.image_index_path = Path(temporary) / "image-index.json"
+                    self.log.image_index_path.write_text(json.dumps(self.log.image_ids), encoding="utf-8")
+                    session_file = checked_session_file((self.session.path if self.session else self.log.root) / "pi")
+                    env["LALC_PI_CONTEXT_BOOTSTRAP"] = str(bootstrap_path)
+                    env["LALC_PI_IMAGE_INDEX"] = str(self.log.image_index_path)
+                    env["LALC_PI_SESSION_FILE"] = str(session_file)
+                    env["LALC_PI_SESSION_ID"] = self.log.identity
+                    command.remove("--no-session")
+                    command += ["--session", str(session_file)]
                     expected = list(self.allowed)
                     env["LALC_PI_ALLOWED_TOOLS"] = json.dumps(expected)
                     command[command.index("--tools") + 1] = ",".join(expected)
@@ -411,12 +460,21 @@ class RepairConversation:
                         context.update(pi_version=env["LALC_PI_VERSION"], pi_path=command[0])
                         self.log.save_json(f"{prefix}/input.json", input_record)
                         ready = await configure_session(send, event, self.log, expected)
+                        await send({"id": "lalc_prepare", "type": "prompt", "message": "/lalc_prepare"})
+                        while True:
+                            prepared = await rpc_event(event, "持久上下文准备")
+                            self.log.record(prepared)
+                            if prepared.get("type") == "lalc_context_ready":
+                                break
+                            if prepared.get("type") == "extension_error" or prepared.get("type") == "response" and not prepared.get("success"):
+                                raise RuntimeError(str(prepared))
+                        (session_file.parent / "initialized").write_text("1\n", encoding="utf-8")
                         input_record["skills"] = ready.get("skills", [])
                         self.log.save_json(f"{prefix}/input.json", input_record)
                         stage = "agent"
                         self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
                         # 原图经 context hook 注入，不进入 pi 的 RPC 图片转码流程。
-                        await send({key: value for key, value in prompt.items() if key != "images"})
+                        await send({"type": "prompt", "message": "/lalc_run"})
                         last = {}
                         while True:
                             item = await event()
@@ -435,6 +493,8 @@ class RepairConversation:
                                     self.history.append(self.log.clean(received))
                                 if received.get("role") == "assistant":
                                     last = received
+                            elif kind == "lalc_compaction" and item.get("phase") == "failed":
+                                raise RuntimeError(item.get("error", "上下文压缩失败"))
                             elif kind == "extension_error" or (kind == "response" and not item.get("success")):
                                 raise RuntimeError(str(item))
                             elif kind == "extension_ui_request":
@@ -518,6 +578,7 @@ class RepairConversation:
                     self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                         "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 self.log.transport_dir = None
+                self.log.image_index_path = None
                 tools.cancelled.set()
                 try:
                     after = candidate_files(self.host.candidate)
@@ -535,7 +596,7 @@ class RepairConversation:
                     details = failed(error, "artifacts")
                     result.update(status="incomplete", artifact_error=details["message"],
                                   error=details["message"], diagnostics=details)
-                result.update(requests=self.log.requests, round=self.log.group, log_path=str(self.log.path),
+                result.update(compaction_requests=getattr(self.log, "compaction_requests", 0), requests=self.log.requests, round=self.log.group, log_path=str(self.log.path),
                               duration_seconds=max(0.0, time.monotonic() - started))
                 self.log.save_json(f"{prefix}/result.json", result)
                 self.log.save_json("result.json", result)

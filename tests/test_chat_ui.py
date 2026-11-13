@@ -496,3 +496,32 @@ def test_open_history_prepares_only_latest_round_in_background(gui, monkeypatch)
     assert restores == [False]
     assert len(reads) == 1 and reads[0][0] == 2 and reads[0][1] != main_thread
     assert {entry['round'] for entry in page.chat.entries} == {2}
+@pytest.mark.parametrize('percent,color', [(0, '#2e9d63'), (49.99, '#2e9d63'),
+                                        (50, '#c58b16'), (79.99, '#c58b16'),
+                                        (80, '#d94a49'), (100, '#d94a49'), (110, '#d94a49')])
+def test_context_usage_uses_compaction_threshold_and_color(gui, percent, color):
+    app, window = gui
+    page = window.repair_page
+    page.show_context_usage({'tokens': percent * 4000, 'limit': 400000})
+    assert page.context_bar.lightBarColor().name() == color
+    assert page.context_bar.value() == min(100, int(percent))
+    assert '400000' in page.context_label.toolTip()
+    page.show_context_usage({'tokens': float('nan'), 'limit': 400000})
+    assert page.context_label.text() == tr('Context: unknown')
+
+
+def test_context_settings_keep_inactive_mode_value(gui):
+    from lalc.agent_settings import settings_document
+    app, window = gui
+    controls = window.settings_page.global_controls
+    assert controls['context_image_limit'].value() == 12
+    assert controls['context_compaction_ratio'].value() == 30
+    assert not controls['context_compaction_tokens'].isEnabled()
+    controls['context_image_limit'].setValue(8)
+    mode = controls['context_compaction_mode']
+    mode.setCurrentIndex(mode.findData('fixed'))
+    assert controls['context_compaction_tokens'].isEnabled()
+    assert not controls['context_compaction_ratio'].isEnabled()
+    saved = settings_document(window.service.data_root)
+    assert saved['context_image_limit'] == 8 and saved['context_compaction_mode'] == 'fixed'
+    assert saved['context_compaction_ratio'] == 30 and saved['context_compaction_tokens'] == 20000

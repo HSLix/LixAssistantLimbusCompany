@@ -99,3 +99,5 @@
 本次复检与维护证据见[一致性审计](architecture-consistency-audit-2026-11-05.md)。
 
 2026-11-09：已接受普通工作目录／文件权限继承及直接导出 ZIP 边界，保留清理、事务和导入 Review；设计与实施验证见[专项记录](ordinary-work-directories-impact-review.md)。
+
+2026-11-12：pi 持久有效上下文、按比例／固定目标压缩、每轮图片窗口、DeepSeek 缺省选择及聊天额度提示已本地实现；设计见 [ADR 0041](adr/0041-let-pi-own-effective-agent-context.md)，验证与限制见 [实施记录](context-compaction-implementation.md)。

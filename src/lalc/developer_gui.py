@@ -22,7 +22,7 @@ from qfluentwidgets import (
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
     TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
-    CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
+    ProgressBar, CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
 )
 
 from .run_logs import LIVE_LOG_LIMIT
@@ -771,6 +771,29 @@ class SettingsPage(QWidget):
             self.global_controls["recovery_limit"] = control
             layout.addWidget(control)
             control.valueChanged.connect(lambda value: self.change_option("recovery_limit", value))
+        if side == "developer":
+            layout.addWidget(QLabel(tr('Context compaction')))
+            mode = QComboBox()
+            mode.addItem(tr('Ratio of used context'), userData="ratio")
+            mode.addItem(tr('Fixed total tokens'), userData="fixed")
+            self.global_controls["context_compaction_mode"] = mode
+            layout.addWidget(mode)
+            mode.currentIndexChanged.connect(lambda: self.change_option("context_compaction_mode", mode.currentData()))
+            for name, label, minimum, maximum in (
+                ("context_compaction_ratio", tr('Target percentage (20–90%)'), 20, 90),
+                ("context_compaction_tokens", tr('Target total tokens'), 1, 2147483647),
+                ("context_image_limit", tr('Recent images per message'), 1, 2147483647),
+            ):
+                layout.addWidget(QLabel(label))
+                control = QSpinBox()
+                control.setRange(minimum, maximum)
+                self.global_controls[name] = control
+                layout.addWidget(control)
+                control.valueChanged.connect(lambda value, name=name: self.change_option(name, value))
+            mode.currentIndexChanged.connect(self.update_context_mode)
+            notice = QLabel(tr('DeepSeek: 400k; llama.cpp: 50k. Changes apply to the next message. Old images require history access.'))
+            notice.setWordWrap(True)
+            layout.addWidget(notice)
         self.provider = QComboBox()
         self.provider.addItem("llama.cpp", userData="llama.cpp")
         self.provider.addItem("DeepSeek", userData="deepseek")
@@ -921,6 +944,8 @@ class SettingsPage(QWidget):
             self.submit()
             save_selection(self.host.service.data_root, self.side, provider)
             self.reload()
+            if self.side == "developer" and hasattr(self.window, "repair_page"):
+                self.window.repair_page.show_context_usage()
         self.window._interact(switch)
 
     def check(self, model):
@@ -969,7 +994,9 @@ class SettingsPage(QWidget):
         try:
             document = settings_document(self.host.service.data_root)
             for name, control in self.global_controls.items():
-                if isinstance(control, QCheckBox):
+                if isinstance(control, QComboBox):
+                    control.setCurrentIndex(control.findData(document[name]))
+                elif isinstance(control, QCheckBox):
                     control.setChecked(document[name])
                 else:
                     control.setValue(document[name])
@@ -987,9 +1014,17 @@ class SettingsPage(QWidget):
             if self.key is not None:
                 self.key.clear()
             self.show_secret(value)
+            self.update_context_mode()
             self.dirty = False
         finally:
             self.loading = False
+
+    def update_context_mode(self, *_):
+        """保留另一模式的值，只启用当前模式适用的输入框。"""
+        if "context_compaction_mode" in self.global_controls:
+            ratio = self.global_controls["context_compaction_mode"].currentData() == "ratio"
+            self.global_controls["context_compaction_ratio"].setEnabled(ratio)
+            self.global_controls["context_compaction_tokens"].setEnabled(not ratio)
 
     def change_option(self, name, value):
         """保存独立开关，不触发模型请求或覆盖 provider 表单。"""
@@ -1234,6 +1269,19 @@ class RepairPage(QWidget):
         row.addWidget(self.send_button)
         composer_layout.addLayout(row)
         body.addWidget(self.composer)
+        context_row = QHBoxLayout()
+        self.context_label = QLabel(tr('Context: unknown'))
+        self.context_label.setAccessibleName(tr('Context usage'))
+        self.context_bar = ProgressBar(useAni=False)
+        self.context_bar.setRange(0, 100)
+        self.context_bar.setValue(0)
+        self.context_bar.setFixedWidth(90)
+        self.context_bar.setFixedHeight(6)
+        self.context_bar.setAccessibleName(tr('Context usage'))
+        context_row.addWidget(self.context_label)
+        context_row.addWidget(self.context_bar)
+        context_row.addStretch()
+        body.addLayout(context_row)
         self.request_progress = QLabel(self)
         self.request_progress.hide()
         self.build_menus()
@@ -1423,7 +1471,28 @@ class RepairPage(QWidget):
             self.sidebar.show()
             self._auto_collapsed = False
 
+    def show_context_usage(self, value=None):
+        """额度按压缩触发线显示；未知状态不伪装为零占用。"""
+        tokens, limit = (value or {}).get("tokens"), (value or {}).get("limit")
+        import math
+        if (type(tokens) not in (int, float) or type(limit) not in (int, float)
+                or not math.isfinite(tokens) or not math.isfinite(limit) or tokens < 0 or limit <= 0):
+            self.context_label.setText(tr('Context: unknown'))
+            self.context_bar.setValue(0)
+            self.context_bar.setToolTip(tr('Context: unknown'))
+            return
+        percent = tokens / limit * 100
+        color = '#2e9d63' if percent < 50 else '#c58b16' if percent < 80 else '#d94a49'
+        self.context_bar.setCustomBarColor(color, color)
+        self.context_bar.setValue(min(100, max(0, int(percent))))
+        self.context_label.setText(tr('Context: {0}%').format(int(percent)))
+        details = tr('Estimated {0} / {1} tokens; 100% triggers compaction.').format(int(tokens), int(limit))
+        self.context_label.setToolTip(details)
+        self.context_bar.setToolTip(details)
+
     def show_empty_chat(self):
+        self.context_event_order = (-1, "")
+        self.show_context_usage()
         self.chat.setHtml('<p style="color:#808080;text-align:center">' + tr('Start a new chat. Choose a mode and set the source in Chat context.') + '</p>')
 
     def update_attachment_notice(self):
@@ -1632,6 +1701,8 @@ class RepairPage(QWidget):
 
     def activate_session(self, session, *, restore_history=True, history_reader=None, history_rows=None):
         self.clear_raw_output()
+        self.context_event_order = (-1, "")
+        self.show_context_usage()
         self.session, self.host = session, session.host
         self.history_reader = history_reader
         self.history_rounds = []
@@ -1949,6 +2020,8 @@ class RepairPage(QWidget):
     def show_event(self, event):
         value = event["event"]
         kind, number = value.get("type"), event.get("round", 0)
+        if event.get('conversation') and self.host.conversation and event['conversation'] != self.host.conversation.log.identity:
+            return
         live = (not getattr(self, '_replaying', False) and not self.window.closing
                 and not any(job.cancel_requested for job in self.window.jobs))
         if kind == 'round_finished':
@@ -1969,6 +2042,23 @@ class RepairPage(QWidget):
                     'round_interrupted', 'final_answer_retry', 'agent_settled'}:
             self.clear_raw_output()
         status = None
+        if kind == 'lalc_context_usage':
+            order = (number, event.get('time', ''))
+            if order >= getattr(self, 'context_event_order', (-1, '')):
+                self.context_event_order = order
+                self.show_context_usage(value)
+        elif kind == 'lalc_compaction':
+            phase = value.get('phase')
+            status = {'started': tr('Compacting context…'), 'completed': tr('Context compaction completed'),
+                      'failed': tr('Context compaction failed')}.get(phase, tr('Context compaction'))
+            if phase == 'completed':
+                status += tr(': {0} → {1} tokens').format(value['before'], value['after'])
+                if not value.get('target_met', True):
+                    status += tr(' (target not reached)')
+            if value.get('error'):
+                status += ': ' + value['error']
+            self.chat.activity(number)['timeline'].append(status)
+            self.chat.render()
         if kind == 'workbench_session':
             identity = value['session'].identity
             if not self.titles.get(identity, ('', ''))[0]:

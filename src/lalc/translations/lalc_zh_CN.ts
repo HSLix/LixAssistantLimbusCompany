@@ -2077,5 +2077,69 @@ Original pixel region: {2}</source>
 <message><source>Extracting files</source><translation>正在解压文件</translation></message>
 <message><source>Installing files</source><translation>正在安装文件</translation></message>
 <message><source>Finishing…</source><translation>正在收尾…</translation></message>
+    <message>
+      <source>Context compaction</source>
+      <translation>上下文压缩</translation>
+    </message>
+    <message>
+      <source>Ratio of used context</source>
+      <translation>按比例压缩</translation>
+    </message>
+    <message>
+      <source>Fixed total tokens</source>
+      <translation>固定压缩</translation>
+    </message>
+    <message>
+      <source>Target percentage (20–90%)</source>
+      <translation>压缩目标比例（20–90%）</translation>
+    </message>
+    <message>
+      <source>Target total tokens</source>
+      <translation>压缩后总 token 目标</translation>
+    </message>
+    <message>
+      <source>Recent images per message</source>
+      <translation>本轮保留的最近图片张数</translation>
+    </message>
+    <message>
+      <source>DeepSeek: 400k; llama.cpp: 50k. Changes apply to the next message. Old images require history access.</source>
+      <translation>DeepSeek 达 400k、llama.cpp 达 50k 时压缩。设置下轮生效；回读旧图需要历史读取权限。</translation>
+    </message>
+    <message>
+      <source>Context: unknown</source>
+      <translation>上下文：未知</translation>
+    </message>
+    <message>
+      <source>Context usage</source>
+      <translation>上下文额度</translation>
+    </message>
+    <message>
+      <source>Context: {0}%</source>
+      <translation>上下文 {0}%</translation>
+    </message>
+    <message>
+      <source>Estimated {0} / {1} tokens; 100% triggers compaction.</source>
+      <translation>估算 {0} / {1} token；100% 时触发压缩。</translation>
+    </message>
+    <message>
+      <source>Compacting context…</source>
+      <translation>正在压缩上下文…</translation>
+    </message>
+    <message>
+      <source>Context compaction completed</source>
+      <translation>上下文压缩完成</translation>
+    </message>
+    <message>
+      <source>Context compaction failed</source>
+      <translation>上下文压缩失败</translation>
+    </message>
+    <message>
+      <source>: {0} → {1} tokens</source>
+      <translation>：{0} → {1} token</translation>
+    </message>
+    <message>
+      <source> (target not reached)</source>
+      <translation>（未达到目标）</translation>
+    </message>
 </context>
 </TS>

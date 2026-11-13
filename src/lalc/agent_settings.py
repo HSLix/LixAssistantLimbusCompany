@@ -18,39 +18,49 @@ from .runtime import atomic_write_json
 
 FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit",
           "thinking", "reasoning_effort")
-DEFAULTS = {"provider": "llama.cpp", "base_url": "http://localhost:12138/v1", "model": None,
+DEFAULTS = {"provider": "deepseek", "base_url": "https://api.deepseek.com", "model": "deepseek-flash",
             "max_requests": 50, "secret_name": None, "output_limit": "server_default",
-            "thinking": False, "reasoning_effort": "high"}
+            "thinking": True, "reasoning_effort": "high"}
 PROVIDERS = {"llama.cpp", "deepseek"}
 SETTINGS_LOCK = threading.RLock()
 OPTION_DEFAULTS = {"history_enabled": True, "runtime_feedback_enabled": False,
-                   "automatic_repair_default": True, "recovery_limit": 10, "knowledge_enabled": True}
+                   "automatic_repair_default": True, "recovery_limit": 10, "knowledge_enabled": True,
+                   "context_image_limit": 12, "context_compaction_mode": "ratio",
+                   "context_compaction_ratio": 30, "context_compaction_tokens": 20000}
 
 
 def checked_options(value: dict) -> dict:
     """检查独立于 provider 的运行与历史开关，旧配置只补缺省值。"""
     result = {name: value.get(name, default) for name, default in OPTION_DEFAULTS.items()}
     for name in OPTION_DEFAULTS:
-        if name == "recovery_limit":
+        if name == "context_compaction_mode":
+            if result[name] not in {"ratio", "fixed"}:
+                raise ValueError("Invalid context compaction mode")
+        elif name == "context_compaction_ratio":
+            if type(result[name]) is not int or not 20 <= result[name] <= 90:
+                raise ValueError("Context compaction ratio must be 20–90")
+        elif name in {"recovery_limit", "context_image_limit", "context_compaction_tokens"}:
             if type(result[name]) is not int or result[name] < 1:
-                raise ValueError("连续恢复次数上限必须是正整数。")
+                label = {"recovery_limit": "连续恢复次数上限", "context_image_limit": "图片张数",
+                         "context_compaction_tokens": "压缩目标 token 数"}[name]
+                raise ValueError(f"{label}必须是正整数。")
         elif type(result[name]) is not bool:
             raise ValueError(f"{name} must be a boolean")
     return result
 
 
 def provider_defaults(provider: str) -> dict:
-    """仅为 DeepSeek 提供固定模型与默认推理选项，保留本地服务原行为。"""
+    """分别提供服务默认值，避免本地配置继承云端 URL 和模型。"""
     return ({"base_url": "https://api.deepseek.com", "model": "deepseek-flash", "thinking": True,
              "reasoning_effort": "high"} if provider == "deepseek" else
-            {key: DEFAULTS[key] for key in ("base_url", "model", "thinking", "reasoning_effort")})
+            {"base_url": "http://localhost:12138/v1", "model": None, "thinking": False, "reasoning_effort": "high"})
 
 
 def validate_settings(value: dict, *, for_use: bool = True) -> dict:
     """保存时只检查结构；使用前检查连接内容，不补路径或联网。"""
     if not isinstance(value, dict) or value.keys() - set(FIELDS) - {"provider_secrets"}:
         raise ValueError("Invalid Agent settings fields")
-    provider = value.get("provider", "llama.cpp")
+    provider = value.get("provider", DEFAULTS["provider"])
     if provider not in PROVIDERS:
         raise ValueError("仅支持 llama.cpp 或 deepseek provider")
     result = {**DEFAULTS, **provider_defaults(provider), **value}
@@ -93,6 +103,10 @@ def settings_document(data_root: Path, overrides: dict | None = None) -> dict:
     options = checked_options(saved)
     if "profiles" not in saved:
         repair = overrides or {}
+        if not saved:
+            saved = {"provider": DEFAULTS["provider"]}
+        else:
+            saved.setdefault("provider", "llama.cpp")
         if repair.get("provider", saved.get("provider", "llama.cpp")) != saved.get("provider", "llama.cpp"):
             repair = {}
         legacy = validate_settings({**{k: v for k, v in saved.items() if k not in OPTION_DEFAULTS},

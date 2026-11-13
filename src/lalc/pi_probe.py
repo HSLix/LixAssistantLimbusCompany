@@ -298,6 +298,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
         raise AgentDiagnosticError("DeepSeek 当前仅支持 deepseek-flash", "settings")
     if require_image and provider != "deepseek" and "image" not in model.get("architecture", {}).get("input_modalities", []):
         raise AgentDiagnosticError("Selected service model does not declare image input support", "model_preflight")
+    context_window = 1000000 if provider == "deepseek" else int(model.get("context_length") or model.get("max_context_length") or 65536)
     with WorkDirectory(prefix="lalc-pi-") as temporary:
         agent_dir = Path(temporary) / "agent"
         agent_dir.mkdir()
@@ -307,7 +308,7 @@ def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_ima
             "enableInstallTelemetry": False, "enableAnalytics": False,
         }), encoding="utf-8")
         env = {**os.environ, "PI_CODING_AGENT_DIR": str(agent_dir), "PI_OFFLINE": "1",
-               "PI_TELEMETRY": "0", "LALC_PI_API_KEY": key, "LALC_PI_BASE_URL": base,
+               "PI_TELEMETRY": "0", "LALC_PI_CONTEXT_WINDOW": str(context_window), "LALC_PI_API_KEY": key, "LALC_PI_BASE_URL": base,
                "LALC_PI_MODEL": model["id"], "LALC_PI_SOURCE_ROOT": str(root),
                "LALC_PI_MAX_REQUESTS": str(args.max_requests), "LALC_PI_PROVIDER": provider,
                "LALC_PI_THINKING": "1" if provider == "deepseek" and getattr(args, "thinking", None) is not False else "0"}

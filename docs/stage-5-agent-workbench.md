@@ -172,3 +172,5 @@ GUI Construct / Repair 均可在当前轮次请求信息、方案意见，或请
 普通源码 / 替身 / offscreen 测试、真实 pi、真实模型、Windows 成品和真实游戏证据分别记录。真实 pi 进程、Agent 工具循环或模型服务测试标记 pytest.mark.agent，默认跳过，按相关测试文件显式选择；不得因本机装了 pi 就自动执行，不把跳过计为通过。本轮文档与审查不提供这些产品运行证据。
 
 2026-11-12：Session 页面标题下显示可选中复制的完整 Session UUID，空白新会话不显示；导出选择列表补充标题和时间，见[决定、影响审查与验证](session-sharing-display-impact-review.md)。
+
+2026-11-12 上下文修订：由持久 pi Session 恢复有效模型历史和压缩边界，LALC 日志保留原始证据；旧会话一次性迁入、图片按 ID 回读、轮内压缩和额度显示见 [ADR 0041](adr/0041-let-pi-own-effective-agent-context.md) 与 [实施记录](context-compaction-implementation.md)。本项替代每轮从完整业务历史重建模型输入的方式，当前权限仍逐轮固定。

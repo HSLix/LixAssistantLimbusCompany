@@ -113,7 +113,7 @@ def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_fir
     from test_developer_gui import wait_jobs
     _, options, state = conversation
     app, window = gui
-    save_settings(window.service.data_root, {'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
+    save_settings(window.service.data_root, {'provider': 'llama.cpp', 'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
     session = DeveloperSession.create(window.service, None, mode='Construct', entry='gui')
     session.conversation()
     window.repair_page.activate_session(session)
@@ -299,7 +299,7 @@ def test_actual_gui_feedback_signal_and_empty_confirmation(conversation, gui):
     from test_developer_gui import wait_jobs
     _, options, state = conversation
     app, window = gui
-    save_settings(window.service.data_root, {'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
+    save_settings(window.service.data_root, {'provider': 'llama.cpp', 'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
     script(state, [tool('request_feedback', {'message': '请操作后确认'}), answer('feedback received')])
     seen = []
     timer = QTimer()
@@ -431,7 +431,8 @@ def test_restart_retains_original_images_tools_and_rounds(conversation, tmp_path
     assert "remember this answer" in json.dumps(payload)
     urls = [part["image_url"]["url"] for item in payload["messages"] if isinstance(item.get("content"), list)
             for part in item["content"] if part["type"] == "image_url"]
-    assert [base64.b64decode(url.split(",", 1)[1]) for url in urls] == [path.read_bytes() for path in paths]
+    assert urls == []
+    assert "image_id=" in json.dumps(payload)
     assert all(path.read_bytes() == value for path, value in original_files.items())
     assert all(b"session-private-key" not in path.read_bytes() for path in session.path.rglob("*") if path.is_file())
 
@@ -449,6 +450,18 @@ def test_interrupted_calls_continue_with_known_and_unknown_results_without_repla
     (chat.log.root / "round-2").mkdir()
     chat.append_user({"role": "user", "content": [{"type": "text", "text": "interrupted round"}], "timestamp": 1})
     chat.log.record({"type": "message_end", "message": assistant})
+    import uuid
+    path = session.path / 'pi/session.jsonl'
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    parent = rows[-1]['id']
+    source_sequence = chat.log.event_sequence - 1
+    drafts = [{'type': 'custom', 'customType': 'lalc_context', 'data': {'cursor': 0, 'pending': source_sequence}},
+              {'type': 'message', 'message': chat.history[-1]}, {'type': 'message', 'message': assistant}]
+    with path.open('a') as stream:
+        for draft in drafts:
+            identity = str(uuid.uuid4())
+            stream.write(json.dumps({**draft, 'id': identity, 'parentId': parent, 'timestamp': '2026-11-12T00:00:00Z'}) + '\n')
+            parent = identity
     published = chat.tools.publish()
     chat.log.record({"type": "repair_tool", "toolCallId": "pending-publish", "result": published})
     manifests = chat.host.manager.list_manifests()
@@ -478,7 +491,7 @@ def test_cli_creates_and_resumes_without_manual_candidate(conversation, monkeypa
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "default_data_root", lambda: session.host.service.data_root)
     source = json.loads((session.path / "session.json").read_text(encoding="utf-8"))["source_manifest_id"]
-    common = ["--base-url", options.base_url, "--model", options.model, "--max-requests", "5"]
+    common = ["--provider", "llama.cpp", "--base-url", options.base_url, "--model", options.model, "--max-requests", "5"]
     state["respond"] = lambda body: answer("CLI first answer")
     assert cli.main(["repair", "--from", source, "--problem", "CLI first message", *common]) == 0
     lines = capsys.readouterr().out.splitlines()
@@ -590,7 +603,7 @@ def test_gui_send_uses_actual_pi_events_and_cli_can_continue(conversation, gui):
     from test_developer_gui import wait_jobs
     _, options, state = conversation
     app, window = gui
-    save_settings(window.service.data_root, {'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
+    save_settings(window.service.data_root, {'provider': 'llama.cpp', 'base_url': options.base_url, 'model': options.model, 'max_requests': 20})
     page = window.repair_page
     source = window.host.manager.default_manifest_id()
     page.new()

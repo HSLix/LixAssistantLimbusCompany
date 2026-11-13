@@ -211,6 +211,9 @@ def gui(tmp_path, monkeypatch):
     for dialog in window.findChildren(QDialog):
         dialog.close()
     window.close()
+    window.deleteLater()
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     app.processEvents()
 
 
@@ -509,10 +512,12 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     import threading
     app, window = gui
     page = window.settings_page
-    assert page.provider.currentData() == "llama.cpp" and page.provider.count() == 2
+    assert page.provider.currentData() == "deepseek" and page.provider.count() == 2
+    page.provider.setCurrentIndex(page.provider.findData("llama.cpp"))
     assert page.output_limit.count() == 1
     assert page.output_limit.currentText() == "使用服务端默认值"
     assert page.values()["output_limit"] == "server_default"
+    saved_before_check = (window.service.data_root / "agent-settings.json").read_bytes()
     entered, release = threading.Event(), threading.Event()
     calls = []
     def models(base, key):
@@ -532,7 +537,7 @@ def test_settings_checks_unsaved_form_and_invalidates_stale_result(gui, monkeypa
     wait_jobs(app, window)
     assert calls == [("http://host/custom/api", "gui-secret")]
     assert "设置已变更" in page.check_status.text()
-    assert not (window.service.data_root / "agent-settings.json").exists()
+    assert (window.service.data_root / "agent-settings.json").read_bytes() == saved_before_check
     page.model.setText("Gemma4")
     page.check(True)
     wait_jobs(app, window)
@@ -662,6 +667,8 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     monkeypatch.setattr('lalc.developer_gui.sys.platform', 'darwin')
     app, window = gui
     page = window.settings_page
+    assert not page.deepseek_options.isHidden()
+    page.provider.setCurrentIndex(page.provider.findData('llama.cpp'))
     assert page.deepseek_options.isHidden()
     page.url.setText('http://local/custom/api')
     page.model.setText('local-model')

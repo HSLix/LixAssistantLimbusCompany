@@ -38,7 +38,7 @@ def test_global_options_survive_provider_and_side_saves(tmp_path):
 
 def test_saved_settings_and_per_call_overrides(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
-    assert cli.main(["agent-config", "--base-url", "http://example.test/custom/api", "--model", "chosen",
+    assert cli.main(["agent-config", "--provider", "llama.cpp", "--base-url", "http://example.test/custom/api", "--model", "chosen",
                      "--max-requests", "8", "--secret-name", "service-token"]) == 0
     saved = (tmp_path / "agent-settings.json").read_bytes()
     assert settings.effective_settings(arguments(model="temporary", max_requests=2), tmp_path) == {
@@ -248,7 +248,7 @@ def test_platform_secret_replacement_and_clear_preserve_other_key(tmp_path, monk
     """使用加密替身检查引用隔离，不冒充 Windows DPAPI 原生验收。"""
     monkeypatch.setattr(settings.sys, 'platform', 'win32')
     monkeypatch.setattr(settings, 'dpapi', lambda data, decrypt=False: data[4:][::-1] if decrypt else b'test' + data[::-1])
-    local = settings.save_settings(tmp_path, {'model': 'local'}, secret='local-api-key')
+    local = settings.save_settings(tmp_path, {'provider': 'llama.cpp', 'model': 'local'}, secret='local-api-key')
     local_name = local['secret_name']
     cloud = settings.save_settings(tmp_path, {'provider': 'deepseek'}, secret='cloud-api-key')
     cloud_name = cloud['secret_name']
