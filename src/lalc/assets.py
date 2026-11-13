@@ -181,7 +181,7 @@ class AssetLibrary:
         return result
 
     def remove(self, name: str, digest: str, reason: str, screenshot: bytes, *, checkpoint: Callable[[], None]) -> dict:
-        """先完整归档，再移除活跃图片和标签；中途失败回退，归档始终保留恢复数据。"""
+        """先归档再移除图片及标签，仅清理无其他内容的逻辑名目录；失败回退并保留归档。"""
         from .recognition import decode_image
         asset_name(name)
         if not isinstance(reason, str) or not reason.strip():
@@ -219,7 +219,7 @@ class AssetLibrary:
         with (directory / "record.json").open("r+b") as stream:
             os.fsync(stream.fileno())
         path = self.path(relative)
-        tags_changed = removed = False
+        tags_changed = tags_removed = removed = directory_removed = False
         try:
             checkpoint()
             if updated != mapping:
@@ -227,15 +227,32 @@ class AssetLibrary:
                 tags_changed = True
             path.unlink()
             removed = True
+            remaining = [item for item in path.parent.iterdir() if item.name != "asset-tag.json"]
+            retained_reason = None
+            if any(item.is_file() and item.suffix == ".png" for item in remaining):
+                retained_reason = "仍有图片，保留逻辑名目录。"
+            elif remaining:
+                retained_reason = "仍有子目录或其他文件，保留目录及这些内容，不递归删除。"
+            else:
+                tag_path = self.path(f"{name}/asset-tag.json")
+                if tag_path.exists():
+                    tag_path.unlink()
+                    tags_removed = True
+                path.parent.rmdir()
+                directory_removed = True
+            record["directory_removed"] = directory_removed
+            record["directory_retained_reason"] = retained_reason
             record["state"] = "completed"
             atomic_write_json(directory / "record.json", record)
         except BaseException:
             try:
                 if removed:
+                    if directory_removed:
+                        path.parent.mkdir()
                     with path.open("xb") as stream:
                         stream.write(content)
             finally:
-                if tags_changed:
+                if tags_changed or tags_removed:
                     atomic_write_json(self.path(f"{name}/asset-tag.json"), mapping)
             raise
         return record

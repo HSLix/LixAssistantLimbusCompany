@@ -38,3 +38,6 @@ Runtime Repair 保留 Stage 6 范围，不继承开发工具集，无删除工�
 完整契约见 [Stage 5 规格](../stage-5-agent-workbench.md)，源码差距见[影响审查](../stage-5-design-impact-review.md)，讨论决定见[记录](../stage-5-2026-10-31-decisions.md)。
 
 2026-11-06 试用修订：页面草稿不再区分新增／替换，也不依赖独立目标元数据；同一草稿可反复编辑、预览并由人工批准覆盖同名正式页，旧元数据忽略。仍校验路径、注册冲突及固定整包快照。本轮 Agent 后台作业结束并清理完成后，仅当本轮有实际页面安装时统一显示一次独立完成弹窗；安装后本轮失败或取消仍提示，无安装或仅恢复历史不提示。可取消提示继续工作，或主动选择现在重启，沿用既有整应用重载，不绕过活动门控。
+
+
+2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。

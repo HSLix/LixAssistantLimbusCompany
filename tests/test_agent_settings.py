@@ -264,3 +264,28 @@ def test_platform_secret_replacement_and_clear_preserve_other_key(tmp_path, monk
     assert settings.resolve_key(args, settings.load_settings(tmp_path, {'provider': 'llama.cpp'}), tmp_path) == 'local-api-key'
     text = (tmp_path / 'agent-settings.json').read_text(encoding="utf-8")
     assert 'local-api-key' not in text and 'cloud-api-key' not in text
+
+
+@pytest.mark.parametrize(('mode', 'entry'), [('Construct', 'gui'), ('Repair', 'gui'),
+                                               ('Repair', 'cli'), ('Repair', 'runtime')])
+def test_manifest_reference_switch_filters_only_three_tools(mode, entry):
+    from lalc.agent_policy import MANIFEST_REFERENCE_TOOLS, allowed_tools
+    enabled = set(allowed_tools(mode, entry))
+    disabled = set(allowed_tools(mode, entry, manifest_reference_enabled=False))
+    assert set(MANIFEST_REFERENCE_TOOLS) <= enabled
+    assert enabled - disabled == set(MANIFEST_REFERENCE_TOOLS)
+    assert disabled <= enabled
+
+
+def test_manifest_reference_option_migration_persistence_and_validation(tmp_path):
+    assert settings.settings_document(tmp_path)['manifest_reference_enabled'] is True
+    settings.save_options(tmp_path, manifest_reference_enabled=False)
+    settings.save_selection(tmp_path, 'developer', 'llama.cpp')
+    settings.save_settings(tmp_path, {'provider': 'llama.cpp', 'model': 'local'})
+    assert settings.settings_document(tmp_path)['manifest_reference_enabled'] is False
+    before = (tmp_path / 'agent-settings.json').read_bytes()
+    with pytest.raises(ValueError, match='manifest_reference_enabled'):
+        settings.save_options(tmp_path, manifest_reference_enabled=1)
+    assert (tmp_path / 'agent-settings.json').read_bytes() == before
+    settings.save_options(tmp_path, manifest_reference_enabled=True)
+    assert settings.settings_document(tmp_path)['manifest_reference_enabled'] is True

@@ -916,3 +916,29 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
     assert '11:00:00' in second_input['prompt']['message']
     functions = {item['function']['name']: item['function'] for item in state['calls'][0]['tools']}
     assert {'levels', 'logical_name'} <= functions['read_run_log']['parameters']['properties'].keys()
+
+
+def test_manifest_reference_switch_changes_next_round_and_rejects_calls(conversation):
+    from lalc.agent_policy import MANIFEST_REFERENCE_TOOLS
+    from lalc.agent_settings import save_options
+    chat, options, state = conversation
+    root = chat.host.service.data_root
+    source = chat.host.manager.default_manifest_id()
+    save_options(root, manifest_reference_enabled=False)
+    # 构造后改设置，验证每轮重新计算权限；附件不能重新授予工具权限。
+    def respond(body):
+        names = {item['function']['name'] for item in body['tools']}
+        assert not names & set(MANIFEST_REFERENCE_TOOLS)
+        guidance = body['messages'][0]['content'].split('# Tool Guidance\n', 1)[1]
+        assert not any('- ' + name + ':' in guidance for name in MANIFEST_REFERENCE_TOOLS)
+        for name in MANIFEST_REFERENCE_TOOLS:
+            result = json.loads(Path(chat.tools.call(name, {})).read_text(encoding="utf-8"))
+            assert result['isError']
+        save_options(root, manifest_reference_enabled=True)
+        return answer()
+    state['respond'] = respond
+    assert asyncio.run(chat.run('disabled', options, manifest_references=[source]))['status'] == 'completed'
+    state['respond'] = lambda body: answer()
+    assert asyncio.run(chat.run('enabled', options))['status'] == 'completed'
+    assert set(MANIFEST_REFERENCE_TOOLS) <= {item['function']['name'] for item in state['calls'][-1]['tools']}
+    assert source in json.dumps(state['calls'][-1]['messages'])

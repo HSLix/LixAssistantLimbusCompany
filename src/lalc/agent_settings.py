@@ -23,7 +23,7 @@ DEFAULTS = {"provider": "deepseek", "base_url": "https://api.deepseek.com", "mod
             "thinking": True, "reasoning_effort": "high"}
 PROVIDERS = {"llama.cpp", "deepseek"}
 SETTINGS_LOCK = threading.RLock()
-OPTION_DEFAULTS = {"history_enabled": True, "runtime_feedback_enabled": False,
+OPTION_DEFAULTS = {"manifest_reference_enabled": True, "history_enabled": True, "runtime_feedback_enabled": False,
                    "automatic_repair_default": True, "recovery_limit": 10, "knowledge_enabled": True,
                    "context_image_limit": 12, "context_compaction_mode": "ratio",
                    "context_compaction_ratio": 30, "context_compaction_tokens": 20000}
