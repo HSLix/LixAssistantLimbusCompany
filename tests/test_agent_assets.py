@@ -67,10 +67,47 @@ def test_remove_archives_raw_image_tags_and_fresh_screenshot_preserving_other_na
     assert sha256_bytes((archive / "asset.png").read_bytes()) == saved["sha256"]
     assert np.array_equal(decode_image((archive / "screenshot.png").read_bytes()), np.full((2, 2, 3), [31, 41, 59], dtype=np.uint8))
     assert not tools.library.path(saved["path"]).exists()
+    assert not tools.library.path("ui/claim").exists()
+    assert removed["directory_removed"] is True and removed["directory_retained_reason"] is None
+    assert "claim/" not in invoke(tools, "asset_tree")["details"]["tree"]
     assert tools.library._tag_mapping("ui/claim") == {}
     assert other.read_bytes() == raw_asset and tools.library._tag_mapping("other/name") == {saved["sha256"]: ["other"]}
     assert json.loads((archive / "record.json").read_text(encoding="utf-8"))["state"] == "completed"
-    assert tools.library.match("ui/claim", bytes([0, 0, 0, 255]) * 4, (2, 2), run_id=1, observation=1, emit=lambda *args: None) == []
+    with pytest.raises(FileNotFoundError, match="logical name does not exist"):
+        tools.library.match("ui/claim", bytes([0, 0, 0, 255]) * 4, (2, 2), run_id=1, observation=1, emit=lambda *args: None)
+
+
+@pytest.mark.parametrize("remaining", ["image", "directory", "file", "no_tags"])
+def test_remove_cleans_only_empty_logical_name_directory(tools, remaining):
+    """保留其他图片、子目录和文件；没有标签文件的最后一张也可安全清理。"""
+    saved = invoke(tools, "crop_asset", preview_id=preview(tools)["details"]["preview_id"])["details"]
+    directory = tools.library.path("ui/claim")
+    other = None
+    if remaining == "image":
+        tools.platform.capture = lambda *args: bytes([31, 41, 59, 255]) * 4
+        other = invoke(tools, "crop_asset", preview_id=preview(tools)["details"]["preview_id"])["details"]
+    elif remaining == "directory":
+        (directory / "child").mkdir()
+        (directory / "child" / "keep.txt").write_text("keep", encoding="utf-8")
+    elif remaining == "file":
+        (directory / "keep.txt").write_text("keep", encoding="utf-8")
+    else:
+        (directory / "asset-tag.json").unlink()
+    before = snapshot(directory)
+    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="目录清理")
+    assert not result.get("isError")
+    removed = result["details"]
+    assert removed["directory_removed"] is (remaining == "no_tags")
+    if remaining == "no_tags":
+        assert not directory.exists() and removed["directory_retained_reason"] is None
+    else:
+        assert removed["directory_retained_reason"]
+        after = snapshot(directory)
+        excluded = {Path(saved["sha256"] + ".png"), Path("asset-tag.json")}
+        assert {name: content for name, content in before.items() if name not in excluded} == {
+            name: content for name, content in after.items() if name != Path("asset-tag.json")}
+        expected_tags = {other["sha256"]: ["en", "en"]} if other else {}
+        assert tools.library._tag_mapping("ui/claim") == expected_tags
 
 
 @pytest.mark.parametrize("sync_fails", [False, True])
@@ -113,7 +150,7 @@ def test_remove_record_sync_requires_write_access_and_preserves_asset_on_failure
         assert not tools.library.path(saved["path"]).exists()
 
 
-@pytest.mark.parametrize("fault", ["capture", "archive_image", "prepare", "tags", "unlink", "complete", "cancel"])
+@pytest.mark.parametrize("fault", ["capture", "archive_image", "prepare", "tags", "unlink", "tag_unlink", "rmdir", "complete", "cancel"])
 def test_remove_failures_preserve_active_image_and_tags(tools, monkeypatch, fault):
     import lalc.assets as assets
     saved = invoke(tools, "crop_asset", preview_id=preview(tools)["details"]["preview_id"])["details"]
@@ -121,6 +158,7 @@ def test_remove_failures_preserve_active_image_and_tags(tools, monkeypatch, faul
     original_write = assets.atomic_write_json
     original_open = Path.open
     original_unlink = Path.unlink
+    original_rmdir = Path.rmdir
     def fail_write(path, value):
         if ((fault == "prepare" and path.name == "record.json" and value["state"] == "prepared")
                 or (fault == "complete" and path.name == "record.json" and value["state"] == "completed")
@@ -137,10 +175,17 @@ def test_remove_failures_preserve_active_image_and_tags(tools, monkeypatch, faul
     def fail_unlink(path, *args, **kwargs):
         if fault == "unlink" and path == tools.library.path(saved["path"]):
             raise OSError("active image locked")
+        if fault == "tag_unlink" and path == tools.library.path("ui/claim/asset-tag.json"):
+            raise OSError("tag file locked")
         return original_unlink(path, *args, **kwargs)
+    def fail_rmdir(path, *args, **kwargs):
+        if fault == "rmdir" and path == tools.library.path("ui/claim"):
+            raise OSError("directory unavailable")
+        return original_rmdir(path, *args, **kwargs)
     monkeypatch.setattr(assets, "atomic_write_json", fail_write)
     monkeypatch.setattr(Path, "open", fail_open)
     monkeypatch.setattr(Path, "unlink", fail_unlink)
+    monkeypatch.setattr(Path, "rmdir", fail_rmdir)
     if fault == "capture":
         tools.platform.windows = []
     result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="测试失败")

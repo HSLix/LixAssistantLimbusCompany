@@ -79,6 +79,7 @@ pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查�
 - `preview_crop(logical_name, region, threshold=0.9, tags=...)` 从当前游戏新截图，返回区域标线全图、干净裁剪图、同图匹配结果及 `preview_id`。结果含命中数、坐标、分数和中心点；不自动判断模板合格，不加入活跃库。
 - `crop_asset(preview_id)` 保存本对话预览的相同原始像素、名称、区域和标签，不重新截图。预览可跨同一对话的轮次复用；New Conversation/重建 Candidate 后须重新预览。既有同名同哈希图片及标签仍保留。
 - `remove_asset(logical_name, sha, reason)` 先验完整哈希及路径、新截当前原始画面，归档完成准备后移除活跃图片及同逻辑名的 SHA→Tags 关系；其他逻辑名不变。不需要 Publish，但会影响所有后续使用该 Asset 的匹配。
+  仍有图片时保留逻辑名目录；已无图片且仅剩本目录标签文件（或已空）时清理标签文件与该目录；仍有子目录或其他文件时保留这些内容，不递归删除。结果中的 `directory_removed` 和 `directory_retained_reason` 说明目录清理情况；清理失败同样回退活跃图片和标签。删除目录后，旧 Workflow 再匹配此名会报逻辑名不存在。
 
 归档位于数据目录 `agent_removed_asset/<UTC时间-UUID>/`，包含原图、移除时的原始截图及 `record.json`（原名、SHA、Tags 快照、理由、时间、原路径和状态），结果返回记录 ID 与归档位置。截图/准备失败不移除；修改活跃数据中途发生普通失败或取消会回退。中断可能留下 `prepared` 记录及完整恢复数据，不提供自动恢复工具、GUI 或永久删除。网格/标线不会进入模板、模拟匹配或原始截图证据。
 
