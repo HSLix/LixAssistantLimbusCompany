@@ -8,6 +8,7 @@ description: LALC Workflow 的共用编写规范。创建、修改或审查 Plan
 - Plan 使用 execute(ctx)，不再接收 task_repetitions、settings 参数；配置和必要业务进度通过 ctx.run_state.task_repetitions / settings 共享。业务代码自行决定状态含义、更新时间与重调入口后的行为，修改立即共享，失败不回滚；普通调用参数仍是独立快照，不随 RunState 自动重算。框架 recovery_count 只读，不可自行清零。
 - Plan／Workflow／Step 各自调度或执行失败可在本层入口修复后重新调用；不能依赖失败帧的局部变量或任意行续跑。非必要不修改调用约定，避免破坏仍在等待的调用者；这是编写建议，不是旧新签名一致的强制校验。
 - Step 承担自身职责的状态识别、动作、完成确认及业务异常；恢复时重新观察，已完成则直接返回，不重放已完成动作。预期过渡继续观察，未知或停滞按证据抛出 ExecutionFailure。
+- Step 的文件名、逻辑名应该与内容相符。对于一个 Step 承担了多个状态的场景，应该把 Step 切分出多个 Step。
 - Task Workflow／Subworkflow 负责排布、参数传递、分支、循环和汇总，也可通过 observe 动作观测、确认当前状态，再决定是否进入子步骤。控制动作仍由 Step 执行；上层检查不能替代 Step 在恢复重调时重新观察和确认自身职责。观察、等待等基础 Step 只确认自身职责，不冒充业务完成。
 - 点击返回或固定等待结束不证明业务完成。完成证据可以是模板、OCR 或其他可靠状态，不限定必须使用某种识别方式。
 - 先读 action_contracts 和已有 Component 签名，按实际参数与返回契约复用能力，避免重复实现；Action 参数不能直接套给签名不同的 Step 包装。
