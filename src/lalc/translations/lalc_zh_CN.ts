@@ -2145,5 +2145,21 @@ Original pixel region: {2}</source>
       <source> (target not reached)</source>
       <translation>（未达到目标）</translation>
     </message>
+    <message>
+      <source>Image unavailable</source>
+      <translation>图片不可用</translation>
+    </message>
+    <message>
+      <source>Remove attachment</source>
+      <translation>移除附件</translation>
+    </message>
+    <message>
+      <source>Collapse attachments</source>
+      <translation>收起附件</translation>
+    </message>
+    <message>
+      <source>+{0} · Show all</source>
+      <translation>+{0} · 展开全部</translation>
+    </message>
 </context>
 </TS>

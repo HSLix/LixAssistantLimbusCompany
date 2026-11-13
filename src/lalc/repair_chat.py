@@ -4,8 +4,8 @@ from html import escape
 import json
 import time
 
-from PySide6.QtCore import Signal, QTimer
-from PySide6.QtGui import QDesktopServices, QTextDocument
+from PySide6.QtCore import Signal, QTimer, Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QTextDocument, QTextCursor, QImage
 from PySide6.QtWidgets import QTextBrowser
 
 from .i18n import tr
@@ -70,6 +70,8 @@ class RepairChat(QTextBrowser):
         self._rendering = False
         self._following = True
         self.entries = []
+        self.attachment_trays = {}
+        self.attachment_positions = {}
         self.tools = {}
         self.activities = {}
         self.activity_round = 0
@@ -82,6 +84,7 @@ class RepairChat(QTextBrowser):
         self.anchorClicked.connect(self.open_link)
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
         self.verticalScrollBar().rangeChanged.connect(self._scroll_range_changed)
+        self.verticalScrollBar().valueChanged.connect(self.position_attachments)
 
     def _scroll_changed(self, value):
         if self._rendering or self.batch_render:
@@ -104,6 +107,11 @@ class RepairChat(QTextBrowser):
 
     def clear(self):
         self.stop_work()
+        for tray in self.attachment_trays.values():
+            tray.hide()
+            tray.deleteLater()
+        self.attachment_trays.clear()
+        self.attachment_positions.clear()
         self.entries.clear()
         self.tools.clear()
         self.activities.clear()
@@ -179,9 +187,22 @@ class RepairChat(QTextBrowser):
             body += '</table>'
         return body
 
-    def add_message(self, role, text, round_number=0):
-        self.entries.append({"role": role, "text": text, "round": round_number})
+    def add_message(self, role, text, round_number=0, *, attachments=()):
+        self.entries.append({"role": role, "text": text, "round": round_number, 'attachments': list(attachments)})
         self.render()
+
+    def position_attachments(self, *_):
+        """原生托盘随富文本占位移动，保留嵌套滚动与键盘操作。"""
+        for key, position in self.attachment_positions.items():
+            cursor = QTextCursor(self.document())
+            cursor.setPosition(position)
+            rect = self.cursorRect(cursor)
+            self.attachment_trays[key].move(rect.x(), rect.y())
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if hasattr(self, 'attachment_trays') and self.attachment_trays and not self._rendering:
+            self.render(follow=False)
 
     def upsert_tool(self, round_number, call_id, name, kind, event):
         """同轮同 ID 更新一条记录；错误状态保留，宿主结果不冒充 pi 完成。"""
@@ -306,14 +327,44 @@ class RepairChat(QTextBrowser):
                 body = document.toHtml().split("<body", 1)[1].split(">", 1)[1].rsplit("</body>", 1)[0]
             else:
                 body = "<p>" + escape(entry["text"]).replace("\n", "<br>") + "</p>"
+            if entry.get('attachments'):
+                from .chat_attachments import AttachmentTray
+                key = id(entry)
+                if key not in self.attachment_trays:
+                    tray = AttachmentTray(self.viewport())
+                    tray.set_items(entry['attachments'])
+                    tray.geometryChanged.connect(lambda: self.render(follow=False))
+                    self.attachment_trays[key] = tray
+                tray = self.attachment_trays[key]
+                tray.setFixedWidth(max(1, self.viewport().width() - 48))
+                tray.reflow()
+                body = (f'<p><img src="attachment-tray:{key}" width="{tray.width()}" '
+                        f'height="{tray.height()}" /></p>' + body)
             parts.append(f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" '
                          f'style="color:#172b4d"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
         for number in activity_at.get(len(self.entries), []):
             parts.append(self.activity_html(number))
+        self.attachment_positions.clear()
         self.setHtml("".join(parts))
+        blank = QImage(1, 1, QImage.Format.Format_ARGB32)
+        blank.fill(Qt.GlobalColor.transparent)
+        for key in self.attachment_trays:
+            self.document().addResource(QTextDocument.ResourceType.ImageResource, QUrl(f'attachment-tray:{key}'), blank)
+        block = self.document().begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.charFormat().isImageFormat():
+                    name = fragment.charFormat().toImageFormat().name()
+                    if name.startswith('attachment-tray:'):
+                        self.attachment_positions[int(name.split(':')[1])] = fragment.position()
+                iterator += 1
+            block = block.next()
         # 后续延迟排版继续由 rangeChanged 沿用贴底状态。
         self.document().documentLayout().documentSize()
         bar.setValue(bar.maximum() if self._following else position)
         if not follow:
             self._following = bar.value() >= bar.maximum() - 2
+        self.position_attachments()
         self._rendering = False
