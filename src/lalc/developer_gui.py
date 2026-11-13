@@ -31,6 +31,7 @@ from .run_log_gui import log_colors, log_time
 
 from .repair_chat import RepairChat, chat_title, process_text_parts
 from .chat_input import ChatInput
+from .chat_attachments import AttachmentTray, draft_attachments, history_attachments
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot, settings_document, save_options
 from .agent_diagnostics import check_settings, details_text
 
@@ -1246,11 +1247,10 @@ class RepairPage(QWidget):
         self.update_composer_focus()
         self.message.setPlaceholderText(tr('Message the Agent…'))
         self.message.sendRequested.connect(self.send)
+        self.attachment_tray = AttachmentTray(removable=True)
+        self.attachment_tray.removed.connect(self.remove_attachment)
+        composer_layout.addWidget(self.attachment_tray)
         composer_layout.addWidget(self.message)
-        self.attachment_notice = QLabel()
-        self.attachment_notice.setWordWrap(True)
-        self.attachment_notice.hide()
-        composer_layout.addWidget(self.attachment_notice)
         row = QHBoxLayout()
         self.attach = TransparentToolButton(FluentIcon.ADD, self)
         self.attach.setAccessibleName(tr('Attachments'))
@@ -1433,6 +1433,7 @@ class RepairPage(QWidget):
         for action in (self.image_action, self.reference_action):
             action.setEnabled(not busy)
         self.clear_action.setEnabled(not busy and bool(self.images or self.manifest_references))
+        self.attachment_tray.setEnabled(not busy)
         running = self._round_running and bool(self.window.jobs)
         cancelling = running and any(job.cancel_requested for job in self.window.jobs)
         if cancelling:
@@ -1496,12 +1497,23 @@ class RepairPage(QWidget):
         self.chat.setHtml('<p style="color:#808080;text-align:center">' + tr('Start a new chat. Choose a mode and set the source in Chat context.') + '</p>')
 
     def update_attachment_notice(self):
-        attached = bool(self.images or self.manifest_references)
-        self.attachment_notice.setVisible(attached)
-        self.attachment_notice.setText(tr('{0} images · {1} Manifest references').format(len(self.images), len(self.manifest_references)))
-        details = '\n'.join([*(str(path) for path in self.images), *self.manifest_references])
-        self.attach.setToolTip(details or tr('Attachments'))
-        self.attachment_notice.setToolTip(details)
+        """附件卡片仅反映当前待发送列表，不触碰历史或原文件。"""
+        expanded = self.attachment_tray.expanded
+        offset = self.attachment_tray.scroll.verticalScrollBar().value()
+        self.attachment_tray.set_items(draft_attachments(self.images, self.manifest_references))
+        self.attachment_tray.expanded = expanded and bool(self.attachment_tray.items)
+        self.attachment_tray.reflow()
+        self.attachment_tray.scroll.verticalScrollBar().setValue(offset)
+
+    def remove_attachment(self, index):
+        """沿用活动互斥，只移除所选待发送条目。"""
+        if self.is_busy():
+            return
+        if index < len(self.images):
+            self.images.pop(index)
+        else:
+            self.manifest_references.pop(index - len(self.images))
+        self.update_attachment_notice()
 
     def update_source_label(self):
         """已有 Session 显示固定来源；新对话显示当前选择。"""
@@ -1794,7 +1806,8 @@ class RepairPage(QWidget):
                 if kind == 'session_message':
                     text = '\n'.join(part.get('text', '') for part in value['message'].get('content', []) if part.get('type') == 'text')
                     if not text.startswith(('开发者执行完整校验：', '开发者已 Publish 完整草稿', FORMAT_RETRY_PREFIX)):
-                        self.chat.add_message('你', user_message_text(text), number)
+                        attachments = history_attachments(self.host.conversation.log.root, number)
+                        self.chat.add_message('你', user_message_text(text), number, attachments=attachments)
                 elif kind == 'message_end' and value.get('message', {}).get('role') == 'assistant':
                     self.chat.remember_message(number, value['message'].get('content', []))
                     try:
@@ -1911,7 +1924,8 @@ class RepairPage(QWidget):
                 current.host.secrets = self.window.host.secrets
                 conversation = current.host.conversation or current.conversation()
                 self.window.operation_event.emit({'event': {'type': 'workbench_session', 'session': current,
-                    'message': message, 'round': conversation.log.group + 1}})
+                    'message': message, 'round': conversation.log.group + 1,
+                    'attachments': draft_attachments(images, references)}})
                 return conversation.run(message, SimpleNamespace(pi='pi', ask_api_key=False), images=images,
                                         manifest_references=references, on_event=self.window.operation_event.emit,
                                         on_feedback=self.window.feedback_requested.emit,
@@ -1925,9 +1939,20 @@ class RepairPage(QWidget):
     def answered(self, result):
         self.chat.stop_work()
         expanded = {number: activity['expanded'] for number, activity in self.chat.activities.items()}
+        attachment_states = {
+            (entry['round'], entry['text']): (tray.expanded, tray.scroll.verticalScrollBar().value())
+            for entry in self.chat.entries
+            if (tray := self.chat.attachment_trays.get(id(entry))) is not None}
         self.reload_history()
         for number, activity in self.chat.activities.items():
             activity['expanded'] = expanded.get(number, False)
+        for entry in self.chat.entries:
+            tray = self.chat.attachment_trays.get(id(entry))
+            state = attachment_states.get((entry['round'], entry.get('text', '')))
+            if tray is not None and state is not None:
+                tray.expanded = state[0]
+                tray.reflow()
+                tray.scroll.verticalScrollBar().setValue(state[1])
         self.chat.render()
         answer = result.get("answer", {})
         if result.get("diagnostics"):
@@ -2064,7 +2089,7 @@ class RepairPage(QWidget):
             if not self.titles.get(identity, ('', ''))[0]:
                 self.titles[identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
             self.activate_session(value['session'], restore_history=False)
-            self.chat.add_message('你', value['message'], value['round'])
+            self.chat.add_message('你', value['message'], value['round'], attachments=value.get('attachments', ()))
             self.chat.start_work(value['round'])
             self.message.clear()
             self.clear_image()

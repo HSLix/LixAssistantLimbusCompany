@@ -49,7 +49,7 @@ def test_non_image_and_corrupt_image_are_errors(tmp_path):
             image_attachments([path], tmp_path)
 
 
-def test_gui_accumulates_selection_displays_paths_and_clears_all(gui, monkeypatch, tmp_path):
+def test_gui_accumulates_selection_displays_cards_and_clears_all(gui, monkeypatch, tmp_path):
     from PySide6.QtWidgets import QFileDialog
     app, window = gui
     paths = make_images(tmp_path, ("PNG", "JPEG"))
@@ -58,10 +58,10 @@ def test_gui_accumulates_selection_displays_paths_and_clears_all(gui, monkeypatc
     page.attach_image()
     page.attach_image()
     assert page.images == paths * 2
-    assert "4" in page.attachment_notice.text()
-    assert str(paths[1]) in page.attach.toolTip()
+    assert [item['path'] for item in page.attachment_tray.items] == paths * 2
+    assert not page.attachment_tray.isHidden()
     page.clear_image()
-    assert not page.images and str(paths[1]) not in page.attach.toolTip()
+    assert not page.images and not page.attachment_tray.items and page.attachment_tray.isHidden()
 
 
 def test_cli_accepts_repeated_image_options():
