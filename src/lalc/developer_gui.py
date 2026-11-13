@@ -22,7 +22,7 @@ from qfluentwidgets import (
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
     TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
-    ProgressBar, CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
+    CaptionLabel, IconWidget, CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
 )
 
 from .run_logs import LIVE_LOG_LIMIT
@@ -1257,6 +1257,18 @@ class RepairPage(QWidget):
         self.attach.setToolTip(tr('Attachments'))
         self.attach.clicked.connect(self.open_attachment_menu)
         row.addWidget(self.attach)
+        self.context_usage = QWidget(self.composer)
+        context_layout = QHBoxLayout(self.context_usage)
+        context_layout.setContentsMargins(4, 0, 4, 0)
+        context_layout.setSpacing(6)
+        self.context_icon = IconWidget(FluentIcon.SPEED_MEDIUM, self.context_usage)
+        self.context_icon.setFixedSize(16, 16)
+        self.context_label = CaptionLabel(self.context_usage)
+        self.context_label.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Preferred)
+        self.context_label.setAccessibleName(tr('Context usage'))
+        context_layout.addWidget(self.context_icon)
+        context_layout.addWidget(self.context_label)
+        row.addWidget(self.context_usage)
         row.addStretch()
         self.more_button = TransparentToolButton(FluentIcon.MORE, self)
         self.more_button.setAccessibleName(tr('More developer tools'))
@@ -1269,19 +1281,6 @@ class RepairPage(QWidget):
         row.addWidget(self.send_button)
         composer_layout.addLayout(row)
         body.addWidget(self.composer)
-        context_row = QHBoxLayout()
-        self.context_label = QLabel(tr('Context: unknown'))
-        self.context_label.setAccessibleName(tr('Context usage'))
-        self.context_bar = ProgressBar(useAni=False)
-        self.context_bar.setRange(0, 100)
-        self.context_bar.setValue(0)
-        self.context_bar.setFixedWidth(90)
-        self.context_bar.setFixedHeight(6)
-        self.context_bar.setAccessibleName(tr('Context usage'))
-        context_row.addWidget(self.context_label)
-        context_row.addWidget(self.context_bar)
-        context_row.addStretch()
-        body.addLayout(context_row)
         self.request_progress = QLabel(self)
         self.request_progress.hide()
         self.build_menus()
@@ -1477,18 +1476,19 @@ class RepairPage(QWidget):
         import math
         if (type(tokens) not in (int, float) or type(limit) not in (int, float)
                 or not math.isfinite(tokens) or not math.isfinite(limit) or tokens < 0 or limit <= 0):
-            self.context_label.setText(tr('Context: unknown'))
-            self.context_bar.setValue(0)
-            self.context_bar.setToolTip(tr('Context: unknown'))
+            self.context_label.setText(tr('Context —'))
+            self.context_label.setTextColor('#606060', '#b8b8b8')
+            self.context_label.setToolTip(tr('Context: unknown'))
+            self.context_usage.setToolTip(tr('Context: unknown'))
             return
         percent = tokens / limit * 100
-        color = '#2e9d63' if percent < 50 else '#c58b16' if percent < 80 else '#d94a49'
-        self.context_bar.setCustomBarColor(color, color)
-        self.context_bar.setValue(min(100, max(0, int(percent))))
+        light, dark = (('#237b4b', '#70d69b') if percent < 50 else
+                       ('#906400', '#f2c661') if percent < 80 else ('#c42b2b', '#ff9393'))
+        self.context_label.setTextColor(light, dark)
         self.context_label.setText(tr('Context: {0}%').format(int(percent)))
         details = tr('Estimated {0} / {1} tokens; 100% triggers compaction.').format(int(tokens), int(limit))
         self.context_label.setToolTip(details)
-        self.context_bar.setToolTip(details)
+        self.context_usage.setToolTip(details)
 
     def show_empty_chat(self):
         self.context_event_order = (-1, "")

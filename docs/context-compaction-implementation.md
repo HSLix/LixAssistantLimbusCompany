@@ -1,5 +1,7 @@
 # 上下文压缩实施与验证
 
+
+2026-11-13 补充：额度显示位置已由[工具栏内嵌审查](context-usage-toolbar-impact-review.md)替代，下文保留当时记录。
 2026-11-12。依据[审查](context-compaction-impact-review.md)和 [ADR 0041](adr/0041-let-pi-own-effective-agent-context.md)实施；实现已完成，验证范围和限制如下。
 
 ## 实现

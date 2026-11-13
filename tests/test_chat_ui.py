@@ -496,18 +496,20 @@ def test_open_history_prepares_only_latest_round_in_background(gui, monkeypatch)
     assert restores == [False]
     assert len(reads) == 1 and reads[0][0] == 2 and reads[0][1] != main_thread
     assert {entry['round'] for entry in page.chat.entries} == {2}
-@pytest.mark.parametrize('percent,color', [(0, '#2e9d63'), (49.99, '#2e9d63'),
-                                        (50, '#c58b16'), (79.99, '#c58b16'),
-                                        (80, '#d94a49'), (100, '#d94a49'), (110, '#d94a49')])
+@pytest.mark.parametrize('percent,color', [(0, '#237b4b'), (49.99, '#237b4b'),
+                                        (50, '#906400'), (79.99, '#906400'),
+                                        (80, '#c42b2b'), (100, '#c42b2b'), (110, '#c42b2b')])
 def test_context_usage_uses_compaction_threshold_and_color(gui, percent, color):
     app, window = gui
     page = window.repair_page
     page.show_context_usage({'tokens': percent * 4000, 'limit': 400000})
-    assert page.context_bar.lightBarColor().name() == color
-    assert page.context_bar.value() == min(100, int(percent))
+    assert page.context_label.lightColor.name() == color
+    assert page.context_label.text() == tr('Context: {0}%').format(int(percent))
     assert '400000' in page.context_label.toolTip()
     page.show_context_usage({'tokens': float('nan'), 'limit': 400000})
-    assert page.context_label.text() == tr('Context: unknown')
+    assert page.context_label.text() == tr('Context —')
+    assert page.context_label.lightColor.name() == '#606060'
+    assert page.context_label.toolTip() == page.context_usage.toolTip() == tr('Context: unknown')
 
 
 def test_context_settings_keep_inactive_mode_value(gui):
@@ -525,3 +527,38 @@ def test_context_settings_keep_inactive_mode_value(gui):
     saved = settings_document(window.service.data_root)
     assert saved['context_image_limit'] == 8 and saved['context_compaction_mode'] == 'fixed'
     assert saved['context_compaction_ratio'] == 30 and saved['context_compaction_tokens'] == 20000
+
+
+@pytest.mark.parametrize('dark', [False, True])
+@pytest.mark.parametrize('language', ['en_US', 'zh_CN'])
+def test_context_usage_fits_composer_toolbar_and_tracks_theme(gui, dark, language):
+    from qfluentwidgets import Theme, qconfig, setTheme
+    from lalc.i18n import install_translations
+
+    app, window = gui
+    page = window.repair_page
+    previous_theme = qconfig.theme
+    previous_language = getattr(app, '_lalc_language', 'en_US')
+    try:
+        install_translations(app, language)
+        setTheme(Theme.DARK if dark else Theme.LIGHT)
+        window.show()
+        window.switchTo(page)
+        window.resize(760, 640)
+        for usage in ({'tokens': 168000, 'limit': 400000},
+                      {'tokens': 440000, 'limit': 400000}, None):
+            page.show_context_usage(usage)
+            QTest.qWait(20)
+            assert page.context_usage.parentWidget() is page.composer
+            assert page.context_label.font().pixelSize() < page.message.font().pixelSize()
+            assert page.context_usage.geometry().left() >= page.attach.geometry().right()
+            assert page.context_usage.geometry().right() < page.more_button.geometry().left()
+            assert page.context_usage.geometry().bottom() <= page.composer.height()
+            assert page.context_label.width() >= page.context_label.sizeHint().width()
+            expected = ('#b8b8b8' if dark else '#606060') if usage is None else (
+                ('#70d69b' if dark else '#237b4b') if usage['tokens'] < 200000 else
+                ('#ff9393' if dark else '#c42b2b'))
+            assert '#ff' + expected[1:] in page.context_label.styleSheet()
+    finally:
+        install_translations(app, previous_language)
+        setTheme(previous_theme)

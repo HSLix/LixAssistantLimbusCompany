@@ -2106,6 +2106,10 @@ Original pixel region: {2}</source>
       <translation>DeepSeek 达 400k、llama.cpp 达 50k 时压缩。设置下轮生效；回读旧图需要历史读取权限。</translation>
     </message>
     <message>
+      <source>Context —</source>
+      <translation>上下文 —</translation>
+    </message>
+    <message>
       <source>Context: unknown</source>
       <translation>上下文：未知</translation>
     </message>
