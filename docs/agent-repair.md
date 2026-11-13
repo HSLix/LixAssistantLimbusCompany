@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。
+
 2026-11-11 Stage 6 已实施：Runtime 从当前 Working Manifest 创建同一套 Repair Session，Run 结束后可在 Developer GUI 接续；Runtime 提供当前失败入口的 `recheck` 和 `read_run_state`，不提供独立 `trial_run` 或删除。请求上限默认 50，同一恢复会话共享余额。历史检索默认开启，Runtime 人工反馈默认关闭，均在下一轮 Agent 开始时生效。详见 [Stage 6 实施记录](stage-6-implementation.md)。
 
 2026-11-08 已接受页面多任务与人工确认启停设计：TASKS 逐项声明任务名称及次数开关，不兼容旧单任务声明；停用页面保留配置和 ID，占用不释放，覆盖安装不改变本机状态，启停重启后生效。仅 GUI Construct Agent 提供专用确认工具，不提供永久删除；Session 顶栏显示固定来源 Manifest。设计、影响及实施验证见[专项记录](page-tasks-and-availability-design-impact-review.md)。

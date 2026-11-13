@@ -278,7 +278,8 @@ class RepairConversation:
         options = settings_document(host.service.data_root)
         self.allowed = allowed_tools(self.mode, entry, history_enabled=options["history_enabled"],
                                      runtime_feedback_enabled=options["runtime_feedback_enabled"],
-                                     knowledge_enabled=options["knowledge_enabled"])
+                                     knowledge_enabled=options["knowledge_enabled"],
+                                     manifest_reference_enabled=options["manifest_reference_enabled"])
         self.system_prompt = system_prompt(self.mode)
         if entry == "runtime":
             from .agent_prompts import RUNTIME_GUIDANCE
@@ -313,7 +314,8 @@ class RepairConversation:
             options = settings_document(self.host.service.data_root)
             self.allowed = allowed_tools(self.mode, self.entry, history_enabled=options["history_enabled"],
                                          runtime_feedback_enabled=options["runtime_feedback_enabled"],
-                                         knowledge_enabled=options["knowledge_enabled"])
+                                         knowledge_enabled=options["knowledge_enabled"],
+                                         manifest_reference_enabled=options["manifest_reference_enabled"])
             self.tools.allowed = frozenset(self.allowed)
             references = list(dict.fromkeys(manifest_references))
             for identity in references:

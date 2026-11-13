@@ -829,3 +829,17 @@ def test_trial_history_notice_has_theme_background(gui, dark):
         dialog.deleteLater()
     finally:
         setTheme(previous)
+
+
+def test_manifest_reference_checkbox_saves_and_reloads(gui):
+    from lalc.agent_settings import settings_document
+    app, window = gui
+    page = window.settings_page
+    control = page.global_controls['manifest_reference_enabled']
+    assert control.isChecked()
+    control.click()
+    assert settings_document(window.service.data_root)['manifest_reference_enabled'] is False
+    page.reload()
+    assert not control.isChecked()
+    control.click()
+    assert settings_document(window.service.data_root)['manifest_reference_enabled'] is True

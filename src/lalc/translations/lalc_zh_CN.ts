@@ -2014,6 +2014,7 @@ Original pixel region: {2}</source>
 <message><source>Copied successfully</source><translation>复制成功</translation></message>
 <message><source>Skills</source><translation>Skills</translation></message>
 <message><source>Choose Replace all conflicts or Skip all conflicts for Assets / Skills.</source><translation>请为冲突的 Asset／Skill 选择全部覆盖或全部跳过。</translation></message>
+<message><source>Allow querying published Manifests</source><translation>允许查询已发布 Manifest</translation></message>
 <message><source>Allow searching Agent history</source><translation>允许检索历史 Agent 记录</translation></message>
 <message><source>Automatically use the repaired version after normal completion</source><translation>运行成功后自动使用修复版本</translation></message>
 <message><source>Allow requesting human feedback</source><translation>允许请求人工反馈</translation></message>
