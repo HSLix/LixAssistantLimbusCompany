@@ -91,7 +91,7 @@ def check_codesearch(archive: Path, models: Path) -> None:
 def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
-    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts",
+    for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts",
                      *[f"_internal/lalc/skills/{name}/SKILL.md" for name in DEFAULT_SKILL_NAMES],
                      "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                      "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",

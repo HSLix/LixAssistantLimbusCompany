@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-12：Sharing 与单次运行日志的导出／导入统一双进度窗口：整体文件计数、当前文件名与字节进度，明确准备、ZIP 写入、解压及安装阶段；提交／收尾成功后才显示整体完成。规格见[Sharing](sharing.md)。相关普通回归 176 passed；扩展检查发现既有默认 Skill 清单遗漏 `limbuscompany-knowledge` 的一项失败，核对 HEAD 后从最终回归排除。已检查中英文及明暗主题的离屏窗口；未运行真实 Agent、Windows 成品或游戏验收。
+
 2026-11-12：聊天贴底改为持续跟随状态，工具更新、延迟排版及计时刷新沿用该状态；轮次结束耗时随结果和事件保存，历史无记录则不显示。相关普通回归 189 passed，范围和验收边界见[专项记录](chat-scroll-and-duration-implementation.md)。
 
 2026-11-12：根据镜牢入口开发日志复盘修订默认 Agent 指导：局部修改分段试跑、稳定后补完整路径，每次运行前明确起点和期望并在结束后核对；通常采用十秒左右到十几秒超时后交给 Recovery Rule，不要求正常轮询检测错误弹窗。Task／Subworkflow 可先观测状态再进入子步骤，现有 observe／control 权限不变。补充中文直接编辑、准确类型示例及按需 OCR 指导，见[开发教程](developer-workflow-tutorial.md)与[默认规范](../src/lalc/skills/workflow-conventions/SKILL.md)。仅修改指导和工具说明；已有数据目录 Skills 不自动覆盖，需人工合并。
@@ -97,3 +99,5 @@
 本次复检与维护证据见[一致性审计](architecture-consistency-audit-2026-11-05.md)。
 
 2026-11-09：已接受普通工作目录／文件权限继承及直接导出 ZIP 边界，保留清理、事务和导入 Review；设计与实施验证见[专项记录](ordinary-work-directories-impact-review.md)。
+
+2026-11-12：pi 持久有效上下文、按比例／固定目标压缩、每轮图片窗口、DeepSeek 缺省选择及聊天额度提示已本地实现；设计见 [ADR 0041](adr/0041-let-pi-own-effective-agent-context.md)，验证与限制见 [实施记录](context-compaction-implementation.md)。

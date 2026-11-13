@@ -110,7 +110,7 @@ class PiProcess:
         for flag in ("--system-prompt",):
             signature_command[signature_command.index(flag) + 1] = "<round>"
         signature = (tuple(signature_command), *(env.get(key) for key in
-                     ("LALC_PI_BASE_URL", "LALC_PI_API_KEY", "LALC_PI_PROVIDER")))
+                     ("LALC_PI_BASE_URL", "LALC_PI_API_KEY", "LALC_PI_PROVIDER", "LALC_PI_CONTEXT_WINDOW")))
         reuse = self.process is not None and self.process.poll() is None and self.signature == signature
         if not reuse:
             self.close()
@@ -121,7 +121,8 @@ class PiProcess:
             home = Path(self.directory.name)
         # 密钥留在启动环境；轮次文件只传已单独持久化的提示、路径及权限。
         keys = ("SOURCE_ROOT", "REPAIR_FILES", "HISTORY", "INPUT_IMAGES", "INPUT_MESSAGE", "PAYLOAD_DIR",
-                "CONVERSATION_ROUND", "ROUND_REQUEST_LIMIT", "ALLOWED_TOOLS", "MAX_REQUESTS", "SKILLS_ROOT", "SKILLS_SOURCE")
+                "CONVERSATION_ROUND", "ROUND_REQUEST_LIMIT", "ALLOWED_TOOLS", "MAX_REQUESTS", "SKILLS_ROOT", "SKILLS_SOURCE",
+                "CONTEXT_BOOTSTRAP", "IMAGE_INDEX", "SESSION_FILE", "SESSION_ID")
         state = {"LALC_PI_" + key: env.get("LALC_PI_" + key) for key in keys}
         state["LALC_PI_SYSTEM_PROMPT"] = command[command.index("--system-prompt") + 1]
         config = home / "round.json"
@@ -172,7 +173,8 @@ class PiProcess:
 
             if reuse:
                 try:
-                    await send({"id": "lalc_new_round", "type": "new_session"})
+                    await send({"id": "lalc_new_round", "type": "switch_session", "sessionPath": env["LALC_PI_SESSION_FILE"]}
+                               if env.get("LALC_PI_SESSION_FILE") else {"id": "lalc_new_round", "type": "new_session"})
                 except (BrokenPipeError, ConnectionResetError) as error:
                     raise PiExited("复用 pi 时旧进程已退出。") from error
             show({"type": "pi_process", "pid": process.pid, "reused": reuse})

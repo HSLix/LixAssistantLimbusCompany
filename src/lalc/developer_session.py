@@ -203,6 +203,7 @@ class DeveloperSession:
         history = AgentHistory(self.host.service.data_root)
         with self.host.candidate_activity('Session delete'), history.lock():
             self.check()
+            self.host.service.pi_process.close()
             stage = None
             try:
                 with history.connection(write=history.database.exists()) as connection:
@@ -258,6 +259,7 @@ class DeveloperSession:
                     with events_path.open("ab") as stream:
                         stream.write(b"\n")
         events = list(read_events(events_path, expand=load_history)) if events_path.exists() else []
+        log.event_sequence = len(events)
         if load_history:
             conversation.history = restored_history(events)
         rounds = sorted(int(path.name.removeprefix("round-")) for path in log.root.glob("round-*")

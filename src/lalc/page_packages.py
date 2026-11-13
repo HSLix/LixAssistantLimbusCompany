@@ -140,7 +140,7 @@ def _freeze_snapshot(files):
     for name, content in files.items():
         target = root / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        write_content(target, content)
+        write_content(target, content, name=name)
         fixed[name] = FileContent(target, len(content), content_hash(content), owner)
     return PageSnapshot(fixed)
 
@@ -150,7 +150,7 @@ def _write_snapshot(snapshot, directory):
     for name, content in snapshot.files.items():
         path = directory.joinpath(*_relative(name))
         path.parent.mkdir(parents=True, exist_ok=True)
-        write_content(path, content)
+        write_content(path, content, name=name)
 
 
 @contextmanager

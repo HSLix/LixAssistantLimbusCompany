@@ -17,7 +17,7 @@ import zipfile
 
 from .work_files import work_root, WorkDirectory, create_work_directory, work_file
 from .file_content import (FileContent, content_hash, content_bytes, copy_content, write_content,
-    content_stream, require_memory, require_disk, available_memory, open_image, image_preview, ResourceUnknown, checkpoint)
+    content_stream, require_memory, require_disk, available_memory, open_image, image_preview, ResourceUnknown, checkpoint, file_transfers, transfer_file)
 from .agent_log import FORMAT, LogStore
 from .assets import AssetLibrary, asset_name
 from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries,
@@ -216,7 +216,7 @@ def replace_skill(root, identity, files, expected):
         for name, content in files.items():
             path = staged / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            write_content(path, content)
+            write_content(path, content, name=name)
         current = skill_files(root, identity)
         if (files_version(current) if current is not None else None) != expected:
             raise ValueError("本地 Skill 已变化，请重新检查。")
@@ -380,15 +380,16 @@ def build_export(manager, selection):
     require_disk([(work_root(), sum(len(content) for obj in objects for content in obj["files"].values()))])
     owner = WorkDirectory(prefix="lalc-export-")
     root = Path(owner.name).resolve()
-    for number, obj in enumerate(objects):
-        fixed = {}
-        for name, content in obj["files"].items():
-            checkpoint()
-            target = root / str(number) / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            write_content(target, content)
-            fixed[name] = FileContent(target, len(content), digest(content), owner)
-        obj["files"] = fixed
+    with file_transfers("Preparing export files", sum(len(obj["files"]) for obj in objects)):
+        for number, obj in enumerate(objects):
+            fixed = {}
+            for name, content in obj["files"].items():
+                checkpoint()
+                target = root / str(number) / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                write_content(target, content, name=f"{obj['kind']}/{obj['id']}/{name}")
+                fixed[name] = FileContent(target, len(content), digest(content), owner)
+            obj["files"] = fixed
     return objects
 
 
@@ -422,20 +423,24 @@ def save_package(objects, destination):
     require_disk([(destination.parent, len(index) + sum(len(content) + 1024 for obj in objects for content in obj["files"].values()))])
     if destination.is_symlink():
         raise ValueError("保存目标不能是链接。")
-    temporary = None
-    try:
-        with work_file(dir=destination.parent, prefix=".sharing-", delete=False) as stream:
-            temporary = Path(stream.name)
-        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr("sharing.json", index)
-            for number, obj in enumerate(objects):
-                for name, content in sorted(obj["files"].items()):
-                    with archive.open(f"objects/{number}/{name}", "w", force_zip64=True) as stream:
-                        copy_content(content, stream)
-        temporary.replace(destination)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+    with file_transfers("Writing ZIP", sum(len(obj["files"]) for obj in objects)) as progress:
+        temporary = None
+        try:
+            with work_file(dir=destination.parent, prefix=".sharing-", delete=False) as stream:
+                temporary = Path(stream.name)
+            with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr("sharing.json", index)
+                for number, obj in enumerate(objects):
+                    for name, content in sorted(obj["files"].items()):
+                        with archive.open(f"objects/{number}/{name}", "w", force_zip64=True) as stream:
+                            copy_content(content, stream, name=f"{obj['kind']}/{obj['id']}/{name}")
+                        progress.complete()
+            progress.update(phase="Finishing…")
+            temporary.replace(destination)
+            progress.update(finished=True)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
 
 def staging_root():
@@ -532,25 +537,32 @@ class SharingPackage:
                 if data_root is not None:
                     requirements.append((Path(data_root), required))
                 require_disk(requirements, allow_unknown=allow_unknown_space)
-                done = 0
-                for obj in self.objects:
-                    for name, record in obj["files"].items():
-                        checkpoint(done, total, name)
-                        target = obj["root"] / name
-                        target.parent.mkdir(parents=True, exist_ok=True)
-                        hashed, size = hashlib.sha256(), 0
-                        with archive.open(f"objects/{obj['number']}/{name}") as source, target.open("xb") as destination:
-                            while chunk := source.read(1024 * 1024):
-                                checkpoint(done, total, name)
-                                size += len(chunk)
-                                if size > record["size"]:
-                                    raise ValueError("解压数据超过声明大小。")
-                                hashed.update(chunk)
-                                destination.write(chunk)
-                                done += len(chunk)
-                        if size != record["size"] or hashed.hexdigest() != record["sha256"]:
-                            raise ValueError("包文件内容哈希不符。")
-                checkpoint(total, total, "")
+                with file_transfers("Extracting files", sum(len(obj["files"]) for obj in self.objects)) as progress:
+                    done = 0
+                    for obj in self.objects:
+                        progress.prefix = f"{obj['kind']}/{obj['id']}/"
+                        for name, record in obj["files"].items():
+                            transfer_file(0, record["size"], name)
+                            checkpoint(done, total, name)
+                            target = obj["root"] / name
+                            target.parent.mkdir(parents=True, exist_ok=True)
+                            hashed, size = hashlib.sha256(), 0
+                            with archive.open(f"objects/{obj['number']}/{name}") as source, target.open("xb") as destination:
+                                while chunk := source.read(1024 * 1024):
+                                    checkpoint(done, total, name)
+                                    size += len(chunk)
+                                    if size > record["size"]:
+                                        raise ValueError("解压数据超过声明大小。")
+                                    hashed.update(chunk)
+                                    destination.write(chunk)
+                                    done += len(chunk)
+                                    transfer_file(size, record["size"], name)
+                            if size != record["size"] or hashed.hexdigest() != record["sha256"]:
+                                raise ValueError("包文件内容哈希不符。")
+                            transfer_file(size, record["size"], name, finished=True)
+                            progress.complete()
+                    checkpoint(total, total, "")
+                progress.update(finished=True)
         except BaseException:
             self.close()
             raise
@@ -708,7 +720,7 @@ def replace_asset(root, identity, files, expected):
     written, moved, success = [], [], False
     try:
         for name, content in files.items():
-            write_content(staged / name, content)
+            write_content(staged / name, content, name=name)
         originals = list(target.glob("*.png")) + ([target / "asset-tag.json"] if (target / "asset-tag.json").exists() else [])
         for path in originals:
             path.rename(backup / path.name)
@@ -751,7 +763,7 @@ def import_history(root, obj, content_hash):
         for name in obj["files"]:
             path = folder / name
             path.parent.mkdir(parents=True, exist_ok=True)
-            write_content(path, FileContent.from_path(obj["root"] / name))
+            write_content(path, FileContent.from_path(obj["root"] / name), name=name)
         readable = folder / "readable"
         if readable.exists():
             raise ValueError("历史来源占用了宿主可读索引目录。")
@@ -802,40 +814,48 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
     page_errors = page_selection_errors(manager, package, checks, selected, reviewed)
     if page_errors:
         raise ValueError("; ".join(message for messages in page_errors.values() for message in messages))
-    for index, obj in enumerate(objects):
-        number, kind, identity = obj["number"], obj["kind"], obj["id"]
-        check = checks[number]
-        try:
-            if check["errors"]:
-                raise ValueError("; ".join(check["errors"]))
-            if kind == "workflow":
-                outcome = import_workflow(manager, obj["root"], identity, manifest_id=check["manifest_id"], manifest_sha256=check["manifest_sha256"])
-            elif kind in {"assets", "skills"}:
-                current = (asset_files if kind == "assets" else skill_files)(manager.data_root, identity)
-                if (files_version(current) if current is not None else None) != check["before"]:
-                    raise ValueError("本地 Asset 已变化，请重新检查。")
-                if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
-                    outcome = {"status": "skipped"}
+    with file_transfers("Installing files", sum(len(obj["files"]) for obj in objects)) as progress:
+        for index, obj in enumerate(objects):
+            number, kind, identity = obj["number"], obj["kind"], obj["id"]
+            progress.prefix = f"{kind}/{identity}/"
+            progress.update(phase="Installing files", name=progress.prefix, done=0, size=0, file_finished=False)
+            check = checks[number]
+            try:
+                if check["errors"]:
+                    raise ValueError("; ".join(check["errors"]))
+                if kind == "workflow":
+                    outcome = import_workflow(manager, obj["root"], identity, manifest_id=check["manifest_id"], manifest_sha256=check["manifest_sha256"])
+                elif kind in {"assets", "skills"}:
+                    current = (asset_files if kind == "assets" else skill_files)(manager.data_root, identity)
+                    if (files_version(current) if current is not None else None) != check["before"]:
+                        raise ValueError("本地 Asset 已变化，请重新检查。")
+                    if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
+                        for name, record in obj["files"].items():
+                            transfer_file(record["size"], record["size"], name, finished=True)
+                        outcome = {"status": "skipped"}
+                    else:
+                        if check["conflict"] and asset_actions.get(number) != "replace":
+                            raise ValueError("Asset 冲突尚未选择替换或跳过。")
+                        (replace_asset if kind == "assets" else replace_skill)(manager.data_root, identity, package.files(obj), check["before"])
+                        outcome = {"status": "imported"}
+                elif kind == "pages":
+                    if number not in reviewed and not allow_unreviewed:
+                        raise ValueError("页面尚未 Review，也未明确确认跳过 Review 安装。")
+                    target = installed_page(manager.data_root, identity)
+                    before = snapshot_page(target, freeze=False).sha256 if target.exists() else None
+                    if before != check["before"]:
+                        raise ValueError("本地页面已变化，请重新检查。")
+                    install_page_package(manager.data_root / "pages", Path(identity).stem, check["package"],
+                                         replace=before is not None, legacy_filename=identity if target.is_file() else None)
+                    outcome = {"status": "installed", "reviewed": number in reviewed, "reload_required": True}
                 else:
-                    if check["conflict"] and asset_actions.get(number) != "replace":
-                        raise ValueError("Asset 冲突尚未选择替换或跳过。")
-                    (replace_asset if kind == "assets" else replace_skill)(manager.data_root, identity, package.files(obj), check["before"])
-                    outcome = {"status": "imported"}
-            elif kind == "pages":
-                if number not in reviewed and not allow_unreviewed:
-                    raise ValueError("页面尚未 Review，也未明确确认跳过 Review 安装。")
-                target = installed_page(manager.data_root, identity)
-                before = snapshot_page(target, freeze=False).sha256 if target.exists() else None
-                if before != check["before"]:
-                    raise ValueError("本地页面已变化，请重新检查。")
-                install_page_package(manager.data_root / "pages", Path(identity).stem, check["package"],
-                                     replace=before is not None, legacy_filename=identity if target.is_file() else None)
-                outcome = {"status": "installed", "reviewed": number in reviewed, "reload_required": True}
-            else:
-                outcome = {"path": str(import_history(manager.data_root, obj, check["content_hash"]))}
-            result["completed"].append({"kind": kind, "id": identity, **outcome})
-        except Exception as error:
-            result["failed"] = {"kind": kind, "id": identity, "error": str(error)}
-            result["unprocessed"] = [{"kind": item["kind"], "id": item["id"]} for item in objects[index + 1:]]
-            break
+                    outcome = {"path": str(import_history(manager.data_root, obj, check["content_hash"]))}
+                progress.complete(len(obj["files"]), skipped=outcome.get("status") == "skipped")
+                result["completed"].append({"kind": kind, "id": identity, **outcome})
+            except Exception as error:
+                result["failed"] = {"kind": kind, "id": identity, "error": str(error)}
+                result["unprocessed"] = [{"kind": item["kind"], "id": item["id"]} for item in objects[index + 1:]]
+                break
+        if result["failed"] is None:
+            progress.update(finished=True)
     return result

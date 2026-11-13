@@ -225,3 +225,20 @@ def test_gui_run_list_without_scrollbar_accepts_wheel_and_keyboard(log_page, tmp
     page.runs.setCurrentRow(19)
     app.sendEvent(page.runs, QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Down, Qt.KeyboardModifier.NoModifier))
     assert page.runs.count() == 25
+
+
+def test_run_log_transfers_report_overall_and_current_file_progress(tmp_path):
+    root = tmp_path / 'source'
+    root.mkdir()
+    original = tmp_path / 'original.zip'
+    package(root, original)
+    events = []
+    with file_operation(details=events.append):
+        export_log(root, 1, tmp_path / 'exported.zip')
+    assert events[-1].finished and events[-1].completed == events[-1].total
+    assert any(event.name.endswith('.jsonl') and event.file_finished for event in events)
+    events.clear()
+    with file_operation(details=events.append):
+        import_log(tmp_path / 'target', original)
+    assert events[-1].finished and events[-1].completed == events[-1].total
+    assert any(event.name.startswith('evidence/') and event.file_finished for event in events)

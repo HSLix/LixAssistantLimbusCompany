@@ -7,7 +7,7 @@ from pathlib import Path
 import uuid
 
 from .work_files import work_file
-from .file_content import require_memory
+from .file_content import require_memory, transfer_file
 from .manifest import ManifestManager
 from .runtime import sha256_bytes
 
@@ -103,18 +103,25 @@ def import_workflow(manager, source_root, source_manifest_id, *, manifest_id, ma
         component = manager.components_dir / f"{source.component_id.removeprefix('sha256:')}.py"
         if component.is_symlink() or component.exists() and not component.is_file():
             raise ValueError("本地 Component 必须是普通文件。")
+        name = f"components/{component.name}"
+        transfer_file(0, len(source.content), name)
         manager._store_component(source)
+        transfer_file(len(source.content), len(source.content), name, finished=True)
     assert isinstance(prepared.manifest, dict)
     manifest = {**prepared.manifest, "manifest_id": manifest_id}
     temporary = None
     try:
+        content = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+        name = f"manifests/{manifest_id}.json"
+        transfer_file(0, len(content), name)
         with work_file(dir=manager.manifests_dir, prefix=".import-", delete=False) as stream:
             temporary = Path(stream.name)
-            stream.write(json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8"))
+            stream.write(content)
             stream.flush()
             os.fsync(stream.fileno())
         # 排他创建也保护检查之后发生的占用；失败保留已存储的共享哈希源码。
         os.link(temporary, target)
+        transfer_file(len(content), len(content), name, finished=True)
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)

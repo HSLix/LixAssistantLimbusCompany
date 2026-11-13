@@ -10,7 +10,8 @@ import uuid
 import zipfile
 
 from .work_files import WorkDirectory
-from .file_content import (FileContent, checkpoint, copy_content, require_disk, require_memory)
+from .file_content import (FileContent, checkpoint, copy_content, require_disk, require_memory,
+                           file_transfers, transfer_file)
 from .page_packages import real_directory
 from .run_logs import image_path, lines, snapshot, trace_path
 from .sharing import strict_json, json_bytes
@@ -113,16 +114,20 @@ def export_log(root, run_id, destination, boundary=None):
                         files={name: dict(size=len(content), sha256=content.sha256) for name, content in files.items()})
         require_disk([(destination.parent, sum(len(content) + 1024 for content in files.values()))])
         pending = stage / 'log.zip'
-        with zipfile.ZipFile(pending, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
-            archive.writestr('run.json', json_bytes(metadata))
-            for number, (name, content) in enumerate(files.items()):
-                checkpoint(number, len(files), name)
-                with archive.open(name, 'w', force_zip64=True) as stream:
-                    copy_content(content, stream)
-        checkpoint(len(files), len(files), 'ZIP')
-        if destination.is_symlink():
-            raise ValueError('ZIP destination must not be a link.')
-        pending.replace(destination)
+        with file_transfers("Writing ZIP", len(files)) as progress:
+            with zipfile.ZipFile(pending, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                archive.writestr('run.json', json_bytes(metadata))
+                for number, (name, content) in enumerate(files.items()):
+                    checkpoint(number, len(files), name)
+                    with archive.open(name, 'w', force_zip64=True) as stream:
+                        copy_content(content, stream, name=name)
+                    progress.complete()
+            checkpoint(len(files), len(files), 'ZIP')
+            if destination.is_symlink():
+                raise ValueError('ZIP destination must not be a link.')
+            progress.update(phase="Finishing…")
+            pending.replace(destination)
+    progress.update(finished=True)
 
 
 def import_log(root, archive_path):
@@ -169,24 +174,31 @@ def import_log(root, archive_path):
                         or not isinstance(record['sha256'], str) or not re.fullmatch('[0-9a-f]{64}', record['sha256'])):
                     raise ValueError('Invalid ZIP size or hash.')
             require_disk([(folder, sum(info.file_size + 4096 for info in members))])
-            for number, (name, record) in enumerate(files.items()):
-                target = stage / name
-                target.parent.mkdir(parents=True, exist_ok=True)
-                digest, size = hashlib.sha256(), 0
-                with archive.open(name) as source, target.open('wb') as output:
-                    while chunk := source.read(65536):
-                        checkpoint(number, len(files), name)
-                        digest.update(chunk)
-                        size += len(chunk)
-                        if size > record['size']:
-                            raise ValueError('ZIP size mismatch.')
-                        output.write(chunk)
-                if size != record['size'] or digest.hexdigest() != record['sha256']:
-                    raise ValueError('ZIP hash mismatch.')
-            (stage / 'run.json').write_bytes(json_bytes(metadata))
-            if snapshot(stage, identity)[2] != (stage / trace_name).stat().st_size:
-                raise ValueError('Incomplete log record.')
-            checkpoint(len(files), len(files), 'Import')
-            key = str(uuid.uuid4())
-            stage.rename(folder / key)
+            with file_transfers("Extracting files", len(files)) as progress:
+                for number, (name, record) in enumerate(files.items()):
+                    transfer_file(0, record["size"], name)
+                    target = stage / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    digest, size = hashlib.sha256(), 0
+                    with archive.open(name) as source, target.open('wb') as output:
+                        while chunk := source.read(65536):
+                            checkpoint(number, len(files), name)
+                            digest.update(chunk)
+                            size += len(chunk)
+                            if size > record['size']:
+                                raise ValueError('ZIP size mismatch.')
+                            output.write(chunk)
+                            transfer_file(size, record["size"], name)
+                    if size != record['size'] or digest.hexdigest() != record['sha256']:
+                        raise ValueError('ZIP hash mismatch.')
+                    transfer_file(size, record["size"], name, finished=True)
+                    progress.complete()
+                (stage / 'run.json').write_bytes(json_bytes(metadata))
+                if snapshot(stage, identity)[2] != (stage / trace_name).stat().st_size:
+                    raise ValueError('Incomplete log record.')
+                checkpoint(len(files), len(files), 'Import')
+                key = str(uuid.uuid4())
+                progress.update(phase="Finishing…")
+                stage.rename(folder / key)
+    progress.update(finished=True)
     return key

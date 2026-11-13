@@ -36,7 +36,7 @@ def test_status_check_is_read_only_and_records_unknown_state(tmp_path, monkeypat
         calls.append((base, key))
         return [{"id": "Gemma4", **({"status": {"value": status}} if status else {})}]
     monkeypatch.setattr("lalc.pi_probe._models", models)
-    result = check_settings(tmp_path, {"base_url": "http://host/custom/api/", "model": "Gemma4"},
+    result = check_settings(tmp_path, {"provider": "llama.cpp", "base_url": "http://host/custom/api/", "model": "Gemma4"},
                             key="test-secret", check_model=True)
     assert result["ok"] and result["model_status"] == (status or "unknown")
     assert calls == [("http://host/custom/api", "test-secret")]
@@ -50,8 +50,8 @@ def test_status_check_is_read_only_and_records_unknown_state(tmp_path, monkeypat
 
 def test_connection_does_not_require_model_but_model_check_does(tmp_path, monkeypatch):
     monkeypatch.setattr("lalc.pi_probe._models", lambda *args: [])
-    assert check_settings(tmp_path, {}, key="lalc-no-key")["ok"]
-    result = check_settings(tmp_path, {"model": "missing"}, key="lalc-no-key", check_model=True)
+    assert check_settings(tmp_path, {"provider": "llama.cpp"}, key="lalc-no-key")["ok"]
+    result = check_settings(tmp_path, {"provider": "llama.cpp", "model": "missing"}, key="lalc-no-key", check_model=True)
     assert not result["ok"] and result["error"]["stage"] == "model_status"
     assert "missing" in result["message"] and "traceback" in result["error"]
 
@@ -144,7 +144,7 @@ def test_next_round_reads_new_saved_settings_without_new_conversation(tmp_path, 
         yield
     monkeypatch.setattr("lalc.agent_repair.configured_pi", fail)
     options = SimpleNamespace(pi="pi", ask_api_key=False)
-    save_settings(host.service.data_root, {"model": "first"})
+    save_settings(host.service.data_root, {"provider": "llama.cpp", "model": "first"})
     asyncio.run(chat.run("first", options))
     save_settings(host.service.data_root, {"model": "second"})
     asyncio.run(chat.run("second", options))

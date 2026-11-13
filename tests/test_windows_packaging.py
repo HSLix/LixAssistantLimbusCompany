@@ -52,7 +52,7 @@ def agent_resources(tmp_path, monkeypatch):
 
 def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
-    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
+    for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                  "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
                  "_internal/UnityPy/resources/lzma.tpk",
@@ -87,7 +87,7 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
 def test_tampered_ocr_model_prevents_replacing_archives(tmp_path, archive, monkeypatch):
     app = tmp_path / "application"
     resources = ["LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico",
-                 "_internal/lalc/pi_probe.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
+                 "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
                  "_internal/rapidocr/config.yaml", "_internal/rapidocr/default_models.yaml",
                  "_internal/UnityPy/resources/lzma.tpk"]

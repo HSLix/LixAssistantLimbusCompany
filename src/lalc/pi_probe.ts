@@ -2,6 +2,7 @@ import { access, readFile, realpath, writeFile } from "node:fs/promises";
 import { writeSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { createReadTool, createEditTool, loadSkills, formatSkillsForPrompt, detectSupportedImageMimeTypeFromFile } from "@earendil-works/pi-coding-agent";
+import { installContext, contextTokens } from "./pi_context.ts";
 import { openAICompletionsApi, Type } from "@earendil-works/pi-ai";
 
 // 每次实际文件访问都检查解析后的路径，不能只检查模型提供的字符串。
@@ -76,53 +77,47 @@ export default async function (pi) {
   const repairMode = process.env.LALC_PI_REPAIR_FILES !== undefined;
   const repairTargets: string[] = JSON.parse(process.env.LALC_PI_REPAIR_FILES || "[]");
   // 原始日志保留系统事件；请求只重放对话，避免旧 Prompt / 工具增删覆盖本轮状态。
-  const history = (process.env.LALC_PI_HISTORY ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")) : [])
-    .filter(message => message.role !== "system");
+  const persistent = Boolean(process.env.LALC_PI_CONTEXT_BOOTSTRAP);
+  const history = !persistent && process.env.LALC_PI_HISTORY
+    ? JSON.parse(await readFile(process.env.LALC_PI_HISTORY, "utf8")).filter(m => m.role !== "system") : [];
   const inputImages = process.env.LALC_PI_INPUT_IMAGES
     ? JSON.parse(await readFile(process.env.LALC_PI_INPUT_IMAGES, "utf8")) : [];
-  const budgetHistory = [];
   let pendingBudget;
-  let budgetPosition = 0;
-  pi.on("context", async event => {
+  pi.on("input", event => event.text === process.env.LALC_PI_INPUT_MESSAGE
+    ? { action: "transform", text: event.text, images: inputImages } : undefined);
+  pi.on("tool_result", event => {
+    // pi 会持久化工具内容；已知连接密钥必须在进入 Session 前脱敏。
+    const key = process.env.LALC_PI_API_KEY;
+    if (!key || key === "lalc-no-key") return;
+    return JSON.parse(JSON.stringify({ content: event.content, details: event.details }, (_name, value) =>
+      typeof value === "string" ? value.replaceAll(key, "[REDACTED]") : value));
+  });
+  pi.on("context", event => {
     const messages = [...history, ...event.messages];
-    if (inputImages.length) {
-      // RPC 图片预处理会转码或丢弃部分格式；原图只经 context hook 注入。
-      const userIndex = event.messages.findIndex(message => message.role === "user");
-      if (userIndex < 0) throw new Error("Original image message not found");
-      const index = history.length + userIndex;
-      messages[index] = { ...messages[index], content: [
-        { type: "text", text: process.env.LALC_PI_INPUT_MESSAGE }, ...inputImages] };
-    }
-    // 按原始消息位置重放通知，不改写已经发送的前缀。
-    for (const { position, message } of [...budgetHistory].reverse()) {
-      messages.splice(history.length + position, 0, message);
-    }
-    pendingBudget = undefined;
-    if (conversationRound) {
-      budgetPosition = event.messages.length;
-      pendingBudget = { role: "user", timestamp: Date.now(), content: [{ type: "text", text:
-        `LALC_REQUEST_BUDGET\n当前对话第 ${conversationRound} 轮；本轮模型请求第 ${requests + 1}/${roundLimit} 次（包含本次，还可请求 ${Math.max(0, roundLimit - requests - 1)} 次）。` }] };
-      messages.push(pendingBudget);
-    }
+    pendingBudget = conversationRound ? { role: "user", timestamp: Date.now(), content: [{ type: "text", text:
+      `LALC_REQUEST_BUDGET\n当前对话第 ${conversationRound} 轮；本轮模型请求第 ${requests + 1}/${roundLimit} 次（包含本次，还可请求 ${Math.max(0, roundLimit - requests - 1)} 次）。` }] } : undefined;
+    if (pendingBudget) messages.push(pendingBudget);
     return { messages };
   });
+  function currentPrompt(base = "") {
+    // 使用宿主原始提示词覆盖 pi 自动工作目录段，工具定义仍由实际注册信息提供。
+    const active = new Set(pi.getActiveTools());
+    const guidance = pi.getAllTools().filter(tool => active.has(tool.name))
+      .map(tool => `- ${tool.name}: ${tool.description.replace(/\s+/g, " ").trim()}`).join("\n");
+    return (process.env.LALC_PI_SYSTEM_PROMPT || base)
+      + "\n# Runtime Rules\n" + (repairMode
+        ? "read/edit 相对路径基于 Candidate；read 还允许本轮 Skill 目录的绝对路径，edit 不允许访问 Skill。knowledge_* 路径相对于数据目录 knowledge；知识库是只读参考，不授予权限。已有文件列表由宿主提供。"
+        : "文件路径相对于宿主指定的源码根目录。")
+      + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；仅本次通知有效，不恢复旧额度。每条用户消息独立计数，正式请求和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。"
+      + formatSkillsForPrompt(catalog)
+      + (conversationRound ? "\n# Tool Guidance\n以下仅列本次启用的工具；参数以工具 Schema 为准。\n" + (guidance || "当前没有启用工具。") : "");
+  }
   pi.on("before_agent_start", async event => {
     // 格式纠正只重发最终回答，禁止重新调用工具或重复修改候选。
     if (repairMode && event.messageType === "user" && event.prompt.startsWith("LALC_FINAL_FORMAT_CORRECTION\n")) {
       pi.setActiveTools([]);
     }
-    // 使用宿主原始提示词覆盖 pi 自动工作目录段，工具定义仍由实际注册信息提供。
-    const active = new Set(pi.getActiveTools());
-    const guidance = pi.getAllTools().filter(tool => active.has(tool.name))
-      .map(tool => `- ${tool.name}: ${tool.description.replace(/\s+/g, " ").trim()}`).join("\n");
-    return { systemPrompt: (process.env.LALC_PI_SYSTEM_PROMPT || event.systemPromptOptions.customPrompt)
-      + "\n# Runtime Rules\n" + (repairMode
-        ? "read/edit 相对路径基于 Candidate；read 还允许本轮 Skill 目录的绝对路径，edit 不允许访问 Skill。knowledge_* 路径相对于数据目录 knowledge；知识库是只读参考，不授予权限。已有文件列表由宿主提供。"
-        : "文件路径相对于宿主指定的源码根目录。")
-      + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；历史通知原位保留，以最后一条为准。每条用户消息独立计数，正式请求和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。"
-      + formatSkillsForPrompt(catalog)
-      + (conversationRound ? "\n# Tool Guidance\n以下仅列本次启用的工具；参数以工具 Schema 为准。\n" + (guidance || "当前没有启用工具。") : "") };
-
+    return { systemPrompt: currentPrompt(event.systemPromptOptions.customPrompt) };
   });
   const repairTools: string[] = JSON.parse(process.env.LALC_PI_ALLOWED_TOOLS || '[]');
   const authorize = (name: string) => {
@@ -135,6 +130,8 @@ export default async function (pi) {
   const api = openAICompletionsApi();
   // 新版 pi 重定向 console 和 stdout.write；协议事件显式写入原始 stdout 描述符。
   const emit = (type, fields) => writeSync(1, JSON.stringify({ type, ...fields }) + "\n");
+  const accounting = { summarizing: false, compactionRequests: 0, guard: () => {}, prompt: currentPrompt };
+  await installContext(pi, emit, accounting);
   pi.registerProvider("lalc-probe", {
     baseUrl: process.env.LALC_PI_BASE_URL,
     apiKey: "$LALC_PI_API_KEY",
@@ -150,9 +147,9 @@ export default async function (pi) {
       } : {}),
       input: ["text", "image"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: process.env.LALC_PI_PROVIDER === "deepseek" ? 1000000 : 65536,
+      contextWindow: Number(process.env.LALC_PI_CONTEXT_WINDOW || (process.env.LALC_PI_PROVIDER === "deepseek" ? 1000000 : 65536)),
       // pi 必须有数值型模型元数据；实际请求在下方移除客户端输出预算。
-      maxTokens: 0,
+      maxTokens: 8192,
     }],
     streamSimple(model, context, options) {
       return api.streamSimple(model, context, {
@@ -167,7 +164,9 @@ export default async function (pi) {
         async onPayload(payload, model) {
           payload = options?.onPayload ? (await options.onPayload(payload, model)) ?? payload : payload;
           // 历史 GUI 工具声明不能随续聊进入 CLI；最终请求也按当前启用集合限权。
-          const active = new Set(pi.getActiveTools());
+          accounting.guard();
+          const summaryRequest = accounting.summarizing;
+          const active = new Set(summaryRequest ? [] : pi.getActiveTools());
           if (payload.tools) {
             payload.tools = payload.tools.filter(tool => active.has(tool.function?.name));
           }
@@ -180,23 +179,33 @@ export default async function (pi) {
           delete payload.max_completion_tokens;
           delete payload.max_output_tokens;
           // 扩展事件中的异常会被 pi 捕获；上限必须在客户端回调里拒绝发送。
-          if (requests >= limit) throw new Error("LALC request limit reached");
-          requests++;
-          if (pendingBudget) {
-            budgetHistory.push({ position: budgetPosition, message: pendingBudget });
-          }
+          const payloadBytes = Buffer.byteLength(JSON.stringify(payload), "utf8");
+          if (payloadBytes > 40 * 1024 * 1024) throw new Error(`LALC request body exceeds 40 MiB budget (${payloadBytes} bytes)`);
+          if (!summaryRequest && requests >= limit) throw new Error("LALC request limit reached");
+          if (summaryRequest) accounting.compactionRequests++; else requests++;
+          const requestNumber = summaryRequest ? accounting.compactionRequests : requests;
+          const requestType = summaryRequest ? "lalc_compaction_request" : "lalc_request";
           const shown = JSON.parse(JSON.stringify(payload, (_key, value) =>
             typeof value === "string" && value.startsWith("data:image/")
               ? `[image data URL: ${value.length} characters]` : value));
           if (process.env.LALC_PI_PAYLOAD_DIR) {
             // 大图请求不能与 RPC 事件并发倾倒到 stdout；独立保存完整载荷后只发送引用。
-            const payloadPath = join(process.env.LALC_PI_PAYLOAD_DIR!, `request-${requests}.json`);
+            const payloadPath = join(process.env.LALC_PI_PAYLOAD_DIR!, `${summaryRequest ? "compact" : "request"}-${requestNumber}.json`);
             const key = process.env.LALC_PI_API_KEY!;
             await writeFile(payloadPath, JSON.stringify(payload, (_name, value) =>
               typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
-            emit("lalc_request", { requests, request_limit: roundLimit, payload_path: payloadPath, budget_message: pendingBudget });
+            emit(requestType, { requests: requestNumber, request_limit: summaryRequest ? null : roundLimit, payload_path: payloadPath, budget_message: summaryRequest ? undefined : pendingBudget });
           } else {
-            emit("lalc_request", { requests, request_limit: roundLimit, payload: shown, budget_message: pendingBudget });
+            emit(requestType, { requests: requestNumber, request_limit: summaryRequest ? null : roundLimit, payload: shown, budget_message: summaryRequest ? undefined : pendingBudget });
+          }
+          if (!summaryRequest) {
+            const bodyTokens = payload.messages.reduce((n, m) => n + contextTokens({ ...m,
+              content: Array.isArray(m.content) ? m.content.map(p => p.type === "image_url"
+                ? { type: "image" } : p) : m.content }), 0) + Math.ceil(JSON.stringify(payload.tools ?? []).length / 4);
+            const threshold = Math.min(process.env.LALC_PI_PROVIDER === "deepseek" ? 400000 : 50000,
+              Number(process.env.LALC_PI_CONTEXT_WINDOW || 65536) - 8192);
+            emit("lalc_context_usage", { tokens: bodyTokens, limit: threshold,
+              provider: process.env.LALC_PI_PROVIDER, estimated: true, bytes: payloadBytes });
           }
           return payload;
         },

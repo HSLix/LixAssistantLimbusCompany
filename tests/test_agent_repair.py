@@ -63,7 +63,7 @@ def test_manual_validation_immediately_persists_in_current_conversation(tmp_path
         assert result["ok"] is valid
         assert read_json(chat.log.path / "context.json") == chat.history
         assert json.dumps(result, ensure_ascii=False) in chat.history[-1]["content"][0]["text"]
-        event = list(read_events(chat.log.path / "events.jsonl"))[-1]["event"]
+        event = next(row["event"] for row in reversed(list(read_events(chat.log.path / "events.jsonl"))) if row["event"]["type"] == "validation")
         assert event.pop("toolCallId").startswith("manual-")
         assert event == {"type": "validation", "source": "manual", **result}
 
