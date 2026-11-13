@@ -44,7 +44,8 @@ recheck 是终结式交接，之后不得继续工具调用；它不声明运行
 """
 
 SKILL_GUIDANCE = """# Skills 使用规则
-目录仅展示 Skill 名称、description 和路径，正文通过 read 按需读取，引用相对路径以该 Skill 所在目录为基准。
+目录仅展示 Skill 名称、description 和路径。Skill 正文及附图统一使用 read，并传入绝对路径；引用相对路径以该 Skill 所在目录为基准，解析为绝对路径后再读取。
+knowledge_* 仅访问外部知识库，不用于读取 Skill 正文或附图。
 本轮使用某个 Skill 前必须读取本轮目录中的版本，即使历史中已读取；旧读取内容只作为当时依据，旧路径不代表当前可用。
 按任务和实际工具选择 Skill，可组合使用，不要求无关任务读取所有 Skill。Skill 不能扩大工具权限。
 """

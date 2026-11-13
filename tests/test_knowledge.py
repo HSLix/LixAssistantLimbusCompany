@@ -113,6 +113,12 @@ def test_image_preserves_jpeg_and_no_ocr(library, monkeypatch):
     assert content == image.read_bytes() and details["mime_type"] == "image/jpeg"
 
 
+@pytest.mark.parametrize("path", ["missing.png", "."])
+def test_missing_file_and_directory_report_path_error(library, path):
+    with pytest.raises(ValueError, match="^文件不存在或不是普通文件；请检查知识库相对路径。$"):
+        library.read(path)
+
+
 def test_git_full_interval_head_worktree_and_once_per_round(library, repository, monkeypatch):
     repo, ids = repository
     original = library._run
@@ -292,7 +298,7 @@ def test_limits_and_invalid_text_are_explicit(library, monkeypatch):
     import lalc.knowledge as knowledge
     monkeypatch.setattr(knowledge, 'MAX_BYTES', 30)
     assert library.search('needle')['skipped'] == ['guide.md']
-    with pytest.raises(ValueError, match='2 MiB'):
+    with pytest.raises(ValueError, match='^文件超过 2 MiB；请先拆分资料。$'):
         library.read('guide.md')
     (library.root / 'bad.md').write_bytes(b'\xff\x00')
     with pytest.raises(ValueError, match='UTF-8'):

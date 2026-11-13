@@ -231,7 +231,7 @@ export default async function (pi) {
   });
   pi.registerTool({
     ...read,
-    description: read.description + " Relative paths use the Candidate root. Absolute Skill catalog paths read this round's fixed snapshot, never live Skill files. Skills are never editable.",
+    description: read.description + " Relative paths use the Candidate root. Use read with absolute paths for Skill text and reference images; resolve references against the Skill directory. Absolute Skill catalog paths read this round's fixed snapshot, never live Skill files. Skills are never editable.",
     async execute(id, params, signal, onUpdate) {
       // pi 的会话 cwd 会覆盖工厂 cwd，先固定为已检查的绝对路径。
       authorize("read");

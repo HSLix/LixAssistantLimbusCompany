@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-13：Agent 常驻提示及 `read` 工具说明明确 Skill 正文和附图统一使用 `read` 与绝对路径，`knowledge_*` 仅访问外部知识库；知识库读取分开报告文件缺失／非普通文件和超过 2 MiB。见[影响审查与验证](skill-image-read-impact-review.md)。针对性普通回归 42 passed；未运行真实 pi／模型、Windows 或游戏验收。
+
 2026-11-13：Developer 聊天使用折叠附件托盘，待发送与已发送附件均显示在对应正文上方；支持图片预览、完整 UUID 提示、待发送逐项删除，以及多附件两行有界滚动。历史恢复复用留存原图，缺失图片显示占位。见[交互规格](stage-5-agent-workbench.md#聊天附件托盘)及[影响审查和实施证据](chat-attachment-tray-impact-review.md)。普通定向回归 113 passed；未运行全量、真实 Agent、Windows 或游戏验收。
 
 2026-11-13：上下文用量移入输入框工具栏附件按钮旁，使用紧凑图标与文本，删除输入框下方独立进度条；保留压缩阈值、颜色分级及 token 悬停说明，未知回退为“上下文 —”并清除旧提示。见[影响审查及实施](context-usage-toolbar-impact-review.md)。聊天及语言普通定向回归 54 passed，已检查明暗主题及未知状态离屏截图；未运行全量、真实 Agent、Windows 或游戏验收。
