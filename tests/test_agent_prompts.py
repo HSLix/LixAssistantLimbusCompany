@@ -17,6 +17,9 @@ def test_prompt_keeps_contract_and_domain_knowledge_at_end(mode):
     assert text.endswith(prompts.DOMAIN_KNOWLEDGE)
     assert text.index("# 领域知识") > text.index("# Mode:")
     assert "revise_success" in text and "不绕过工具" in text
+    assert "思考内容和回复均遵循本轮用户输入的语言" in text
+    assert "用户明确指定语言时优先遵循" in text
+    assert "最终 JSON 字段名保持原样" in text
     assert "本轮使用某个 Skill 前必须读取" in text
     assert "Skill 正文及附图统一使用 read，并传入绝对路径" in text
     assert "knowledge_* 仅访问外部知识库" in text

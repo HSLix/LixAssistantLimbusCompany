@@ -69,6 +69,7 @@ class RepairChat(QTextBrowser):
         self.batch_render = False
         self._rendering = False
         self._following = True
+        self._render_pending = False
         self.entries = []
         self.attachment_trays = {}
         self.attachment_positions = {}
@@ -82,9 +83,19 @@ class RepairChat(QTextBrowser):
         self.working_timer.timeout.connect(self.render)
         self.setOpenLinks(False)
         self.anchorClicked.connect(self.open_link)
+        self.verticalScrollBar().sliderReleased.connect(self._slider_released)
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
         self.verticalScrollBar().rangeChanged.connect(self._scroll_range_changed)
         self.verticalScrollBar().valueChanged.connect(self.position_attachments)
+
+    def _slider_released(self):
+        """松手后按最终位置恢复跟随，并合并刷新拖动期间积累的内容。"""
+        bar = self.verticalScrollBar()
+        self._following = bar.value() >= bar.maximum() - 2
+        pending = self._render_pending
+        self._render_pending = False
+        if pending:
+            self.render()
 
     def _scroll_changed(self, value):
         if self._rendering or self.batch_render:
@@ -95,7 +106,7 @@ class RepairChat(QTextBrowser):
 
     def _scroll_range_changed(self, minimum, maximum):
         """延迟排版或窗口缩放改变高度时，沿用更新前的贴底选择。"""
-        if self._following and not self._rendering and not self.batch_render:
+        if self._following and not self._rendering and not self.batch_render and not self.verticalScrollBar().isSliderDown():
             self._rendering = True
             self.verticalScrollBar().setValue(maximum)
             self._rendering = False
@@ -107,6 +118,7 @@ class RepairChat(QTextBrowser):
 
     def clear(self):
         self.stop_work()
+        self._render_pending = False
         for tray in self.attachment_trays.values():
             tray.hide()
             tray.deleteLater()
@@ -292,8 +304,12 @@ class RepairChat(QTextBrowser):
         """更新沿用贴底选择；主动展开详情或补载历史时保留阅读位置。"""
         if self.batch_render:
             return
-        self._rendering = True
         bar = self.verticalScrollBar()
+        if bar.isSliderDown():
+            # 重建文档会改变滑块范围；拖动时只更新数据，松手后统一绘制。
+            self._render_pending = True
+            return
+        self._rendering = True
         position = bar.value()
         self._following = self._following and follow
         parts, previous_round = [], None

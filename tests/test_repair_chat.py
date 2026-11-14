@@ -436,3 +436,44 @@ def test_tool_links_follow_reordered_history_entries(gui):
     assert 'older result' in chat.toPlainText() and 'recent result' not in chat.toPlainText()
     chat.open_link(QUrl('tool:1'))
     assert 'recent result' in chat.toPlainText()
+
+
+@pytest.mark.parametrize('release_at_bottom', [True, False])
+def test_slider_drag_defers_updates_until_release(gui, release_at_bottom):
+    """持续抓住滑块时范围不变，松手合并新内容并按最终位置决定跟随。"""
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    chat.resize(500, 350)
+    chat.show()
+    try:
+        chat.add_message('Agent', '已有内容\n\n' * 100, 1)
+        app.processEvents()
+        bar = chat.verticalScrollBar()
+        maximum = bar.maximum()
+        assert maximum > 0
+        bar.setSliderDown(True)
+        bar.setSliderPosition(maximum // 3)
+        chat.add_message('Agent', '拖动期间的新内容\n\n' * 30, 2)
+        chat.set_activity('状态更新', 2)
+        chat.render(follow=False)
+        app.processEvents()
+        assert len(chat.entries) == 2
+        assert '拖动期间的新内容' not in chat.toPlainText()
+        assert bar.maximum() == maximum
+        assert bar.isSliderDown()
+        bar.setSliderPosition(maximum if release_at_bottom else maximum // 2)
+        position = bar.value()
+        bar.setSliderDown(False)
+        app.processEvents()
+        assert '拖动期间的新内容' in chat.toPlainText()
+        assert '状态更新' in chat.toPlainText()
+        assert bar.maximum() > maximum
+        assert bar.value() == (bar.maximum() if release_at_bottom else position)
+        chat.add_message('Agent', '松手后的更新\n\n' * 10, 3)
+        app.processEvents()
+        assert bar.value() == (bar.maximum() if release_at_bottom else position)
+    finally:
+        chat.close()
+        chat.deleteLater()
