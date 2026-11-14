@@ -413,7 +413,7 @@ class RepairTools:
         if (type(run_id) is not int or run_id < 1 or type(start_sequence) is not int or start_sequence < 1
                 or type(limit) is not int or not 1 <= limit <= 200):
             raise ValueError("run_id/start_sequence 必须为正整数，limit 必须为 1–200 的整数。")
-        from .run_logs import image_path, query_trace, trace_records, trace_path
+        from .run_logs import image_path, query_trace, run_log_counts, trace_records, trace_path
         from .file_content import FileContent, image_preview
         root = self.library.data_root
         try:
@@ -424,7 +424,8 @@ class RepairTools:
                            levels=levels, logical_name=logical_name, check=self.checkpoint)
         details = {"run_id": run_id, "events": [item["record"] for item in page["matches"]],
                    "next_sequence": page["next"]["start_sequence"] if page["next"] else None,
-                   "damaged_records": page["damaged_records"]}
+                   "damaged_records": page["damaged_records"],
+                   "log_counts": run_log_counts(root, run_id, check=self.checkpoint)}
         if evidence_id is None:
             return self.text(details)
         def referenced(value):

@@ -5,6 +5,7 @@
 ## 已接受决定
 
 - Session 页面保留标题，在标题下显示完整 UUID，可选中复制；新建未发送会话不显示 UUID。
+- 2026-11-14 展示补充：完整 UUID 前增加“聊天 ID：”（英文 `Chat ID:`），直接解释编号用途，保留文字选中复制。只更改标签和翻译，不改持久身份、历史选择或分享格式；新建未发送时仍隐藏。
 - Workflow 导出项保留 Manifest UUID，新增已有 AdditionalMessage（缺省留空）及 Manifest 文件修改时间。
 - Agent History 导出项保留来源路径，Session 新增标题及会话目录修改时间。本地时间显示到秒。
 - Session 按历史会话侧栏的目录修改时间倒序排列；独立 developer-operations、agent-interactions 日志保留在 Session 后方，无标题时留空，显示目录修改时间。

@@ -4,6 +4,8 @@
 
 ## Agent 工具
 
+`knowledge_*` 仅访问外部知识库。Skill 正文及附图使用 `read` 和 Skill 目录下的绝对路径，不能把 Skill 相对引用交给 `knowledge_read`。知识库读取分别报告“文件不存在或不是普通文件”（检查知识库相对路径）与“文件超过 2 MiB”（拆分资料），不再合并两种原因。
+
 仅 Developer GUI Construct／Repair 获得知识库工具；CLI／Runtime 不因进程复用或历史恢复自动获权。
 
 | 工具 | 用途 |

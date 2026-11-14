@@ -553,8 +553,10 @@ class KnowledgeLibrary:
         repo = self.repository(target)
         sync = self.synchronize(repo) if repo else None
         target = self.path(path)
-        if not target.is_file() or target.stat().st_size > MAX_BYTES:
-            raise ValueError("文件不存在或超过 2 MiB；请先拆分资料。")
+        if not target.is_file():
+            raise ValueError("文件不存在或不是普通文件；请检查知识库相对路径。")
+        if target.stat().st_size > MAX_BYTES:
+            raise ValueError("文件超过 2 MiB；请先拆分资料。")
         with target.open("rb") as stream:
             content = stream.read(MAX_BYTES + 1)
         if len(content) > MAX_BYTES:

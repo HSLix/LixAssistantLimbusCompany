@@ -20,6 +20,74 @@ from test_developer_gui import gui, wait_jobs
 
 
 @pytest.mark.parametrize('mode', ['Construct', 'Repair'])
+def test_new_chat_defaults_to_latest_manifest_and_keeps_explicit_blank(gui, mode):
+    from lalc.developer_gui import RepairPage
+
+    app, window = gui
+    page = window.repair_page
+    manager = window.host.manager
+    original = manager.default_manifest_id()
+    published = manager.publish(page.host.candidate / 'manifest.json')
+    assert published.ok, published.errors
+    latest = published.loaded.manifest_id
+    assert latest != original and manager.list_manifests()[0]['manifest_id'] == latest
+    initial = RepairPage(window)
+    assert initial.baseline.itemData(0) is None
+    assert initial.baseline.currentData() == latest
+    initial.deleteLater()
+    page.mode.setCurrentItem(mode)
+    page.new()
+    assert page.baseline.itemData(0) is None
+    assert page.baseline.currentData() == latest
+    assert latest in page.source_label.text()
+    page.baseline.setCurrentIndex(0)
+    page.refresh_sessions()
+    assert page.baseline.currentData() is None
+    assert manager.default_manifest_id() == original
+    page.open_session(page.history.item(0))
+    wait_jobs(app, window)
+    assert page.baseline.currentData() == original
+    assert original in page.source_label.text()
+    page.new()
+    assert page.baseline.currentData() == latest
+
+
+def test_new_chat_without_manifests_keeps_blank(gui, monkeypatch):
+    from lalc.developer_gui import RepairPage
+
+    _, window = gui
+    monkeypatch.setattr(window.host.manager, 'list_manifests', lambda: [])
+    initial = RepairPage(window)
+    assert initial.baseline.count() == 1
+    assert initial.baseline.currentData() is None
+    initial.deleteLater()
+    window.repair_page.new()
+    assert window.repair_page.baseline.count() == 1
+    assert window.repair_page.baseline.currentData() is None
+
+
+def test_new_chat_clears_history_selection_and_delegate_highlight(gui):
+    app, window = gui
+    page = window.repair_page
+    identity = page.session.identity
+    history = page.history
+    assert history.selectedItems() and history.delegate.selectedRows
+    history._setHoverRow(0)
+    history._setPressedRow(0)
+    page.new()
+    assert page.session is None and history.count() == 1
+    assert history.currentItem() is None and not history.selectedItems()
+    assert not history.delegate.selectedRows
+    assert history.delegate.hoverRow == history.delegate.pressedRow == -1
+    page.open_session(history.item(0))
+    wait_jobs(app, window)
+    assert history.currentItem().data(Qt.ItemDataRole.UserRole) == identity
+    assert history.delegate.selectedRows == {history.currentRow()}
+    page.refresh_sessions()
+    assert history.delegate.selectedRows == {history.currentRow()}
+
+
+@pytest.mark.parametrize('mode', ['Construct', 'Repair'])
 def test_chat_first_submit_fixes_mode_and_history_restores_candidate(gui, monkeypatch, mode):
     from lalc.agent_repair import RepairConversation
     app, window = gui

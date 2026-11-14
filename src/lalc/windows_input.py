@@ -183,6 +183,7 @@ class WindowsInputBackend:
             "GetAncestor": ([wintypes.HWND, wintypes.UINT], wintypes.HWND),
             "MapVirtualKeyW": ([wintypes.UINT, wintypes.UINT], wintypes.UINT),
             "SendInput": ([wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int], wintypes.UINT),
+            "GetClipCursor": ([ctypes.POINTER(wintypes.RECT)], wintypes.BOOL),
             "GetSystemMetrics": ([ctypes.c_int], ctypes.c_int),
             "CreateSyntheticPointerDevice": ([ctypes.c_uint32, wintypes.ULONG, ctypes.c_uint32], ctypes.c_void_p),
             "InjectSyntheticPointerInput": ([ctypes.c_void_p, ctypes.POINTER(POINTER_TYPE_INFO), ctypes.c_uint32], wintypes.BOOL),
@@ -289,23 +290,31 @@ class WindowsInputBackend:
     def client_point(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         return self.platform.client_to_screen(hwnd, x, y)
 
-    def park_cursor(self, hwnd: int) -> None:
+    def park_cursor(self, hwnd: int) -> dict:
         """向窗口右下角外侧发送带注入标志的绝对移动，不触发自身物理接管。"""
         rect = wintypes.RECT()
         if not self.user32.GetWindowRect(hwnd, ctypes.byref(rect)):
             raise ctypes.WinError(ctypes.get_last_error())
         left, top, width, height = (self.user32.GetSystemMetrics(i) for i in (76, 77, 78, 79))
         x, y = rect.right + 8, rect.bottom + 8
+        clip = wintypes.RECT()
+        clipped = self.user32.GetClipCursor(ctypes.byref(clip))
+        diagnostics = {"target_screen": [x, y],
+                       "window_rect": [rect.left, rect.top, rect.right, rect.bottom],
+                       "virtual_desktop": [left, top, width, height],
+                       "cursor_clip": [clip.left, clip.top, clip.right, clip.bottom] if clipped else None}
         if width <= 1 or height <= 1 or not (left <= x < left + width and top <= y < top + height):
             from .focused import WindowError
-            raise WindowError("No desktop space beyond the game's bottom-right corner; move or resize the game window.")
+            raise WindowError(f"No desktop space beyond the game's bottom-right corner: {diagnostics}")
         item = INPUT()
         item.type = 0
         item.mi = MOUSEINPUT(round((x - left) * 65535 / (width - 1)),
                              round((y - top) * 65535 / (height - 1)), 0,
                              0x0001 | 0x8000 | 0x4000, 0, 0x4C414C43)
+        ctypes.set_last_error(0)
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise OSError(f"SendInput failed: winerror={ctypes.get_last_error()}, {diagnostics}")
+        return diagnostics
 
     def key(self, virtual_key: int, up: bool) -> None:
         item = INPUT()

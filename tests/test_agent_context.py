@@ -57,3 +57,26 @@ def test_missing_or_partial_pi_state_is_not_reimported(tmp_path):
     with pytest.raises(ValueError, match='不完整'):
         checked_session_file(directory)
     assert path.read_bytes() == original
+
+
+def test_image_index_publishes_complete_json_atomically(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    log = RepairLog(tmp_path)
+    log.image_index_path = tmp_path / 'image-index.json'
+    log.write_image_index()
+    replace = Path.replace
+    published = []
+
+    def checked_replace(source, target):
+        # 发布之前读者仍须看到上一份完整索引。
+        assert json.loads(target.read_text()) == {}
+        published.append(json.loads(source.read_text()))
+        return replace(source, target)
+
+    monkeypatch.setattr(Path, 'replace', checked_replace)
+    image = {'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(b'new').decode()}
+    log.record({'type': 'tool_execution_end', 'result': {'content': [image]}})
+    assert published == [log.image_ids]
+    assert json.loads(log.image_index_path.read_text()) == log.image_ids
+    assert not list(tmp_path.glob('.image-index-*'))

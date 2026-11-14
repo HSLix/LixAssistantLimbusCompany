@@ -7,8 +7,8 @@ from pathlib import Path
 
 from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable, QRectF,
                             QSize, Qt, QThreadPool, QTimer, QSignalBlocker, QEvent, Signal, Slot)
-from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption
-from PySide6.QtWidgets import (QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
+from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption, QShortcut, QKeySequence
+from PySide6.QtWidgets import (QApplication, QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
 from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, isDarkTheme
 
@@ -126,8 +126,15 @@ class LogDelegate(QStyledItemDelegate):
         painter.fillRect(option.rect.adjusted(4, 4, -4, -4), QColor(background))
         painter.setPen(QColor(foreground))
         record = row["record"]
+        painter.save()
+        painter.setClipRect(QRectF(rect.x(), rect.y(), max(0, rect.width() - 110), 22))
         painter.drawText(rect.x(), rect.y() + 14,
                          f"{log_time(record.get('recorded_at'))}  [{row['level'].upper()}]  {record.get('logical_name', '')}")
+        painter.restore()
+        painter.setPen(QColor("#009faa"))
+        painter.drawText(QRectF(rect.right() - 105, rect.y(), 105, 22),
+                         Qt.AlignmentFlag.AlignRight, tr("Copy details"))
+        painter.setPen(QColor(foreground))
         layout, height, toggle, image_height = self.geometry(row, option.rect.width(), option.font)
         painter.save()
         painter.setClipRect(QRectF(rect.x(), rect.y() + 24, rect.width(), height))
@@ -164,6 +171,10 @@ class LogDelegate(QStyledItemDelegate):
         from PySide6.QtCore import QEvent
         if event.type() != QEvent.Type.MouseButtonRelease or event.button() != Qt.MouseButton.LeftButton:
             return False
+        if (option.rect.right() - 117 <= event.position().x() <= option.rect.right() - 12
+                and 8 <= event.position().y() - option.rect.y() < 30):
+            self.page.copy_log(index)
+            return True
         row = model.rows[index.row()]
         _, height, toggle, _ = self.geometry(row, option.rect.width(), option.font)
         y = event.position().y() - option.rect.y()
@@ -265,6 +276,9 @@ class RunLogPage(QWidget):
         self.delegate = LogDelegate(self)
         self.view.setItemDelegate(self.delegate)
         self.view.activated.connect(self.toggle_details)
+        self.copy_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self.view)
+        self.copy_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.copy_shortcut.activated.connect(lambda: self.copy_log(self.view.currentIndex()))
         self.view.verticalScrollBar().valueChanged.connect(self.scrolled)
         detail_card = CardWidget()
         details = QVBoxLayout(detail_card)
@@ -318,6 +332,16 @@ class RunLogPage(QWidget):
         self.generation += 1
         self.loading = False
         self.pending_images.clear()
+
+    def copy_log(self, index):
+        """复制单条日志的完整文字，折叠和图片解码状态不影响正文。"""
+        if not index.isValid():
+            return
+        row = self.model.rows[index.row()]
+        record = row["record"]
+        header = f"{log_time(record.get('recorded_at'))}  [{row['level'].upper()}]  {record.get('logical_name', '')}"
+        QApplication.clipboard().setText(header + "\n" + row["text"])
+        self.status.setText(tr("Copied successfully"))
 
     def toggle_details(self, index):
         """键盘回车也能展开正文，图像预览由行内点击进入。"""

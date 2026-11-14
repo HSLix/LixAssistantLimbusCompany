@@ -23,6 +23,7 @@ from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 from .agent_log import LogStore
 from .agent_prompts import system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
 from .agent_skills import skill_snapshot
+from .work_files import work_file
 
 
 class RepairLog:
@@ -108,7 +109,7 @@ class RepairLog:
                 image_number += 1
         index_images(value)
         if image_number and self.image_index_path:
-            self.image_index_path.write_text(json.dumps(self.image_ids), encoding="utf-8")
+            self.write_image_index()
         event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "conversation": self.identity, "round": self.group, "event": value})
         with (self.path / "events.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(self.store.pack(event), ensure_ascii=False) + "\n")
@@ -120,6 +121,13 @@ class RepairLog:
             self.on_event(event)
         if value.get("type") == "skill_warning":
             print("WARNING: " + self.clean(value["message"]), file=sys.stderr, flush=True)
+
+    def write_image_index(self):
+        """完整写入后原子发布索引，避免 pi 并发读取到截断 JSON。"""
+        with work_file(dir=self.image_index_path.parent, prefix=".image-index-") as stream:
+            stream.write(json.dumps(self.image_ids).encode("utf-8"))
+            stream.close()
+            Path(stream.name).replace(self.image_index_path)
 
     def stream(self, value):
         """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
@@ -444,7 +452,7 @@ class RepairConversation:
                     bootstrap_path.write_text(json.dumps(bootstrap, ensure_ascii=False), encoding="utf-8")
                     self.log.image_ids.update(bootstrap["image_ids"])
                     self.log.image_index_path = Path(temporary) / "image-index.json"
-                    self.log.image_index_path.write_text(json.dumps(self.log.image_ids), encoding="utf-8")
+                    self.log.write_image_index()
                     session_file = checked_session_file((self.session.path if self.session else self.log.root) / "pi")
                     env["LALC_PI_CONTEXT_BOOTSTRAP"] = str(bootstrap_path)
                     env["LALC_PI_IMAGE_INDEX"] = str(self.log.image_index_path)

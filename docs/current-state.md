@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-13：Agent 常驻提示及 `read` 工具说明明确 Skill 正文和附图统一使用 `read` 与绝对路径，`knowledge_*` 仅访问外部知识库；知识库读取分开报告文件缺失／非普通文件和超过 2 MiB。见[影响审查与验证](skill-image-read-impact-review.md)。针对性普通回归 42 passed；未运行真实 pi／模型、Windows 或游戏验收。
+
 2026-11-13：Developer 聊天使用折叠附件托盘，待发送与已发送附件均显示在对应正文上方；支持图片预览、完整 UUID 提示、待发送逐项删除，以及多附件两行有界滚动。历史恢复复用留存原图，缺失图片显示占位。见[交互规格](stage-5-agent-workbench.md#聊天附件托盘)及[影响审查和实施证据](chat-attachment-tray-impact-review.md)。普通定向回归 113 passed；未运行全量、真实 Agent、Windows 或游戏验收。
 
 2026-11-13：上下文用量移入输入框工具栏附件按钮旁，使用紧凑图标与文本，删除输入框下方独立进度条；保留压缩阈值、颜色分级及 token 悬停说明，未知回退为“上下文 —”并清除旧提示。见[影响审查及实施](context-usage-toolbar-impact-review.md)。聊天及语言普通定向回归 54 passed，已检查明暗主题及未知状态离屏截图；未运行全量、真实 Agent、Windows 或游戏验收。
@@ -10,7 +12,11 @@
 
 2026-11-12：根据镜牢入口开发日志复盘修订默认 Agent 指导：局部修改分段试跑、稳定后补完整路径，每次运行前明确起点和期望并在结束后核对；通常采用十秒左右到十几秒超时后交给 Recovery Rule，不要求正常轮询检测错误弹窗。Task／Subworkflow 可先观测状态再进入子步骤，现有 observe／control 权限不变。补充中文直接编辑、准确类型示例及按需 OCR 指导，见[开发教程](developer-workflow-tutorial.md)与[默认规范](../src/lalc/skills/workflow-conventions/SKILL.md)。仅修改指导和工具说明；已有数据目录 Skills 不自动覆盖，需人工合并。
 
-2026-11-12：游戏截图默认受控归位鼠标：客户区内鼠标移到窗口右下角外 8 像素，接管后丢弃本次观察，Run 手动恢复后重新检测；`auto_park_cursor=False` 可关闭。手动截图增加接管监测并保留失焦即失败的边界；右下角无桌面空间时明确失败。用法与限制见[开发教程](developer-workflow-tutorial.md#匹配规则)，核心回归见 `tests/test_capture_cursor.py`。相关普通回归 289 passed；另有既存 PNG／AVIF 文件名断言不符的一项测试，单独执行失败后从最终回归排除。未运行真实 pi／模型、Windows 与游戏验收。
+2026-11-14：原生聚焦从单次请求后持续等待，改为最多请求 10 次、间隔 1 秒；最后一次也保留 1 秒异步激活等待，仍未成为实际前台则报 WindowError，带目标／前台句柄及最后请求结果。用户活动等待、接管、暂停、取消及窗口失效边界保持；覆盖手动连接、Run、试运行和游戏重启共用入口。见[开发教程](developer-workflow-tutorial.md)及[影响记录](cursor-parking-and-log-copy-impact-review.md)。
+
+2026-11-14：截图鼠标归位改为最多三次尝试，失败记录 Warning 并继续观察；截图后反复重新进入也设三次上限。新增移动坐标、窗口／桌面及鼠标裁剪诊断；User GUI 历史日志块支持行内复制全文及标准复制快捷键。设计与验证边界见[影响记录](cursor-parking-and-log-copy-impact-review.md)。此前“右下角无空间就失败”的行为已被本决定替代；接管、焦点及窗口错误边界保留。
+
+2026-11-12：游戏截图默认受控归位鼠标：客户区内鼠标移到窗口右下角外 8 像素，接管后丢弃本次观察，Run 手动恢复后重新检测；`auto_park_cursor=False` 可关闭。手动截图增加接管监测并保留失焦即失败的边界；当时右下角无桌面空间时明确失败（已由 2026-11-14 决定替代）。用法与限制见[开发教程](developer-workflow-tutorial.md#匹配规则)，核心回归见 `tests/test_capture_cursor.py`。相关普通回归 289 passed；另有既存 PNG／AVIF 文件名断言不符的一项测试，单独执行失败后从最终回归排除。未运行真实 pi／模型、Windows 与游戏验收。
 
 2026-11-12：日志诊断改进已本地实施：Run 图片使用 AVIF 65 / speed 8 / 默认色度采样，仅 Match 取消自动截图；Agent Run 元数据、过滤与跨 Run 关键词搜索、共享知识库开关、本轮静态当地时间，以及工具摘要／工作计时、日志滚动与短数组格式同步更新。相关普通回归 366 passed、1 skipped；真实 pi + 本地 HTTP 替身 3 passed。Windows 成品、真实模型和游戏未验收，见[决策](log-diagnostics-decisions.md)与[影响审查及验证](log-diagnostics-impact-review.md)。
 

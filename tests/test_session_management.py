@@ -159,7 +159,7 @@ def test_live_title_is_fixed_across_rounds_and_manual_title_survives_reopen(gui,
     page.show_event({'event': dict(type='workbench_session', session=current, message='First request.', round=1)})
     page.show_event({'event': dict(type='workbench_session', session=current, message='Different request.', round=2)})
     assert page.identity.text() == 'First request.'
-    assert page.session_uuid.text() == current.identity
+    assert page.session_uuid.text() == tr('Chat ID: {0}').format(current.identity)
     assert not page.session_uuid.isHidden()
     assert page.session_uuid.textInteractionFlags() & Qt.TextInteractionFlag.TextSelectableByMouse
     current.rename('人工名称' * 20)
@@ -176,7 +176,7 @@ def test_live_title_is_fixed_across_rounds_and_manual_title_survives_reopen(gui,
     page.open_session(page.history.item(0))
     wait_jobs(app, window)
     assert '人工名称' * 20 in page.identity.toolTip()
-    assert page.session_uuid.text() == current.identity
+    assert page.session_uuid.text() == tr('Chat ID: {0}').format(current.identity)
     assert not page.session_uuid.isHidden()
 
 

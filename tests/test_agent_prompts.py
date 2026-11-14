@@ -18,6 +18,8 @@ def test_prompt_keeps_contract_and_domain_knowledge_at_end(mode):
     assert text.index("# 领域知识") > text.index("# Mode:")
     assert "revise_success" in text and "不绕过工具" in text
     assert "本轮使用某个 Skill 前必须读取" in text
+    assert "Skill 正文及附图统一使用 read，并传入绝对路径" in text
+    assert "knowledge_* 仅访问外部知识库" in text
     assert "<construct_sop>" not in text and "Step 承担" not in text
 
 

@@ -16,6 +16,7 @@
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
 - **Agent Settings**：User／Developer 共用 provider 设置内容，各自选用；失焦或选择变化时保存。Developer 打开时独占具体配置的编辑，关闭后交还 User；User 的“启用 User Agent”开关始终可操作并立即保存。每轮请求上限默认 50、最小 2（Runtime 同一恢复会话共享额度）；Windows 凭据使用当前用户 DPAPI，其他平台仅在本次 GUI 内存中保留临时密钥，不读取其他 pi 实例的个人配置。
 - **Agent Workbench**：新聊天选择 Construct／Repair 及来源，首条消息提交时固定。Construct 可空白起步，Repair 必须选择已发布 Manifest。每 Session 独立保存 Candidate、固定 Diff 基线、聊天与页面草稿；GUI 可打开 CLI Repair Session。开始后更换模式／来源须新建 Session，旧 Session 保留，不重建或清空。
+- **新聊天默认值**：初次打开及 New Chat 默认选最新已发布 Manifest，首项仍保留空白，无版本时保持空白；手动选择空白后刷新不覆盖。New Chat 清除历史侧栏的旧选中样式，恢复历史会话仍使用其固定来源，不改变 Default。
 - **聊天与审阅**：纯文字及可选多图片，每条用户消息启动一轮；历史续聊不重放操作。思考与工具按轮放入默认收起的内联时间线，左侧竖线及节点串联过程段落与工具调用；工具参数与结果再独立默认收起，最终回答显示在外部。失败工具仅该行标红并显示失败，不自动展开，不在区域标题统计失败数；累计 Diff、Validate 与 Publish 绑定当前 Session。展示增量与影响见[专项记录](developer-process-timeline-impact-review.md)。人工反馈限 GUI 两种模式；页面包构建和人工预览安装限 GUI Construct，详见 [Stage 5 权限表](stage-5-agent-workbench.md#prompt-与工具权限)。
 - **运行入口**：Developer GUI 不再提供所选 Manifest 或人工运行区域。普通执行从 User GUI 启动；Agent `trial_run` 仍显式运行已发布版本，CLI 也保留直接运行入口。
 
@@ -99,7 +100,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 - `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 省略 logical_name，普通 inputs 必须为空。`use_saved_config` 默认 True，采用页面保存配置及已启用任务次数；False 才采用显式 `run_state={"task_repetitions": {}, "settings": {}}`，未提供字段为空。只加载该已发布 Manifest 的唯一 Python Plan，不接受文件路径。独立试运行失败交给原 Developer Agent，不启动 Runtime Agent。修改 Candidate 后先重新 Publish 才能运行新代码。
 - 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
 - `list_runs(offset=0, limit=100)`：按 Run ID 新到旧分页，返回 ID 与开始／结束时间、耗时、状态、入口 logical name、Manifest ID、来源（Agent 试运行／用户运行／未知）、结果和失败原因。缺失字段不推断，缺少结束记录不等于仍运行。
-- `read_run_log(run_id, start_sequence=1, limit=100, levels=..., logical_name=..., evidence_id=...)`：按事件序号读取原始 Trace；levels 内取并集，与精确 logical name 取交集，limit 计匹配条数，沿 next_sequence 续读并保留条件。可选查看该 Run 真实引用的 PNG／AVIF 证据，返回 JPEG 预览；日志截图不作为素材来源。记录已清理时明确报不可用。
+- `read_run_log(run_id, start_sequence=1, limit=100, levels=..., logical_name=..., evidence_id=...)`：按事件序号读取原始 Trace；levels 内取并集，与精确 logical name 取交集，limit 计匹配条数，沿 next_sequence 续读并保留条件。每次自动附带 `log_counts`（`scope=full_run`、`warning`、`error`、`damaged_records`），统计整份 Run 完整行快照的显式日志等级，独立于分页和筛选；大小写归一，动作失败或正文中的 warning/error 字样不冒充等级。损坏行单独计数，未写完的尾行暂不计入，活动 Run 后续读取时统计可增长。统计流式扫描整份日志，超大日志可能增加读取耗时。可选查看该 Run 真实引用的 PNG／AVIF 证据，返回 JPEG 预览；日志截图不作为素材来源。记录已清理时明确报不可用。
 - `search_run_logs(keyword, run_id=...)`：不区分大小写的原始事件 JSON 子串查询（含参数、结果和错误），可显式使用 `all_runs=true` 替代 run_id 搜索全部保留 Run。支持相同 levels／logical_name 条件；Run ID 降序、Run 内序号升序。返回 matches（run_id、sequence、完整 record）及 next（start_run_id、start_sequence），沿游标续读时保留全部查询条件。按命中序号调用 read_run_log 读取上下文；damaged_records 非零表示扫描遇到损坏行，不能宣称完整无匹配。没有持久索引，大范围查询可能耗时。
 
 开发者面板 Agent 设置的“允许查询外部知识库”默认开启，同时控制开发者和运行时 Agent；每轮开始固定开关，轮次内不变。关闭时 knowledge_* 和从知识库复制页面资源均不可用；历史记录和 Skills 不属于该开关。
