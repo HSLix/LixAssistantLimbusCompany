@@ -2258,5 +2258,29 @@ Original pixel region: {2}</source>
       <source>Restore defaults</source>
       <translation>恢复默认</translation>
     </message>
+    <message>
+      <source>Minimum target scale</source>
+      <translation>目标最小缩放比例</translation>
+    </message>
+    <message>
+      <source>Maximum target scale</source>
+      <translation>目标最大缩放比例</translation>
+    </message>
+    <message>
+      <source>Maximum deformation ratio</source>
+      <translation>最大形变比</translation>
+    </message>
+    <message>
+      <source>Minimum inlier coverage</source>
+      <translation>最小内点覆盖率</translation>
+    </message>
+    <message>
+      <source>Target scale is relative to the original template. Coverage checks both images; higher coverage or lower deformation is stricter.</source>
+      <translation>目标缩放相对于原始模板。覆盖率同时检查模板与目标；覆盖率越高、允许形变越小，要求越严格。</translation>
+    </message>
+    <message>
+      <source>Coverage: template {0}, target {1}</source>
+      <translation>覆盖率：模板 {0}，目标 {1}</translation>
+    </message>
 </context>
 </TS>
