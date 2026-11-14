@@ -72,7 +72,11 @@ class RecognitionPage(QWidget):
         upper_layout.addWidget(self.results, 1)
         self.parameters_panel = lower = QWidget()
         lower_layout = QVBoxLayout(lower)
-        lower_layout.addWidget(BodyLabel(tr('Match parameters')))
+        heading = QHBoxLayout()
+        heading.addWidget(BodyLabel(tr('Match parameters')))
+        heading.addStretch()
+        self.reset_parameters_button = button(tr('Restore defaults'), self.reset_parameters, heading)
+        lower_layout.addLayout(heading)
         form = QFormLayout()
         self.threshold = DoubleSpinBox()
         self.iou = DoubleSpinBox()
@@ -134,6 +138,8 @@ class RecognitionPage(QWidget):
             control.valueChanged.connect(self.clear_feature_results)
             self.feature_controls[key] = control
             feature_form.addRow(label, control)
+        self.feature_defaults = {key: control.isChecked() if isinstance(control, CheckBox) else control.value()
+                                 for key, control in self.feature_controls.items()}
         note = BodyLabel(tr('SIFT uses grayscale features. Score = inliers; ratio is local to each target.'))
         note.setWordWrap(True)
         feature_form.addRow(note)
@@ -303,6 +309,23 @@ class RecognitionPage(QWidget):
         self.clear_results()
         self.render(self.busy)
 
+    def reset_parameters(self):
+        """恢复当前匹配方式的默认参数；保留选区和素材，不自动执行。"""
+        if self.method == "feature":
+            for key, control in self.feature_controls.items():
+                value = self.feature_defaults[key]
+                if isinstance(control, CheckBox):
+                    control.setChecked(value)
+                else:
+                    control.setValue(value)
+            self.clear_feature_results()
+        elif self.method == "template":
+            self.threshold.setValue(0.9)
+            self.iou.setValue(0.5)
+            self.nms.setChecked(True)
+            self.tags.clear()
+            self.parameters_changed()
+
     def capture(self):
         """仅成功时提交新截图；失败完整保留原图、选区与结果。"""
         def shown(snapshot):
@@ -366,7 +389,8 @@ class RecognitionPage(QWidget):
         self.busy = busy
         selected = self.selected_template()
         matching = self.method != "ocr"
-        for control in (self.methods, self.tree, self.capture_button, self.threshold, self.nms, self.view):
+        for control in (self.methods, self.tree, self.capture_button, self.threshold, self.nms, self.view,
+                        self.reset_parameters_button):
             control.setEnabled(not busy)
         self.iou.setEnabled(not busy and self.nms.isChecked())
         self.tags.setEnabled(not busy and bool(selected) and selected[1] is None)
