@@ -120,7 +120,7 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
         tool("edit", {"path": "steps.unchanged.py", "oldText": 'return "unchanged"', "newText": 'return "changed"'}),
         tool("edit", {"path": "temporary.py", "oldText": "# before", "newText": "# after"}),
         tool("edit", {"path": "new.py", "oldText": "", "newText": "created"}),
-        tool("validate", {}), answer("need another round")])
+        tool("validate_and_publish", {}), answer("need another round")])
     result = asyncio.run(chat.run("edit multiple existing files", options))
     assert result["status"] == "completed", result
     assert "if value >= 0" in (candidate / "steps.total.py").read_text(encoding="utf-8")
@@ -154,6 +154,9 @@ def test_text_only_and_context_retained(conversation):
     assert "remember first user message" in text and "first result" in text and "second user message" in text
     assert "tool" in text and "if value > 0" in text
     assert "edit" in [item["function"]["name"] for item in payload["tools"]]
+    names = {item["function"]["name"] for item in payload["tools"]}
+    assert "validate_and_publish" in names
+    assert not {"validate", "publish"} & names
     assert {path.name: path.read_bytes() for path in chat.host.candidate.iterdir()} == before
     assert state["authorization"] == "Bearer test-private-key"
     assert all(b"test-private-key" not in path.read_bytes() for path in chat.log.path.rglob("*") if path.is_file())
@@ -241,7 +244,7 @@ def test_developer_publish_trial_and_logs_continue_same_round(conversation, monk
         if count == 1:
             return tool("edit", {"path": "steps.total.py", "oldText": " if value > 0", "newText": ""})
         if count == 2:
-            return tool("publish", {})
+            return tool("validate_and_publish", {})
         if count == 3:
             saved = chat.host.manager.list_manifests()
             identity = next(item["manifest_id"] for item in saved if item["manifest_id"] != original_default)
@@ -259,7 +262,7 @@ def test_developer_publish_trial_and_logs_continue_same_round(conversation, monk
     assert result["status"] == "completed", result
     assert result["round"] == 1 and result["requests"] == 6
     assert chat.host.manager.default_manifest_id() == original_default
-    assert {"publish", "trial_run", "list_runs", "read_run_log"} <= {
+    assert {"validate_and_publish", "trial_run", "list_runs", "read_run_log"} <= {
         item["function"]["name"] for item in state["calls"][-1]["tools"]}
 
 
@@ -356,7 +359,7 @@ def test_real_model_repairs_fixed_pure_case(tmp_path):
     chat, options = live_conversation(tmp_path)
     before = {p: p.read_bytes() for p in chat.host.service.data_root.rglob("*") if p.is_file()}
     image = Path(__file__).resolve().parents[1] / "test_pi_img.png"
-    result = asyncio.run(chat.run("修复 steps.total.py：输入 values 的所有数值都应计入总和，包含负数；请实际 read、edit、validate。",
+    result = asyncio.run(chat.run("修复 steps.total.py：输入 values 的所有数值都应计入总和，包含负数；请实际 read、edit、validate_and_publish。",
                                  options, images=[image]))
     print(f"Real model repair evidence: {chat.log.path}")
     assert result["status"] == "completed", result
@@ -593,7 +596,7 @@ def test_add_both_source_kinds_then_edit_new_files_in_same_round(conversation):
         tool("add_recovery_rule", {"filename": "new/rule.py", "logical_name": "rules.new", "source": RULE}),
         tool("edit", {"path": "new/step.py", "oldText": 'return "new"', "newText": 'return "edited"'}),
         tool("edit", {"path": "new/rule.py", "oldText": "return False", "newText": "return True"}),
-        tool("validate", {}), answer("created and edited")])
+        tool("validate_and_publish", {}), answer("created and edited")])
     result = asyncio.run(chat.run("add both kinds", options))
     assert result["status"] == "completed", result
     assert 'return "edited"' in (chat.host.candidate / "new/step.py").read_text(encoding="utf-8")
@@ -707,24 +710,25 @@ def test_host_and_pi_events_share_call_ids_without_removing_raw_logs(conversatio
         ("action_contracts", {}, "contract-second"),
         ("read", {"path": "steps.total.py"}, "read-source"),
         ("edit", {"path": "steps.total.py", "oldText": "if value > 0", "newText": "if value >= 0"}, "edit-source"),
-        ("validate", {}, "validate-draft"),
+        ("validate_and_publish", {}, "validate-draft"),
     ]:
         response = tool(name, arguments)
         response[0]["tool_calls"][0]["id"] = identity
         calls.append(response)
     script(state, [*calls, answer()])
-    result = asyncio.run(chat.run("inspect contracts twice, read, edit and validate", options))
+    result = asyncio.run(chat.run("inspect contracts twice, read, edit and validate_and_publish", options))
     assert result["status"] == "completed", result
     events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
     hosted = [event for event in events if event["type"] == "repair_tool"]
-    assert len(hosted) == 2
-    assert len({event["toolCallId"] for event in hosted}) == 2
+    assert len(hosted) == 3
+    assert len({event["toolCallId"] for event in hosted}) == 3
     completed = {event["toolCallId"]: event for event in events if event["type"] == "tool_execution_end"}
     for event in hosted:
-        assert completed[event["toolCallId"]]["toolName"] == "action_contracts"
+        assert completed[event["toolCallId"]]["toolName"] == event["name"]
         assert completed[event["toolCallId"]]["result"] == event["result"]
-    validation = next(event for event in events if event["type"] == "validation")
-    assert completed[validation["toolCallId"]]["toolName"] == "validate"
+    published = completed["validate-draft"]
+    assert published["toolName"] == "validate_and_publish"
+    assert published["result"]["details"]["manifest_id"]
     assert {"read", "edit"} <= {event["toolName"] for event in completed.values()}
 
 
@@ -786,7 +790,7 @@ def test_python_plan_edit_publish_and_saved_trial_ignore_unpublished_changes(con
             return tool("edit", {"path": "plans.default.py", "oldText": "-> None:\n    return None",
                                  "newText": '-> Any:\n    return {"value": 7}'})
         if step == 2:
-            return tool("publish", {})
+            return tool("validate_and_publish", {})
         if step == 3:
             return tool("edit", {"path": "plans.default.py", "oldText": '{"value": 7}',
                                  "newText": '{"value": 9}'})

@@ -37,7 +37,7 @@ def test_real_pi_recheck_ends_round_without_another_request_and_resumes_parent(t
             return tool("edit", {"path": "steps.break.py", 'oldText': 'raise ExecutionFailure("runtime broken")',
                                  'newText': 'return f"step-new:{value}"'})
         if number == 3:
-            return tool("publish", {"summary": "修复运行时失败，保留调用约定"})
+            return tool("validate_and_publish", {"summary": "修复运行时失败，保留调用约定"})
         if number == 4:
             return tool("recheck", {"manifest_id": manager.list_manifests()[0]["manifest_id"]})
         return answer("unexpected extra request")

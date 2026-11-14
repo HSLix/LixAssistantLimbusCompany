@@ -67,7 +67,7 @@ class RepairTools:
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "delete_component": self.delete_component,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
-                       "publish": self.publish, "trial_run": self.trial_run,
+                       "validate_and_publish": self.publish, "trial_run": self.trial_run,
                        "read_run_state": self.read_run_state, "recheck": self.recheck,
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
                        "search_run_logs": self.search_run_logs,
