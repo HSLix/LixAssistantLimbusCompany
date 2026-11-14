@@ -23,6 +23,7 @@ Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保
 
 - 工作台包含可查看及恢复的历史 Session 侧栏、聊天主体和底部输入区；新建入口使用 New Chat，历史侧栏可折叠。保留图片 / Manifest 参考附件、工具进展、取消、诊断、累计 Diff、Validate 和 Publish 能力，按当前 Session 路由。
 - 新建并选好 Construct / Repair 模式和来源后，首条用户消息提交前仍可调整两者；首次提交时固定模式、来源及其对应 Candidate / Diff 基线。开始对话后，更换模式或来源须新建 Session。打开历史 Session 显示其真实模式。
+- 初次打开工作台及 New Chat 默认选择最新已发布 Manifest（按发布时间倒序），不依赖 Default；首项保留空白，无版本时选首项。手动选择空白后刷新仍保留；打开历史 Session 使用其固定来源。New Chat 清除侧栏旧会话的选中、悬停及按下样式。设计影响与验证见[专项记录](new-chat-defaults-impact-review.md)。
 - 删除 Developer GUI 各页上方共用的 Manifest 选择、刷新和手动试运行区域，不移入工作台，不新增 Runner 页或“应用到 User GUI”快捷设置。普通启动继续使用 User GUI。
 - 保留 Agent 的完整开发试运行闭环：修改、完整 Validate、Publish 后以明确已发布 Manifest ID 和输入调用 trial_run，再读取 Run 结果和日志。保留活动互斥、取消收尾及试运行日志窗口；删除人工入口不撤销 Agent 工具权限。
 - 创建 Session 的来源选择和消息的 Manifest 参考附件选择继续存在，分别服务初始化和只读参考，不是运行版本选择；Publish 不自动修改 Default 或 Session 来源 / 固定基线。

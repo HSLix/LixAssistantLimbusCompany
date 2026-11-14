@@ -2162,5 +2162,9 @@ Original pixel region: {2}</source>
       <source>+{0} · Show all</source>
       <translation>+{0} · 展开全部</translation>
     </message>
+    <message>
+      <source>Chat ID: {0}</source>
+      <translation>聊天 ID：{0}</translation>
+    </message>
 </context>
 </TS>

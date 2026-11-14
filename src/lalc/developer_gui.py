@@ -1109,9 +1109,13 @@ class SessionHistory(QListWidget):
         event.accept()
 
     def clear(self):
+        """清空条目时同步 Fluent 委托缓存，避免重建列表后残留旧行高亮。"""
         self.menu_button.hide()
         self.menu_identity = None
         super().clear()
+        self.clearSelection()
+        self._setHoverRow(-1)
+        self._setPressedRow(-1)
 
 
 class RepairPage(QWidget):
@@ -1289,7 +1293,7 @@ class RepairPage(QWidget):
         self.message.textChanged.connect(lambda: self.update_actions(self.is_busy()))
         self.diagnostics.errors.currentIndexChanged.connect(lambda: self.update_actions(self.is_busy()))
         self.refresh_sessions()
-        self.set_manifests(self.host.manager.list_manifests())
+        self.baseline.setCurrentIndex(min(1, self.baseline.count() - 1))
         self.show_empty_chat()
 
     def update_composer_focus(self, *_):
@@ -1662,7 +1666,7 @@ class RepairPage(QWidget):
                     self.history.setCurrentItem(item)
         if self.session:
             title, full = self.titles.get(self.session.identity, ('', ''))
-            self.session_uuid.setText(self.session.identity)
+            self.session_uuid.setText(tr('Chat ID: {0}').format(self.session.identity))
             self.session_uuid.show()
             self.identity.setText(title or tr('New Chat'))
             self.identity.setToolTip((full + '\n' if full else '') + self.session.identity)
@@ -1670,6 +1674,7 @@ class RepairPage(QWidget):
             self.set_manifests(self.window.host.manager.list_manifests())
 
     def new(self):
+        """回到未创建 Session 的准备状态，默认采用最新已发布来源。"""
         if self.window.jobs or self.window.service.status.get('activity') or self.window.service.status['phase'] == 'running':
             return
         self.clear_raw_output()
@@ -1691,8 +1696,9 @@ class RepairPage(QWidget):
         self.request_progress.setText(tr('Conversation round: not started; model requests this round: 0'))
         self.set_status('')
         self.status.setToolTip('')
-        self.refresh_sessions()
         self.baseline.setCurrentIndex(0)
+        self.refresh_sessions()
+        self.baseline.setCurrentIndex(min(1, self.baseline.count() - 1))
         self.render(False)
 
     def open_session(self, item):

@@ -16,6 +16,7 @@
 - **Capture**：宽/高输入默认 1280×720 客户区物理像素，“重置窗口宽高”保持位置、层叠顺序和焦点，核对实际尺寸；窗口最小化时先恢复。截图预览鼠标附近原图像素通过 5× 小窗辅助定位，不改变框选与保存像素。主动截图后拖动框选，填写完整 Asset 逻辑名和逗号分隔标签，查看裁剪预览并确认保存。保存使用同一张原图和同一区域；取消不写 Asset。已有图片预览不依赖游戏继续前台。坐标监测须手动刷新，显示客户区物理像素坐标及客户区外状态，失效后停止，等待再次刷新。监测不抢焦点，主动截图按原有规则恢复并置前游戏。Agent 使用 `preview_crop` 新截图预览，再以 `crop_asset(preview_id)` 保存同一份像素。
 - **Agent Settings**：User／Developer 共用 provider 设置内容，各自选用；失焦或选择变化时保存。Developer 打开时独占具体配置的编辑，关闭后交还 User；User 的“启用 User Agent”开关始终可操作并立即保存。每轮请求上限默认 50、最小 2（Runtime 同一恢复会话共享额度）；Windows 凭据使用当前用户 DPAPI，其他平台仅在本次 GUI 内存中保留临时密钥，不读取其他 pi 实例的个人配置。
 - **Agent Workbench**：新聊天选择 Construct／Repair 及来源，首条消息提交时固定。Construct 可空白起步，Repair 必须选择已发布 Manifest。每 Session 独立保存 Candidate、固定 Diff 基线、聊天与页面草稿；GUI 可打开 CLI Repair Session。开始后更换模式／来源须新建 Session，旧 Session 保留，不重建或清空。
+- **新聊天默认值**：初次打开及 New Chat 默认选最新已发布 Manifest，首项仍保留空白，无版本时保持空白；手动选择空白后刷新不覆盖。New Chat 清除历史侧栏的旧选中样式，恢复历史会话仍使用其固定来源，不改变 Default。
 - **聊天与审阅**：纯文字及可选多图片，每条用户消息启动一轮；历史续聊不重放操作。思考与工具按轮放入默认收起的内联时间线，左侧竖线及节点串联过程段落与工具调用；工具参数与结果再独立默认收起，最终回答显示在外部。失败工具仅该行标红并显示失败，不自动展开，不在区域标题统计失败数；累计 Diff、Validate 与 Publish 绑定当前 Session。展示增量与影响见[专项记录](developer-process-timeline-impact-review.md)。人工反馈限 GUI 两种模式；页面包构建和人工预览安装限 GUI Construct，详见 [Stage 5 权限表](stage-5-agent-workbench.md#prompt-与工具权限)。
 - **运行入口**：Developer GUI 不再提供所选 Manifest 或人工运行区域。普通执行从 User GUI 启动；Agent `trial_run` 仍显式运行已发布版本，CLI 也保留直接运行入口。
 
