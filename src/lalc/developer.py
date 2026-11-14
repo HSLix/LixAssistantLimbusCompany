@@ -306,6 +306,33 @@ class DeveloperHost:
                      "centerxy": (match["x"] + match["width"] // 2,
                                   match["y"] + match["height"] // 2)} for match in matches]
 
+    def match_feature_preview(self, snapshot, name, digest=None, *, region=None,
+                              nms=True, nms_iou_threshold=0.5, **options):
+        """只读尝试整组或单图的全部特征目标；不短路，不写运行记录。"""
+        import math
+        from .assets import asset_name
+        from .feature_matching import detect_features
+        from .recognition import client_image, decode_image, suppress_overlaps
+        asset_name(name)
+        if type(nms) is not bool:
+            raise ValueError("nms must be bool.")
+        if (type(nms_iou_threshold) not in (int, float) or not math.isfinite(nms_iou_threshold)
+                or not 0 <= nms_iou_threshold <= 1):
+            raise ValueError("nms_iou_threshold must be finite and between 0 and 1.")
+        with self.service.activity("Feature Match"):
+            image = client_image(snapshot[0], snapshot[1])
+            directory = self.service.asset_library.path(name)
+            if not directory.is_dir():
+                raise FileNotFoundError(f"Asset logical name does not exist: {name}")
+            digests = [digest] if digest is not None else [p.stem for p in sorted(directory.glob("*.png"))]
+            results = []
+            for selected in digests:
+                template = decode_image(self.template_preview(name, selected))
+                results.extend({**match, "path": f"{name}/{selected}.png", "sha256": selected}
+                               for match in detect_features(image, template, region=region, **options))
+            results.sort(key=lambda m: (-m["score"], m["y"], m["x"], m["sha256"]))
+            return suppress_overlaps(results, nms_iou_threshold) if nms else results
+
     def resize_window(self, width=1280, height=720):
         """人工尺寸调整与 Run/Agent 互斥；不重截或替换已固定的预览。"""
         with self.service.activity("Capture 调整窗口尺寸"):

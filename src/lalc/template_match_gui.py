@@ -4,22 +4,22 @@ from pathlib import PurePosixPath
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QImage, QPixmap
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter, QTreeWidgetItem, QSizePolicy
-from qfluentwidgets import TreeWidget, DoubleSpinBox, CheckBox, LineEdit, BodyLabel, PlainTextEdit, SegmentedWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter, QTreeWidgetItem, QSizePolicy, QScrollArea
+from qfluentwidgets import TreeWidget, DoubleSpinBox, SpinBox, CheckBox, LineEdit, BodyLabel, PlainTextEdit, SegmentedWidget
 
 from .developer_gui import OcrView, button, capture_tags
 from .i18n import tr
 
 
 class RecognitionPage(QWidget):
-    """模板与 OCR 共用一张原图；方式切换仅恢复状态，不触发识别。"""
+    """三种识别共用一张原图；方式切换仅恢复状态，不触发识别。"""
 
     def __init__(self, window):
         super().__init__()
         self.window, self.host = window, window.host
         self.snapshot = None
         self.method = "template"
-        self.states = {key: {"region": None, "items": [], "text": ""} for key in ("template", "ocr")}
+        self.states = {key: {"region": None, "items": [], "text": ""} for key in ("template", "feature", "ocr")}
         self.signature = None
         self.refresh_pending = False
         self.busy = False
@@ -27,9 +27,10 @@ class RecognitionPage(QWidget):
         layout.addWidget(BodyLabel(tr('Recognition Lab')))
         self.methods = SegmentedWidget(self)
         self.methods.addItem('template', tr('Template Match'))
+        self.methods.addItem('feature', tr('Feature Match (SIFT)'))
         self.methods.addItem('ocr', tr('OCR'))
         self.methods.setCurrentItem('template')
-        self.methods.setFixedWidth(280)
+        self.methods.setFixedWidth(420)
         layout.addWidget(self.methods)
         row = QHBoxLayout()
         self.capture_button = button(tr('Capture screenshot'), self.capture, row)
@@ -91,7 +92,54 @@ class RecognitionPage(QWidget):
         form.addRow(self.nms)
         form.addRow(tr('NMS IoU threshold'), self.iou)
         form.addRow(tr('Priority tags'), self.tags)
-        lower_layout.addLayout(form)
+        self.template_parameters = QWidget()
+        self.template_parameters.setLayout(form)
+        lower_layout.addWidget(self.template_parameters)
+        self.feature_parameters = QScrollArea()
+        self.feature_parameters.setWidgetResizable(True)
+        self.feature_parameters.setMinimumWidth(235)
+        feature_body = QWidget()
+        feature_form = QFormLayout(feature_body)
+        feature_form.setRowWrapPolicy(QFormLayout.RowWrapPolicy.WrapAllRows)
+        self.feature_controls = {}
+        for key, label, value in (("grayscale", tr('Grayscale before enhancement'), True),
+                                  ("clahe", tr('CLAHE enhancement'), True),
+                                  ("precise_upscale", tr('Precise SIFT upscale'), False),
+                                  ("nms", tr('Suppress overlapping matches (NMS)'), True)):
+            control = CheckBox(label)
+            control.setChecked(value)
+            control.toggled.connect(self.clear_feature_results)
+            self.feature_controls[key] = control
+            feature_form.addRow(control)
+        specs = (
+            ("scale", tr('Image scale'), 3, 1, 5, 0),
+            ("nfeatures", tr('Feature limit (0: unlimited)'), 0, 0, 100000, 0),
+            ("n_octave_layers", tr('Octave layers'), 3, 1, 10, 0),
+            ("contrast_threshold", tr('Contrast threshold'), .04, .001, 1, 3),
+            ("edge_threshold", tr('Edge threshold'), 10., .1, 100, 2),
+            ("sigma", tr('Sigma'), 1.6, .1, 10, 2),
+            ("pair_ratio", tr('Descriptor pair ratio'), .75, .01, .99, 3),
+            ("ransac_threshold", tr('Geometry tolerance (original px)'), 4 / 3, .001, 100, 6),
+            ("min_inliers", tr('Minimum inliers'), 6, 4, 100000, 0),
+            ("min_inlier_ratio", tr('Minimum inlier ratio'), .5, .001, 1, 3),
+            ("nms_iou_threshold", tr('NMS IoU threshold'), .5, 0, 1, 3),
+        )
+        for key, label, value, low, high, decimals in specs:
+            control = DoubleSpinBox() if decimals else SpinBox()
+            control.setRange(low, high)
+            if decimals:
+                control.setDecimals(decimals)
+                control.setSingleStep(.01)
+            control.setValue(value)
+            control.valueChanged.connect(self.clear_feature_results)
+            self.feature_controls[key] = control
+            feature_form.addRow(label, control)
+        note = BodyLabel(tr('SIFT uses grayscale features. Score = inliers; ratio is local to each target.'))
+        note.setWordWrap(True)
+        feature_form.addRow(note)
+        self.feature_parameters.setWidget(feature_body)
+        self.feature_parameters.hide()
+        lower_layout.addWidget(self.feature_parameters, 1)
         self.region = BodyLabel()
         self.region.setWordWrap(True)
         lower_layout.addWidget(self.region)
@@ -172,6 +220,7 @@ class RecognitionPage(QWidget):
         self.preview.clear()
         self.preview.setVisible(False)
         self.clear_results()
+        self.clear_feature_results()
         selected = self.selected_template()
         self.selection.setText(tr('No template selected.'))
         self.selection.setToolTip('')
@@ -209,13 +258,16 @@ class RecognitionPage(QWidget):
         self.view.items = state["items"]
         self.view.update()
         self.results.setPlainText(state["text"])
-        template = method == "template"
-        self.assets_panel.setVisible(template)
-        self.parameters_panel.setVisible(template)
-        self.full_button.setText(tr('Match full image') if template else tr('Recognize full image'))
-        self.results.setAccessibleName(tr('Template match results') if template else tr('OCR results'))
+        matching = method != "ocr"
+        self.assets_panel.setVisible(matching)
+        self.parameters_panel.setVisible(matching)
+        self.template_parameters.setVisible(method == "template")
+        self.feature_parameters.setVisible(method == "feature")
+        self.full_button.setText(tr('Match full image') if matching else tr('Recognize full image'))
+        self.results.setAccessibleName(tr('Feature match results') if method == "feature" else
+                                      tr('Template match results') if matching else tr('OCR results'))
         self.render(self.busy)
-        if template:
+        if matching:
             self.refresh_pending = True
             self.refresh_assets()
 
@@ -232,6 +284,14 @@ class RecognitionPage(QWidget):
         self.results.clear()
         self.region.setText(tr('Search region: {0}').format(self.view.region or tr('Full image')))
         self.save_state()
+
+    def clear_feature_results(self, *_):
+        """SIFT 参数只使自身结果失效；不改变原图和其他方式。"""
+        self.states["feature"]["items"] = []
+        self.states["feature"]["text"] = ""
+        if self.method == "feature":
+            self.clear_current_results()
+        self.render(self.busy)
 
     def selection_changed(self, region):
         self.clear_current_results()
@@ -264,7 +324,7 @@ class RecognitionPage(QWidget):
 
     def run_recognition(self):
         """在主线程固定输入；执行失败清本方式结果，保留截图与选区。"""
-        if self.snapshot is None or (self.method == "template" and not self.selected_template()):
+        if self.snapshot is None or (self.method != "ocr" and not self.selected_template()):
             return
         self.clear_current_results()
         snapshot, method = self.snapshot, self.method
@@ -274,10 +334,15 @@ class RecognitionPage(QWidget):
                 worker = lambda: self.host.recognize_preview(snapshot, region)
             else:
                 name, digest = self.selected_template()
-                options = dict(region=region, threshold=self.threshold.value(), nms=self.nms.isChecked(),
-                               nms_iou_threshold=self.iou.value(),
-                               priority_tags=capture_tags(self.tags.text()) if digest is None else None)
-                worker = lambda: self.host.match_template_preview(snapshot, name, digest, **options)
+                if method == "feature":
+                    options = {key: control.isChecked() if isinstance(control, CheckBox) else control.value()
+                               for key, control in self.feature_controls.items()}
+                    worker = lambda: self.host.match_feature_preview(snapshot, name, digest, region=region, **options)
+                else:
+                    options = dict(region=region, threshold=self.threshold.value(), nms=self.nms.isChecked(),
+                                   nms_iou_threshold=self.iou.value(),
+                                   priority_tags=capture_tags(self.tags.text()) if digest is None else None)
+                    worker = lambda: self.host.match_template_preview(snapshot, name, digest, **options)
             def shown(result):
                 if method == "ocr":
                     self.view.items = result["items"]
@@ -286,7 +351,8 @@ class RecognitionPage(QWidget):
                 else:
                     self.view.items = [{"box": match} for match in result]
                     text = '\n'.join(
-                        f'{number}. score={match["score"]:.6f} · '
+                        (f'{number}. ' + tr('Inliers: {0}; ratio: {1}').format(match['inliers'], f'{match["inlier_ratio"]:.3f}') + ' · '
+                         if method == "feature" else f'{number}. score={match["score"]:.6f} · ') +
                         f'({match["x"]}, {match["y"]}, {match["width"]}, {match["height"]}) · '
                         f'centerxy={match["centerxy"]} · {match["path"]}'
                         for number, match in enumerate(result, 1)) or tr('No matches.')
@@ -299,14 +365,16 @@ class RecognitionPage(QWidget):
     def render(self, busy):
         self.busy = busy
         selected = self.selected_template()
-        template = self.method == "template"
+        matching = self.method != "ocr"
         for control in (self.methods, self.tree, self.capture_button, self.threshold, self.nms, self.view):
             control.setEnabled(not busy)
         self.iou.setEnabled(not busy and self.nms.isChecked())
         self.tags.setEnabled(not busy and bool(selected) and selected[1] is None)
-        ready = not busy and self.snapshot is not None and (not template or bool(selected))
+        for key, control in self.feature_controls.items():
+            control.setEnabled(not busy and (key != 'nms_iou_threshold' or self.feature_controls['nms'].isChecked()))
+        ready = not busy and self.snapshot is not None and (not matching or bool(selected))
         self.full_button.setEnabled(ready)
-        self.run_button.setVisible(template)
+        self.run_button.setVisible(matching)
         self.run_button.setEnabled(ready and bool(self.view.region))
         self.region.setText(tr('Search region: {0}').format(self.view.region or tr('Full image')))
         if not busy and self.refresh_pending and self.isVisible():

@@ -2186,5 +2186,73 @@ Original pixel region: {2}</source>
       <source>Capture does not run recognition. Release a selection to process it, or use the full-image button. Korean OCR is not supported.</source>
       <translation>截图后不自动执行。框选结束后处理选区，或点击全图按钮。OCR 暂不支持韩文。</translation>
     </message>
+    <message>
+      <source>Feature Match (SIFT)</source>
+      <translation>特征匹配（SIFT）</translation>
+    </message>
+    <message>
+      <source>Grayscale before enhancement</source>
+      <translation>增强前转为灰度</translation>
+    </message>
+    <message>
+      <source>CLAHE enhancement</source>
+      <translation>CLAHE 局部对比增强</translation>
+    </message>
+    <message>
+      <source>Precise SIFT upscale</source>
+      <translation>SIFT 精确上采样</translation>
+    </message>
+    <message>
+      <source>Image scale</source>
+      <translation>图像放大倍数</translation>
+    </message>
+    <message>
+      <source>Feature limit (0: unlimited)</source>
+      <translation>特征数上限（0：不限）</translation>
+    </message>
+    <message>
+      <source>Octave layers</source>
+      <translation>每组尺度层数</translation>
+    </message>
+    <message>
+      <source>Contrast threshold</source>
+      <translation>对比度阈值</translation>
+    </message>
+    <message>
+      <source>Edge threshold</source>
+      <translation>边缘阈值</translation>
+    </message>
+    <message>
+      <source>Sigma</source>
+      <translation>高斯平滑 sigma</translation>
+    </message>
+    <message>
+      <source>Descriptor pair ratio</source>
+      <translation>特征配对比率</translation>
+    </message>
+    <message>
+      <source>Geometry tolerance (original px)</source>
+      <translation>几何容差（原图像素）</translation>
+    </message>
+    <message>
+      <source>Minimum inliers</source>
+      <translation>最少内点数量</translation>
+    </message>
+    <message>
+      <source>Minimum inlier ratio</source>
+      <translation>最小内点比例</translation>
+    </message>
+    <message>
+      <source>SIFT uses grayscale features. Score = inliers; ratio is local to each target.</source>
+      <translation>SIFT 提取灰度特征。分数为内点数，比例按每个目标单独计算。</translation>
+    </message>
+    <message>
+      <source>Feature match results</source>
+      <translation>特征匹配结果</translation>
+    </message>
+    <message>
+      <source>Inliers: {0}; ratio: {1}</source>
+      <translation>内点：{0}；比例：{1}</translation>
+    </message>
 </context>
 </TS>

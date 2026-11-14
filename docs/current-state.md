@@ -113,3 +113,5 @@
 2026-11-12：pi 持久有效上下文、按比例／固定目标压缩、每轮图片窗口、DeepSeek 缺省选择及聊天额度提示已本地实现；设计见 [ADR 0041](adr/0041-let-pi-own-effective-agent-context.md)，验证与限制见 [实施记录](context-compaction-implementation.md)。
 
 2026-11-14：开发者模板匹配与 OCR 合并为“识别调试”，顶部切换，共用固定截图、分别保留选区与结果；截图不自动执行，框选结束自动处理。素材保存页继续独立。设计、影响及本地验证见[合并记录](recognition-lab-impact-review.md)；Windows 与真实游戏未验收。
+
+2026-11-14：识别调试新增 SIFT 特征匹配标签，支持单图／整组多实例查找、按内点数排序及可调预处理、SIFT、几何验证和 NMS 参数；暂不注册 Trusted Action。设计、实现及验证限制见 [SIFT 记录](feature-match-lab-impact-review.md)，全图效果仍有漏检与定位不准风险，不沿用固定区域实验的准确率结论。
