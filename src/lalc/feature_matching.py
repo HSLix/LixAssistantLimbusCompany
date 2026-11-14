@@ -59,11 +59,31 @@ def candidate_group(matches, source, target, shape):
     return best
 
 
+def projection_metrics(polygon, source_points, target_points, shape):
+    """衡量证据覆盖及投影角点处的缩放／拉伸，不依赖业务布局。"""
+    height, width = shape[:2]
+    source_coverage = cv2.contourArea(cv2.convexHull(source_points)) / (width * height)
+    target_coverage = cv2.contourArea(cv2.convexHull(target_points)) / cv2.contourArea(polygon)
+    edges = np.roll(polygon, -1, axis=0) - polygon
+    lengths = [width, height, width, height]
+    scales, deformations = [], []
+    for index in range(4):
+        basis = np.column_stack((edges[index] / lengths[index],
+                                 -edges[index - 1] / lengths[index - 1]))
+        singular = np.linalg.svd(basis, compute_uv=False)
+        scales.extend(singular)
+        deformations.append(singular[0] / singular[1] if singular[1] > 0 else math.inf)
+    return dict(template_coverage=float(source_coverage), target_coverage=float(target_coverage),
+                min_scale=float(min(scales)), max_scale=float(max(scales)),
+                deformation=float(max(deformations)))
+
+
 def detect_features(image, template, *, region=None, grayscale=True, scale=3, clahe=True,
                     nfeatures=0, n_octave_layers=3, contrast_threshold=0.04,
                     edge_threshold=10.0, sigma=1.6, precise_upscale=False,
                     pair_ratio=0.75, ransac_threshold=4 / 3, min_inliers=6,
-                    min_inlier_ratio=0.5):
+                    min_inlier_ratio=0.5, min_scale=0.5, max_scale=2.0,
+                    max_deformation=2.0, min_coverage=0.1):
     """反向配对后迭代提取多个几何模型；内点比例只统计当前候选范围。"""
     for value in (image, template):
         if value.dtype != np.uint8 or value.ndim != 3 or value.shape[2] != 3 or not value.size:
@@ -84,6 +104,14 @@ def detect_features(image, template, *, region=None, grayscale=True, scale=3, cl
             raise ValueError(f"{name} must be finite, positive and no greater than {high}.")
     if pair_ratio == 1:
         raise ValueError("pair_ratio must be less than 1.")
+    for name, value, low, high in (("min_scale", min_scale, .001, 100),
+                                   ("max_scale", max_scale, .001, 100),
+                                   ("max_deformation", max_deformation, 1, 100),
+                                   ("min_coverage", min_coverage, 0, 1)):
+        if type(value) not in (int, float) or not math.isfinite(value) or not low <= value <= high:
+            raise ValueError(f"{name} must be finite and between {low} and {high}.")
+    if min_scale > max_scale:
+        raise ValueError("min_scale must not exceed max_scale.")
     area = checked_region(region, image.shape[1], image.shape[0])
     x, y, width, height = (area[k] for k in ("x", "y", "width", "height"))
     options = dict(grayscale=grayscale, scale=scale, clahe=clahe)
@@ -120,6 +148,9 @@ def detect_features(image, template, *, region=None, grayscale=True, scale=3, cl
         model_pairs = [m for m, keep in zip(group, inlier_mask) if keep]
         discarded = {m.queryIdx for m in model_pairs}
         remaining = [m for m in remaining if m.queryIdx not in discarded]
+        denominators = np.column_stack((corners, np.ones(4))) @ homography[2]
+        if not (np.all(denominators > 0) or np.all(denominators < 0)):
+            continue
         polygon = cv2.perspectiveTransform(corners.reshape(-1, 1, 2), homography).reshape(-1, 2)
         if not np.isfinite(polygon).all() or not cv2.isContourConvex(polygon):
             continue
@@ -139,6 +170,13 @@ def detect_features(image, template, *, region=None, grayscale=True, scale=3, cl
         ratio = count / len(local_positions) if local_positions else 0.0
         if count < min_inliers or ratio < min_inlier_ratio:
             continue
+        metrics = projection_metrics(polygon,
+            np.float32([source_kp[m.trainIdx].pt for m in inliers]),
+            np.float32([target_kp[m.queryIdx].pt for m in inliers]), pattern.shape)
+        if (metrics["min_scale"] < min_scale or metrics["max_scale"] > max_scale
+                or metrics["deformation"] > max_deformation
+                or min(metrics["template_coverage"], metrics["target_coverage"]) < min_coverage):
+            continue
         # 只在接受后消除目标范围内残余配对，拒绝的投影不能吞掉其他真实目标。
         remaining = [m for m in remaining if cv2.pointPolygonTest(polygon, target_kp[m.queryIdx].pt, False) < 0]
         low = np.maximum(0, np.floor(polygon.min(axis=0) / scale + 1e-3)).astype(int)
@@ -149,6 +187,6 @@ def detect_features(image, template, *, region=None, grayscale=True, scale=3, cl
         w, h = (int(v) for v in high - low)
         output.append(dict(x=left, y=top, width=w, height=h, score=count,
                            inliers=count, inlier_ratio=ratio, good_matches=len(local_positions),
-                           centerxy=(left + w // 2, top + h // 2)))
+                           centerxy=(left + w // 2, top + h // 2), **metrics))
     output.sort(key=lambda m: (-m["score"], m["y"], m["x"]))
     return output

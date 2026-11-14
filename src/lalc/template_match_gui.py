@@ -126,6 +126,10 @@ class RecognitionPage(QWidget):
             ("ransac_threshold", tr('Geometry tolerance (original px)'), 4 / 3, .001, 100, 6),
             ("min_inliers", tr('Minimum inliers'), 6, 4, 100000, 0),
             ("min_inlier_ratio", tr('Minimum inlier ratio'), .5, .001, 1, 3),
+            ("min_scale", tr('Minimum target scale'), .5, .001, 100, 3),
+            ("max_scale", tr('Maximum target scale'), 2., .001, 100, 3),
+            ("max_deformation", tr('Maximum deformation ratio'), 2., 1, 100, 3),
+            ("min_coverage", tr('Minimum inlier coverage'), .1, 0, 1, 3),
             ("nms_iou_threshold", tr('NMS IoU threshold'), .5, 0, 1, 3),
         )
         for key, label, value, low, high, decimals in specs:
@@ -143,6 +147,9 @@ class RecognitionPage(QWidget):
         note = BodyLabel(tr('SIFT uses grayscale features. Score = inliers; ratio is local to each target.'))
         note.setWordWrap(True)
         feature_form.addRow(note)
+        coverage_note = BodyLabel(tr('Target scale is relative to the original template. Coverage checks both images; higher coverage or lower deformation is stricter.'))
+        coverage_note.setWordWrap(True)
+        feature_form.addRow(coverage_note)
         self.feature_parameters.setWidget(feature_body)
         self.feature_parameters.hide()
         lower_layout.addWidget(self.feature_parameters, 1)
@@ -375,6 +382,8 @@ class RecognitionPage(QWidget):
                     self.view.items = [{"box": match} for match in result]
                     text = '\n'.join(
                         (f'{number}. ' + tr('Inliers: {0}; ratio: {1}').format(match['inliers'], f'{match["inlier_ratio"]:.3f}') + ' · '
+                         + tr('Coverage: template {0}, target {1}').format(
+                             f'{match["template_coverage"]:.3f}', f'{match["target_coverage"]:.3f}') + ' · '
                          if method == "feature" else f'{number}. score={match["score"]:.6f} · ') +
                         f'({match["x"]}, {match["y"]}, {match["width"]}, {match["height"]}) · '
                         f'centerxy={match["centerxy"]} · {match["path"]}'

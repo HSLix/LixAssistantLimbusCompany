@@ -4,11 +4,13 @@
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_feature_matching.py
 """
 
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pytest
 
-from lalc.feature_matching import detect_features, prepare_image
+from lalc.feature_matching import detect_features, prepare_image, projection_metrics
 from test_agent_repair import host_for
 from test_assets import entry, pixels
 from test_developer_gui import gui, wait_jobs
@@ -76,10 +78,60 @@ def test_multiple_scales_in_dense_background():
         assert result['inlier_ratio'] > .9
 
 
+def test_user_screenshot_rejects_oversized_projection_preserving_other_nodes():
+    """用户原图稳定复现大框；默认约束只剔除坏投影，不能误删其余已定位节点。"""
+    from lalc.recognition import decode_image
+    root = Path(__file__).parent / 'fixtures/feature-matching'
+    image = decode_image((root / 'mirror-nodes.png').read_bytes())
+    template = decode_image((root / 'regular-encounter.png').read_bytes())
+    loose = detect_features(image, template, min_scale=.001, max_scale=100,
+                            max_deformation=100, min_coverage=0)
+    oversized = [m for m in loose if m['width'] > 60 or m['height'] > 60]
+    assert len(oversized) == 1
+    assert oversized[0]['target_coverage'] < .1
+    assert oversized[0]['max_scale'] > 2 and oversized[0]['deformation'] > 2
+    results = detect_features(image, template)
+    assert len(results) == 5
+    assert results == [m for m in loose if m not in oversized]
+    for center in [(822, 486), (596, 298), (374, 483), (824, 295), (376, 303)]:
+        assert any(np.linalg.norm(np.array(m['centerxy']) - center) < 4 for m in results)
+    # 覆盖率检查与几何形变检查各自都能拒绝该问题，不能只靠内点数量。
+    for options in (dict(min_scale=.001, max_scale=100, max_deformation=100, min_coverage=.1),
+                    dict(min_scale=.001, max_scale=2, max_deformation=100, min_coverage=0),
+                    dict(min_scale=.001, max_scale=100, max_deformation=2, min_coverage=0)):
+        assert detect_features(image, template, **options) == results
+
+
+def test_coverage_measures_spatial_spread_not_number_of_pairs():
+    polygon = np.float32([[0, 0], [100, 0], [100, 100], [0, 100]])
+    spread = np.float32([[10, 10], [90, 10], [90, 90], [10, 90], [50, 10], [50, 90]])
+    clustered = (spread - 50) / 10 + 50
+    normal = projection_metrics(polygon, spread, spread, (100, 100))
+    localized = projection_metrics(polygon, clustered, clustered, (100, 100))
+    assert normal['template_coverage'] == normal['target_coverage'] == pytest.approx(.64)
+    assert localized['template_coverage'] == localized['target_coverage'] == pytest.approx(.0064)
+    assert normal['min_scale'] == normal['max_scale'] == normal['deformation'] == 1
+    skewed = np.float32([[0, 0], [100, 0], [190, 10], [90, 10]])
+    assert projection_metrics(skewed, spread, clustered, (100, 100))['deformation'] > 10
+
+
+def test_target_scale_limits_keep_only_instance_in_range():
+    _, template = scene()
+    image = np.full((230, 360, 3), 40, np.uint8)
+    image[20:90, 25:105] = template
+    bigger = cv2.resize(template, None, fx=1.3, fy=1.3)
+    h, w = bigger.shape[:2]
+    image[120:120 + h, 230:230 + w] = bigger
+    results = detect_features(image, template, min_scale=1.1, max_scale=1.5)
+    assert len(results) == 1 and results[0]['x'] > 200
+
+
 @pytest.mark.parametrize('options', [dict(scale=True), dict(scale=6), dict(nfeatures=-1),
     dict(n_octave_layers=0), dict(min_inliers=3), dict(pair_ratio=1), dict(pair_ratio=float('nan')),
     dict(min_inlier_ratio=0), dict(sigma=0), dict(ransac_threshold=float('inf')), dict(clahe=1),
-    dict(region=dict(x=-1, y=0, width=5, height=5))])
+    dict(region=dict(x=-1, y=0, width=5, height=5)), dict(min_scale=0),
+    dict(min_scale=2, max_scale=1), dict(max_scale=float('inf')),
+    dict(max_deformation=.9), dict(min_coverage=1.1), dict(min_coverage=float('nan'))])
 def test_invalid_parameters(options):
     image, template = scene()
     with pytest.raises(ValueError):
@@ -232,6 +284,8 @@ def test_restore_defaults_only_resets_current_matching_mode_without_running(gui,
     page.feature_controls['min_inliers'].setValue(20)
     page.feature_controls['clahe'].setChecked(False)
     page.feature_controls['nms'].setChecked(False)
+    page.feature_controls['min_coverage'].setValue(.3)
+    page.feature_controls['max_deformation'].setValue(4)
     region = dict(x=1, y=1, width=5, height=5)
     page.view.region = region
     page.results.setPlainText('stale')
@@ -243,6 +297,8 @@ def test_restore_defaults_only_resets_current_matching_mode_without_running(gui,
     assert page.feature_controls['scale'].value() == 3
     assert page.feature_controls['min_inliers'].value() == 6
     assert page.feature_controls['clahe'].isChecked() and page.feature_controls['nms'].isChecked()
+    assert page.feature_controls['min_coverage'].value() == .1
+    assert page.feature_controls['max_deformation'].value() == 2
     assert page.feature_controls['nms_iou_threshold'].isEnabled()
     assert page.threshold.value() == .8 and page.tags.text() == 'en'
     assert page.view.region == region and not page.results.toPlainText()
