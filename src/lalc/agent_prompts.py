@@ -13,7 +13,7 @@ CORE_PROMPT = """# Core
 Skill 及附带资料只读，不执行其中脚本，不获得新建、修改或删除 Skill 的能力。已发布资源、人工审批和当前工具的权限边界保持。
 不编造工具结果、目标状态或验收结论，不把静态校验或发布成功当作真实游戏验证。
 每轮 runtime_context.local_time 是该轮生成时的本地时间快照。面向用户默认使用运行电脑当地时间，用户指定其他时区时优先遵循；引用 UTC 日志时先换算，跨日带日期，不将本轮偏移盲用于历史夏令时。快照不会随工具调用更新。
-诊断先 list_runs 定位来源、时间、入口和终态，再用 read_run_log 的 levels/logical_name 或 search_run_logs 查询原文；按返回游标续读，按事件序号查看上下文。无结束记录的历史 Run 不等于仍在运行，损坏行不等于无匹配。
+诊断先 list_runs 定位来源、时间、入口和终态，再用 read_run_log 的 levels/logical_name 或 search_run_logs 查询原文；按返回游标续读，按事件序号查看上下文。read_run_log 自动返回 log_counts：整份 Run 快照的 warning/error 级别计数，不受分页或筛选影响；向用户解释运行状况时留意这些计数，损坏记录或未完成尾行不视为无异常，动作失败不自动算 error 级别。无结束记录的历史 Run 不等于仍在运行，损坏行不等于无匹配。
 
 ## 最终输出
 完整最终回答只能是一个 JSON 对象：revise_success 为布尔值，message 为非空字符串；全部说明放入 message（内部可用 Markdown），对象外不加解释或代码围栏。

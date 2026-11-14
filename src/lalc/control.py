@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import threading
 import time
@@ -194,22 +195,41 @@ class InputSession:
         else:
             self.resume_focus = False
 
-    def park_cursor(self) -> None:
-        """只在拥有前台控制权时移开鼠标，移动前后响应接管并等待悬停画面刷新。"""
-        self.check(record=False)
-        hwnd = self.window.hwnd
-        if not self.window.platform.cursor_position(hwnd)["inside"]:
-            return
-        while self.backend.any_pressed():
+    def park_cursor(self) -> bool:
+        """受控重试三次归位；仅移动失败降级，接管和窗口异常仍传播。"""
+        attempts = []
+        for _ in range(3):
             self.check(record=False)
-            time.sleep(self.POLL_SECONDS)
-        self.check(record=False)
-        self.backend.park_cursor(hwnd)
-        self.check(record=False)
-        # 留出游戏处理鼠标离开和重绘悬停状态的时间。
-        self._wait(0.1)
-        if self.window.platform.cursor_position(hwnd)["inside"]:
-            raise WindowError("Cannot park cursor outside the game; move or resize the game window.")
+            hwnd = self.window.hwnd
+            before = self.window.platform.cursor_position(hwnd)
+            if not before["inside"]:
+                return True
+            while self.backend.any_pressed():
+                self.check(record=False)
+                time.sleep(self.POLL_SECONDS)
+            self.check(record=False)
+            diagnostics = {}
+            reason = "Cursor remained inside the game after injected movement."
+            try:
+                diagnostics = self.backend.park_cursor(hwnd) or {}
+            except (WindowError, OSError) as error:
+                reason = str(error)
+            self.check(record=False)
+            immediate = self.window.platform.cursor_position(hwnd)
+            # 留出游戏及远程输入处理移动和重绘悬停状态的时间。
+            self._wait(0.1)
+            after = self.window.platform.cursor_position(hwnd)
+            if not immediate["inside"] and after["inside"]:
+                reason = "Cursor returned inside the game during the settle wait."
+            attempts.append({"before": before, "immediate": immediate, "after": after, "reason": reason, **diagnostics})
+            if not after["inside"]:
+                return True
+        self.emit("component_log", {
+            "level": "warning", "logical_name": "observe.capture_screen",
+            "message": "Cannot park cursor after 3 attempts; continuing capture with possible hover/occlusion. "
+                       + json.dumps(attempts, ensure_ascii=False),
+        })
+        return False
 
     def prepare_resume(self) -> None:
         """明确恢复仅等待输入释放，不等待十秒；恢复后首次聚焦享有例外。"""

@@ -1,4 +1,4 @@
-"""覆盖窗口连接、异步聚焦确认、原始异常、内存截图及 Run 观察证据。
+"""覆盖窗口连接、异步聚焦重试及取消、原始异常、内存截图及 Run 观察证据。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen pytest -q tests/test_focused_observation.py
@@ -146,7 +146,7 @@ def test_focus_waits_for_async_activation_on_repeated_connections(monkeypatch) -
 
 
 @pytest.mark.parametrize("returned", [0, 1])
-def test_focus_wait_has_no_deadline_and_can_be_cancelled(monkeypatch, returned: int) -> None:
+def test_focus_retries_can_be_cancelled(monkeypatch, returned: int) -> None:
     now = [0.0]
     requests = []
     platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
@@ -162,11 +162,12 @@ def test_focus_wait_has_no_deadline_and_can_be_cancelled(monkeypatch, returned: 
             raise UserInterruption()
 
     platform.checkpoint = checkpoint
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(focused.time, "sleep", lambda duration: now.__setitem__(0, now[0] + duration))
     with pytest.raises(UserInterruption) as captured:
         platform.focus(42)
     assert captured.value.reason == "cancel"
-    assert requests == [42]
+    assert requests == [42] * 4
     assert now[0] >= 4
 
 
@@ -367,3 +368,74 @@ def test_cancelled_run_does_not_cancel_later_developer_observation(tmp_path, mon
     assert service.connect()["image"]["width"] == 2
     assert host.resize_window(1280, 720) == {"width": 1280, "height": 720}
     assert service.state["trace"] == trace
+
+
+@pytest.mark.parametrize("returned", [0, 1])
+def test_focus_stops_after_ten_requests_even_if_api_reports_success(monkeypatch, returned):
+    """实际前台未改变时严格限制十次，每次间隔及最后等待均为一秒。"""
+    now, requests = [0.0], []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 10,
+        IsWindow=lambda hwnd: True,
+        IsIconic=lambda hwnd: False,
+        SetForegroundWindow=lambda hwnd: requests.append(now[0]) or returned,
+    )
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", lambda seconds: now.__setitem__(0, round(now[0] + seconds, 6)))
+    with pytest.raises(WindowError, match="after 10 attempts") as captured:
+        platform.focus(42)
+    assert requests == list(range(10))
+    assert now[0] == 10
+    assert "target_hwnd=42, foreground_hwnd=10" in str(captured.value)
+    assert f"last_set_foreground_result={bool(returned)}" in str(captured.value)
+
+
+@pytest.mark.parametrize("success_attempt", [2, 10])
+def test_focus_succeeds_on_retry_and_restores_minimized_window(monkeypatch, success_attempt):
+    """重试恢复最小化窗口，最后一次异步激活也可成功且不再发送请求。"""
+    now, foreground, minimized, requests, restores = [0.0], [10], [True], [], []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
+    def restore(hwnd, command):
+        restores.append((hwnd, command))
+        minimized[0] = False
+    def sleep(seconds):
+        now[0] = round(now[0] + seconds, 6)
+        if len(requests) == success_attempt:
+            foreground[0] = 42
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: foreground[0],
+        IsWindow=lambda hwnd: True,
+        IsIconic=lambda hwnd: minimized[0],
+        ShowWindow=restore,
+        SetForegroundWindow=lambda hwnd: requests.append(now[0]) or 0,
+    )
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", sleep)
+    platform.focus(42)
+    assert len(requests) == success_attempt and foreground[0] == 42
+    assert restores == [(42, 9)]
+
+
+@pytest.mark.parametrize("interrupt", ["cancel", "disappeared"])
+def test_focus_checks_interruptions_before_sending_another_request(monkeypatch, interrupt):
+    """显式检查点中断及窗口消失均先于下一次置前，不误报重试耗尽。"""
+    now, requests = [0.0], []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 10,
+        IsWindow=lambda hwnd: now[0] < 1,
+        IsIconic=lambda hwnd: False,
+        SetForegroundWindow=lambda hwnd: requests.append(now[0]) or 0,
+    )
+    def checkpoint():
+        if interrupt == "cancel" and now[0] >= 1:
+            raise UserInterruption()
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", lambda seconds: now.__setitem__(0, round(now[0] + seconds, 6)))
+    with pytest.raises(UserInterruption if interrupt == "cancel" else WindowError):
+        platform.focus(42, checkpoint=checkpoint)
+    assert requests == [0.0]

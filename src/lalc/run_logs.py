@@ -182,6 +182,19 @@ def trace_records(root, run_id, *, reverse=False, check=lambda: None):
             yield None
 
 
+def run_log_counts(root, run_id, *, check=lambda: None):
+    """统计整份 Run 快照的显式警告与错误等级，不受分页和筛选影响。"""
+    counts = {"scope": "full_run", "warning": 0, "error": 0, "damaged_records": 0}
+    for record in trace_records(root, run_id, check=check):
+        if record is None:
+            counts["damaged_records"] += 1
+            continue
+        level = record.get("level")
+        if isinstance(level, str) and level.lower() in {"warning", "error"}:
+            counts[level.lower()] += 1
+    return counts
+
+
 def run_summary(root, run_id, *, check=lambda: None):
     """只读首尾事件，缺失终态时不把历史 Run 冒充正在运行。"""
     first = next((r for r in trace_records(root, run_id, check=check) if r), {})

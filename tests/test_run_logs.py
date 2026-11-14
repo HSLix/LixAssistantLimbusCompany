@@ -326,3 +326,33 @@ def test_log_delegate_paints_shared_level_background(log_page, monkeypatch, dark
     background, foreground = gui.log_colors(level)
     assert image.pixelColor(6, 6) == QColor(background)
     assert QColor(background) != QColor(foreground)
+
+
+@pytest.mark.parametrize("expanded", [False, True])
+def test_log_copy_click_and_keyboard_include_complete_text(log_page, expanded):
+    """鼠标复制及快捷键复制保留完整正文和标题，不受折叠影响。"""
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtGui import QKeySequence
+    from PySide6.QtTest import QTest
+    from lalc.run_log_gui import log_time
+    app, page, path, until = log_page
+    row = {**page.model.rows[0], "text": "参数\n中文正文\n第三行\n完整 traceback 最后一行", "expanded": expanded}
+    page.model.replace([row])
+    app.processEvents()
+    index = page.model.index(0)
+    rect = page.view.visualRect(index)
+    record = row["record"]
+    expected = f"{log_time(record.get('recorded_at'))}  [{row['level'].upper()}]  {record.get('logical_name', '')}\n" + row["text"]
+    app.clipboard().clear()
+    QTest.mouseClick(page.view.viewport(), Qt.MouseButton.LeftButton,
+                     pos=QPoint(rect.right() - 50, rect.top() + 18))
+    assert app.clipboard().text() == expected
+    assert row["expanded"] is expanded
+    app.clipboard().clear()
+    page.view.setCurrentIndex(index)
+    page.view.setFocus()
+    app.processEvents()
+    QTest.keySequence(page.view, QKeySequence(QKeySequence.StandardKey.Copy))
+    assert app.clipboard().text() == expected
+    page.copy_log(page.model.index(-1))
+    assert app.clipboard().text() == expected

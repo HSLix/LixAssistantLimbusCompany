@@ -18,10 +18,9 @@ description: LALC Workflow 的共用编写规范。创建、修改或审查 Plan
 - ctx.log(message) 可记录语义日志并附已有截图，不重新截图。Python 模块和关键函数使用简洁中文 docstring。
 - 已发布 Manifest／源码及 Trusted Actions 不可修改。新增源码走专用创建工具，不自动登记未引用文件；不生成绕过 ctx 的文件操作、网络、子进程、顶层副作用或后台调用。
 - 对于 Step 内的操作，等待状态变化必须有明确超时或重试次数限制；通常十秒左右到十几秒即可，更长等待应有实际加载或网络耗时依据。流程专注正常状态推进，超时后抛出 ExecutionFailure，由 Recovery Rule 识别和处理错误；不要求每次轮询都检测错误弹窗。
-- Workflow 和 Recovery Rule 的重试、轮询禁止使用 while True，即使内部有超时或 break 也不例外；统一使用 for ... in range(MAX_RETRIES) 这样的有界循环。MAX_RETRIES 初始设为 10，只有实际运行发现次数不足时再按证据增加；耗尽后明确报告失败，不以循环结束冒充成功。
+- Workflow 和 Recovery Rule 的重试、轮询禁止使用 while True，即使内部有超时或 break 也不例外；统一使用 for ... in range(MAX_RETRIES) 这样的有界循环。MAX_RETRIES 初始设为 3，只有实际运行发现次数不足时再按证据增加；耗尽后，对于 workflow 来说，需要主动报错，说明陷入了没有设置的状态转移场景；对于 Recovery Rule 来说，有恢复规则-重试 Step/Workflow-还不行就恢复规则，这样的外部循环限制，所以次数耗尽就返回就好，只处理自己应该且能处理的场景。
 - 同一截图优先使用足以判定状态的模板匹配，需要文字时再按需做局部或全屏 OCR，避免每轮无条件全屏 OCR；点击后重新截图，不复用旧帧识别结果。
 - edit 的 oldText／newText 可直接使用中文，不需要手写 Unicode 转义。oldText 从最新读取的文件复制，选短且唯一的代码锚点；匹配失败先重读并修正，不重复提交同一错误文本。
-- 禁止跨状态盲目操作（鼠标或键盘等），必须要确认当前属于某个状态，为了进入到下一个的某个状态采取行动时才进行操作。
 
 ## Component 类型示例
 

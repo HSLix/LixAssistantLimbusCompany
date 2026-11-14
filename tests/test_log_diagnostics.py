@@ -11,7 +11,7 @@ from PIL import Image
 
 from lalc.agent_policy import KNOWLEDGE_TOOLS, allowed_tools
 from lalc.agent_settings import save_options, settings_document
-from lalc.run_logs import display_json, image_path, query_trace, run_summary
+from lalc.run_logs import display_json, image_path, query_trace, run_log_counts, run_summary
 from lalc.run_log_sharing import export_log, import_log
 from test_agent_repair import host_for
 from test_workflow_observability import make_service, finish
@@ -132,3 +132,41 @@ def test_local_time_is_a_snapshot_and_never_changes_system_prompt(monkeypatch):
     second = agent_prompts.local_time_snapshot()
     assert first != second and first['now'] != second['now']
     assert agent_prompts.system_prompt('Repair') == prompt
+
+
+
+def test_read_run_log_counts_whole_run_independent_of_filters_and_paging(tmp_path):
+    """分页、筛选及正文中的等级字样均不改变整份快照的显式等级统计。"""
+    host, _ = host_for(tmp_path)
+    tools, root = host.conversation.tools, host.service.data_root
+    records = [
+        dict(sequence=1, event="component_log", level="warning", message="first"),
+        dict(sequence=2, event="component_log", level="info", message="warning error"),
+        dict(sequence=3, event="trusted_action_failed", logical_name="observe.test", message="failed"),
+        dict(sequence=4, event="component_log", level="error", message="last"),
+        dict(sequence=5, event="component_log", level="WARNING", message="upper"),
+    ]
+    path = write_trace(root, 1, records)
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write('broken\n[]\n{"sequence":6,"level":"error"')
+    expected = dict(scope="full_run", warning=2, error=1, damaged_records=2)
+    first = tools.read_run_log(1, limit=1)["details"]
+    filtered = tools.read_run_log(1, start_sequence=2, levels=["info"], logical_name="missing")["details"]
+    assert first["log_counts"] == filtered["log_counts"] == expected
+    assert len(first["events"]) == 1 and filtered["events"] == []
+    assert json.loads(tools.read_run_log(1)["content"][0]["text"])["log_counts"] == expected
+    with path.open("a", encoding="utf-8") as stream:
+        stream.write('}\n')
+    assert run_log_counts(root, 1) == dict(expected, error=2)
+
+
+def test_log_count_zeroes_and_cancellation(tmp_path):
+    """空日志明确返回零；扫描仍响应取消，损坏等级不导致计数崩溃。"""
+    write_trace(tmp_path, 1, [])
+    assert run_log_counts(tmp_path, 1) == dict(scope="full_run", warning=0, error=0, damaged_records=0)
+    write_trace(tmp_path, 1, [dict(level=["warning"], message="bad level")])
+    assert run_log_counts(tmp_path, 1)["warning"] == 0
+    def cancelled():
+        raise RuntimeError("cancelled")
+    with pytest.raises(RuntimeError, match="cancelled"):
+        run_log_counts(tmp_path, 1, check=cancelled)

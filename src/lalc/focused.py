@@ -32,10 +32,10 @@ class FocusedAutomationSession:
         self.captured_at: str | None = None
         self.before_check: Callable[[], None] | None = None
         self.before_focus: Callable[[int], None] | None = None
-        self.before_capture: Callable[[], None] | None = None
+        self.before_capture: Callable[[], bool] | None = None
 
     def connect(self, *, checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
-        """唯一匹配后只恢复并置前一次，随后核验真实前台状态。"""
+        """唯一匹配后恢复并尝试置前，随后核验真实前台状态。"""
 
         matches = self.platform.find_windows()
         if len(matches) != 1:
@@ -121,13 +121,14 @@ class FocusedAutomationSession:
 
         self.image = None
         self.size = None
+        reentries = 0
         try:
             while True:
                 info = self.check()
                 revision = self.focus_revision
                 if auto_park_cursor:
                     assert self.before_capture is not None
-                    self.before_capture()
+                    parked = self.before_capture()
                     if self.focus_revision != revision:
                         continue
                 pixels = self.platform.capture(info["hwnd"], info["width"], info["height"])
@@ -138,8 +139,14 @@ class FocusedAutomationSession:
                 if (current["width"], current["height"]) != (info["width"], info["height"]):
                     raise WindowError("Target Window client area changed during capture.")
                 if self.focus_revision == revision:
-                    if auto_park_cursor and self.platform.cursor_position(info["hwnd"])["inside"]:
-                        continue
+                    if auto_park_cursor and parked is not False and self.platform.cursor_position(info["hwnd"])["inside"]:
+                        reentries += 1
+                        if reentries < 3:
+                            continue
+                        self.emit("component_log", {
+                            "level": "warning", "logical_name": "observe.capture_screen",
+                            "message": "Cursor re-entered the game during 3 captures; continuing with possible hover/occlusion.",
+                        })
                     break
         except Exception as error:
             self.emit("screenshot_refresh_failed", {"reason": str(error)})
@@ -435,14 +442,11 @@ class WindowsWindowPlatform:
         return subprocess.Popen([str(executable)], cwd=str(executable.parent))
 
     def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None) -> None:
-        """只请求置前一次，等待异步激活；不以等待时长报错，允许用户取消。"""
+        """每隔一秒请求置前，最多十次；等待实际激活期间仍响应取消和接管。"""
 
-        if self.user32.GetForegroundWindow() == hwnd:
-            return
-        if self.user32.IsIconic(hwnd):
-            self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-        self.user32.SetForegroundWindow(hwnd)
-        # 跨线程激活可能尚未完成；等待真实焦点，不重复抢占前台。
+        attempts = 0
+        next_attempt = time.monotonic()
+        last_result = None
         while True:
             if checkpoint is not None:
                 checkpoint()
@@ -453,6 +457,19 @@ class WindowsWindowPlatform:
                 return
             if not self.user32.IsWindow(hwnd):
                 raise WindowError(f"Target Window disappeared while waiting for foreground: target_hwnd={hwnd}.")
+            if time.monotonic() >= next_attempt:
+                if attempts == 10:
+                    raise WindowError(
+                        f"Cannot focus Target Window after 10 attempts at 1-second intervals: "
+                        f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, "
+                        f"last_set_foreground_result={last_result}."
+                    )
+                if self.user32.IsIconic(hwnd):
+                    self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                last_result = bool(self.user32.SetForegroundWindow(hwnd))
+                attempts += 1
+                # 返回成功也可能尚未完成跨线程激活，以真实前台句柄为准。
+                next_attempt = time.monotonic() + 1.0
             time.sleep(0.02)
 
     def cursor_position(self, hwnd: int) -> dict[str, Any]:
