@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-15：Agent 素材归档默认需本次 feedback 确认，用户明确要求可直接归档；新增同权限 `restore_asset(logical_name, sha)` 按完整 hash 恢复原图及标签。见[影响审查](asset-archive-impact-review.md)及[工具契约](agent-repair.md#agent-素材预览与归档)。
+
 2026-11-15：按用户决定移除仓库 `example/`，保留测试自有语言页面夹具，页面契约迁至[页面接口](business-settings-pages.md)。审查、引用调整和验证限制见[移除记录](example-removal-impact-review.md)。
 
 2026-11-15：新增 `delete_component`，仅经用户本次明确反馈删除 Session Candidate 的单个 Python 文件；不修改登记或已发布版本。仅 Developer GUI 两模式可用，CLI／Runtime 均不开放，与 Runtime 人工反馈开关无关。普通定向回归 119 passed、1 skipped；随后独立串行运行真实 pi＋本机 HTTP 替身的两项新增接入测试，2 passed。未运行全量回归、真实模型、Windows 成品或游戏验收。具体边界见 [Agent 用法](agent-repair.md#candidate-component-文件删除2026-11-15)。

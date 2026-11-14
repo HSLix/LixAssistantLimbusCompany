@@ -193,7 +193,8 @@ def test_transport_error_preserves_cause_and_request_without_retry(conversation,
     assert "test-private-key" not in json.dumps(result)
 
 
-def test_agent_previews_saves_and_archives_asset(conversation):
+@pytest.mark.parametrize("explicit", [True, False])
+def test_agent_previews_archives_and_restores_asset(conversation, explicit):
     from test_focused_observation import FakeWindowPlatform
     chat, options, state = conversation
     platform = FakeWindowPlatform()
@@ -203,19 +204,28 @@ def test_agent_previews_saves_and_archives_asset(conversation):
         return bytes([10, 20, 30, 255]) * 4
     platform.capture = fixed_capture
     chat.tools.platform = platform
+    chat.entry = "gui"
+    identity = {}
+    def feedback(request):
+        request.finish("confirmed", f"确认归档 ui/test/{identity['sha']}")
     def save(_body):
         return tool("crop_asset", {"preview_id": next(reversed(chat.tools.previews))})
     def remove(_body):
         path = next(chat.tools.library.root.glob("ui/test/*.png"))
-        return tool("remove_asset", {"logical_name": "ui/test", "sha": path.stem, "reason": "开发者要求测试归档"})
+        identity['sha'] = path.stem
+        return tool("remove_asset", {"logical_name": "ui/test", "sha": path.stem, "reason": "开发者要求测试归档", "explicit_user_request": explicit})
+    def restore(_body):
+        assert not list(chat.tools.library.root.glob("ui/test/*.png"))
+        assert chat.tools.library._tag_mapping("ui/test") == {}
+        return tool("restore_asset", {"logical_name": "ui/test", "sha": identity['sha']})
     steps = iter([lambda body: tool("preview_crop", {"logical_name": "ui/test", "region": {"x": 0, "y": 0, "width": 1, "height": 1}}),
-                  save, remove, lambda body: answer()])
+                  save, remove, restore, lambda body: answer()])
     state["respond"] = lambda body: next(steps)(body)
-    result = asyncio.run(chat.run("预览、保存后归档素材", options))
+    result = asyncio.run(chat.run("预览、保存后归档并恢复素材" if explicit else "修复素材后恢复归档", options, on_feedback=feedback))
     assert result["status"] == "completed", result
     assert platform.captures == 2
-    assert not list(chat.tools.library.root.glob("ui/test/*.png"))
-    assert chat.tools.library._tag_mapping("ui/test") == {}
+    assert len(list(chat.tools.library.root.glob("ui/test/*.png"))) == 1
+    assert chat.tools.library._tag_mapping("ui/test") == {identity["sha"]: []}
     assert len(list((chat.host.service.data_root / "agent_removed_asset").glob("*/record.json"))) == 1
     assert "archive_id" in json.dumps(state["calls"][-1])
 

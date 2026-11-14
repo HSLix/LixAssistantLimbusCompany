@@ -81,7 +81,7 @@ Asset Library、已发布 Manifest、正式页面、业务配置及外部知识�
 | 能力 | GUI Repair | GUI Construct | CLI Repair |
 | --- | --- | --- | --- |
 | 本 Session Candidate 读 / 编辑、专用 Component / Recovery Rule 新增、完整校验 | 是 | 是 | 是 |
-| Asset / Trusted Action 契约检查、游戏截图、专用 crop / 归档 remove_asset | 是 | 是 | 是 |
+| Asset / Trusted Action 契约检查、游戏截图、专用 crop / 归档 remove_asset / 恢复 restore_asset | 是 | 是 | 是 |
 | Publish、显式已发布版本 trial_run、Run 日志 | 是 | 是 | 是 |
 | 任意已发布 Manifest 结构及登记源码只读查看 | 是 | 是 | 是 |
 | 外部知识库只读检索及受控 Git | 是 | 是 | 否 |

@@ -59,7 +59,7 @@ def test_remove_archives_raw_image_tags_and_fresh_screenshot_preserving_other_na
     other.write_bytes(raw_asset)
     tools.library._set_tags("other/name", saved["sha256"], ["other"])
     tools.platform.capture = lambda *args: bytes([31, 41, 59, 255]) * 4
-    removed = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="误裁")["details"]
+    removed = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="误裁")["details"]
     archive = Path(removed["archive_path"])
     assert archive.parent.name == "agent_removed_asset"
     assert (archive / "asset.png").read_bytes() == raw_asset
@@ -94,7 +94,7 @@ def test_remove_cleans_only_empty_logical_name_directory(tools, remaining):
     else:
         (directory / "asset-tag.json").unlink()
     before = snapshot(directory)
-    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="目录清理")
+    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="目录清理")
     assert not result.get("isError")
     removed = result["details"]
     assert removed["directory_removed"] is (remaining == "no_tags")
@@ -137,7 +137,7 @@ def test_remove_record_sync_requires_write_access_and_preserves_asset_on_failure
 
     monkeypatch.setattr(Path, "open", record_open)
     monkeypatch.setattr(assets.os, "fsync", sync)
-    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="刷盘回归")
+    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="刷盘回归")
     assert synced == [True]
     if sync_fails:
         assert result["isError"]
@@ -188,7 +188,7 @@ def test_remove_failures_preserve_active_image_and_tags(tools, monkeypatch, faul
     monkeypatch.setattr(Path, "rmdir", fail_rmdir)
     if fault == "capture":
         tools.platform.windows = []
-    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="测试失败")
+    result = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="测试失败")
     assert result["isError"]
     assert snapshot(tools.library.root) == before
 
@@ -200,13 +200,13 @@ def test_repeated_archive_ids_are_unique_and_invalid_hash_cannot_remove(tools):
     original = image.read_bytes()
     image.write_bytes(original + b"corrupted")
     count = tools.platform.captures
-    failed = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="错误图片")
+    failed = invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="错误图片")
     assert failed["isError"] and image.exists() and tools.platform.captures == count
     image.write_bytes(original)
     archives = []
     for _ in range(2):
         invoke(tools, "crop_asset", preview_id=identity)
-        archives.append(invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], reason="重复移除")["details"])
+        archives.append(invoke(tools, "remove_asset", logical_name="ui/claim", sha=saved["sha256"], explicit_user_request=True, reason="重复移除")["details"])
     assert archives[0]["archive_id"] != archives[1]["archive_id"]
     assert all(Path(item["archive_path"]).is_dir() for item in archives)
 
@@ -216,5 +216,122 @@ def test_remove_rejects_internal_symlink_to_other_logical_name(tools):
     alias = tools.library.root / "alias"
     alias.symlink_to(tools.library.path("ui/claim"), target_is_directory=True)
     before = snapshot(tools.library.root)
-    result = invoke(tools, "remove_asset", logical_name="alias", sha=saved["sha256"], reason="越名移除")
+    result = invoke(tools, "remove_asset", logical_name="alias", sha=saved["sha256"], explicit_user_request=True, reason="越名移除")
     assert result["isError"] and snapshot(tools.library.root) == before
+
+
+@pytest.mark.parametrize('status,text,removed', [
+    ('skipped', '', False), ('confirmed', '不同意', False),
+    ('confirmed', '', False), ('confirmed', 'CONFIRM', True)])
+def test_archive_requires_target_feedback_without_explicit_request(tools, status, text, removed):
+    """默认走目标确认，拒绝及跳过不截图、不修改；明确同意才归档。"""
+    saved = invoke(tools, 'crop_asset', preview_id=preview(tools)['details']['preview_id'])['details']
+    tools.allowed = tools.allowed | {'request_feedback'}
+    confirmation = f"确认归档 ui/claim/{saved['sha256']}"
+    def feedback(request):
+        assert confirmation in request.message
+        request.finish(status, confirmation if text == 'CONFIRM' else text)
+    tools.on_feedback = feedback
+    before, count = snapshot(tools.library.root), tools.platform.captures
+    result = invoke(tools, 'remove_asset', logical_name='ui/claim', sha=saved['sha256'], reason='误裁')
+    assert not result.get('isError')
+    assert tools.library.path(saved['path']).exists() is (not removed)
+    if not removed:
+        assert snapshot(tools.library.root) == before and tools.platform.captures == count
+        assert result['details']['removed'] is False
+
+
+def test_archive_without_feedback_cannot_remove_and_restore_permissions_match(tools):
+    """CLI 缺少明确要求时拒绝归档；恢复权限与归档保持一致。"""
+    from lalc.agent_policy import allowed_tools
+    saved = invoke(tools, 'crop_asset', preview_id=preview(tools)['details']['preview_id'])['details']
+    before = snapshot(tools.library.root)
+    for allowed in [tools.allowed, tools.allowed | {'request_feedback'}]:
+        tools.allowed = allowed
+        assert invoke(tools, 'remove_asset', logical_name='ui/claim', sha=saved['sha256'], reason='误裁')['isError']
+        assert snapshot(tools.library.root) == before
+    for mode, entry in [('Construct', 'gui'), ('Repair', 'gui'), ('Repair', 'cli'), ('Repair', 'runtime')]:
+        tools.allowed = allowed_tools(mode, entry, runtime_feedback_enabled=True)
+        assert ('restore_asset' in tools.allowed) == ('remove_asset' in tools.allowed) == (entry != 'runtime')
+    assert invoke(tools, 'restore_asset', logical_name='ui/claim', sha=saved['sha256'])['isError']
+
+
+def archived_asset(tools):
+    """准备一张已归档图片，返回其原身份和归档记录。"""
+    saved = invoke(tools, 'crop_asset', preview_id=preview(tools)['details']['preview_id'])['details']
+    removed = invoke(tools, 'remove_asset', logical_name='ui/claim', sha=saved['sha256'],
+                     reason='用户要求归档', explicit_user_request=True)['details']
+    return saved, removed
+
+
+@pytest.mark.parametrize('state', ['completed', 'prepared'])
+def test_restore_original_image_tags_without_capture_and_keep_archive(tools, state):
+    """恢复已完成或中断归档，重复恢复保留现有标签，不调用截图。"""
+    saved, removed = archived_asset(tools)
+    archive = Path(removed['archive_path'])
+    if state == 'prepared':
+        removed['state'] = state
+        (archive / 'record.json').write_text(json.dumps(removed), encoding='utf-8')
+    archived = snapshot(archive)
+    tools.platform.capture = lambda *args: pytest.fail('恢复不得截图')
+    result = invoke(tools, 'restore_asset', logical_name='ui/claim', sha=saved['sha256'])
+    assert not result.get('isError') and result['details']['restored']
+    assert tools.library.read({'path': saved['path'], 'sha256': saved['sha256']}) == (archive / 'asset.png').read_bytes()
+    assert tools.library._tag_mapping('ui/claim') == {saved['sha256']: ['en', 'en']}
+    tools.library._set_tags('ui/claim', saved['sha256'], ['changed'])
+    result = invoke(tools, 'restore_asset', logical_name='ui/claim', sha=saved['sha256'])['details']
+    assert result['existed'] and not result['restored'] and result['tags'] == ['changed']
+    assert snapshot(archive) == archived
+
+
+@pytest.mark.parametrize('fault', ['hash', 'record', 'tags', 'missing', 'short_hash', 'cancel', 'symlink', 'active_conflict'])
+def test_restore_rejects_invalid_archive_and_rolls_back_new_image(tools, monkeypatch, fault):
+    """损坏、越界、取消及标签写入失败不覆盖活跃数据，归档始终留存。"""
+    import lalc.assets as assets
+    saved, removed = archived_asset(tools)
+    archive = Path(removed['archive_path'])
+    sha = saved['sha256']
+    if fault == 'hash':
+        (archive / 'asset.png').write_bytes(b'corrupted')
+    elif fault == 'record':
+        removed['source_path'] = '../escape.png'
+        (archive / 'record.json').write_text(json.dumps(removed), encoding='utf-8')
+    elif fault == 'tags':
+        def fail(*args):
+            raise OSError('injected tag write failure')
+        monkeypatch.setattr(assets, 'atomic_write_json', fail)
+    elif fault == 'missing':
+        sha = '0' * 64
+    elif fault == 'short_hash':
+        sha = sha[:8]
+    elif fault == 'cancel':
+        monkeypatch.setattr(tools.library, '_tag_mapping', lambda name: (tools.cancelled.set() or {}))
+    elif fault == 'symlink':
+        (archive / 'asset.png').rename(archive / 'original.png')
+        (archive / 'asset.png').symlink_to(archive / 'original.png')
+    elif fault == 'active_conflict':
+        target = tools.library.path(saved['path'])
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b'conflict')
+    before = snapshot(tools.library.root)
+    result = invoke(tools, 'restore_asset', logical_name='ui/claim', sha=sha)
+    assert result['isError']
+    assert snapshot(tools.library.root) == before
+    assert (archive / 'asset.png').exists()
+
+
+def test_restore_chooses_latest_archive_and_preserves_other_images(tools):
+    """同一图片重复归档后取最新标签，并保留其他逻辑名和同目录图片。"""
+    saved, first = archived_asset(tools)
+    invoke(tools, 'restore_asset', logical_name='ui/claim', sha=saved['sha256'])
+    tools.library._set_tags('ui/claim', saved['sha256'], ['latest'])
+    second = invoke(tools, 'remove_asset', logical_name='ui/claim', sha=saved['sha256'],
+                    reason='再次归档', explicit_user_request=True)['details']
+    tools.platform.capture = lambda *args: bytes([31, 41, 59, 255]) * 4
+    other = invoke(tools, 'crop_asset', preview_id=preview(tools)['details']['preview_id'])['details']
+    before = tools.library.read({'path': other['path'], 'sha256': other['sha256']})
+    restored = invoke(tools, 'restore_asset', logical_name='ui/claim', sha=saved['sha256'])['details']
+    assert restored['archive_id'] == second['archive_id'] != first['archive_id']
+    assert restored['tags'] == ['latest']
+    assert tools.library.read({'path': other['path'], 'sha256': other['sha256']}) == before
+    assert tools.library._tag_mapping('ui/claim') == {saved['sha256']: ['latest'], other['sha256']: ['en', 'en']}

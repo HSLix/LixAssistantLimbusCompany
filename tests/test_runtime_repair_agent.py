@@ -58,7 +58,7 @@ def test_real_pi_recheck_ends_round_without_another_request_and_resumes_parent(t
         assert manager.default_manifest_id() == state["working_manifest_id"]
         tools = {item["function"]["name"] for item in server["calls"][0]["tools"]}
         assert {"read_run_state", "recheck"} <= tools
-        assert not {"trial_run", "remove_asset", "knowledge_git", "request_feedback"} & tools
+        assert not {"trial_run", "remove_asset", "restore_asset", "knowledge_git", "request_feedback"} & tools
     finally:
         service.shutdown()
 
