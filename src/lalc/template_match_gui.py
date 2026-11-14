@@ -1,34 +1,48 @@
-"""只读模板匹配调试页：增量素材树、固定截图及正式参数。"""
+"""只读识别调试页：共用固定截图，分别保留各方式的选区与结果。"""
 
 from pathlib import PurePosixPath
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFormLayout, QSplitter, QTreeWidgetItem, QSizePolicy
-from qfluentwidgets import TreeWidget, DoubleSpinBox, CheckBox, LineEdit, BodyLabel, PlainTextEdit
+from qfluentwidgets import TreeWidget, DoubleSpinBox, CheckBox, LineEdit, BodyLabel, PlainTextEdit, SegmentedWidget
 
 from .developer_gui import OcrView, button, capture_tags
 from .i18n import tr
 
 
-class TemplateMatchPage(QWidget):
-    """调试仅持有本页截图；切换输入清除结果，进入页面只检查文件状态。"""
+class RecognitionPage(QWidget):
+    """模板与 OCR 共用一张原图；方式切换仅恢复状态，不触发识别。"""
 
     def __init__(self, window):
         super().__init__()
         self.window, self.host = window, window.host
         self.snapshot = None
+        self.method = "template"
+        self.states = {key: {"region": None, "items": [], "text": ""} for key in ("template", "ocr")}
         self.signature = None
         self.refresh_pending = False
         self.busy = False
         layout = QVBoxLayout(self)
-        layout.addWidget(BodyLabel(tr('Template Match')))
-        hint = BodyLabel(tr('Select an Asset or image. Capture once, adjust parameters, then run on the frozen screenshot.'))
+        layout.addWidget(BodyLabel(tr('Recognition Lab')))
+        self.methods = SegmentedWidget(self)
+        self.methods.addItem('template', tr('Template Match'))
+        self.methods.addItem('ocr', tr('OCR'))
+        self.methods.setCurrentItem('template')
+        self.methods.setFixedWidth(280)
+        layout.addWidget(self.methods)
+        row = QHBoxLayout()
+        self.capture_button = button(tr('Capture screenshot'), self.capture, row)
+        self.full_button = button(tr('Match full image'), self.full_image, row)
+        self.run_button = button(tr('Match selected region'), self.run_recognition, row)
+        row.addStretch()
+        layout.addLayout(row)
+        hint = BodyLabel(tr('Capture does not run recognition. Release a selection to process it, or use the full-image button. Korean OCR is not supported.'))
         hint.setWordWrap(True)
         layout.addWidget(hint)
         split = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(split, 1)
-        left = QWidget()
+        self.assets_panel = left = QWidget()
         left_layout = QVBoxLayout(left)
         self.tree = TreeWidget()
         self.tree.setHeaderLabel(tr('Assets / Templates'))
@@ -44,15 +58,10 @@ class TemplateMatchPage(QWidget):
         self.preview.setMinimumHeight(150)
         left_layout.addWidget(self.preview)
         split.addWidget(left)
-        right = QSplitter(Qt.Orientation.Vertical)
+        right = QWidget()
         split.addWidget(right)
         split.setStretchFactor(1, 2)
-        upper = QWidget()
-        upper_layout = QVBoxLayout(upper)
-        row = QHBoxLayout()
-        self.capture_button = button(tr('Capture screenshot'), self.capture, row)
-        self.full_button = button(tr('Use full image'), self.full_image, row)
-        upper_layout.addLayout(row)
+        upper_layout = QVBoxLayout(right)
         self.view = OcrView()
         upper_layout.addWidget(self.view, 3)
         self.results = PlainTextEdit()
@@ -60,8 +69,7 @@ class TemplateMatchPage(QWidget):
         self.results.setAccessibleName(tr('Template match results'))
         self.results.setMinimumHeight(80)
         upper_layout.addWidget(self.results, 1)
-        right.addWidget(upper)
-        lower = QWidget()
+        self.parameters_panel = lower = QWidget()
         lower_layout = QVBoxLayout(lower)
         lower_layout.addWidget(BodyLabel(tr('Match parameters')))
         form = QFormLayout()
@@ -85,15 +93,16 @@ class TemplateMatchPage(QWidget):
         form.addRow(tr('Priority tags'), self.tags)
         lower_layout.addLayout(form)
         self.region = BodyLabel()
+        self.region.setWordWrap(True)
         lower_layout.addWidget(self.region)
-        self.run_button = button(tr('Run match'), self.run_match, lower_layout)
-        right.addWidget(lower)
-        right.setStretchFactor(0, 3)
-        right.setSizes([500, 240])
+        lower_layout.addStretch()
+        split.addWidget(lower)
+
         self.tree.currentItemChanged.connect(self.select_template)
-        self.view.selected.connect(self.clear_results)
+        self.view.selected.connect(self.selection_changed)
+        self.methods.currentItemChanged.connect(self.switch_method)
         self.clear_results()
-        split.setSizes([300, 700])
+        split.setSizes([220, 560, 230])
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -161,6 +170,7 @@ class TemplateMatchPage(QWidget):
     def select_template(self, *_):
         """图片叶子才解码预览；目录选择不批量加载图片。"""
         self.preview.clear()
+        self.preview.setVisible(False)
         self.clear_results()
         selected = self.selected_template()
         self.selection.setText(tr('No template selected.'))
@@ -171,6 +181,7 @@ class TemplateMatchPage(QWidget):
                                    else tr('Asset group: {0}').format(name))
             self.selection.setToolTip(f'{name}/{digest}.png' if digest else name)
             if digest:
+                self.preview.setVisible(True)
                 def shown(content):
                     image = QImage.fromData(content)
                     if image.isNull():
@@ -180,59 +191,123 @@ class TemplateMatchPage(QWidget):
                 self.window.launch(lambda: self.host.template_preview(name, digest), shown)
         self.render(self.busy)
 
+    def save_state(self):
+        """只保留方式相关状态，不复制截图像素。"""
+        self.states[self.method] = dict(region=dict(self.view.region) if self.view.region else None,
+                                        items=self.view.items, text=self.results.toPlainText())
+
+    def switch_method(self, method):
+        """恢复当前方式的区域与标注；画布原图不重新赋值。"""
+        if method == self.method:
+            return
+        self.save_state()
+        self.method = method
+        state = self.states[method]
+        self.view.region = dict(state["region"]) if state["region"] else None
+        self.view.anchor = None
+        self.view.magnifier.hide()
+        self.view.items = state["items"]
+        self.view.update()
+        self.results.setPlainText(state["text"])
+        template = method == "template"
+        self.assets_panel.setVisible(template)
+        self.parameters_panel.setVisible(template)
+        self.full_button.setText(tr('Match full image') if template else tr('Recognize full image'))
+        self.results.setAccessibleName(tr('Template match results') if template else tr('OCR results'))
+        self.render(self.busy)
+        if template:
+            self.refresh_pending = True
+            self.refresh_assets()
+
     def clear_results(self, *_):
+        """素材和参数只使模板结果失效，不清除 OCR 的结果。"""
+        self.states["template"]["items"] = []
+        self.states["template"]["text"] = ""
+        if self.method == "template":
+            self.clear_current_results()
+
+    def clear_current_results(self):
         self.view.items = []
         self.view.update()
         self.results.clear()
         self.region.setText(tr('Search region: {0}').format(self.view.region or tr('Full image')))
+        self.save_state()
+
+    def selection_changed(self, region):
+        self.clear_current_results()
+        self.render(self.busy)
+        if region:
+            self.run_recognition()
 
     def parameters_changed(self):
         self.clear_results()
         self.render(self.busy)
 
     def capture(self):
-        self.clear_results()
+        """仅成功时提交新截图；失败完整保留原图、选区与结果。"""
         def shown(snapshot):
             self.snapshot = snapshot
-            self.view.set_image(snapshot[0], snapshot[1])
+            for key in self.states:
+                self.states[key] = dict(region=None, items=[], text="")
+            self.view.blockSignals(True)
+            try:
+                self.view.set_image(snapshot[0], snapshot[1])
+            finally:
+                self.view.blockSignals(False)
+            self.clear_current_results()
             self.render(self.busy)
         self.window.launch(lambda: self.host.capture(update_preview=False), shown)
 
     def full_image(self):
         self.view.region = None
-        self.clear_results()
+        self.run_recognition()
 
-    def run_match(self):
-        """启动前固定本次选择和参数，失败时不保留旧结果。"""
-        self.clear_results()
-        if self.snapshot is None or not self.selected_template():
+    def run_recognition(self):
+        """在主线程固定输入；执行失败清本方式结果，保留截图与选区。"""
+        if self.snapshot is None or (self.method == "template" and not self.selected_template()):
             return
+        self.clear_current_results()
+        snapshot, method = self.snapshot, self.method
+        region = dict(self.view.region) if self.view.region else None
         def operation():
-            name, digest = self.selected_template()
-            options = dict(region=dict(self.view.region) if self.view.region else None,
-                           threshold=self.threshold.value(), nms=self.nms.isChecked(),
-                           nms_iou_threshold=self.iou.value(),
-                           priority_tags=capture_tags(self.tags.text()) if digest is None else None)
-            snapshot = self.snapshot
-            def shown(matches):
-                self.view.items = [{"box": match} for match in matches]
+            if method == "ocr":
+                worker = lambda: self.host.recognize_preview(snapshot, region)
+            else:
+                name, digest = self.selected_template()
+                options = dict(region=region, threshold=self.threshold.value(), nms=self.nms.isChecked(),
+                               nms_iou_threshold=self.iou.value(),
+                               priority_tags=capture_tags(self.tags.text()) if digest is None else None)
+                worker = lambda: self.host.match_template_preview(snapshot, name, digest, **options)
+            def shown(result):
+                if method == "ocr":
+                    self.view.items = result["items"]
+                    text = '\n'.join(f'{number}. {item["text"]}'
+                                     for number, item in enumerate(result["items"], 1)) or tr('No text recognized.')
+                else:
+                    self.view.items = [{"box": match} for match in result]
+                    text = '\n'.join(
+                        f'{number}. score={match["score"]:.6f} · '
+                        f'({match["x"]}, {match["y"]}, {match["width"]}, {match["height"]}) · '
+                        f'centerxy={match["centerxy"]} · {match["path"]}'
+                        for number, match in enumerate(result, 1)) or tr('No matches.')
                 self.view.update()
-                self.results.setPlainText('\n'.join(
-                    f'{number}. score={match["score"]:.6f} · '
-                    f'({match["x"]}, {match["y"]}, {match["width"]}, {match["height"]}) · '
-                    f'centerxy={match["centerxy"]} · {match["path"]}'
-                    for number, match in enumerate(matches, 1)) or tr('No matches.'))
-            self.window.launch(lambda: self.host.match_template_preview(snapshot, name, digest, **options), shown)
+                self.results.setPlainText(text)
+                self.save_state()
+            self.window.launch(worker, shown)
         self.window._interact(operation)
 
     def render(self, busy):
         self.busy = busy
         selected = self.selected_template()
-        for control in (self.tree, self.capture_button, self.threshold, self.nms, self.view):
+        template = self.method == "template"
+        for control in (self.methods, self.tree, self.capture_button, self.threshold, self.nms, self.view):
             control.setEnabled(not busy)
         self.iou.setEnabled(not busy and self.nms.isChecked())
         self.tags.setEnabled(not busy and bool(selected) and selected[1] is None)
-        self.full_button.setEnabled(not busy and self.snapshot is not None)
-        self.run_button.setEnabled(not busy and self.snapshot is not None and bool(selected))
+        ready = not busy and self.snapshot is not None and (not template or bool(selected))
+        self.full_button.setEnabled(ready)
+        self.run_button.setVisible(template)
+        self.run_button.setEnabled(ready and bool(self.view.region))
+        self.region.setText(tr('Search region: {0}').format(self.view.region or tr('Full image')))
         if not busy and self.refresh_pending and self.isVisible():
             QTimer.singleShot(0, self.refresh_assets)

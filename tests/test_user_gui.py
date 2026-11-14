@@ -50,7 +50,7 @@ def test_shared_windows_and_independent_idle_close(windows):
     assert owner.open_window(True) is developer
     assert user.pages.widget(0).objectName() == 'dashboard'
     pages = {developer.pages.widget(i).objectName() for i in range(developer.pages.count())}
-    assert {'developer-capture', 'developer-ocr', 'developer-settings', 'developer-workbench'} <= pages
+    assert {'developer-capture', 'developer-recognition', 'developer-settings', 'developer-workbench'} <= pages
     assert developer.close()
     assert owner.developer is None and owner.user is user
     assert owner.open_window(True) is not developer

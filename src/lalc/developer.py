@@ -230,7 +230,7 @@ class DeveloperHost:
             return self.conversation
 
     def capture(self, *, update_preview=True, auto_park_cursor: bool = True):
-        """固定原始截图；默认更新素材预览，OCR 可独立取图，不写 Asset。"""
+        """固定原始截图；默认更新素材预览，识别调试页可独立取图，不写 Asset。"""
         with self.service.activity("Capture 截图"):
             session = FocusedAutomationSession(self.service._window_platform(), lambda *_: None)
             session.capture(auto_park_cursor=auto_park_cursor)

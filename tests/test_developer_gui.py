@@ -234,7 +234,8 @@ def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
     from lalc.ocr import OcrService
     from lalc.developer_gui import OcrView
     app, window = gui
-    page = window.ocr_page
+    page = window.recognition_page
+    page.methods.setCurrentItem("ocr")
     pixels = bytes([1, 2, 3, 255]) * 200 * 100
     captures = []
     class Session:
@@ -258,6 +259,9 @@ def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
     assert not page.capture_button.isEnabled() and not page.view.isEnabled()
     wait_jobs(app, window)
     assert window.host.preview is original
+    assert not page.results.toPlainText() and not calls
+    page.full_button.click()
+    wait_jobs(app, window)
     assert page.results.toPlainText() == '1. <文字>&'
     assert page.view.items == [item]
     assert page.full_button.isEnabled()
@@ -289,7 +293,7 @@ def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
     def fail(*_, **__):
         raise RuntimeError('OCR test failure')
     monkeypatch.setattr(OcrService, 'recognize', fail)
-    page.recognize()
+    page.run_recognition()
     wait_jobs(app, window)
     assert not view.items and not page.results.toPlainText()
     assert errors and 'OCR test failure' in errors[-1]
@@ -297,13 +301,13 @@ def test_ocr_capture_selection_replacement_and_failure(gui, monkeypatch):
     plain.close()
 
 
-def test_required_pages_ocr_after_capture_scaled_crop_and_no_implicit_selection(gui):
+def test_required_pages_recognition_after_capture_scaled_crop_and_no_implicit_selection(gui):
     from PySide6.QtCore import QPointF
     app, window = gui
     pages = [window.pages.widget(i).objectName() for i in range(window.pages.count())]
-    assert {"developer-capture", "developer-ocr", "developer-settings", "developer-workbench"} <= set(pages)
-    assert pages.index("developer-template-match") == pages.index("developer-capture") + 1
-    assert pages.index("developer-ocr") > pages.index("developer-capture")
+    assert {"developer-capture", "developer-recognition", "developer-settings", "developer-workbench"} <= set(pages)
+    assert pages.index("developer-recognition") == pages.index("developer-capture") + 1
+    assert "developer-template-match" not in pages and "developer-ocr" not in pages
     assert not hasattr(window.repair_page, "files")
     assert not hasattr(window.repair_page, "diff")
     view = window.capture_page.view

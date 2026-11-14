@@ -2166,5 +2166,25 @@ Original pixel region: {2}</source>
       <source>Chat ID: {0}</source>
       <translation>聊天 ID：{0}</translation>
     </message>
+    <message>
+      <source>Recognition Lab</source>
+      <translation>识别调试</translation>
+    </message>
+    <message>
+      <source>OCR</source>
+      <translation>OCR</translation>
+    </message>
+    <message>
+      <source>Match full image</source>
+      <translation>全图匹配</translation>
+    </message>
+    <message>
+      <source>Match selected region</source>
+      <translation>匹配当前选区</translation>
+    </message>
+    <message>
+      <source>Capture does not run recognition. Release a selection to process it, or use the full-image button. Korean OCR is not supported.</source>
+      <translation>截图后不自动执行。框选结束后处理选区，或点击全图按钮。OCR 暂不支持韩文。</translation>
+    </message>
 </context>
 </TS>

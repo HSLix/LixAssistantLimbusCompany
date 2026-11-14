@@ -1,4 +1,4 @@
-"""覆盖调试匹配只读边界、资源增量检查、独立截图与 GUI 输入失效。
+"""覆盖调试匹配只读边界、资源增量检查、共享截图与 GUI 输入失效。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_template_match_lab.py
@@ -99,7 +99,7 @@ def test_catalog_rejects_symlinks(tmp_path):
 
 def test_gui_tree_unchanged_and_changed_on_reentry(gui, monkeypatch):
     app, window = gui
-    page = window.template_match_page
+    page = window.recognition_page
     a = entry(window.service.data_root, 'ui/start')
     reads = []
     original = AssetLibrary.read
@@ -142,7 +142,7 @@ def test_gui_tree_unchanged_and_changed_on_reentry(gui, monkeypatch):
 def test_gui_frozen_capture_parameters_results_and_failure(gui, monkeypatch):
     from lalc.gui import ErrorDialog
     app, window = gui
-    page = window.template_match_page
+    page = window.recognition_page
     a = entry(window.service.data_root, 'ui/start')
     page.update_catalog(window.host.template_catalog())
     page.tree.setCurrentItem(page.tree.topLevelItem(0).child(0))
@@ -159,20 +159,17 @@ def test_gui_frozen_capture_parameters_results_and_failure(gui, monkeypatch):
     wait_jobs(app, window)
     assert page.snapshot is snapshot and window.host.preview is original
     page.threshold.setValue(.999)
-    page.run_button.click()
-    assert not page.run_button.isEnabled() and not page.tree.isEnabled()
+    page.full_button.click()
+    assert not page.run_button.isEnabled() and not page.tree.isEnabled() and not page.methods.isEnabled()
     wait_jobs(app, window)
     assert len(page.view.items) == 2 and a['path'] in page.results.toPlainText()
     page.view.region = {'x': 7, 'y': 4, 'width': 5, 'height': 4}
     page.view.selected.emit(page.view.region)
-    assert not page.view.items and not page.results.toPlainText()
-    page.run_button.click()
     wait_jobs(app, window)
     assert len(page.view.items) == 1 and page.view.items[0]['box']['x'] == 8
     page.full_button.click()
-    assert page.view.region is None and not page.view.items
-    page.run_button.click()
     wait_jobs(app, window)
+    assert page.view.region is None and len(page.view.items) == 2
     page.nms.setChecked(False)
     assert not page.iou.isEnabled() and not page.view.items
     assert len(captures) == 1
@@ -180,7 +177,7 @@ def test_gui_frozen_capture_parameters_results_and_failure(gui, monkeypatch):
     page.tree.setCurrentItem(page.tree.topLevelItem(0).child(0).child(0))
     wait_jobs(app, window)
     assert not page.tags.isEnabled()
-    page.run_button.click()
+    page.full_button.click()
     wait_jobs(app, window)
     assert len(page.view.items) == 2
     page.threshold.setValue(.998)
@@ -188,15 +185,15 @@ def test_gui_frozen_capture_parameters_results_and_failure(gui, monkeypatch):
     errors = []
     monkeypatch.setattr(ErrorDialog, 'open', lambda dialog: errors.append(dialog.details.toPlainText()))
     window.service.asset_library.path(a['path']).write_bytes(b'broken')
-    page.run_button.click()
+    page.full_button.click()
     wait_jobs(app, window)
     assert errors and 'hash mismatch' in errors[-1]
-    assert not page.view.items and not page.results.toPlainText() and page.run_button.isEnabled()
+    assert not page.view.items and not page.results.toPlainText() and page.full_button.isEnabled()
 
 
 def test_catalog_only_expands_top_level_and_preserves_manual_expansion(gui):
     app, window = gui
-    page = window.template_match_page
+    page = window.recognition_page
     entry(window.service.data_root, 'ui/start/deep')
     page.update_catalog(window.host.template_catalog())
     top = page.tree.topLevelItem(0)
@@ -206,3 +203,126 @@ def test_catalog_only_expands_top_level_and_preserves_manual_expansion(gui):
     entry(window.service.data_root, 'ui/start/other')
     page.update_catalog(window.host.template_catalog())
     assert page.tree.topLevelItem(0).child(0).isExpanded()
+
+
+def test_shared_capture_independent_regions_results_reset_and_capture_failure(gui, monkeypatch):
+    """验证切换不执行、单帧共享、独立选区，以及新截图成功／失败的提交边界。"""
+    from copy import deepcopy
+    from lalc.gui import ErrorDialog
+    app, window = gui
+    page = window.recognition_page
+    entry(window.service.data_root, 'ui/start')
+    page.update_catalog(window.host.template_catalog())
+    page.tree.setCurrentItem(page.tree.topLevelItem(0).child(0))
+    captures, matches, ocr = [], [], []
+    snapshot = pixels(screenshot()), (12, 8), 5
+    def capture(self, *, update_preview):
+        assert not update_preview
+        captures.append(True)
+        return snapshot
+    original_match = type(window.host).match_template_preview
+    def match(self, frame, *args, **kwargs):
+        assert frame is snapshot
+        matches.append(kwargs['region'])
+        return original_match(self, frame, *args, **kwargs)
+    item = {'text': 'Start', 'box': {'x': 2, 'y': 1, 'width': 2, 'height': 2}}
+    def recognize(self, frame, region):
+        assert frame is snapshot
+        ocr.append(region)
+        return {'items': [item]}
+    monkeypatch.setattr(type(window.host), 'capture', capture)
+    monkeypatch.setattr(type(window.host), 'match_template_preview', match)
+    monkeypatch.setattr(type(window.host), 'recognize_preview', recognize)
+    page.threshold.setValue(.999)
+    page.capture_button.click()
+    wait_jobs(app, window)
+    assert len(captures) == 1 and not matches and not ocr
+    image_key = page.view.image.cacheKey()
+    a = {'x': 7, 'y': 4, 'width': 5, 'height': 4}
+    page.view.region = a
+    page.view.selected.emit(a)
+    assert not page.methods.isEnabled()
+    wait_jobs(app, window)
+    template_text = page.results.toPlainText()
+    assert len(page.view.items) == 1 and matches == [a]
+    page.methods.setCurrentItem('ocr')
+    assert page.view.region is None and not page.view.items and not page.results.toPlainText()
+    assert not page.run_button.isVisible()
+    b = {'x': 0, 'y': 0, 'width': 6, 'height': 4}
+    page.view.region = b
+    page.view.selected.emit(b)
+    wait_jobs(app, window)
+    ocr_text = page.results.toPlainText()
+    page.methods.setCurrentItem('template')
+    wait_jobs(app, window)
+    assert page.view.region == a and page.results.toPlainText() == template_text
+    assert page.run_button.isEnabled() and len(page.view.items) == 1
+    page.threshold.setValue(.998)
+    assert not page.view.items and not page.results.toPlainText()
+    assert matches == [a]
+    page.run_button.click()
+    wait_jobs(app, window)
+    assert matches == [a, a]
+    page.methods.setCurrentItem('ocr')
+    assert page.view.region == b and page.results.toPlainText() == ocr_text
+    assert page.view.items == [item] and ocr == [b]
+    page.full_button.click()
+    wait_jobs(app, window)
+    assert ocr == [b, None] and page.view.region is None
+    page.methods.setCurrentItem('template')
+    wait_jobs(app, window)
+    assert page.view.region == a
+    assert page.view.image.cacheKey() == image_key
+    before = deepcopy(page.states)
+    errors = []
+    monkeypatch.setattr(ErrorDialog, 'open', lambda dialog: errors.append(dialog.details.toPlainText()))
+    def fail(self, **kwargs):
+        raise RuntimeError('new screenshot failed')
+    monkeypatch.setattr(type(window.host), 'capture', fail)
+    page.capture_button.click()
+    wait_jobs(app, window)
+    assert errors and 'new screenshot failed' in errors[-1]
+    assert page.snapshot is snapshot and page.states == before
+    assert page.view.region == a and page.view.items
+    assert page.view.image.cacheKey() == image_key
+    monkeypatch.setattr(type(window.host), 'capture', capture)
+    page.capture_button.click()
+    wait_jobs(app, window)
+    assert page.threshold.value() == .998 and page.selected_template() == ('ui/start', None)
+    assert len(captures) == 2 and matches == [a, a] and ocr == [b, None]
+    for method in ('ocr', 'template'):
+        page.methods.setCurrentItem(method)
+        wait_jobs(app, window)
+        assert page.view.region is None and not page.view.items and not page.results.toPlainText()
+
+
+def test_catalog_change_invalidates_only_template_results(gui, monkeypatch):
+    """素材更新仅清模板结果，保留 OCR 选区与结果，删除模板后禁止执行。"""
+    app, window = gui
+    page = window.recognition_page
+    a = entry(window.service.data_root, 'ui/start')
+    page.update_catalog(window.host.template_catalog())
+    page.tree.setCurrentItem(page.tree.topLevelItem(0).child(0))
+    snapshot = pixels(screenshot()), (12, 8), 5
+    monkeypatch.setattr(type(window.host), 'capture', lambda self, **_: snapshot)
+    page.capture()
+    wait_jobs(app, window)
+    page.threshold.setValue(.999)
+    page.full_button.click()
+    wait_jobs(app, window)
+    assert page.view.items
+    page.methods.setCurrentItem('ocr')
+    item = {'text': 'test', 'box': {'x': 0, 'y': 0, 'width': 2, 'height': 2}}
+    monkeypatch.setattr(type(window.host), 'recognize_preview', lambda *args: {'items': [item]})
+    page.view.region = {'x': 0, 'y': 0, 'width': 4, 'height': 4}
+    page.view.selected.emit(page.view.region)
+    wait_jobs(app, window)
+    before = page.results.toPlainText()
+    window.service.asset_library.path(a['path']).unlink()
+    page.update_catalog(window.host.template_catalog())
+    assert page.view.items == [item] and page.results.toPlainText() == before
+    assert page.view.region is not None
+    page.methods.setCurrentItem('template')
+    wait_jobs(app, window)
+    assert not page.view.items and not page.results.toPlainText()
+    assert page.selected_template() is None and not page.full_button.isEnabled()
