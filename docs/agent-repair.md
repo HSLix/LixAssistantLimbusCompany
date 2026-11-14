@@ -277,6 +277,8 @@ levels are recorded and `error` alone does not fail a task. Matched targets prov
 
 ## Prompt 与 Skills
 
+Agent 系统提示词要求思考内容和回复遵循本轮用户输入的语言，用户明确指定语言时优先遵循；混合输入以主要需求语言为准。代码标识符、原文引用和最终 JSON 字段名保持原样。此要求用于引导模型输出，实际遵循情况仍需真实模型验证。
+
 开发 Prompt 由 `agent_prompts.py` 维护简短角色、模式、安全原则和最终 JSON 契约；领域知识在后部独立保留 Manifest／Candidate／Asset 的关系。详细 Workflow 编写规范、开发修复、素材、页面、验证和人工反馈指导迁入七个默认 Skills。`pi_probe.ts` 复用 pi 原生的发现和目录生成，系统消息只列名称、description 和路径，正文由 `read` 按需读取；工具 Schema 和权限仍以本轮实际注册及启用状态为准。
 
 Skill 位于应用数据目录 `skills/`。仅目录不存在时复制内置内容；已有目录不补齐、不覆盖，空目录允许使用。开发者直接编辑或添加文件，Agent 只读，没有 GUI 编辑器或脚本执行能力。每条消息刷新并固定本轮正文及参考资料，执行期间编辑从下轮生效；三个开发入口统一展示，读取不扩大工具权限。完整格式、路径、原生功能范围及维护步骤见 [Developer Skills](agent-skills.md)。旧 `sop.md` 的现有内容已先迁移再删除，不再存在 XML 解析或旧 SOP 回退。
