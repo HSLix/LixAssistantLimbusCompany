@@ -5,6 +5,8 @@ supersedes: 0028 (Agent fresh-crop save rule); 0021 (explicit Agent Asset archiv
 
 # Preview Agent crops and archive removed Assets
 
+2026-11-15：归档授权与恢复边界由[归档授权与恢复影响审查](../asset-archive-impact-review.md)及[当前素材工具契约](../agent-repair.md#agent-素材预览与归档)更新：无用户明确要求时须 feedback 允许；新增同权限 restore_asset 按原逻辑名和完整 hash 恢复归档。下文“不提供恢复工具”保留为原决定的历史范围。
+
 2026-10-25：实机开发出现误裁模板长期参与匹配。Developer Agent 改为先 preview_crop(logical_name, region, threshold=0.9, tags=...)，返回带区域横纵线的全图、无覆盖层的小图、同图匹配结果及 preview_id；crop_asset(preview_id) 仅保存本对话预览的同一份像素、区域、逻辑名和标签，不重新截图。预览不进入活跃 Asset Library，仅在交互日志留证；预览可跨同一对话轮次重复使用，新对话不继承 ID。不提供任意文件导入或跳过预览的 Agent 保存路径，已有同名同哈希图仍复用原图及原标签。Workflow Trusted Action observe.crop_asset 保持原有新截图语义。
 
 game_screenshot 同时返回原图和横纵每隔 40px 带坐标标记的网格辅助图。覆盖层只用于观察，不进入模板、匹配输入或原始截图证据。同图匹配复用普通模板算法及默认 NMS，结果提供位置、分数和中心点；不把命中次数作为保存门槛，也不把同图命中当作跨游戏状态可靠性的证明。本次不增加放大上下文图、锚点裁剪或自动吸附。

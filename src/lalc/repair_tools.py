@@ -72,6 +72,7 @@ class RepairTools:
                        "list_runs": self.list_runs, "read_run_log": self.read_run_log,
                        "search_run_logs": self.search_run_logs,
                        "preview_crop": self.preview_crop, "remove_asset": self.remove_asset,
+                       "restore_asset": self.restore_asset,
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
                        "read_manifest_source": self.read_manifest_source,
                        "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
@@ -684,10 +685,29 @@ class RepairTools:
         atomic_write_json(self.library.data_root / "asset-provenance" / f"{result['provenance_id']}.json", result)
         return self.image(self.library.read({"path": result["path"], "sha256": result["sha256"]}), result)
 
-    def remove_asset(self, logical_name, sha, reason):
-        """移除前重新截图；归档保留原始画面，并同步移除活跃图片及标签关系。"""
+    def remove_asset(self, logical_name, sha, reason, explicit_user_request=False):
+        """默认取得本次人工确认，再截图归档并移除活跃图片及标签；明确用户要求可直接执行。"""
         asset_name(logical_name)
         self.library.read({"path": f"{logical_name}/{sha}.png", "sha256": sha})
+        if type(explicit_user_request) is not bool:
+            raise ValueError("explicit_user_request 必须是布尔值。")
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("移除 Asset 必须提供非空理由。")
+        if not explicit_user_request:
+            if "request_feedback" not in self.allowed:
+                raise ValueError("用户未明确要求归档，当前入口也无人工反馈权限。")
+            confirmation = f"确认归档 {logical_name}/{sha}"
+            feedback = self.request_feedback(
+                f"请求归档素材：{logical_name}\nSHA：{sha}\n理由：{reason}\n"
+                "归档后将立即退出共享库匹配，影响所有 Session。保留原图及标签供恢复。\n"
+                f"允许归档请输入以下完整文字并提交；否则跳过：\n{confirmation}")["details"]
+            if feedback["status"] != "confirmed" or feedback["text"].strip() != confirmation:
+                return self.text({"removed": False, "logical_name": logical_name, "sha256": sha, "feedback": feedback})
+        self.checkpoint()
         _, _, path = self.capture()
         result = self.library.remove(logical_name, sha, reason, path.read_bytes(), checkpoint=self.checkpoint)
         return self.text(result)
+
+    def restore_asset(self, logical_name, sha):
+        """按原逻辑名和完整哈希恢复最新归档；权限由调用入口统一检查。"""
+        return self.text(self.library.restore(logical_name, sha, checkpoint=self.checkpoint))

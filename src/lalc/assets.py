@@ -257,6 +257,71 @@ class AssetLibrary:
             raise
         return record
 
+    def restore(self, name: str, digest: str, *, checkpoint: Callable[[], None]) -> dict:
+        """恢复最新有效状态的归档；不覆盖活跃图和标签，失败撤回新增图并保留归档。"""
+        from .recognition import decode_image
+        asset_name(name)
+        if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise ValueError("Asset sha256 must be 64 lowercase hexadecimal characters.")
+        relative = f"{name}/{digest}.png"
+        path = self.path(relative)
+        tag_path = self.path(f"{name}/asset-tag.json")
+        if path != self.root.resolve() / relative or tag_path != self.root.resolve() / name / "asset-tag.json":
+            raise ValueError("恢复不接受指向其他目录或标签文件的符号链接。")
+        root = self.data_root / "agent_removed_asset"
+        if root.resolve() != self.data_root.resolve() / "agent_removed_asset":
+            raise ValueError("恢复不接受归档目录符号链接。")
+        for record_path in sorted(root.glob("*/record.json"), reverse=True):
+            checkpoint()
+            directory = record_path.parent
+            if directory.resolve() != root.resolve() / directory.name or record_path.is_symlink():
+                raise ValueError("恢复不接受归档符号链接。")
+            record = json.loads(record_path.read_text(encoding="utf-8"))
+            if (record.get("logical_name") != name or record.get("sha256") != digest
+                    or record.get("state") not in {"completed", "prepared"}):
+                continue
+            if (record.get("source_path") != relative or record.get("image") != "asset.png"
+                    or record.get("archive_id") != directory.name):
+                raise ValueError("归档记录与原始 Asset 身份不一致。")
+            tags = self.tags(record["tags"])
+            archived = directory / "asset.png"
+            if archived.is_symlink():
+                raise ValueError("恢复不接受归档图片符号链接。")
+            content = archived.read_bytes()
+            if sha256_bytes(content) != digest:
+                raise ValueError("归档图片完整哈希不匹配。")
+            if not content.startswith(b"\x89PNG\r\n\x1a\n"):
+                raise ValueError("归档图片必须是 PNG。")
+            decode_image(content)
+            mapping = self._tag_mapping(name)
+            result = {"logical_name": name, "sha256": digest, "path": relative,
+                      "archive_id": directory.name, "archive_path": str(directory)}
+            if path.exists():
+                self.read({"path": relative, "sha256": digest})
+                return {**result, "restored": False, "existed": True, "tags": mapping.get(digest, [])}
+            checkpoint()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, pending = create_work_file(dir=path.parent, prefix=".asset-")
+            created = False
+            try:
+                with os.fdopen(descriptor, "wb") as stream:
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                checkpoint()
+                os.link(pending, path)
+                created = True
+                if digest not in mapping:
+                    self._set_tags(name, digest, tags)
+            except BaseException:
+                if created:
+                    path.unlink()
+                raise
+            finally:
+                Path(pending).unlink(missing_ok=True)
+            return {**result, "restored": True, "existed": False, "tags": mapping.get(digest, tags)}
+        raise FileNotFoundError("没有找到对应逻辑名与完整哈希的可恢复归档。")
+
     def match(
         self, name: str, pixels: bytes, size: tuple[int, int], *, run_id: int | None,
         observation: int, emit: Callable[[str, dict[str, Any]], None],

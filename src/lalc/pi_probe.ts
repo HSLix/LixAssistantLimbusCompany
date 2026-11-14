@@ -364,8 +364,10 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
           tags: Type.Optional(Type.Array(Type.String())) }) },
       { name: "crop_asset", description: "Save an existing preview from this conversation using preview_id. Does not recapture. Reuses existing logical-name/hash images and original tags. Preview first with preview_crop.",
         parameters: Type.Object({ preview_id: Type.String() }) },
-      { name: "remove_asset", description: "Archive the exact active logical-name/SHA Asset, original tags, reason, and a NEW clean game screenshot. Remove its active image and local tag mapping only after archival preparation. Other logical names are unchanged. No permanent deletion or arbitrary paths. Screenshot failure prevents removal.",
-        parameters: Type.Object({ logical_name: logicalName, sha: Type.String({ pattern: "^[0-9a-f]{64}$" }), reason: Type.String({ minLength: 1 }) }) },
+      { name: "remove_asset", description: "Only archive when the user explicitly requests it or approves host feedback. Set explicit_user_request=true ONLY for an explicit current user request, never inferred cleanup or historical authorization. Otherwise the host requires fresh feedback; refusal/Skip prevents removal. Archive the exact active logical-name/SHA Asset, original tags, reason, and a NEW clean game screenshot. Remove its active image and local tag mapping only after archival preparation. Other logical names are unchanged. No permanent deletion or arbitrary paths. Screenshot failure prevents removal.",
+        parameters: Type.Object({ logical_name: logicalName, sha: Type.String({ pattern: "^[0-9a-f]{64}$" }), reason: Type.String({ minLength: 1 }), explicit_user_request: Type.Optional(Type.Boolean()) }) },
+      { name: "restore_asset", description: "Restore the latest retained archive for the original logical_name and full SHA, including original tags. Preserves existing active images/tags and the archive. No screenshot required. Same permissions as remove_asset; unavailable in Runtime.",
+        parameters: Type.Object({ logical_name: logicalName, sha: Type.String({ pattern: "^[0-9a-f]{64}$" }) }) },
     ];
     for (const tool of tools) {
       pi.registerTool({ ...tool, label: tool.name,
