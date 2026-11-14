@@ -2254,5 +2254,9 @@ Original pixel region: {2}</source>
       <source>Inliers: {0}; ratio: {1}</source>
       <translation>内点：{0}；比例：{1}</translation>
     </message>
+    <message>
+      <source>Restore defaults</source>
+      <translation>恢复默认</translation>
+    </message>
 </context>
 </TS>

@@ -208,3 +208,51 @@ def test_asset_change_invalidates_both_matching_modes_only(gui):
     page.update_catalog(window.host.template_catalog())
     assert page.states['template']['text'] == page.states['feature']['text'] == ''
     assert page.results.toPlainText() == 'ocr'
+
+
+def test_restore_defaults_only_resets_current_matching_mode_without_running(gui, monkeypatch):
+    """恢复按钮只清当前方式结果，保留截图、选区、素材和另一方式参数。"""
+    app, window = gui
+    page = window.recognition_page
+    _, template = scene()
+    entry(window.service.data_root, 'ui/symbol', template)
+    page.update_catalog(window.host.template_catalog())
+    page.tree.setCurrentItem(page.tree.topLevelItem(0).child(0))
+    page.snapshot = (bytes(400), (10, 10), 1)
+    snapshot, selected = page.snapshot, page.selected_template()
+    monkeypatch.setattr(type(window.host), 'match_feature_preview', lambda *a, **k: pytest.fail('reset must not match'))
+    monkeypatch.setattr(type(window.host), 'match_template_preview', lambda *a, **k: pytest.fail('reset must not match'))
+    page.threshold.setValue(.8)
+    page.iou.setValue(.3)
+    page.nms.setChecked(False)
+    page.tags.setText('en')
+    page.methods.setCurrentItem('feature')
+    wait_jobs(app, window)
+    page.feature_controls['scale'].setValue(5)
+    page.feature_controls['min_inliers'].setValue(20)
+    page.feature_controls['clahe'].setChecked(False)
+    page.feature_controls['nms'].setChecked(False)
+    region = dict(x=1, y=1, width=5, height=5)
+    page.view.region = region
+    page.results.setPlainText('stale')
+    page.states['ocr']['text'] = 'retained'
+    page.render(True)
+    assert not page.reset_parameters_button.isEnabled()
+    page.render(False)
+    page.reset_parameters_button.click()
+    assert page.feature_controls['scale'].value() == 3
+    assert page.feature_controls['min_inliers'].value() == 6
+    assert page.feature_controls['clahe'].isChecked() and page.feature_controls['nms'].isChecked()
+    assert page.feature_controls['nms_iou_threshold'].isEnabled()
+    assert page.threshold.value() == .8 and page.tags.text() == 'en'
+    assert page.view.region == region and not page.results.toPlainText()
+    page.feature_controls['scale'].setValue(4)
+    page.methods.setCurrentItem('template')
+    wait_jobs(app, window)
+    page.results.setPlainText('stale')
+    page.reset_parameters_button.click()
+    assert page.threshold.value() == .9 and page.iou.value() == .5
+    assert page.nms.isChecked() and page.iou.isEnabled() and not page.tags.text()
+    assert page.feature_controls['scale'].value() == 4 and not page.results.toPlainText()
+    assert page.snapshot is snapshot and page.selected_template() == selected
+    assert page.states['feature']['region'] == region and page.states['ocr']['text'] == 'retained'
