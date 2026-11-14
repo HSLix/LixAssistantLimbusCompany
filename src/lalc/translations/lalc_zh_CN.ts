@@ -2282,5 +2282,33 @@ Original pixel region: {2}</source>
       <source>Coverage: template {0}, target {1}</source>
       <translation>覆盖率：模板 {0}，目标 {1}</translation>
     </message>
+    <message>
+      <source>Expand notifications</source>
+      <translation>展开全部通知</translation>
+    </message>
+    <message>
+      <source>Dismiss notification</source>
+      <translation>关闭此条通知</translation>
+    </message>
+    <message>
+      <source>Clear all</source>
+      <translation>全部清除</translation>
+    </message>
+    <message>
+      <source>Collapse</source>
+      <translation>收起</translation>
+    </message>
+    <message>
+      <source>Notifications · {count}</source>
+      <translation>通知 · {count}</translation>
+    </message>
+    <message>
+      <source>New notifications ({count})</source>
+      <translation>有新通知（{count}）</translation>
+    </message>
+    <message>
+      <source>Execution stopped</source>
+      <translation>执行已停止</translation>
+    </message>
 </context>
 </TS>

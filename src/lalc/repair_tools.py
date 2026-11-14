@@ -31,6 +31,7 @@ class RepairTools:
         self.allowed = frozenset(REPAIR_TOOLS if allowed is None else allowed)
         self.host = host
         self.created_files = set()
+        self.deleted_files = set()
         self.library = AssetLibrary(data_root)
         self.log = log
         self.platform = platform
@@ -64,6 +65,7 @@ class RepairTools:
             methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
+                       "delete_component": self.delete_component,
                        "add_component": self.add_component, "add_recovery_rule": self.add_recovery_rule,
                        "publish": self.publish, "trial_run": self.trial_run,
                        "read_run_state": self.read_run_state, "recheck": self.recheck,
@@ -301,6 +303,38 @@ class RepairTools:
 
     def read_manifest_source(self, manifest_id, section, logical_name, offset=0, limit=100):
         return self.text(ManifestReference(self.host.manager).source(manifest_id, section, logical_name, offset, limit))
+
+    def delete_component(self, filename, impact):
+        """仅删除经本次人工确认的候选 Python 文件；不修改登记或历史版本。"""
+        from pathlib import Path
+        from .developer import candidate_files
+        if self.host is None or "request_feedback" not in self.allowed:
+            raise ValueError("删除需要 Candidate 和本轮人工反馈权限。")
+        if not isinstance(filename, str) or not filename:
+            raise ValueError("必须指定 Candidate 内的相对 Python 文件路径。")
+        path = Path(filename)
+        if (path.is_absolute() or path.as_posix() != filename or ".." in path.parts
+                or "\\" in filename or ":" in filename or path.suffix != ".py"):
+            raise ValueError("只能删除 Candidate 内的普通 .py 文件。")
+        if not isinstance(impact, str) or not impact.strip():
+            raise ValueError("删除前必须说明用户请求、当前情景和影响范围。")
+        before = candidate_files(self.host.candidate)
+        if filename not in before:
+            raise ValueError("目标文件不存在。")
+        confirmation = f"确认删除 {filename}"
+        result = self.request_feedback(
+            f"请求删除 Candidate 文件：{filename}\n\n{impact}\n\n"
+            "只删除该文件，不自动修改 Manifest、调用方或已发布版本。\n"
+            f"如仍确认删除，请输入以下完整文字并提交：\n{confirmation}")
+        feedback = result["details"]
+        if feedback["status"] != "confirmed" or feedback["text"].strip() != confirmation:
+            return self.text({"deleted": False, "filename": filename, "feedback": feedback})
+        self.checkpoint()
+        if candidate_files(self.host.candidate) != before:
+            raise ValueError("确认期间 Candidate 已改变；请重新检查影响并请求确认。")
+        (self.host.candidate / path).unlink()
+        self.deleted_files.add(filename)
+        return self.text({"deleted": True, "filename": filename})
 
     def add_component(self, filename, logical_name, source):
         """创建普通 Component 并登记；角色由实际源码决定。"""

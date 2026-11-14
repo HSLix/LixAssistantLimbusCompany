@@ -65,7 +65,23 @@ export async function installContext(pi, emit, accounting) {
   let compactionStarted = 0;
   let currentIds = new Set<string>();
   const pendingSource = bootstrap.inputs.at(-1)?.sequence ?? bootstrap.source_sequence;
-  const imageIds = async () => JSON.parse(await readFile(process.env.LALC_PI_IMAGE_INDEX!, "utf8"));
+  const imageIds: Record<string, string> = { ...bootstrap.image_ids };
+  async function syncImageIds(entries, ctx) {
+    const hashes = entries.flatMap(entry => entry.messages).flatMap(message =>
+      (Array.isArray(message.content) ? message.content : []).filter(part => part.type === "image")
+        .map(part => digest(part.data)));
+    const missing = [...new Set<string>(hashes)].filter(hash => !imageIds[hash]);
+    if (!missing.length) return;
+    // 请求经同一 RPC 队列排在图片事件之后；收到编号才提交图片上下文编辑。
+    const response = await ctx.ui.input("lalc.image_ids:" + JSON.stringify(missing));
+    if (response === undefined) throw new Error("图片编号同步已取消，未更新上下文。");
+    const received = JSON.parse(response);
+    if (!received || typeof received !== "object" || Array.isArray(received)
+        || missing.some(hash => typeof received[hash] !== "string" || !/^[1-9]\d*:\d+$/.test(received[hash]))) {
+      throw new Error("图片编号同步响应不完整，未更新上下文。");
+    }
+    for (const hash of missing) imageIds[hash] = received[hash];
+  }
   const threshold = ctx => Math.min(productLimit, Math.max(1, (ctx.model?.contextWindow ?? productLimit + 8192) - 8192));
   const count = entries => entries.reduce((sum, entry) => sum + entry.messages.reduce((n, m) => n + contextTokens(m), 0), 0);
   const usage = (tokens, ctx) => emit("lalc_context_usage", { tokens, limit: threshold(ctx),
@@ -135,7 +151,7 @@ export async function installContext(pi, emit, accounting) {
       if (entry.messages.some(m => ["user", "assistant"].includes(m.role))) cut = i;
     }
     const selected = entries.slice(0, cut).flatMap(entry => entry.messages).filter(m => m.role !== "system");
-    const ids = await imageIds();
+    const ids = imageIds;
     const stripped = selected.map(message => ({ ...message, content: Array.isArray(message.content)
       ? message.content.map(part => part.type === "image" ? { type: "text", text:
         `[图片证据 session_id=${bootstrap.session_id}, image_id=${ids[digest(part.data)] ?? "未知"}]` } : part)
@@ -211,7 +227,7 @@ export async function installContext(pi, emit, accounting) {
       currentIds = new Set([current.id]);
       const projected = sm.buildSessionProjection().entries;
       for (const edit of imageWindow(projected.map(e => ({ id: e.sourceEntry.id, message: e.messages[0] })),
-        await imageIds(), bootstrap.session_id, policy.context_image_limit, currentIds)) sm.appendContextEdit(edit.targetId, edit.replacement);
+        imageIds, bootstrap.session_id, policy.context_image_limit, currentIds)) sm.appendContextEdit(edit.targetId, edit.replacement);
       const drafts = await compact(sm.buildSessionProjection().entries, ctx);
       for (const entry of drafts) {
         if (entry.type === "compaction") sm.appendCompaction(entry.summary, entry.firstKeptEntryId, entry.details.before, entry.details, true, entry.usage);
@@ -252,8 +268,9 @@ export async function installContext(pi, emit, accounting) {
       const branch = ctx.sessionManager.getBranch();
       const marker = branch.filter(e => e.type === "custom" && e.customType === "lalc_context").at(-1);
       currentIds = new Set(branch.slice(marker ? branch.indexOf(marker) + 1 : 0).map(e => e.id));
+      await syncImageIds(event.context.contextEntries, ctx);
       const edits = imageWindow(event.context.contextEntries.map(e => ({ id: e.sourceEntry.id, message: e.messages[0] })),
-        await imageIds(), bootstrap.session_id, policy.context_image_limit, currentIds);
+        imageIds, bootstrap.session_id, policy.context_image_limit, currentIds);
       const replacements = new Map(edits.map(e => [e.targetId, e.replacement.content]));
       const projection = event.context.contextEntries.map(e => ({ ...e, messages: e.messages.map(m =>
         replacements.has(e.sourceEntry.id) ? { ...m, content: replacements.get(e.sourceEntry.id) } : m) }));

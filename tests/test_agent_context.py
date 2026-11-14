@@ -1,4 +1,4 @@
-"""覆盖上下文设置校验、历史图片引用及损坏状态保护。
+"""覆盖上下文设置、内存图片编号查询、历史引用及损坏状态保护。
 
 项目根目录运行：.venv/bin/python -m pytest -q tests/test_agent_context.py
 """
@@ -59,24 +59,31 @@ def test_missing_or_partial_pi_state_is_not_reimported(tmp_path):
     assert path.read_bytes() == original
 
 
-def test_image_index_publishes_complete_json_atomically(tmp_path, monkeypatch):
-    from pathlib import Path
-
+def test_image_references_are_recorded_and_rebuilt_without_shared_file(tmp_path):
+    import hashlib
+    from lalc.agent_log import read_events
     log = RepairLog(tmp_path)
-    log.image_index_path = tmp_path / 'image-index.json'
-    log.write_image_index()
-    replace = Path.replace
-    published = []
-
-    def checked_replace(source, target):
-        # 发布之前读者仍须看到上一份完整索引。
-        assert json.loads(target.read_text()) == {}
-        published.append(json.loads(source.read_text()))
-        return replace(source, target)
-
-    monkeypatch.setattr(Path, 'replace', checked_replace)
     image = {'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(b'new').decode()}
-    log.record({'type': 'tool_execution_end', 'result': {'content': [image]}})
-    assert published == [log.image_ids]
-    assert json.loads(log.image_index_path.read_text()) == log.image_ids
-    assert not list(tmp_path.glob('.image-index-*'))
+    event = {'type': 'tool_execution_end', 'result': {'content': [image, image]}}
+    log.record(event)
+    digest = hashlib.sha256(b'new').hexdigest()
+    assert log.image_references([digest]) == {digest: '1:0'}
+    assert list(read_events(log.root / 'events.jsonl'))[0]['event'] == event
+    log.record(event)
+    assert log.image_references([digest]) == {digest: '1:0'}
+    rebuilt = context_bootstrap(log, [], checked_options({}))
+    assert rebuilt['image_ids'] == log.image_references([digest])
+    assert not list(log.root.rglob('*image-index*'))
+
+
+@pytest.mark.parametrize('digests', [None, {}, 'a' * 64, [1], ['bad'], ['G' * 64]])
+def test_image_references_reject_invalid_query(tmp_path, digests):
+    with pytest.raises(ValueError, match='SHA-256'):
+        RepairLog(tmp_path).image_references(digests)
+
+
+def test_image_references_reject_unrecorded_image(tmp_path):
+    log = RepairLog(tmp_path)
+    with pytest.raises(ValueError, match='尚无已记录'):
+        log.image_references(['a' * 64])
+    assert log.image_references([]) == {}

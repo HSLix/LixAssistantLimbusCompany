@@ -25,7 +25,7 @@
 | 共享 provider 内容、双侧独立选用、单一编辑入口 | 复用当前 SettingsPage 和协调器，Developer 打开禁用 User，独立关闭后恢复并读回原先选用项；重复打开仍复用同一窗口/服务。 |
 | 外置页自动发现和 QWidget 契约 | 现有原生 QWidget 可直接加入 Fluent 导航，需设置非空 objectName，实验用稳定页面 ID；无需把页面并入 Manifest。原生外置页不会自动获得全部 Fluent 样式。 |
 | 所属窗口模态 | 实际 Fluent MessageBox 设置 WindowModal 后，另一 Developer 窗口仍可获得原生焦点；现有运行/错误 QDialog 的功能回归也通过。必须继续显式设置父窗口和模态范围。 |
-| 多条通知、手动关闭、详情入口 | InfoBar 设置 duration=-1、分别绑定所属窗口，可同时保留并添加详情按钮；经过默认超时时间仍在，关闭一条不影响另一条。不要沿用默认自动消失时长。 |
+| 多条通知、手动关闭、详情入口 | 当时验证 InfoBar 设置 duration=-1 可保留多条。2026-11-14 正式呈现已由[窗口右下角通知卡片组](notification-overlay-impact-review.md)替代：CardWidget 单条收起、角标展开限高列表，保留手动关闭和详情入口，不自动消失。 |
 | 跳动圆圈告警及会话保留 | 复用原有告警状态与按钮动画，Fluent 按钮可承载；不使用会自行完成/消失的状态提示代替。 |
 | 循环列表滚动条常驻 | 原生 QScrollArea 保留。Fluent ScrollArea 的平滑滚动代理会将原生策略改成 AlwaysOff，不能直接满足现有要求；完整窗口壳也允许混用原生滚动区。 |
 | 截图框选和原始像素 | 自定义 CropView 保留。在 Retina DPR=2 下，原图区域计算、旧框清除及按比例采样的绘制探针通过，不需要重写捕获/裁剪链路。 |

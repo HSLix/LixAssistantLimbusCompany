@@ -942,3 +942,25 @@ def test_manifest_reference_switch_changes_next_round_and_rejects_calls(conversa
     assert asyncio.run(chat.run('enabled', options))['status'] == 'completed'
     assert set(MANIFEST_REFERENCE_TOOLS) <= {item['function']['name'] for item in state['calls'][-1]['tools']}
     assert source in json.dumps(state['calls'][-1]['messages'])
+
+
+@pytest.mark.parametrize('confirmed', [True, False])
+def test_delete_component_feedback_and_round_authorization(conversation, confirmed):
+    """专用删除贯通 pi、人工反馈和轮末授权，不改 Manifest。"""
+    from lalc.developer_session import DeveloperSession
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(),
+                                      mode='Repair', entry='gui')
+    chat = session.conversation()
+    before = (chat.host.candidate / 'manifest.json').read_bytes()
+    script(state, [tool('delete_component', {'filename': 'steps.total.py', 'impact': '用户要求删除；Manifest 引用会失效。'}),
+                   answer('已处理删除反馈')])
+    def feedback(request):
+        assert 'steps.total.py' in request.message
+        request.finish('confirmed', '确认删除 steps.total.py' if confirmed else '不要删除')
+    result = asyncio.run(chat.run('请删除 steps.total.py', options, on_feedback=feedback))
+    assert result['status'] == 'completed', result
+    assert (chat.host.candidate / 'steps.total.py').exists() is not confirmed
+    assert (chat.host.candidate / 'manifest.json').read_bytes() == before
+    assert chat.tools.deleted_files == ({'steps.total.py'} if confirmed else set())
+    assert any(item.get('toolName') == 'delete_component' for item in chat.history)

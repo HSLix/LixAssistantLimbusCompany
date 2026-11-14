@@ -48,7 +48,9 @@ def test_compaction_is_persisted_and_counted_separately(conversation, mode):
     assert '已整理旧资料' in json.dumps(state['calls'][-1], ensure_ascii=False)
 
 
-def test_tool_loop_can_compact_without_losing_tool_pair(conversation):
+@pytest.mark.parametrize('with_image', [False, True])
+def test_tool_loop_can_compact_without_losing_tool_pair(conversation, tmp_path, with_image):
+    import base64
     chat, options, state = conversation
     count = 0
     def respond(body):
@@ -61,10 +63,16 @@ def test_tool_loop_can_compact_without_losing_tool_pair(conversation):
         return answer()
     state['respond'] = respond
     # 单条工具结果可越过压缩线，必须在下一请求前处理。
-    chat.tools.asset_tree = lambda **_: chat.tools.text({'large': 'tool-result ' * 30000})
+    payload = chat.tools.text({'large': 'tool-result ' * 30000})
+    if with_image:
+        path = make_images(tmp_path, ('PNG',))[0]
+        payload['content'].append({'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(path.read_bytes()).decode()})
+    chat.tools.asset_tree = lambda **_: payload
     result = asyncio.run(chat.run('读取并总结', options))
     assert result['status'] == 'completed', result
     assert any(e['type'] == 'lalc_compaction' and e['phase'] == 'completed' for e in records(chat))
+    assert any(e['type'] == 'extension_ui_request' and e.get('title', '').startswith('lalc.image_ids:')
+               for e in records(chat)) == with_image
     for body in state['calls']:
         calls = set()
         for message in body['messages']:
@@ -104,6 +112,115 @@ def test_image_window_keeps_latest_blocks(conversation, tmp_path):
     result = asyncio.run(chat.run('看最新一张', options, images=make_images(tmp_path, ('PNG', 'JPEG'))))
     assert result['status'] == 'completed', result
     assert json.dumps(state['calls'][-1]).count('data:image/') == 1
+
+
+@pytest.mark.parametrize('source', ['host', 'native'])
+def test_tool_images_sync_ids_in_memory_and_survive_restart(conversation, tmp_path, source):
+    """宿主与原生图片均先同步编号；窗口淘汰、进程复用和重启保持可回读。"""
+    import base64
+    import hashlib
+    import shutil
+    from lalc.agent_history import AgentHistory
+    from test_agent_repair_agent import script
+
+    original, options, state = conversation
+    session = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(), entry='cli')
+    chat = session.conversation()
+    save_options(chat.host.service.data_root, context_image_limit=1)
+    paths = make_images(tmp_path, ('PNG', 'JPEG'))
+    if source == 'native':
+        names = ['probe.png', 'probe.jpg']
+        for path, name in zip(paths, names):
+            shutil.copyfile(path, chat.host.candidate / name)
+        script(state, [*(tool('read', {'path': name}) for name in names), answer()])
+    else:
+        images = [{'type': 'image', 'mimeType': mime, 'data': base64.b64encode(path.read_bytes()).decode()}
+                  for path, mime in zip(paths, ('image/png', 'image/jpeg'))]
+        chat.tools.asset_tree = lambda **_: {'content': images}
+        script(state, [tool('asset_tree', {}), answer()])
+
+    result = asyncio.run(chat.run('读取图片', options))
+    assert result['status'] == 'completed', result
+    assert json.dumps(state['calls'][-1]).count('data:image/') == 1
+    events = records(chat)
+    queries = [event for event in events if event['type'] == 'extension_ui_request'
+               and event.get('title', '').startswith('lalc.image_ids:')]
+    assert queries
+    history = AgentHistory(chat.host.service.data_root)
+    for path in paths:
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        _, content = history.read(session.identity, image_id=chat.log.image_ids[digest])
+        assert content == path.read_bytes()
+    first_pid = next(event['pid'] for event in events if event['type'] == 'pi_process')
+    assert not list(chat.host.service.data_root.rglob('image-index.json'))
+
+    for restart in (False, True):
+        if restart:
+            chat.host.service.pi_process.close()
+        chat = DeveloperSession(chat.host.service, session.identity, entry='cli').conversation()
+        state['respond'] = lambda body: answer()
+        result = asyncio.run(chat.run('继续文字对话', options))
+        assert result['status'] == 'completed', result
+        assert 'data:image/' not in json.dumps(state['calls'][-1])
+        assert 'image_id=' in json.dumps(state['calls'][-1])
+        latest = records(chat)
+        process = [event for event in latest if event['type'] == 'pi_process'][-1]
+        if not restart:
+            assert process['reused'] and process['pid'] == first_pid
+        assert not any(event['type'] == 'extension_ui_request' and event.get('title', '').startswith('lalc.image_ids:')
+                       for event in latest[len(events):])
+        events = latest
+
+
+@pytest.mark.parametrize('failure', ['missing', 'invalid'])
+def test_invalid_image_sync_does_not_commit_context_edits(conversation, tmp_path, monkeypatch, failure):
+    """同步失败直接报告本地上下文错误，不提交不可回读的引用或重复请求模型。"""
+    import base64
+    from test_agent_repair_agent import script
+    chat, options, state = conversation
+    save_options(chat.host.service.data_root, context_image_limit=1)
+    images = [{'type': 'image', 'mimeType': mime, 'data': base64.b64encode(path.read_bytes()).decode()}
+              for path, mime in zip(make_images(tmp_path, ('PNG', 'JPEG')), ('image/png', 'image/jpeg'))]
+    chat.tools.asset_tree = lambda **_: {'content': images}
+    monkeypatch.setattr(chat.log, 'image_references', lambda hashes: {} if failure == 'missing' else {h: 'bad-id' for h in hashes})
+    script(state, [tool('asset_tree', {}), answer()])
+    result = asyncio.run(chat.run('读取图片', options))
+    assert result['status'] == 'incomplete', result
+    assert '图片编号同步响应不完整' in result['error']
+    assert len(state['calls']) == 1
+    entries = [json.loads(line) for line in (chat.log.root / 'pi/session.jsonl').read_text().splitlines()]
+    assert not any(entry['type'] == 'context_edit' for entry in entries)
+
+
+def test_cancel_image_sync_can_resume_without_replaying_tool(conversation, tmp_path):
+    """编号同步期间取消会丢弃进程，续聊从日志恢复图片编号且不重放工具。"""
+    import base64
+    from test_agent_repair_agent import script
+    chat, options, state = conversation
+    path = make_images(tmp_path, ('PNG',))[0]
+    image = {'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(path.read_bytes()).decode()}
+    chat.tools.asset_tree = lambda **_: {'content': [image]}
+    script(state, [tool('asset_tree', {}), answer()])
+    reached = False
+
+    async def cancel():
+        def on_event(row):
+            nonlocal reached
+            event = row['event']
+            if event['type'] == 'extension_ui_request' and event.get('title', '').startswith('lalc.image_ids:'):
+                reached = True
+                task.cancel()
+        task = asyncio.create_task(chat.run('读取图片', options, on_event=on_event))
+        return await task
+
+    result = asyncio.run(cancel())
+    assert reached and result['status'] == 'cancelled', result
+    assert chat.host.service.pi_process.process is None
+    state['respond'] = lambda body: answer()
+    result = asyncio.run(chat.run('继续，不要重放工具', options))
+    assert result['status'] == 'completed', result
+    assert len([e for e in records(chat) if e['type'] == 'repair_tool' and e['name'] == 'asset_tree']) == 1
+    assert 'image_id=' in json.dumps(state['calls'][-1])
 
 
 @pytest.mark.parametrize("failure", ["length", "empty", "http"])

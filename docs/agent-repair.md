@@ -68,7 +68,7 @@ GUI 当前使用[折叠附件托盘](stage-5-agent-workbench.md#聊天附件托�
 
 ## 权限、上下文和日志
 
-按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建及删除文件；Asset 仅允许下述专用移除归档例外；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
+按轮开始时的已有文件固定编辑范围，允许修改多个已有 Candidate 文件，包括候选 `manifest.json` 和 Recovery Rule。拒绝目录外路径、符号链接、通用新建及删除文件；Asset 仅允许下述专用移除归档例外；Candidate Python 文件另允许下述 `delete_component` 专用确认删除；成功通过专用新增工具创建的文件立即加入本轮编辑范围。修复入口不区分候选或文件是否校验失败；失败结果保留在上下文。完整候选仍由既有 Validator 检查，Publish 校验失败不发布。
 
 pi 继续使用原有 read/edit 工厂、受限 Asset 工具、动作契约查询和 Validator RPC；Developer Policy 增加下述发布、试运行和日志工具，不提供终端、通用写入、删除或设置 Default 工具。Candidate Python 校验会导入模块，Validator 不是操作系统沙箱；生成代码的副作用约束不能被描述为进程隔离保证。
 
@@ -299,4 +299,15 @@ DeveloperGUI → Agent 设置可选择按比例（20–90%，首次默认 30%）
 
 每个用户轮次默认只携带最近 12 张图片，张数可设置；旧图在本地保留，模型收到图片 ID，需要时通过已授权的 `read_agent_session` 工具取回。关闭历史读取权限时不能回读。请求体另设 40 MiB 预算，以防 token 未满就发生 413；必要时移出较早图片，不删除原图。
 
+图片编号沿用完整业务日志中的事件／图片位置。pi 扩展从本轮 bootstrap 初始化内存表，新图在工具循环安全边界通过现有内部管道查询编号，再进行窗口裁剪或压缩；不再并发读写共享索引文件。编号同步失败明确结束本轮，下一轮从日志恢复，不重放已执行工具。影响与验证见[专项记录](agent-image-index-impact-review.md)。
+
 压缩请求与业务请求分别计数，实际总结请求快照为 `round-N/compact-K.json`。压缩开始、完成、未达目标、失败及用量进入日志和“思考中”过程；费用缺少可靠价格时未知。`pi/session.jsonl` 是私有执行状态，不能用原始业务日志覆盖已经压缩的有效上下文；Sharing 历史仍为只读证据。
+
+
+### Candidate Component 文件删除（2026-11-15）
+
+`delete_component(filename, impact)` 是通用文件删除禁令的专用例外。仅在用户明确要求删除时，Agent 先检查用户请求、当前情景、源码、Manifest 登记与调用方，在 `impact` 说明影响。宿主通过现有 feedback 展示路径、影响及固定确认文字；用户须输入 `确认删除 <filename>` 并提交，空答复、拒绝、其他文字、跳过或取消均不删除，不自动重试。确认等待期间 Candidate 内容改变时拒绝删除，需重新检查并确认。
+
+工具仅删除当前 Session Candidate 的一个已有普通 `.py` 文件（含 Plan／Recovery Rule 或未登记 Python 草稿）；拒绝目录、越界、符号链接及非规范路径。不修改 Manifest、调用方、空目录、共享素材、页面或已发布源码，不自动发布。Agent 按用户请求通过现有 edit 修订引用，再 Validate；单独删除仍被引用的文件可能使 Candidate 暂时无效。宿主不验证自然语言请求或影响说明的完整性，该语义检查由 Agent 负责；实际删除由本次文件确认强制约束。轮末仅放行专用工具记录的删除，其他删除仍报未授权。
+
+仅 Developer GUI Construct／Repair 可用；CLI／Runtime 均不开放，Runtime 即使开启 `runtime_feedback_enabled` 也不获得删除权限，宿主拒绝调用。确认不跨轮保存或自动重放。此规则替代上文历史说明中的绝对禁止删除表述，不扩大其他删除权限。

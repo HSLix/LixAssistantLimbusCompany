@@ -1,5 +1,11 @@
 # 当前状态与文档入口
 
+2026-11-15：新增 `delete_component`，仅经用户本次明确反馈删除 Session Candidate 的单个 Python 文件；不修改登记或已发布版本。仅 Developer GUI 两模式可用，CLI／Runtime 均不开放，与 Runtime 人工反馈开关无关。普通定向回归 119 passed、1 skipped；随后独立串行运行真实 pi＋本机 HTTP 替身的两项新增接入测试，2 passed。未运行全量回归、真实模型、Windows 成品或游戏验收。具体边界见 [Agent 用法](agent-repair.md#candidate-component-文件删除2026-11-15)。
+
+2026-11-14：Agent 图片编号改由 pi 扩展保存在内存中，新图在工具循环安全边界经现有管道查询已落盘日志编号；删除会与 Windows 读取竞争的共享 `image-index.json`，不改变图片、历史编号及权限。见[影响、维护评判与验证](agent-image-index-impact-review.md)。Windows 成品验收仍待完成。
+
+2026-11-14：User／Developer 通知改为各窗口右下角卡片浮层，跨页面保留且不自动消失；收起仅展示最新一条与总数角标，展开限高滚动，支持关闭单条、全部清除及原有详情。展开阅读期间新通知先提示、不跳动；不展示运行进度。见[设计影响与实施验证](notification-overlay-impact-review.md)。普通定向回归 128 passed、2 skipped，已检查中英文、明暗主题及小窗口离屏截图；未完成全量、原生焦点／IPC、Windows 成品或游戏验收。
+
 2026-11-14：SIFT 新增正式 `observe.match_feature`，复用当前截图、observe 权限、正式素材校验、统一 NMS、Trace 和非空使用索引；调试与正式最小内点比例默认 0.4，NMS IoU 默认 0.4。见[影响审查与验证](sift-trusted-action-impact-review.md)和[用法](developer-workflow-tutorial.md#sift-特征匹配)。普通针对性回归 201 passed。已有数据目录的 workflow-conventions Skill 不自动覆盖，需人工合并新增指导。Windows／真实游戏尚未验收。
 
 2026-11-13：Agent 常驻提示及 `read` 工具说明明确 Skill 正文和附图统一使用 `read` 与绝对路径，`knowledge_*` 仅访问外部知识库；知识库读取分开报告文件缺失／非普通文件和超过 2 MiB。见[影响审查与验证](skill-image-read-impact-review.md)。针对性普通回归 42 passed；未运行真实 pi／模型、Windows 或游戏验收。

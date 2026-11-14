@@ -23,7 +23,6 @@ from .agent_diagnostics import AgentDiagnosticError, redact, error_details
 from .agent_log import LogStore
 from .agent_prompts import system_prompt, FORMAT_RETRY_PREFIX, FORMAT_RETRY
 from .agent_skills import skill_snapshot
-from .work_files import work_file
 
 
 class RepairLog:
@@ -46,7 +45,6 @@ class RepairLog:
         self.transport_error = None
         self.on_event = on_event
         self.raw_content = {}
-        self.image_index_path = None
         self.image_ids = {}
         self.event_sequence = sum(1 for _ in (self.path / "events.jsonl").open(encoding="utf-8")) if (self.path / "events.jsonl").exists() else 0
 
@@ -108,8 +106,6 @@ class RepairLog:
                 self.image_ids.setdefault(hashlib.sha256(content).hexdigest(), f"{self.event_sequence}:{image_number}")
                 image_number += 1
         index_images(value)
-        if image_number and self.image_index_path:
-            self.write_image_index()
         event = self.clean({"time": datetime.now(timezone.utc).isoformat(), "conversation": self.identity, "round": self.group, "event": value})
         with (self.path / "events.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(self.store.pack(event), ensure_ascii=False) + "\n")
@@ -122,12 +118,15 @@ class RepairLog:
         if value.get("type") == "skill_warning":
             print("WARNING: " + self.clean(value["message"]), file=sys.stderr, flush=True)
 
-    def write_image_index(self):
-        """完整写入后原子发布索引，避免 pi 并发读取到截断 JSON。"""
-        with work_file(dir=self.image_index_path.parent, prefix=".image-index-") as stream:
-            stream.write(json.dumps(self.image_ids).encode("utf-8"))
-            stream.close()
-            Path(stream.name).replace(self.image_index_path)
+    def image_references(self, digests):
+        """只返回已记录图片的编号；RPC 顺序保证查询前的图片事件已落盘。"""
+        if not isinstance(digests, list) or any(
+                not isinstance(digest, str) or len(digest) != 64
+                or any(char not in "0123456789abcdef" for char in digest) for digest in digests):
+            raise ValueError("图片编号查询必须是 SHA-256 列表。")
+        if any(digest not in self.image_ids for digest in digests):
+            raise ValueError("图片尚无已记录的本地编号，未更新上下文。")
+        return {digest: self.image_ids[digest] for digest in digests}
 
     def stream(self, value):
         """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
@@ -363,6 +362,7 @@ class RepairConversation:
             tools.cancelled.clear()
             tools.requested_manifest_id = None
             tools.created_files.clear()
+            tools.deleted_files.clear()
             tools.knowledge.begin_round()
             prior_history = list(self.history)
             context_options = dict(options)
@@ -451,11 +451,8 @@ class RepairConversation:
                     bootstrap_path = Path(temporary) / "context-bootstrap.json"
                     bootstrap_path.write_text(json.dumps(bootstrap, ensure_ascii=False), encoding="utf-8")
                     self.log.image_ids.update(bootstrap["image_ids"])
-                    self.log.image_index_path = Path(temporary) / "image-index.json"
-                    self.log.write_image_index()
                     session_file = checked_session_file((self.session.path if self.session else self.log.root) / "pi")
                     env["LALC_PI_CONTEXT_BOOTSTRAP"] = str(bootstrap_path)
-                    env["LALC_PI_IMAGE_INDEX"] = str(self.log.image_index_path)
                     env["LALC_PI_SESSION_FILE"] = str(session_file)
                     env["LALC_PI_SESSION_ID"] = self.log.identity
                     command.remove("--no-session")
@@ -503,15 +500,19 @@ class RepairConversation:
                                     self.history.append(self.log.clean(received))
                                 if received.get("role") == "assistant":
                                     last = received
-                            elif kind == "lalc_compaction" and item.get("phase") == "failed":
-                                raise RuntimeError(item.get("error", "上下文压缩失败"))
+                            elif kind == "lalc_context_error" or kind == "lalc_compaction" and item.get("phase") == "failed":
+                                raise RuntimeError(item.get("error", "上下文处理失败"))
                             elif kind == "extension_error" or (kind == "response" and not item.get("success")):
                                 raise RuntimeError(str(item))
                             elif kind == "extension_ui_request":
                                 title = item.get("title", "")
                                 if item.get("method") != "input":
                                     raise RuntimeError("Unexpected interactive request")
-                                if title.startswith("lalc.validate:"):
+                                if title.startswith("lalc.image_ids:"):
+                                    stage = "image_index"
+                                    digests = json.loads(title.removeprefix("lalc.image_ids:"))
+                                    value = json.dumps(self.log.image_references(digests))
+                                elif title.startswith("lalc.validate:"):
                                     if "validate" not in self.allowed:
                                         raise ValueError("当前模式和入口不允许 validate。")
                                     stage = "validation"
@@ -588,14 +589,14 @@ class RepairConversation:
                     self.append_user({"role": "user", "timestamp": int(datetime.now().timestamp() * 1000),
                         "content": [{"type": "text", "text": prompt["message"]}, *prompt.get("images", [])]})
                 self.log.transport_dir = None
-                self.log.image_index_path = None
                 tools.cancelled.set()
                 try:
                     after = candidate_files(self.host.candidate)
                     self.log.snapshot(f"{prefix}/final", after)
                     changed = [name for name in before.keys() | after.keys() if before.get(name) != after.get(name)]
                     unauthorized = [name for name in changed if name not in set(names) | tools.created_files
-                                    or name not in after or name not in before and name not in tools.created_files]
+                                    or name not in after and name not in tools.deleted_files
+                                    or name not in before and name not in tools.created_files]
                     if unauthorized:
                         result.update(status="incomplete", reason="unauthorized_changes", unauthorized_files=unauthorized)
                         result["error"] = "发现未授权文件变更：" + ", ".join(unauthorized)
