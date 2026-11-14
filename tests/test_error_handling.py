@@ -350,7 +350,7 @@ def test_gui_completed_task_failure_is_reported_once(tmp_path, monkeypatch):
     owner = GuiCoordinator(service, ApplicationLifecycle())
     window = owner.open_window()
     notices = []
-    monkeypatch.setattr(window.notifications, "notify", lambda *args: notices.append(args))
+    monkeypatch.setattr(window.notifications, "notify", lambda *args, **kwargs: notices.append(args))
     window.owns_run = True
     state = {**service.state, "phase": "finished", "run_id": 1, "result": {
         "status": "interrupted", "reason": "execution_failed",

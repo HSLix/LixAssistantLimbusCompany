@@ -193,7 +193,7 @@ def test_catalog_covers_literal_gui_messages_and_preserves_format_fields(app):
     messages = {item.findtext("source"): item.findtext("translation") for item in catalog.findall("context/message")}
     fields = lambda value: sorted(field for _, field, _, _ in Formatter().parse(value) if field is not None)
     install_translations(app, "zh_CN")
-    for filename in ("gui.py", "developer_gui.py", "template_match_gui.py", "run_log_gui.py", "repair_chat.py", "chat_attachments.py", "page_preview.py", "sharing_gui.py", "lifecycle.py", "i18n.py"):
+    for filename in ("gui.py", "notifications.py", "developer_gui.py", "template_match_gui.py", "run_log_gui.py", "repair_chat.py", "chat_attachments.py", "page_preview.py", "sharing_gui.py", "lifecycle.py", "i18n.py"):
         for node in ast.walk(ast.parse((root / filename).read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr":
                 assert isinstance(node.args[0], ast.Constant), (filename, node.lineno)
@@ -251,9 +251,8 @@ def test_dynamic_controls_chat_and_notifications_keep_original_details(owner, ap
     assert dialog.stop.text() == ("停止" if language == "zh_CN" else "Stop")
     dialog.done(0)
     developer.notifications.notify(tr("Execution completed"), "原始结果 raw")
-    from qfluentwidgets import InfoBar
-    bar = developer.notifications.findChildren(InfoBar)[0]
-    assert bar.titleLabel.text() == ("执行完成" if language == "zh_CN" else "Execution completed")
+    card = developer.notifications.cards[0]
+    assert card.title_label.text() == ("执行完成" if language == "zh_CN" else "Execution completed")
     error = ErrorDialog("原文错误", "原文 details", fatal=True)
     assert error.windowTitle() == ("致命错误" if language == "zh_CN" else "Fatal error")
     assert error.details.toPlainText() == "原文 details"

@@ -248,15 +248,15 @@ def test_owner_close_cancels_waits_and_cancelled_confirmation_keeps_window(windo
 
 
 def test_notifications_coexist_and_require_manual_dismissal(windows):
-    from PySide6.QtWidgets import QPushButton
     app, _, user, _ = windows
     user.notifications.notify('第一条')
     user.notifications.notify('第二条')
     app.processEvents()
     assert user.notifications.messages.count() == 2
-    row = user.notifications.messages.itemAt(0).widget()
-    assert row.duration == -1
-    row.closeButton.click()
+    newest, previous = user.notifications.cards
+    assert newest.isVisible() and not previous.isVisible()
+    assert newest.badge.text() == '2'
+    newest.close_button.click()
     from PySide6.QtCore import QCoreApplication, QEvent
     QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
     assert user.notifications.messages.count() == 1

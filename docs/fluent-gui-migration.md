@@ -30,7 +30,7 @@
 - User 的 Dashboard、General Settings 固定置顶，随后加入外置页；页面沿用 QWidget、稳定页面 ID 与 submit/save 契约，宿主将页面 ID 设置为导航 objectName。页面切换使用原生 Fluent 路由，关闭切换动画以保留同步选中语义，不保留隐藏 QListWidget 或额外导航兼容层。
 - Developer 的 Capture、Agent Settings、Agent Repair 直接进入 Fluent 导航，替代旧页签。Selected Manifest、刷新与试运行按钮保留在窗口级内容区，独立于 Default 与 Candidate。长设置页使用原生滚动区，避免撑出屏幕。
 - 复用现有 SettingsPage、CapturePage、RepairPage、CropView 和 RepairChat。基础按钮、标签、输入框、下拉框、次数框使用官方 Fluent 控件；下拉框统一使用命名 userData，文本输入先构造再 setText，没有新增业务控件适配类。
-- NotificationList 的公开 API 保持，内部使用 duration=-1 的 InfoBar，保留多条通知、手动关闭和详情入口。文本按 PlainText 展示，详情仍走已有脱敏及可复制错误对话框。
+- NotificationList 的 `notify(message, details)` 入口保留。2026-11-14 的[通知卡片组设计](notification-overlay-impact-review.md)替代原 InfoBar 纵向堆叠：使用窗口级 Fluent CardWidget 浮层，收起显示最新一条与总数角标，展开限高滚动，不自动消失。文本按 PlainText 展示，详情仍走已有脱敏及可复制错误对话框。
 - 任务滚动区保留原生 QScrollArea 与 AlwaysOn；运行/错误 QDialog 的所属窗口模态、取消、输入释放和日志清理逻辑保持。告警按钮仍使用会话级状态与脉冲动画。
 - 请求重载和最后窗口关闭先 exit(0) 退出事件循环，再执行既有 finally 清理与锁释放；清理失败不启动新实例。禁止任一侧活动/后台操作期间重载、恢复窗口及临时密钥边界保持。
 

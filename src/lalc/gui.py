@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from qfluentwidgets import (
-    FluentWindow, FluentIcon, InfoBar, InfoBarIcon, InfoBarPosition,
+    FluentWindow, FluentIcon, InfoBarIcon,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
     TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet, CustomStyleSheet,
     setStyleSheet as setFluentStyleSheet,
@@ -31,6 +31,7 @@ from qfluentwidgets import (
 )
 
 from .i18n import tr
+from .notifications import NotificationList
 
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
@@ -239,8 +240,7 @@ class MainWindow(FluentWindow):
             self.addSubInterface(page, icon, name)
         self.widgetLayout.removeWidget(self.stackedWidget)
         layout.addWidget(self.stackedWidget, 1)
-        self.notifications = NotificationList()
-        layout.addWidget(self.notifications)
+        self.notifications = NotificationList(self)
         self.widgetLayout.addWidget(root)
         self.render_state(service.status)
 
@@ -378,7 +378,7 @@ class MainWindow(FluentWindow):
         if state["phase"] == "finished":
             if self.owns_run and not trial:
                 result = state.get("result") or {}
-                self.notifications.notify(tr('Execution completed') if result.get("status") == "completed" and result.get("all_tasks_succeeded") else tr('Execution completed with failed tasks') if result.get("status") == "completed" else tr('Execution interrupted'), result_diagnostics(result))
+                self.notifications.notify_result(result)
             self.owns_run = False
             result = state.get("result") or {}
             if result.get("fatal"):
@@ -386,27 +386,6 @@ class MainWindow(FluentWindow):
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
         for page in (self.capture_page, self.recognition_page, self.settings_page, self.repair_page):
             page.render(busy)
-
-
-class NotificationList(QWidget):
-    """统一应用内持久通知；多条共存，仅由用户关闭，不跨进程保留。"""
-
-    def __init__(self):
-        super().__init__()
-        self.messages = QVBoxLayout(self)
-        self.messages.setContentsMargins(0, 0, 0, 0)
-
-    def notify(self, message: str, details: str = "") -> None:
-        bar = InfoBar(InfoBarIcon.INFORMATION, message, "", duration=-1,
-                      position=InfoBarPosition.NONE, parent=self)
-        bar.titleLabel.setTextFormat(Qt.TextFormat.PlainText)
-        bar.contentLabel.setTextFormat(Qt.TextFormat.PlainText)
-        if details:
-            button = QPushButton(tr('Details'), bar)
-            button.clicked.connect(lambda: ErrorDialog(message, details, error=False, parent=self.window()).open())
-            bar.addWidget(button)
-        self.messages.addWidget(bar)
-        bar.show()
 
 
 class UserWindow(MainWindow):
@@ -523,8 +502,7 @@ class UserWindow(MainWindow):
         self.start_button = PrimaryPushButton(tr('Start Plan'))
         self.start_button.clicked.connect(lambda: self._interact(self.start_plan))
         left.addWidget(self.start_button)
-        self.notifications = NotificationList()
-        left.addWidget(self.notifications)
+        self.notifications = NotificationList(self)
         information = QVBoxLayout()
         information.setSpacing(12)
         for title, message in ((tr('Announcements'), tr('Announcements are not connected yet')), (tr('Disclaimer'), tr('The software disclaimer is not connected yet')),
@@ -992,8 +970,7 @@ class UserWindow(MainWindow):
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
             else:
-                message = (tr('Execution completed') if result.get("all_tasks_succeeded") else tr('Execution completed with failed tasks')) if result.get("status") == "completed" else tr('Execution interrupted')
-                self.notifications.notify(message, result_diagnostics(result))
+                self.notifications.notify_result(result)
                 update = state.get("default_update")
                 if update:
                     self.notifications.notify(tr('Repaired version is now the default') if update["status"] == "changed"
