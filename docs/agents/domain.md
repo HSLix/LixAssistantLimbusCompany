@@ -25,7 +25,7 @@
 ## 跨范围边界
 
 - 已发布 Manifest 和正式源码保持不可变；Candidate、Default 与运行中的 Working Manifest 职责不同。Publish 与 Default 选择分开。
-- Assets 独立于 Manifest；旧图像不覆盖，Agent 删除仅走开发策略已授权的专用归档路径。Runtime 无删除权限，不继承 Workbench 工具。
+- Assets 独立于 Manifest；旧图像不覆盖，Agent 删除仅走开发策略已授权的专用归档路径。Candidate 单文件确认删除仅限 Developer GUI；Runtime 无删除权限，不继承 Workbench 工具。
 - Trusted Actions 由应用登记，经 `ctx.action()` 保留权限、校验、Trace、错误与中断边界，不能改为直接后端调用。
 - Session 的固定模式、来源与草稿独立于手工 Candidate；历史附件及日志不构成授权。页面安装仍需专用人工审批。
 - 工作目录与待提交文件采用普通创建方式继承父目录权限；无明确且记录在案的理由不得使用临时目录，清理及事务边界仍须保留（见根目录 `AGENTS.md`）。

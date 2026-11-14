@@ -6,7 +6,7 @@ BASE_TOOLS = ("read", "edit", "validate", "asset_tree", "asset_directory", "asse
               "list_manifests", "read_manifest", "read_manifest_source",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
 KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git")
-GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback",)
+GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback", "delete_component")
 PAGE_TOOLS = ("page_list", "page_read", "page_create", "page_update", "page_resource", "page_preview", "page_set_enabled")
 MANIFEST_REFERENCE_TOOLS = ("list_manifests", "read_manifest", "read_manifest_source")
 HISTORY_TOOLS = ("list_game_versions", "search_agent_sessions", "read_agent_session")

@@ -33,3 +33,6 @@ Runtime 可复用只读知识库／Skills／历史及关联日志。Developer GU
 所有启动入口的 `use_saved_config` 默认为 True，读取保存的页面配置和启用任务次数；False 才使用显式 RunState 初始数据，省略为空。Developer 独立试运行不启动 Runtime Agent，失败交回原 Developer Agent。Default 写入失败保留已完成的执行结果和旧 Default，另行通知。重启恢复达到统一上限且 Agent 未启用或无法介入时终止整个 Run，无需额外确认游戏退出。
 
 旧已发布 Manifest 允许只读、校验路径和源码哈希后复制为修复草稿；复制不导入或执行代码。修改旧 Plan 签名并完整校验后才能重新发布，仍不提供旧参数兼容层。实施及验证见[Stage 6 记录](../stage-6-implementation.md)。
+
+
+2026-11-15：用户明确要求增加 `delete_component`，替代此前对 Candidate 文件删除的绝对禁止。仅 Developer GUI Construct／Repair 可在检查用户请求、当前情景和影响后，请求本次人工确认并仅删除对应 Candidate Python 文件；CLI／Runtime 均不开放，Runtime 人工反馈开关不授予删除权限。宿主要求用户输入绑定目标路径的完整确认文字，等待期间草稿内容变化、跳过、拒绝或取消均不得删除。保留 Manifest／调用方编辑与 Validate 的独立职责，不删除不可变历史或其他资源。详见 [Agent 用法](../agent-repair.md#candidate-component-文件删除2026-11-15)。

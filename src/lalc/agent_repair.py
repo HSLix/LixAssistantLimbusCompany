@@ -362,6 +362,7 @@ class RepairConversation:
             tools.cancelled.clear()
             tools.requested_manifest_id = None
             tools.created_files.clear()
+            tools.deleted_files.clear()
             tools.knowledge.begin_round()
             prior_history = list(self.history)
             context_options = dict(options)
@@ -594,7 +595,8 @@ class RepairConversation:
                     self.log.snapshot(f"{prefix}/final", after)
                     changed = [name for name in before.keys() | after.keys() if before.get(name) != after.get(name)]
                     unauthorized = [name for name in changed if name not in set(names) | tools.created_files
-                                    or name not in after or name not in before and name not in tools.created_files]
+                                    or name not in after and name not in tools.deleted_files
+                                    or name not in before and name not in tools.created_files]
                     if unauthorized:
                         result.update(status="incomplete", reason="unauthorized_changes", unauthorized_files=unauthorized)
                         result["error"] = "发现未授权文件变更：" + ", ".join(unauthorized)
