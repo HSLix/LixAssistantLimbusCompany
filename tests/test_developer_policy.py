@@ -165,3 +165,32 @@ def test_trial_log_failure_does_not_leave_game_running(tmp_path, monkeypatch):
         with pytest.raises(OSError, match="interaction log"):
             tools.trial_run(saved.manifest_id, logical_name="steps.total", inputs={"values": []})
         assert host.service.state["phase"] == "finished"
+
+
+def test_validate_and_publish_replaces_old_agent_tools(tmp_path):
+    """所有 Agent 入口合并校验与发布，失败不保存版本，成功返回可用 ID。"""
+    from lalc.agent_policy import allowed_tools
+    from lalc.agent_log import read_json
+
+    for mode, entry in [("Construct", "gui"), ("Repair", "gui"), ("Repair", "cli"), ("Repair", "runtime")]:
+        names = allowed_tools(mode, entry)
+        assert "validate_and_publish" in names
+        assert not {"validate", "publish"} & set(names)
+    host, original = host_for(tmp_path)
+    tools = host.conversation.tools
+    before = host.manager.list_manifests()
+    for name in ("validate", "publish"):
+        assert read_json(tools.call(name, {}))["isError"]
+    source = host.candidate / "steps.total.py"
+    valid = source.read_text(encoding="utf-8")
+    source.write_text("def broken(:", encoding="utf-8")
+    failed = read_json(tools.call("validate_and_publish", {}))
+    assert failed["isError"] and failed["details"]["errors"]
+    assert host.manager.list_manifests() == before
+    source.write_text(valid, encoding="utf-8")
+    published = read_json(tools.call("validate_and_publish", {}))
+    assert published["details"]["ok"]
+    identity = published["details"]["manifest_id"]
+    assert identity != original.manifest_id
+    assert identity in {item["manifest_id"] for item in host.manager.list_manifests()}
+    assert host.manager.default_manifest_id() == original.manifest_id

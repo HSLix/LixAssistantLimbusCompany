@@ -141,7 +141,7 @@ def execute(ctx, *, value: int) -> str:
         seen.append((self.session.identity, request_limit, self.tools.read_run_state()["details"]))
         if len(seen) == 2:
             (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text(encoding="utf-8"))["components"]["steps.break"]["source_path"]).write_text(NEW_STEP, encoding="utf-8")
-        published = read_json(self.tools.call("publish", {"summary": "修复失败入口"}))
+        published = read_json(self.tools.call("validate_and_publish", {"summary": "修复失败入口"}))
         assert published["details"]["ok"]
         selected = published["details"]["manifest_id"]
         handoff = read_json(self.tools.call("recheck", {"manifest_id": selected}))
@@ -176,7 +176,7 @@ def test_rule_limit_hands_off_and_step_success_resets_counter(tmp_path, monkeypa
     async def round(self, message, args, **kwargs):
         counts.append(self.tools.run_state.recovery_count)
         (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text(encoding="utf-8"))["components"]["steps.break"]["source_path"]).write_text(NEW_STEP, encoding="utf-8")
-        saved = read_json(self.tools.call("publish", {"summary": "修复反复失败"}))["details"]["manifest_id"]
+        saved = read_json(self.tools.call("validate_and_publish", {"summary": "修复反复失败"}))["details"]["manifest_id"]
         return {"status": "recheck", "manifest_id": saved, "requests": 1}
     monkeypatch.setattr(RepairConversation, "run", round)
     service = ApplicationService(tmp_path, manifest_manager=manager)

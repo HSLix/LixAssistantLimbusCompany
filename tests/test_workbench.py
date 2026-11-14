@@ -47,7 +47,7 @@ def test_mode_entry_policy_and_host_reject_before_dispatch(tmp_path, monkeypatch
     chat = session.conversation()
     chat.tools.allowed = frozenset({'read_manifest'})
     monkeypatch.setattr(chat.tools, 'publish', lambda: pytest.fail('forbidden dispatch'))
-    result = read_json(chat.tools.call('publish', {}))
+    result = read_json(chat.tools.call('validate_and_publish', {}))
     assert result['isError'] and '不允许' in result['details']['message']
     monkeypatch.setitem(MODE_TOOLS, 'Construct', frozenset({'read'}))
     assert allowed_tools('Construct', 'gui') == ('read',)

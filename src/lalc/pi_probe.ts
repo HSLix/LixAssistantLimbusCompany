@@ -262,18 +262,6 @@ export default async function (pi) {
         return edit.execute(id, { ...params, path }, signal, onUpdate);
       },
     });
-    pi.registerTool({
-      name: "validate", label: "Validate Developer Candidate",
-      description: "Validate the complete current candidate Manifest and return actual errors. Does not run the workflow or publish.",
-      parameters: Type.Object({}),
-      async execute(_id, _params, _signal, _update, ctx) {
-        // 复用 RPC 已有请求/响应通道，由 Python 宿主校验；不会向用户交互提问。
-        authorize("validate");
-        const value = await ctx.ui.input("lalc.validate:" + _id);
-        if (value === undefined) throw new Error("Validation cancelled");
-        return { content: [{ type: "text", text: value }], details: JSON.parse(value) };
-      },
-    });
     const logicalName = Type.String({ description: "Complete Asset logical name, e.g. ui/claim" });
     const sourceParameters = Type.Object({ filename: Type.String(), logical_name: Type.String(), source: Type.String() });
     const paging = { offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 200 })) };
@@ -326,7 +314,7 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
       { name: "list_manifests", description: "List published Manifest IDs with paging. Read only; does not load Python or change selections.", parameters: Type.Object(paging) },
       { name: "read_manifest", description: "Read registered members of an explicit published Manifest. No attachment required. Returns identity and continuation offset; does not execute source.", parameters: Type.Object({ manifest_id: Type.String(), ...paging }) },
       { name: "read_manifest_source", description: "Read verified source of a registered member in an explicit published Manifest, paged by lines (zero-based offset). No import, execution or copying to Candidate. Does not change selection.", parameters: Type.Object({ manifest_id: Type.String(), section: Type.Union([Type.Literal("components"), Type.Literal("recovery_rules")]), logical_name: Type.String(), ...paging }) },
-      { name: "publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default. Runtime MUST supply summary describing this repair; host saves it as AdditionalMessage. Developer publishes before trial_run; Runtime publishes before recheck.", parameters: Type.Object({ summary: Type.Optional(Type.String({ minLength: 1 })) }) },
+      { name: "validate_and_publish", description: "Validate the complete Developer Candidate and save immutable hashed Component source and a new Manifest ID. Does not change Default. Runtime MUST supply summary describing this repair; host saves it as AdditionalMessage. After Candidate changes, call validate_and_publish to validate and save the revision; fix returned errors and retry. Developer uses the returned Manifest ID for trial_run; Runtime uses it for recheck.", parameters: Type.Object({ summary: Type.Optional(Type.String({ minLength: 1 })) }) },
       { name: "trial_run", description: "Run an explicitly saved Manifest and wait for its actual result and Run ID. Modified Candidate code MUST be published first to enter the immutable hash index. Omit logical_name to run the saved Manifest unique Python Plan with no business inputs. use_saved_config defaults true and reads saved page settings/counts; set false to use explicit run_state or empty state. Never launches Runtime Agent repair inside a Developer trial. A rejected start has no Run ID; fix the cause before retrying. Results return within this round without resetting the request budget.",
         parameters: Type.Object({ manifest_id: Type.String(), logical_name: Type.Optional(Type.String()),
           inputs: Type.Optional(Type.Record(Type.String(), Type.Any())), use_saved_config: Type.Optional(Type.Boolean()),

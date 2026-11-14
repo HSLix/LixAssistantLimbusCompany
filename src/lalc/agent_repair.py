@@ -512,14 +512,6 @@ class RepairConversation:
                                     stage = "image_index"
                                     digests = json.loads(title.removeprefix("lalc.image_ids:"))
                                     value = json.dumps(self.log.image_references(digests))
-                                elif title.startswith("lalc.validate:"):
-                                    if "validate" not in self.allowed:
-                                        raise ValueError("当前模式和入口不允许 validate。")
-                                    stage = "validation"
-                                    errors = self.host.manager.validate(self.host.candidate / "manifest.json")
-                                    validation = {"ok": not errors, "errors": [error.as_dict() for error in errors]}
-                                    self.log.record({"type": "validation", "toolCallId": title.removeprefix("lalc.validate:"), **validation})
-                                    value = json.dumps(self.log.clean(validation))
                                 elif title.startswith("lalc.tool:"):
                                     request = json.loads(title.removeprefix("lalc.tool:"))
                                     stage = "tool:" + request["name"]

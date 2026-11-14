@@ -96,7 +96,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 
 [ADR 0030](adr/0030-developer-policy-publish-and-trial-tools.md) 允许 Agent 在一次开发者消息中自主重复修改、校验、发布、试运行和读日志。此规则优先于旧有“Agent 不自动 Publish/运行”的说明，与 Stage 3.5 Runtime Policy 分开。
 
-- `publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`，不改变 Default，不授予运行时永久批准。
+- `validate_and_publish()`：完整校验并保存哈希源码及新的 Manifest UUID，返回 `manifest_id`；修改 Candidate 后用此工具校验并发布，不再提供独立的 Agent `validate` 或 `publish` 工具。不改变 Default，不授予运行时永久批准。
 - `trial_run(manifest_id, logical_name=..., inputs=...)`：试运行已保存版本中的 Task Workflow、Subworkflow 或 Step。Plan 省略 logical_name，普通 inputs 必须为空。`use_saved_config` 默认 True，采用页面保存配置及已启用任务次数；False 才采用显式 `run_state={"task_repetitions": {}, "settings": {}}`，未提供字段为空。只加载该已发布 Manifest 的唯一 Python Plan，不接受文件路径。独立试运行失败交给原 Developer Agent，不启动 Runtime Agent。修改 Candidate 后先重新 Publish 才能运行新代码。
 - 启动拒绝返回 `run_id: null`、原因及修正后重试的提示；实际启动的运行结果包含 Run ID、请求信息、真实结果及日志事件索引。正常返回只代表该入口契约满足，不能代替整个开发目标的验收。
 - `list_runs(offset=0, limit=100)`：按 Run ID 新到旧分页，返回 ID 与开始／结束时间、耗时、状态、入口 logical name、Manifest ID、来源（Agent 试运行／用户运行／未知）、结果和失败原因。缺失字段不推断，缺少结束记录不等于仍运行。

@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-15：Agent 工具移除独立 `validate`，将 `publish` 更名为 `validate_and_publish`，直接复用发布入口的完整校验与不可变版本保存；修改 Candidate 后校验并发布，失败返回错误供修正。GUI／CLI 手工校验及发布不变，发布仍不改变 Default。见[Agent 用法](agent-repair.md)。已有数据目录的 Skills 不自动覆盖，旧指导需人工合并。
+
 2026-11-15：Agent 素材归档默认需本次 feedback 确认，用户明确要求可直接归档；新增同权限 `restore_asset(logical_name, sha)` 按完整 hash 恢复原图及标签。见[影响审查](asset-archive-impact-review.md)及[工具契约](agent-repair.md#agent-素材预览与归档)。
 
 2026-11-15：按用户决定移除仓库 `example/`，保留测试自有语言页面夹具，页面契约迁至[页面接口](business-settings-pages.md)。审查、引用调整和验证限制见[移除记录](example-removal-impact-review.md)。

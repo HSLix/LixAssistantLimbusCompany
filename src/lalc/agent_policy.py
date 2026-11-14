@@ -1,8 +1,8 @@
 """开发模式与入口的固定授权；历史消息不参与权限计算。"""
 
-BASE_TOOLS = ("read", "edit", "validate", "asset_tree", "asset_directory", "asset_images",
+BASE_TOOLS = ("read", "edit", "asset_tree", "asset_directory", "asset_images",
               "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
-              "publish", "trial_run", "list_runs", "read_run_log", "search_run_logs", "preview_crop", "remove_asset", "restore_asset",
+              "validate_and_publish", "trial_run", "list_runs", "read_run_log", "search_run_logs", "preview_crop", "remove_asset", "restore_asset",
               "list_manifests", "read_manifest", "read_manifest_source",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
 KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git")

@@ -563,10 +563,8 @@ def test_blank_construct_adds_task_publishes_and_trials_plan(conversation, monke
             return tool('edit', {'path': 'plan.py', 'oldText': '    return None',
                                  'newText': '    ctx.call("tasks.built")\n    return None'})
         if count == 3:
-            return tool('validate', {})
+            return tool('validate_and_publish', {})
         if count == 4:
-            return tool('publish', {})
-        if count == 5:
             identity = chat.host.manager.list_manifests()[0]['manifest_id']
             return tool('trial_run', {'manifest_id': identity})
         return answer('built and tried')
