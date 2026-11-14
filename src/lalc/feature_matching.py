@@ -82,7 +82,7 @@ def detect_features(image, template, *, region=None, grayscale=True, scale=3, cl
                     nfeatures=0, n_octave_layers=3, contrast_threshold=0.04,
                     edge_threshold=10.0, sigma=1.6, precise_upscale=False,
                     pair_ratio=0.75, ransac_threshold=4 / 3, min_inliers=6,
-                    min_inlier_ratio=0.5, min_scale=0.5, max_scale=2.0,
+                    min_inlier_ratio=0.4, min_scale=0.5, max_scale=2.0,
                     max_deformation=2.0, min_coverage=0.1):
     """反向配对后迭代提取多个几何模型；内点比例只统计当前候选范围。"""
     for value in (image, template):

@@ -104,6 +104,25 @@ User GUI 的 Logs 可按 Run 查看这些日志。Trusted Action 由执行器自
 
 每次匹配重新读取该逻辑名目录和标签，并固定本次候选/标签。新增图片或改标签从下一次匹配生效，包括同一 Run；不需要 publish 或 set-default，也不建立跨调用缓存。observe.crop_asset 同样可传 tags，始终重新截图，保存后立即可被后续匹配发现。
 
+### SIFT 特征匹配
+
+模板匹配不足以应对目标缩放或形变时，可显式使用应用提供的 SIFT 动作：
+
+```python
+ctx.action("observe.capture_screen")
+matches = ctx.action("observe.match_feature", asset="mirror/node/regular_encounter")
+```
+
+该动作只读取当前已捕获的客户区帧，不隐式刷新或保存截图。按逻辑名尝试全部模板，不使用优先标签短路。
+提供[识别调试页](template-match-lab.md#特征匹配sift)相同的全部 SIFT 参数，另有 `region`、`nms`、`nms_iou_threshold`；
+最小内点比例 `min_inlier_ratio=0.4`、NMS 默认开启且 IoU 阈值 0.4。按内点数降序合并后统一 NMS，同分按 y、x、模板哈希排序。
+`score` 是内点数，不能与模板相似度直接比较。结果保留原图框、`centerxy`、内点数／比例、模板及目标覆盖率、几何指标、
+模板路径／哈希／标签、逻辑名、归一化框和 observation。多个命中由业务代码判断歧义，不自动点击。
+
+动作属于 observe，沿用当前执行阶段的观察权限及统一 Trace；成功的非空匹配更新 Asset Usage Index，事件注明 SIFT 和实际参数。
+不存在的逻辑名、坏素材和非法参数报错；存在但未命中返回 `[]`。需要图像证据时显式截图保存或 `ctx.log(..., screenshot=True)`。
+SIFT 全图放大和整组匹配可能耗时；低纹理、重复图案、遮挡或透视退化仍可能误检或漏检。
+
 ## 证据和边界
 
 `lalc data-dir` 查看数据根。图片在 assets/，裁剪来源在 asset-provenance/。Trace 的 asset_matched 记录优先条件、实际尝试模板、所选批次和最终检测结果；asset-usage.json 按逻辑名保存最近一次非空返回及来源，空结果不更新，不等待 Step 成功，也不影响搜索区域。普通截图不落盘，显式 `save=True` 才保存证据。

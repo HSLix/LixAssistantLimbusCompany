@@ -307,7 +307,7 @@ class DeveloperHost:
                                   match["y"] + match["height"] // 2)} for match in matches]
 
     def match_feature_preview(self, snapshot, name, digest=None, *, region=None,
-                              nms=True, nms_iou_threshold=0.5, **options):
+                              nms=True, nms_iou_threshold=0.4, **options):
         """只读尝试整组或单图的全部特征目标；不短路，不写运行记录。"""
         import math
         from .assets import asset_name

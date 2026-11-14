@@ -1,4 +1,4 @@
-"""语义 Asset 的校验、完整哈希保存、模板匹配与独立使用索引。"""
+"""语义 Asset 的校验、完整哈希保存、图像匹配与独立使用索引。"""
 
 from __future__ import annotations
 
@@ -262,9 +262,9 @@ class AssetLibrary:
         observation: int, emit: Callable[[str, dict[str, Any]], None],
         priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
-        record_usage: bool = True,
+        record_usage: bool = True, _feature_options: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """每次读取目录及标签；调试可关闭使用索引写入，正式调用默认保留。"""
+        """每次读取目录及标签；内部 SIFT 参数切换算法，调试可关闭使用索引。"""
         import math
         from .recognition import checked_region, client_image, decode_image, detect_template, suppress_overlaps
         asset_name(name)
@@ -299,10 +299,14 @@ class AssetLibrary:
                 attempted.append(entry)
                 template = decode_image(self.read({key: entry[key] for key in ("path", "sha256")}))
                 # 跨模板统一 NMS，避免先抑制同模板的框导致最终结果丢失。
-                found = detect_template(image, template, region=area, threshold=threshold, nms=False)
+                if _feature_options is None:
+                    found = detect_template(image, template, region=area, threshold=threshold, nms=False)
+                else:
+                    from .feature_matching import detect_features
+                    found = detect_features(image, template, region=area, **_feature_options)
                 for detection in found:
                     normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
-                                  for key, value in detection.items() if key != "score"}
+                                  for key, value in detection.items() if key in {"x", "y", "width", "height"}}
                     detections.append({**detection, **entry,
                                        "centerxy": (detection["x"] + detection["width"] // 2,
                                                     detection["y"] + detection["height"] // 2),
@@ -318,6 +322,9 @@ class AssetLibrary:
                  "threshold": threshold, "nms": nms, "nms_iou_threshold": nms_iou_threshold,
                  "priority_tags": preferred_tags, "matched_batch": batch,
                  "templates": attempted, "detections": output}
+        if _feature_options is not None:
+            event.update(method="sift", feature_options=_feature_options)
+            event.pop("threshold")
         emit("asset_matched", event)
         if output and record_usage:
             index_path = self.data_root / "asset-usage.json"

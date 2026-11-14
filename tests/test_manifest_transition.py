@@ -58,7 +58,7 @@ def test_legacy_format_is_rejected_without_writes(tmp_path, version, extra):
 def test_production_action_registration_is_shared_and_not_manifest_owned(tmp_path):
     actions = application_actions()
     manager = ManifestManager(tmp_path, actions=actions)
-    assert set(actions) == {"observe.capture_screen", "observe.match_asset", "observe.crop_asset", "observe.ocr",
+    assert set(actions) == {"observe.capture_screen", "observe.match_asset", "observe.match_feature", "observe.crop_asset", "observe.ocr",
                             "control.click", "control.key_press", "control.drag", "observe.wait", "control.restart_game"}
     actions.clear()
     assert manager.actions["observe.wait"].classification == "observe"
