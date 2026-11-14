@@ -149,7 +149,7 @@ Every matching call rereads candidate names and tags, including inside one Run; 
 
 crop_asset always acquires a new Target Window screenshot and saves its crop with actual observation/region provenance. Existing image bytes are immutable; identical content reuses the same hash path. Tags replace the complete old list, preserving input order and duplicates. Crop and tag-asset write [] when tags are omitted or empty, clearing any existing tags for that hash. tag-asset accepts only an existing local crop with valid provenance/hash/decoding, replaces only tag metadata and does not require Candidate or game access. No external image import, generated template or resource-cleanup service is introduced.
 
-The current primitives are ctx.match_asset(logical_name, priority_tags=None, region=None, threshold=0.9, nms=True, nms_iou_threshold=0.5) and ctx.crop_asset(logical_name, region=..., tags=None), gated by observe actions. A Step cannot bypass these gates. Raw pixels do not cross Component result boundaries; results contain JSON-compatible metadata. Crop/match return contracts explicitly include tag lists.
+The template primitives are ctx.match_asset(logical_name, priority_tags=None, region=None, threshold=0.9, nms=True, nms_iou_threshold=0.5) and ctx.crop_asset(logical_name, region=..., tags=None), gated by observe actions. A Step cannot bypass these gates. Raw pixels do not cross Component result boundaries; results contain JSON-compatible metadata. Crop/match return contracts explicitly include tag lists.
 
 Agent Asset creation remains Stage 3.5, not the current independent Stage 3 Component repair. Future creation can affect the next match without a Manifest trial, but never grants overwrite/delete authority over existing images or Components. Manifest approval still concerns executable capability and does not publish an Asset mapping. ADR 0021 retention remains in force; the developer-authorized one-time disposal of obsolete Asset data for ADR 0027 is not automatic run-end cleanup.
 
@@ -528,3 +528,9 @@ if matches := ctx.action("observe.match_asset", asset="main/drive_unselected"):
 else:
     ctx.log("未找到未选中的 Drive 标识", level="warning", screenshot=True)
 ```
+
+## SIFT observation action (2026-11-14)
+
+`observe.match_feature(asset=..., region=None, nms=True, nms_iou_threshold=0.4, ...)` adds SIFT matching of the existing captured frame. It uses the same observe permission matrix and current-session checks as template matching, without implicit capture, input or screenshot persistence. All templates under the Asset logical name participate; priority-tag short-circuiting does not apply. All SIFT options exposed in the recognition lab are accepted with the same defaults, including `min_inlier_ratio=0.4`.
+
+Results merge before NMS and sort by descending inlier count, then y, x and template hash. They include the existing Asset detection metadata and SIFT inlier, coverage and geometry metrics; `score` is inlier count. Raw pixels do not cross the action boundary. `asset_matched` records `method="sift"` and `feature_options` instead of a template score threshold; non-empty results update the shared usage index. Logs support result boxes without automatically saving images. See [usage](developer-workflow-tutorial.md#sift-特征匹配) and [impact review](sift-trusted-action-impact-review.md).

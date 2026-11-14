@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-14：SIFT 新增正式 `observe.match_feature`，复用当前截图、observe 权限、正式素材校验、统一 NMS、Trace 和非空使用索引；调试与正式最小内点比例默认 0.4，NMS IoU 默认 0.4。见[影响审查与验证](sift-trusted-action-impact-review.md)和[用法](developer-workflow-tutorial.md#sift-特征匹配)。普通针对性回归 201 passed。已有数据目录的 workflow-conventions Skill 不自动覆盖，需人工合并新增指导。Windows／真实游戏尚未验收。
+
 2026-11-13：Agent 常驻提示及 `read` 工具说明明确 Skill 正文和附图统一使用 `read` 与绝对路径，`knowledge_*` 仅访问外部知识库；知识库读取分开报告文件缺失／非普通文件和超过 2 MiB。见[影响审查与验证](skill-image-read-impact-review.md)。针对性普通回归 42 passed；未运行真实 pi／模型、Windows 或游戏验收。
 
 2026-11-13：Developer 聊天使用折叠附件托盘，待发送与已发送附件均显示在对应正文上方；支持图片预览、完整 UUID 提示、待发送逐项删除，以及多附件两行有界滚动。历史恢复复用留存原图，缺失图片显示占位。见[交互规格](stage-5-agent-workbench.md#聊天附件托盘)及[影响审查和实施证据](chat-attachment-tray-impact-review.md)。普通定向回归 113 passed；未运行全量、真实 Agent、Windows 或游戏验收。

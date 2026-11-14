@@ -17,7 +17,7 @@ def action_annotations(record: dict) -> list[dict]:
             return [{"kind": "cross", "x": point[0], "y": point[1]}]
     if name == "control.drag" and all(type(inputs.get(key)) is int for key in ("x", "y", "end_x", "end_y")):
         return [{"kind": "arrow", **{key: inputs[key] for key in ("x", "y", "end_x", "end_y")}}]
-    if name == "observe.match_asset" and isinstance(record.get("return_value"), list):
+    if name in {"observe.match_asset", "observe.match_feature"} and isinstance(record.get("return_value"), list):
         return [{"kind": "box", "number": i, **{key: item[key] for key in ("x", "y", "width", "height")}}
                 for i, item in enumerate(record["return_value"], 1) if isinstance(item, dict)
                 and all(type(item.get(key)) in {int, float} and isfinite(item[key]) for key in ("x", "y", "width", "height"))]

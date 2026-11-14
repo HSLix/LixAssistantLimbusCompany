@@ -747,6 +747,12 @@ class WorkflowExecutor:
             raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
         return self._match_asset(logical_name, **options)
 
+    def match_feature(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
+        """复用素材观察门禁和正式会话回调，仅切换检测算法。"""
+        options = dict(options)
+        common = {key: options.pop(key) for key in ("region", "nms", "nms_iou_threshold")}
+        return self.match_asset(logical_name, {**common, "_feature_options": options})
+
     def ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
         """保持 OCR 的 observe 权限边界，原始失败交由现有执行路径处理。"""
         if self._active_action != "observe" or self._ocr is None:

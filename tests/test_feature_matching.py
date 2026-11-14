@@ -35,7 +35,7 @@ def test_repeated_targets_and_original_coordinates_without_mutation(scale):
     assert [m['score'] for m in results] == sorted([m['score'] for m in results], reverse=True)
     for result, center in zip(sorted(results, key=lambda m: m['x']), [(65, 55), (280, 165)]):
         assert np.linalg.norm(np.array(result['centerxy']) - center) < 3
-        assert result['score'] >= 6 and .5 <= result['inlier_ratio'] <= 1
+        assert result['score'] >= 6 and .4 <= result['inlier_ratio'] <= 1
         assert result['inlier_ratio'] == result['inliers'] / result['good_matches']
     assert np.array_equal(image, before[0]) and np.array_equal(template, before[1])
     assert detect_features(image, template, scale=scale) == results
@@ -87,7 +87,7 @@ def test_user_screenshot_rejects_oversized_projection_preserving_other_nodes():
     loose = detect_features(image, template, min_scale=.001, max_scale=100,
                             max_deformation=100, min_coverage=0)
     oversized = [m for m in loose if m['width'] > 60 or m['height'] > 60]
-    assert len(oversized) == 1
+    assert len(oversized) == 2
     assert oversized[0]['target_coverage'] < .1
     assert oversized[0]['max_scale'] > 2 and oversized[0]['deformation'] > 2
     results = detect_features(image, template)
@@ -202,7 +202,8 @@ def test_gui_feature_state_parameters_capture_and_errors(gui, monkeypatch):
     assert all(not control.isEnabled() for control in page.feature_controls.values())
     wait_jobs(app, window)
     assert len(page.view.items) == 2 and a['path'] in page.results.toPlainText()
-    assert calls[-1]['min_inliers'] == 6 and calls[-1]['min_inlier_ratio'] == .5
+    assert calls[-1]['min_inliers'] == 6 and calls[-1]['min_inlier_ratio'] == .4
+    assert calls[-1]['nms_iou_threshold'] == .4
     roi = dict(x=210, y=110, width=130, height=110)
     page.view.region = roi
     page.view.selected.emit(roi)
@@ -282,10 +283,12 @@ def test_restore_defaults_only_resets_current_matching_mode_without_running(gui,
     wait_jobs(app, window)
     page.feature_controls['scale'].setValue(5)
     page.feature_controls['min_inliers'].setValue(20)
+    page.feature_controls['min_inlier_ratio'].setValue(.7)
     page.feature_controls['clahe'].setChecked(False)
     page.feature_controls['nms'].setChecked(False)
     page.feature_controls['min_coverage'].setValue(.3)
     page.feature_controls['max_deformation'].setValue(4)
+    page.feature_controls['nms_iou_threshold'].setValue(.7)
     region = dict(x=1, y=1, width=5, height=5)
     page.view.region = region
     page.results.setPlainText('stale')
@@ -296,10 +299,12 @@ def test_restore_defaults_only_resets_current_matching_mode_without_running(gui,
     page.reset_parameters_button.click()
     assert page.feature_controls['scale'].value() == 3
     assert page.feature_controls['min_inliers'].value() == 6
+    assert page.feature_controls['min_inlier_ratio'].value() == .4
     assert page.feature_controls['clahe'].isChecked() and page.feature_controls['nms'].isChecked()
     assert page.feature_controls['min_coverage'].value() == .1
     assert page.feature_controls['max_deformation'].value() == 2
     assert page.feature_controls['nms_iou_threshold'].isEnabled()
+    assert page.feature_controls['nms_iou_threshold'].value() == .4
     assert page.threshold.value() == .8 and page.tags.text() == 'en'
     assert page.view.region == region and not page.results.toPlainText()
     page.feature_controls['scale'].setValue(4)

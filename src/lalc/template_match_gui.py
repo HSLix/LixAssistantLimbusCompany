@@ -125,12 +125,12 @@ class RecognitionPage(QWidget):
             ("pair_ratio", tr('Descriptor pair ratio'), .75, .01, .99, 3),
             ("ransac_threshold", tr('Geometry tolerance (original px)'), 4 / 3, .001, 100, 6),
             ("min_inliers", tr('Minimum inliers'), 6, 4, 100000, 0),
-            ("min_inlier_ratio", tr('Minimum inlier ratio'), .5, .001, 1, 3),
+            ("min_inlier_ratio", tr('Minimum inlier ratio'), .4, .001, 1, 3),
             ("min_scale", tr('Minimum target scale'), .5, .001, 100, 3),
             ("max_scale", tr('Maximum target scale'), 2., .001, 100, 3),
             ("max_deformation", tr('Maximum deformation ratio'), 2., 1, 100, 3),
             ("min_coverage", tr('Minimum inlier coverage'), .1, 0, 1, 3),
-            ("nms_iou_threshold", tr('NMS IoU threshold'), .5, 0, 1, 3),
+            ("nms_iou_threshold", tr('NMS IoU threshold'), .4, 0, 1, 3),
         )
         for key, label, value, low, high, decimals in specs:
             control = DoubleSpinBox() if decimals else SpinBox()

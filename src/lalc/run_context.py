@@ -90,6 +90,25 @@ class RunContext:
             "nms_iou_threshold": nms_iou_threshold,
         })
 
+    def match_feature(self, logical_name: str, *, region: dict[str, int] | None = None,
+                      nms: bool = True, nms_iou_threshold: float = 0.4,
+                      grayscale: bool = True, scale: int = 3, clahe: bool = True,
+                      nfeatures: int = 0, n_octave_layers: int = 3, contrast_threshold: float = 0.04,
+                      edge_threshold: float = 10.0, sigma: float = 1.6, precise_upscale: bool = False,
+                      pair_ratio: float = 0.75, ransac_threshold: float = 4 / 3, min_inliers: int = 6,
+                      min_inlier_ratio: float = 0.4, min_scale: float = 0.5, max_scale: float = 2.0,
+                      max_deformation: float = 2.0, min_coverage: float = 0.1) -> list[dict[str, Any]]:
+        """仅供 observe Action 在已有帧中执行整组 SIFT 检测。"""
+        return self._executor.match_feature(logical_name, {
+            "region": region, "nms": nms, "nms_iou_threshold": nms_iou_threshold,
+            "grayscale": grayscale, "scale": scale, "clahe": clahe,
+            "nfeatures": nfeatures, "n_octave_layers": n_octave_layers, "contrast_threshold": contrast_threshold,
+            "edge_threshold": edge_threshold, "sigma": sigma, "precise_upscale": precise_upscale,
+            "pair_ratio": pair_ratio, "ransac_threshold": ransac_threshold, "min_inliers": min_inliers,
+            "min_inlier_ratio": min_inlier_ratio, "min_scale": min_scale, "max_scale": max_scale,
+            "max_deformation": max_deformation, "min_coverage": min_coverage,
+        })
+
     def crop_asset(self, logical_name: str, *, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
         """仅供 observe Action 请求现场截图裁剪；只新增文件，不改 Manifest。"""
 
