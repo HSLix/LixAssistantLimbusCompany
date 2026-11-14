@@ -63,43 +63,11 @@ uv run --no-project --python 3.12 python scripts/build_windows.py --pi-zip 'D:\R
 - 随包缺失直接使用环境 pi；随包启动／版本探测失败或 RPC ready 前退出，清理后最多回退一次并留日志。版本不同仅警告。超时、协议／工具集错误、取消、清理失败、模型错误不触发回退。第一条正式模型 prompt 发送前即关闭本轮回退，之后不因进程故障改换 pi；每轮图片／连接推理预检已取消。
 - 没有可用 pi 时只拒绝实际 Agent 启动；User Agent 关闭时仍可执行确定性任务，不自动联网安装 pi。
 
-## 开发者单独准备验收示例
+## 开发者准备验收数据
 
-使用专门的 Windows 测试账号，保留其数据作为证据。先验证无数据成品的空 Dashboard、三张占位卡、不联网和 Update 禁用，再退出。以下步骤仅用于空测试环境，不应覆盖已有用户数据或草稿。
+仓库已移除 example 教学与验收目录。使用专门的 Windows 测试账号，先验证空数据启动，再通过 [Sharing](sharing.md) 导入自行准备并已审查的页面和 Manifest，明确选择 Default；保留原数据与草稿。页面契约见[页面接口](business-settings-pages.md)。
 
-准备源码目录 `$repo` 和已解压程序目录 `$app`：
-
-```powershell
-$repo = 'D:\Code\LixAssistantLimbusCompany'
-$app = 'D:\LALC'
-$data = Join-Path $env:LOCALAPPDATA 'LALC'
-if ((Test-Path "$data\candidate") -or (Test-Path "$data\pages")) {
-    throw '测试目录已有 Candidate 或 pages，请保留原数据，改用干净测试账号。'
-}
-New-Item -ItemType Directory -Force $data | Out-Null
-Copy-Item -Recurse "$repo\example\acceptance" "$data\candidate"
-Copy-Item -Recurse "$repo\example\pages" "$data\pages"
-& "$app\LALC-console.exe" validate
-& "$app\LALC-console.exe" publish
-```
-
-检查 validate 成功、publish 返回 UUID 后，用实际值替换下方 `<UUID>`：
-
-```powershell
-& "$app\LALC-console.exe" set-default '<UUID>'
-& "$app\LALC-console.exe" init --from '<UUID>' --replace
-```
-
-此处 replace 只重建刚创建的验收 Candidate 及其基线，不能用于覆盖实际开发草稿。外置页面仍独立放在 pages，不进入 Manifest。
-
-启动唯一可用的游戏窗口，再从成品 GUI 开始 Plan。该示例只等待，不发送点击／按键，正式运行仍使用原有焦点、接管和互斥契约；不代表完整游戏 Workflow 验收。
-
-- exp 消息 `Hello`，次数 3：三个 Task 成功，各协作等待五秒，可观察暂停／继续／Stop。
-- exp 消息 `task-fail`，次数 3：成功→普通失败→成功；Plan completed 与所有 Task 成功须区分，Ledger／Trace 保留三个结果。
-- exp 消息 `plan-fail`，次数 3：首次成功后 Plan 自身失败，中断并保留首次结果，不执行后续。
-- mirror 可填另一消息，验证另一页面配置与 Task 输出；legacy 是纯设置兼容页。复制／修改页面后通过 General Settings 保存并重启验证重新发现，而非修改核心或重新打包。
-
-切换到另一已发布 Manifest，验证页面配置及次数仍保留。不匹配项 warning 可通过在 Candidate 修改 SUPPORTED_TASK_IDS 后另行发布、切换版本演示；保留原版本以恢复。错误页可在 pages 临时加入单行 `raise ValueError('acceptance page failure')`，重载后应通知并隔离该页，其他页面可用；移走此测试文件后再次重载。
+验收数据应覆盖正常完成、Task 普通失败后继续、Plan 自身失败、暂停／继续／Stop 和页面配置保存；测试夹具不代表真实游戏业务验收。
 
 ## 验收矩阵与记录
 
