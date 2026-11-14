@@ -58,7 +58,7 @@ CLI 的 `--image` 可省略或重复提供，`--chat` 的下一条消息沿用�
 ## 新增源码与多图片
 
 - `add_component(filename, logical_name, source)`：写入完整源码，登记到候选 Manifest 的 components。
-- `add_recovery_rule(filename, logical_name, source)`：写入完整 detect/recover 源码，登记到 recovery_rules。教学用法见 [Recovery Rule 示例](../example/workflow/README.md)。
+- `add_recovery_rule(filename, logical_name, source)`：写入完整 detect/recover 源码，登记到 recovery_rules。接口及执行边界见[开发教程](developer-workflow-tutorial.md)。
 
 工具拒绝已有文件/逻辑名覆盖和越界，先按既有源码结构契约检查，不导入执行新源码；创建和登记在提交前失败或取消会回退。其他已有文件校验失败不一概禁止新增。新文件可在同一轮继续编辑，进入快照和累计 Diff；完整校验、Publish 和 Default 仍分别操作。取消工具请求时先等待工具线程回退/完成，再生成最终快照。
 

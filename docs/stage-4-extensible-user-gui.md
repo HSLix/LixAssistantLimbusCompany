@@ -74,7 +74,7 @@
 
 仅 User General Settings 提供共享语言选择和既有重载入口，Developer 单独启动也沿用共享语言，不新增设置入口。选择立即保存，当前进程含新弹窗、重开窗口和外置页都维持启动语言；下次整应用重启后统一切换。活动期间允许保存语言选择，禁止重载；语言控件不属于 Agent 配置编辑权范围。设置失败不得假报成功。具体保存、资源与验证见[#333 实施记录](stage-4-333-implementation.md)。
 
-外置页增加 `context.language`、`context.translate(中文, English)` 和可选 `PAGE_NAMES` 两语显示名，稳定 PAGE_NAME 回退、页面/任务 ID、配置和 submit 契约保持。现有 example/pages 的 exp/mirror 完整双语，另有不支持切换的 legacy 纯设置示例，用来证明旧接口兼容；该页和第三方未翻译页面是英文模式全英文要求的明确例外。用法见[示例说明](../example/pages/README.md)。
+外置页增加 `context.language`、`context.translate(中文, English)` 和可选 `PAGE_NAMES` 两语显示名，稳定 PAGE_NAME 回退、页面/任务 ID、配置和 submit 契约保持。测试自有夹具包含双语页和不支持切换的旧式纯设置页，用来证明旧接口兼容；该页和第三方未翻译页面是英文模式全英文要求的明确例外。用法见[示例说明](business-settings-pages.md)。
 
 ## 外置页面、任务注册与配置
 

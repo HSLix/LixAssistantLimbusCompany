@@ -34,9 +34,9 @@ def main():
     app.setQuitOnLastWindowClosed(False)
     with WorkDirectory(prefix="lalc-fluent-gui-") as directory:
         root = Path(directory)
-        shutil.copytree(project / "example/pages", root / "pages")
+        shutil.copytree(project / "tests/fixtures/language-pages", root / "pages")
         manager = ManifestManager(root)
-        saved = manager.publish(project / "example/workflow/manifest.json")
+        saved = manager.publish(project / "tests/fixtures/user-pages/manifest.json")
         assert saved.ok, saved.errors
         assert manager.set_default(saved.loaded.manifest_id).ok
         owner = GuiCoordinator(ApplicationService(root, manifest_manager=manager), ApplicationLifecycle())

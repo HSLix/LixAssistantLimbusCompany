@@ -29,7 +29,7 @@ def app():
 
 def test_documented_minimal_page_loads_and_submits_empty_config(tmp_path, app):
     """文档中的标签页示例完整可加载，无 Task 也提供实例 submit。"""
-    document = Path(__file__).resolve().parents[1] / "example/pages/README.md"
+    document = Path(__file__).resolve().parents[1] / "docs/business-settings-pages.md"
     source = document.read_text(encoding="utf-8").split("```python\n", 1)[1].split("```", 1)[0]
     directory = tmp_path / "pages"
     directory.mkdir()

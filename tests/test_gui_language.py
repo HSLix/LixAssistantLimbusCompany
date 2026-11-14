@@ -98,7 +98,7 @@ def test_selection_is_saved_during_activity_but_does_not_retranslate_or_allow_re
 @pytest.mark.parametrize("language", ["zh_CN", "en_US"])
 def test_fresh_process_uses_saved_language_for_both_windows_and_pages(tmp_path, language):
     root = Path(__file__).resolve().parents[1]
-    shutil.copytree(root / "example/pages", tmp_path / "pages")
+    shutil.copytree(root / "tests/fixtures/language-pages", tmp_path / "pages")
     save_language(tmp_path, language)
     script = '''
 import json, sys
@@ -161,7 +161,7 @@ def test_examples_translate_navigation_content_and_validation_but_legacy_does_no
     install_translations(app, language)
     store = UserSettings(tmp_path)
     store.save("pages", "exp", {"message": "用户 input"})
-    directory = Path(__file__).resolve().parents[1] / "example/pages"
+    directory = Path(__file__).resolve().parents[1] / "tests/fixtures/language-pages"
     pages, errors = discover_pages(directory, store)
     assert not errors and len(pages) == 3
     by_id = {page.page_id: page for page in pages}

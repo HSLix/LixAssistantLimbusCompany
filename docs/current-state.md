@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-15：按用户决定移除仓库 `example/`，保留测试自有语言页面夹具，页面契约迁至[页面接口](business-settings-pages.md)。审查、引用调整和验证限制见[移除记录](example-removal-impact-review.md)。
+
 2026-11-15：新增 `delete_component`，仅经用户本次明确反馈删除 Session Candidate 的单个 Python 文件；不修改登记或已发布版本。仅 Developer GUI 两模式可用，CLI／Runtime 均不开放，与 Runtime 人工反馈开关无关。普通定向回归 119 passed、1 skipped；随后独立串行运行真实 pi＋本机 HTTP 替身的两项新增接入测试，2 passed。未运行全量回归、真实模型、Windows 成品或游戏验收。具体边界见 [Agent 用法](agent-repair.md#candidate-component-文件删除2026-11-15)。
 
 2026-11-14：Agent 图片编号改由 pi 扩展保存在内存中，新图在工具循环安全边界经现有管道查询已落盘日志编号；删除会与 Windows 读取竞争的共享 `image-index.json`，不改变图片、历史编号及权限。见[影响、维护评判与验证](agent-image-index-impact-review.md)。Windows 成品验收仍待完成。

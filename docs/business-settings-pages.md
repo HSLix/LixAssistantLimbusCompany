@@ -1,12 +1,6 @@
-# exp、mirror 教学页面
+# 业务设置页面接口
 
-2026-11-02：GUI Construct 已可通过专用工具创建 / 修改 Session 页面草稿，加载检查通过后进入默认 Proposed 的三 Tab 审批，由人批准固定版本安装；正式目录仍不开放通用编辑，Repair / CLI 不继承页面工具。当前用法及验收边界见[实施记录](../../docs/stage-5-339-340-implementation.md)和[审批修订](../../docs/page-review-tabs-implementation.md)。
-
-将本目录 `exp.py`、`mirror.py` 手动复制到 `lalc data-dir` 显示的数据目录下的 `pages/`。同名用户页先检查，不能直接覆盖。重启应用或在通用设置中保存并重新加载整个应用。
-
-两个页面分别使用 `PAGE_ID = "exp"`、`"mirror"` 并各自声明 TASKS，配置教学消息；Dashboard 管理是否启用和重复次数。页面 ID、任务 ID 与 Component 名称是不同概念，这里只是有意取相同字符串。
-
-搭配 [workflow](../workflow/README.md) 发布的 Plan 使用，链路为页面消息 → `settings[PAGE_ID]` → Plan → `tasks.exp` / `tasks.mirror` → 共享 Subworkflow / Step → 应用 Trusted Actions。样例只观察和等待，不实现经验本或镜牢的真实游戏流程。
+仓库已移除教学目录；以下保留页面接口契约，页面由用户准备或经 GUI Construct 审批安装。
 
 外置页是可信、同进程的 Python 模块，契约分三个层级，即使只显示一个标签也必须满足：
 
@@ -41,7 +35,7 @@ def create_page(context):
 
 有输入字段的页面应在 submit 中读取并校验输入，非法时抛出明确错误。`context.load(defaults)` 读取配置副本，`context.save(config)` 保存 JSON 配置；宿主开始运行和整应用重载前提交所有已加载页面，包括未启用的任务与纯设置页。页面不随 Manifest 发布；Agent 只能通过专用工具修改草稿，经人工审批安装，不能通用编辑正式目录。
 
-可与 `PAGE_ID` 并列声明可选导航图标，例如 `from qfluentwidgets import FluentIcon` 后设置 `PAGE_ICON = FluentIcon.EDUCATION`。exp 使用 EDUCATION，mirror 使用 GAME；未声明或设为 `None` 时统一使用 APPLICATION。图标值必须是 `FluentIcon` 成员；无效值会记录带页面身份的警告并回退默认图标，页面仍可用。若声明引用不存在的枚举成员，导致模块本身导入/求值失败，仍按原有加载失败规则处理。图标属于展示元数据，不保存到 `user-settings.json`，修改后需整应用重载。
+可与 `PAGE_ID` 并列声明可选导航图标，例如 `from qfluentwidgets import FluentIcon` 后设置 `PAGE_ICON = FluentIcon.EDUCATION`。未声明或设为 `None` 时统一使用 APPLICATION。图标值必须是 `FluentIcon` 成员；无效值会记录带页面身份的警告并回退默认图标，页面仍可用。若声明引用不存在的枚举成员，导致模块本身导入/求值失败，仍按原有加载失败规则处理。图标属于展示元数据，不保存到 `user-settings.json`，修改后需整应用重载。
 
 导航展开时，Dashboard 与 General Settings 位于 `GENERAL`，其下以原生分隔线和 `WORKFLOW SETTINGS` 标题列出全部已加载业务页，包括纯设置页和当前 Plan 不支持的页。收起为图标栏后隐藏标题、保留分隔线；没有业务页时也保留该分组。General Settings 继续使用齿轮，页面顺序和配置保存规则不变。
 
@@ -56,7 +50,7 @@ User GUI → General Settings → 应用 → 界面语言可选“跟随系统 /
 
 `context.language` 是本次已生效的 `zh_CN` 或 `en_US`；`context.translate(中文文案, English_text)` 按该语言选择页面自带文案，无需编译翻译资源。导航名可选声明 `PAGE_NAMES = {"zh_CN": "中文名称", "en_US": "English name"}`，键只允许这两个语言，值须为非空字符串；未提供当前语言时回退原有 `PAGE_NAME`。`PAGE_NAME` 仍必需，原有 create_page、submit、配置保存契约不变。
 
-`exp.py` 和 `mirror.py` 同时翻译导航、页面标签及输入校验提示，保持现有页面/任务 ID 和 message 配置键。新增 `legacy.py` 是不使用语言接口的纯设置页：导航和标签固定中文，不注册循环任务，切换英文仍保留原文，用于验证旧页面兼容；其 note 配置仍正常保存。页面作者负责自己的翻译，宿主不调用模型翻译页面，也不翻译用户填写的内容。旧页面无需迁移，修改已安装页面后仍需整应用重载。
+页面作者负责翻译；宿主不翻译用户输入。旧页面保持原文回退和配置保存兼容，回归使用测试自有夹具。
 
 ## 页面目录与图片资源
 
@@ -90,7 +84,7 @@ Agent 的 GUI Construct 页面工具现已接通整包：`filename="sample.py"` 
 
 `page_preview` 的 Current 和 Proposed 使用各自固定整包副本及独立内存配置，切换 Tab 保持实例。人工点击安装提交批准的源码和资源，即使草稿随后变化也不混入新内容；关闭后清理临时包，安装日志保留所审批的完整包证据。CLI／Repair 不获得这些工具，安装仍需专用人工审批。
 
-General Settings 的 [Sharing 向导](../../docs/sharing.md) 已支持整包导入导出。Sharing 的 Review 只批准固定整包，最终由 Import Selected 统一安装；未 Review 页面需额外明确确认。Agent 的人工批准仍直接安装，不继承 Sharing 的跳过 Review 例外。
+General Settings 的 [Sharing 向导](sharing.md) 已支持整包导入导出。Sharing 的 Review 只批准固定整包，最终由 Import Selected 统一安装；未 Review 页面需额外明确确认。Agent 的人工批准仍直接安装，不继承 Sharing 的跳过 Review 例外。
 
 
 每个 TASKS 项必须声明布尔 show_task_count。False 隐藏该任务的次数控件，保留勾选与“设置”；匹配且启用传 1，未启用或不匹配传 0。True 使用保存的次数（1–2147483647）；隐藏期间保留旧次数。旧 TASK_ID 和页面级 SHOW_TASK_COUNT 不再支持。
