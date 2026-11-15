@@ -69,6 +69,18 @@ uv run lalc generate-stubs
 
 `tests/test_stubgen.py` 比较声明与当前注册、Context 接口是否一致，并使用 Pyright 验证典型合法与非法调用。静态声明对应应用正式注册，不随测试替身表或 Manifest 切换；角色/阶段权限仍由现有 Validator 和执行器检查，`ctx.call()` 仍保持现有动态参数与返回类型。
 
+## 鼠标滚轮
+
+在 Step 中使用 `ctx.action("control.scroll", x=890, y=350, direction="down", steps=3)`，
+或 `ctx.action("control.scroll", centerxy=target["centerxy"], direction="up")`。
+坐标为当前游戏客户区原图像素，`centerxy` 与 `x/y` 不可混用。
+`direction` 必填，仅支持区分大小写的 `up`、`down`；`steps` 为 1–10 的整数，默认 1。
+每格发送 ±120，相邻两格间隔固定 0.2 秒；格数不表示页面像素距离。
+动作先移动鼠标，不点击；结束后光标留在该处，后续截图仍默认归位。
+返回 `None` 只表示输入完成，需重新截图确认业务状态。
+动作中途接管、暂停、取消或失焦会中断；已滚动部分不撤销，Step 重入须重新观察，不能盲目重放滚动量。
+设计、影响及验收边界见[滚轮记录](scroll-action-design.md)。
+
 ## 独立素材与标签
 
 完整逻辑名对应完整目录，例如 `ui/claim` 对应数据目录的 `assets/ui/claim/`。每张图为 `<完整SHA256>.png`，目录下 `asset-tag.json` 保存 `哈希 → tag列表`。语言只是普通可选 tag，无特殊筛选规则。所有有效图片都参与候选；缺 tag 文件或缺哈希条目时按 `[]` 处理，不需要登记白名单。

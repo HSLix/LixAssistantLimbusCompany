@@ -62,6 +62,9 @@ def test_readonly_tree_directory_images_and_actual_action_contracts(tools):
         assert base64.b64decode(result["content"][index * 2 + 1]["data"]) == tools.library.read(item)
         assert result["details"]["images"][index]["sha256"] == item["sha256"]
     actions = invoke(tools, "action_contracts")["details"]["actions"]
+    scroll = next(item for item in actions if item["logical_name"] == "control.scroll")
+    assert scroll["classification"] == "control"
+    assert "steps" in scroll["signature"] and "0.2" in scroll["docstring"]
     assert [item["logical_name"] for item in actions] == list(application_actions())
     assert all("ctx" in item["signature"] and "->" in item["signature"] and item["docstring"] for item in actions)
     click = next(item for item in actions if item["logical_name"] == "control.click")
