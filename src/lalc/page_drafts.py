@@ -44,7 +44,7 @@ class PageDrafts:
 
     def __init__(self, session):
         session.check()
-        if session.entry != "gui" or session.mode != "Construct":
+        if session.entry not in {"gui", "mcp"} or session.mode != "Construct":
             raise ValueError("页面工具仅允许 GUI Construct Session。")
         self.session = session
         self.root = real_directory(session.path / "page-drafts")

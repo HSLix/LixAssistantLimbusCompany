@@ -93,6 +93,14 @@ _Avoid_: Unrestricted coding agent, Runtime Agent Session, shared global Agent C
 A persistent, resumable Agent conversation with its own Candidate, fixed comparison baseline, page drafts where authorized, and a fixed Construct or Repair mode. Stage 6 uses the same Session for runtime Repair initialized from the active Manifest and subsequent developer continuation; the current entry determines tool authority, and retaining the conversation does not retain a live Run. Its display title is initialized from the first user request and remains fixed unless manually renamed; the title does not define its identity. Deleting a Session removes its private conversation and unpublished drafts while preserving independently published or installed capabilities.
 _Avoid_: Separate runtime session store, model request, global Candidate
 
+**Remote MCP Workbench**:
+A single persistent LALC development workspace for an external Agent, with its own Developer Candidate initialized from an explicitly selected or latest published Manifest. Its tool authority is defined independently of the built-in Agent Workbench, initially matching Construct authority; the external Agent owns its conversation.
+_Avoid_: Pi conversation, shared local Candidate, remote desktop
+
+**Remote Control Session**:
+An exclusive grant of development authority to one external controller, retained across network disconnections until release, local revocation or application exit. It is distinct from the external conversation, connection authentication and a protocol session.
+_Avoid_: MCP connection, Codex account, Developer Session
+
 **Manifest Reference Attachment**:
 A message-level pointer to one or more published Manifests suggested as reference material, with optional focus described in the message. It is contextual information rather than a read-access grant, a Candidate source selection, or an execution request.
 _Avoid_: Manifest access whitelist, Candidate initialization, trial selection

@@ -202,6 +202,7 @@ class MainWindow(FluentWindow):
         from .developer import DeveloperHost
         from .developer_gui import CapturePage, SettingsPage, RepairPage
         from .template_match_gui import RecognitionPage
+        from .remote_mcp_gui import RemoteMcpPage
         self.host = host or DeveloperHost(service, default_candidate_root(service.data_root))
         self.jobs = []
         self.owns_run = False
@@ -221,6 +222,7 @@ class MainWindow(FluentWindow):
         self.recognition_page = RecognitionPage(self)
         self.settings_page = SettingsPage(self)
         self.repair_page = RepairPage(self)
+        self.remote_mcp_page = RemoteMcpPage(self)
         self.settings_view = QScrollArea()
         self.settings_view.setWidgetResizable(True)
         self.settings_view.setWidget(self.settings_page)
@@ -235,6 +237,7 @@ class MainWindow(FluentWindow):
             (self.recognition_page, "developer-recognition", tr('Recognition Lab'), FluentIcon.SEARCH),
             (self.settings_view, "developer-settings", tr('Agent Settings'), FluentIcon.SETTING),
             (self.repair_page, "developer-workbench", tr('Agent Workbench'), FluentIcon.CHAT),
+            (self.remote_mcp_page, "developer-remote-mcp", tr('Remote MCP'), FluentIcon.LINK),
         ):
             page.setObjectName(identity)
             self.addSubInterface(page, icon, name)
@@ -270,13 +273,16 @@ class MainWindow(FluentWindow):
         job.start()
 
     def cancel_operation(self):
+        if (remote := getattr(self.service, "_remote_mcp", None)) is not None:
+            remote.cancel_active()
         for job in self.jobs:
             job.cancel()
         self.render_state(self.service.status)
 
     def closeEvent(self, event):
         """退出等待取消、输入释放、日志和子进程清理，期间保持事件循环。"""
-        active = bool(self.jobs) or (self.owns_run and self.service.status["phase"] == "running")
+        remote = getattr(self.service, "_remote_mcp", None)
+        active = bool(self.jobs) or (self.owns_run and self.service.status["phase"] == "running") or bool(remote and remote.active)
         if active:
             event.ignore()
             if not self.closing:
@@ -302,7 +308,8 @@ class MainWindow(FluentWindow):
             self.coordinator.closed(self)
 
     def _finish_close(self):
-        if not self.jobs and (not self.owns_run or self.service._thread is None or not self.service._thread.is_alive()):
+        remote = getattr(self.service, "_remote_mcp", None)
+        if not self.jobs and not (remote and remote.active) and (not self.owns_run or self.service._thread is None or not self.service._thread.is_alive()):
             self.close()
 
     def shutdown(self):
@@ -364,7 +371,10 @@ class MainWindow(FluentWindow):
     @Slot(dict)
     def render_state(self, state: dict) -> None:
         trial = bool((state.get("entry") or {}).get("developer_trial"))
-        if (trial or self.owns_run) and state["phase"] == "running":
+        remote_trial = bool((state.get("entry") or {}).get("remote_operation_id"))
+        if remote_trial and state["phase"] == "running":
+            self.owns_run = True
+        if (trial or self.owns_run) and not remote_trial and state["phase"] == "running":
             self.owns_run = True
             if self.trial_dialog is None:
                 from .developer_gui import TrialDialog
@@ -384,8 +394,15 @@ class MainWindow(FluentWindow):
             if result.get("fatal"):
                 self.fatal_error(result_diagnostics(result))
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(self.jobs) or self.closing
-        for page in (self.capture_page, self.recognition_page, self.settings_page, self.repair_page):
-            page.render(busy)
+        controlled = bool(state.get("remote_control"))
+        self.capture_page.render(busy)
+        self.capture_page.resize_button.setEnabled(not busy and not controlled)
+        self.recognition_page.render(bool(self.jobs) or self.closing if controlled else busy)
+        if controlled:
+            self.recognition_page.capture_button.setEnabled(not busy)
+        self.settings_page.render(busy or controlled)
+        self.repair_page.render(busy or controlled)
+        self.remote_mcp_page.refresh_state(state)
 
 
 class UserWindow(MainWindow):
@@ -718,6 +735,8 @@ class UserWindow(MainWindow):
 
     def select_latest_manifest(self):
         """显式选择卡片展示的版本，仅影响后续运行。"""
+        if (remote := getattr(self.service, "_remote_mcp", None)) is not None:
+            remote.check_local("Default")
         if self.latest_manifest_id:
             result = self.host.manager.set_default(self.latest_manifest_id)
             if not result.ok:
@@ -770,6 +789,8 @@ class UserWindow(MainWindow):
         choices.currentItemChanged.connect(selection_changed)
         selection_changed()
         def select():
+            if (remote := getattr(self.service, "_remote_mcp", None)) is not None:
+                remote.check_local("Default")
             item = choices.currentItem()
             if item is None:
                 return
@@ -933,7 +954,7 @@ class UserWindow(MainWindow):
     def render_state(self, state):
         if not hasattr(self, "start_button"):
             return
-        busy = state["phase"] == "running" or bool(state.get("activity")) or self.closing
+        busy = state["phase"] == "running" or bool(state.get("activity")) or bool(state.get("remote_control")) or self.closing
         for button in getattr(self, "sharing_buttons", []):
             button.setEnabled(not busy and not self.jobs)
         if self.current_manifest_id != state["default_manifest_id"] or not hasattr(self, "_tasks_initialized"):
@@ -951,6 +972,15 @@ class UserWindow(MainWindow):
         self.start_hint.setText("" if ready else tr('Complete the Agent settings or turn off User Agent'))
         self.start_hint.setVisible(not ready)
         self.start_button.setEnabled(not busy and ready)
+        controlled = bool(state.get("remote_control"))
+        self.latest_button.setEnabled(not controlled)
+        self.user_enabled.setEnabled(not controlled)
+        for enabled, count in self.task_rows.values():
+            enabled.setEnabled(not controlled)
+            if count is not None:
+                count.setEnabled(not controlled)
+        for page in self.business_pages:
+            page.widget.setEnabled(not controlled)
         self.start_button.setToolTip(tr('The current activity has not finished') if busy else
                                     tr("Run the Default Manifest's Python Plan") if ready else self.start_hint.text())
         if self.owns_run and state["phase"] == "running":
@@ -1056,7 +1086,7 @@ class GuiCoordinator:
         """先保存并封闭所有入口，最终清理成功后才允许启动新进程。"""
         def check_idle():
             state = self.service.status
-            if (self.reloading or state["phase"] == "running" or state.get("activity") or
+            if (self.reloading or state["phase"] == "running" or state.get("activity") or state.get("remote_control") or
                     self.service._thread is not None and self.service._thread.is_alive() or
                     any(window.jobs or window.closing for window in (self.user, self.developer) if window)):
                 raise ValueError(tr('Cannot reload while either window has an activity or unfinished background operation.'))
@@ -1101,6 +1131,8 @@ class GuiCoordinator:
                 page.widget.setParent(None)
             self.user = None
         elif window is self.developer:
+            self.service.remote_mcp.on_feedback = None
+            self.service.remote_mcp.on_page_preview = None
             self.developer = None
             if self.user is not None:
                 self.user.settings_page.reload()

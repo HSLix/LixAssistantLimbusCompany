@@ -8,6 +8,7 @@ import inspect
 import json
 import threading
 import uuid
+from typing import Any, Callable
 
 from .actions import application_actions
 from .assets import AssetLibrary, asset_name
@@ -39,8 +40,8 @@ class RepairTools:
         self.requested_manifest_id = None
         self.run_state = None
         self.runtime_gate = None
-        self.on_feedback = None
-        self.on_page_preview = None
+        self.on_feedback: Callable[[Any], None] | None = None
+        self.on_page_preview: Callable[[Any], None] | None = None
         self.knowledge = KnowledgeLibrary(data_root, self.checkpoint, host.service.codesearch if host is not None else None)
         self.sequence = 0
         self.previews = {}

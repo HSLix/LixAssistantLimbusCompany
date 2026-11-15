@@ -347,7 +347,11 @@ def main(argv: list[str] | None = None) -> int:
         parsed = _parser().parse_args(args)
         if parsed.command in {"validate", "publish", "clear"}:
             from .process_lock import ProcessLock
-            with ProcessLock("candidate:" + str(default_candidate_root(default_data_root()).resolve())):
+            with ProcessLock("remote-mcp-control"), ProcessLock("candidate:" + str(default_candidate_root(default_data_root()).resolve())):
+                return _dispatch(parsed)
+        if parsed.command in {"init", "set-default", "tag-asset", "crop-asset", "repair", "agent-config", "secret-set"}:
+            from .process_lock import ProcessLock
+            with ProcessLock("remote-mcp-control"):
                 return _dispatch(parsed)
         return _dispatch(parsed)
     except (EOFError, KeyboardInterrupt, OSError, WindowError) as error:

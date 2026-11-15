@@ -70,6 +70,8 @@ class PageInstalledDialog(QDialog):
         self.message.setText(tr('Finishing current operations before restarting LALC…'))
         for window in self.windows:
             window.cancel_operation()
+        if (remote := getattr(self.window.service, "_remote_mcp", None)) is not None and remote.owner:
+            remote.revoke()
         self.window.service.stop()
         self.timer.start(50)
 

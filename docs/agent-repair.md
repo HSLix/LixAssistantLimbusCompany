@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-15：本文描述内置 pi 的开发接入。Mac Codex 桌面应用的远程 MCP 入口、独立工作台、异步操作及 Windows 审批见[远程 MCP 指南](remote-mcp.md)；两者复用底层服务，但不共享对话生命周期或控制凭据。
+
 2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。
 
 2026-11-11 Stage 6 已实施：Runtime 从当前 Working Manifest 创建同一套 Repair Session，Run 结束后可在 Developer GUI 接续；Runtime 提供当前失败入口的 `recheck` 和 `read_run_state`，不提供独立 `trial_run` 或删除。请求上限默认 50，同一恢复会话共享余额。历史检索默认开启，Runtime 人工反馈默认关闭，均在下一轮 Agent 开始时生效。详见 [Stage 6 实施记录](stage-6-implementation.md)。

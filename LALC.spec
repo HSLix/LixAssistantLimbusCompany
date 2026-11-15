@@ -21,6 +21,7 @@ a = Analysis(
     + collect_data_files("rapidocr", includes=["config.yaml", "default_models.yaml"])
     + collect_data_files("UnityPy", includes=["resources/*.tpk"])
     + copy_metadata("UnityPy", recursive=True)
+    + copy_metadata("mcp", recursive=True)
     + [(str(path), "rapidocr/models") for path in model_files().values()]
     + sum((copy_metadata(name) for name in (
         "PySide6", "PySide6-Essentials", "PySide6-Addons", "PySide6-Fluent-Widgets",
