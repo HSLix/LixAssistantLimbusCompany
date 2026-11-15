@@ -289,7 +289,7 @@ class InputSession:
         return self.backend.client_point(info["hwnd"], x, y)
 
     def execute(self, operation: str, arguments: dict[str, Any]) -> None:
-        """固定四个动作；所有参数先验证，再注入，并在 finally 中释放。"""
+        """固定输入动作；所有参数先验证，持有型输入在 finally 中释放。"""
 
         self.check()
         while self.backend.any_pressed():
@@ -303,6 +303,13 @@ class InputSession:
             if key not in self.KEYS:
                 raise ValueError("Supported keys: esc, p, enter.")
             self._key(self.KEYS[key])
+        elif operation == "scroll":
+            direction, steps = arguments["direction"], arguments["steps"]
+            if direction not in ("up", "down"):
+                raise ValueError("Scroll direction must be up or down.")
+            if type(steps) is not int or not 1 <= steps <= 10:
+                raise ValueError("Scroll steps must be an integer between 1 and 10.")
+            self._scroll(arguments["x"], arguments["y"], direction, steps)
         elif operation in {"click", "drag"}:
             start = self._point(arguments["x"], arguments["y"])
             end = self._point(arguments["end_x"], arguments["end_y"]) if operation == "drag" else start
@@ -310,6 +317,27 @@ class InputSession:
             self._touch(start, end, duration, operation)
         else:
             raise ValueError(f"Unknown control operation: {operation}")
+
+    def _scroll(self, x: int, y: int, direction: str, steps: int) -> None:
+        """逐格检查焦点与光标；失焦中断，不重新聚焦后续滚。"""
+        self.holding = True
+        try:
+            self.check()
+            self.backend.move_cursor(*self._point(x, y))
+            # 留出游戏和远程输入处理移动、更新悬停区域的时间。
+            self._wait(0.2)
+            for index in range(steps):
+                if index:
+                    self._wait(0.2)
+                self.check()
+                self._point(x, y)
+                position = self.window.platform.cursor_position(self.window.hwnd)
+                if abs(position["x"] - x) > 2 or abs(position["y"] - y) > 2:
+                    self._interrupt("滚轮目标处的鼠标位置已改变或未到达。", "physical_input")
+                self.backend.wheel(120 if direction == "up" else -120)
+                self.check()
+        finally:
+            self.holding = False
 
     def _release(self, release: Callable[[], None], kind: str) -> None:
         """只尝试释放一次；失败永久禁用会话，保留原始异常轨迹。"""

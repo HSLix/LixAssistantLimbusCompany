@@ -239,6 +239,39 @@ def click(ctx, *, centerxy: tuple[int, int] | None = None, x: int | None = None,
     ctx.control_input("click", x=x, y=y)
 
 
+@overload
+def scroll(ctx, *, centerxy: tuple[int, int], direction: str, steps: int = 1) -> None: ...
+
+
+@overload
+def scroll(ctx, *, x: int, y: int, direction: str, steps: int = 1) -> None: ...
+
+
+def scroll(ctx, *, direction: str, steps: int = 1, centerxy: tuple[int, int] | None = None,
+           x: int | None = None, y: int | None = None) -> None:
+    """移到目标客户区坐标并滚动，不点击；返回 None，不代表业务目标完成。
+
+    坐标为客户区原图像素，必须位于当前客户区内。鼠标结束后留在目标位置。
+    每格发送 ±120，格与格间隔固定 0.2 秒；期间响应接管、暂停和取消。
+    中断不会撤销已滚动部分，Step 重入后须重新观察，不自动续滚剩余格数。
+
+    参数：
+        ctx：执行器自动传入的运行上下文，调用 ctx.action 时不要手动提供。
+        direction：仅支持 up（向上）、down（向下），区分大小写。
+        steps：滚轮格数，1–10 的整数，默认 1；不是界面移动像素数。
+        centerxy：整数坐标元组 (x, y)，与 x/y 互斥。
+        x：横坐标整数，不用 centerxy 时须与 y 一起提供。
+        y：纵坐标整数，不用 centerxy 时须与 x 一起提供。
+    """
+    if centerxy is not None:
+        if x is not None or y is not None:
+            raise ValueError("scroll requires either centerxy or x/y, not both")
+        x, y = centerxy
+    elif x is None or y is None:
+        raise ValueError("scroll requires centerxy or both x and y")
+    ctx.control_input("scroll", x=x, y=y, direction=direction, steps=steps)
+
+
 def key_press(ctx, *, key: str) -> None:
     """向目标窗口发送一次按键并释放；不表示游戏已完成该按键对应的业务操作。
 
@@ -302,6 +335,7 @@ def application_actions() -> dict[str, TrustedAction]:
         "control.click": TrustedAction(click, "control"),
         "control.key_press": TrustedAction(key_press, "control"),
         "control.drag": TrustedAction(drag, "control"),
+        "control.scroll": TrustedAction(scroll, "control"),
         "observe.wait": TrustedAction(wait, "observe"),
         "control.restart_game": TrustedAction(restart_game, "control"),
     }

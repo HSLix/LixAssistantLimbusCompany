@@ -1,4 +1,4 @@
-"""Windows 只读输入钩子、前台按键与无光标合成触摸。"""
+"""Windows 只读输入钩子、前台按键、滚轮与无光标合成触摸。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import threading
 from ctypes import wintypes
 
 from .control import PhysicalInputMonitor
+from .focused import WindowError
 
 # INPUT 必须包含完整 union；只声明键盘成员会使 Win32 拒绝其尺寸。
 class MSLLHOOKSTRUCT(ctypes.Structure):
@@ -315,6 +316,29 @@ class WindowsInputBackend:
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
             raise OSError(f"SendInput failed: winerror={ctypes.get_last_error()}, {diagnostics}")
         return diagnostics
+
+    def move_cursor(self, x: int, y: int) -> None:
+        """按虚拟桌面物理像素移动鼠标；拒绝屏幕外位置。"""
+        left, top, width, height = (self.user32.GetSystemMetrics(i) for i in (76, 77, 78, 79))
+        if width <= 1 or height <= 1 or not (left <= x < left + width and top <= y < top + height):
+            raise WindowError("Cursor target is outside the virtual desktop.")
+        item = INPUT()
+        item.type = 0
+        item.mi = MOUSEINPUT(round((x - left) * 65535 / (width - 1)),
+                             round((y - top) * 65535 / (height - 1)), 0,
+                             0x0001 | 0x8000 | 0x4000, 0, 0x4C414C43)
+        ctypes.set_last_error(0)
+        if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
+            raise OSError(f"Cursor SendInput failed: winerror={ctypes.get_last_error()}")
+
+    def wheel(self, delta: int) -> None:
+        """发送一格垂直滚轮输入；负值以 DWORD 补码传递。"""
+        item = INPUT()
+        item.type = 0
+        item.mi = MOUSEINPUT(0, 0, delta & 0xFFFFFFFF, 0x0800, 0, 0x4C414C43)
+        ctypes.set_last_error(0)
+        if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
+            raise OSError(f"Wheel SendInput failed: winerror={ctypes.get_last_error()}")
 
     def key(self, virtual_key: int, up: bool) -> None:
         item = INPUT()

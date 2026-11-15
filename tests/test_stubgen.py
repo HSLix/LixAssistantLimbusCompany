@@ -34,13 +34,15 @@ def test_generated_stub_matches_registration_and_all_public_members():
     actions = [node for node in methods if node.name == 'action']
     clicks = [node for node in actions if node.args.args[1].annotation.slice.value == 'control.click']
     assert [[arg.arg for arg in node.args.kwonlyargs] for node in clicks] == [['centerxy'], ['x', 'y']]
-    assert [node.args.args[1].annotation.slice.value for node in actions] == [
-        'control.click', *sorted(application_actions())]
+    assert [node.args.args[1].annotation.slice.value for node in actions] == sorted([
+        *application_actions(), 'control.click', 'control.scroll'])
     for node in actions:
         name = node.args.args[1].annotation.slice.value
         signature = inspect.signature(application_actions()[name].execute)
         assert [arg.arg for arg in node.args.kwonlyargs] in (
-            [['x', 'y'], ['centerxy']] if name == 'control.click' else [list(signature.parameters)[1:]])
+            [['x', 'y'], ['centerxy']] if name == 'control.click' else
+            [['centerxy', 'direction', 'steps'], ['x', 'y', 'direction', 'steps']] if name == 'control.scroll'
+            else [list(signature.parameters)[1:]])
         assert ast.unparse(node.returns) == inspect.formatannotation(
             inspect.signature(application_actions()[name].execute, eval_str=True).return_annotation
         )
@@ -126,6 +128,11 @@ def execute(ctx: RunContext) -> None:
     assert_type(ctx.action("observe.match_asset", asset="ui/claim"), list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]])
     assert_type(ctx.action("observe.match_feature", asset="ui/claim", min_inlier_ratio=0.4), list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]])
     ctx.action("control.drag", x=1, y=2, end_x=3, end_y=4)
+    assert_type(ctx.action("control.scroll", x=1, y=2, direction="down"), None)
+    assert_type(ctx.action("control.scroll", centerxy=(1, 2), direction="up", steps=10), None)
+    ctx.action("control.scroll", x=1, y=2)  # error
+    ctx.action("control.scroll", centerxy=(1, 2), x=1, direction="up")  # error
+    ctx.action("control.scroll", x=1, y=2, direction="up", steps=1.5)  # error
     ctx.action(logical_name="observe.wait", seconds=0.1)
     assert_type(ctx.call("steps.example", value=1), Any)
     assert_type(ctx.game_language, str)
