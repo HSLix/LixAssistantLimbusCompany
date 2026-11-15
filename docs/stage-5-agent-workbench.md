@@ -1,5 +1,7 @@
 # Stage 5 — Agent 工作台
 
+2026-11-15：新增独立远程 MCP 开发入口，复用 Construct 能力和本地审批，但不把外部对话保存为 pi Developer Session；单个持久工作台及独占控制会话按 [ADR 0042](adr/0042-add-an-exclusive-remote-mcp-workbench.md) 和[远程 MCP 指南](remote-mcp.md)执行。本文内置 pi Session、模式及 Runtime 边界保持；MCP 的工具名和异步查询方式见独立指南。
+
 2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。
 
 2026-11-11 Stage 6 接受复用同一 Repair Session、Candidate、对话与日志，由程序组织 active Manifest 和故障反馈，Run 后可在 Developer GUI 接续；Runtime 工具仍按入口授权。全模式历史检索总开关默认开启、下一轮生效；Runtime 只读知识库／Skills 已获准，人工反馈由 User GUI 默认关闭的开关控制。Stage 6 已完成本地接入，接口与验证边界见[实施记录](stage-6-implementation.md)。 目标见 [Stage 6](stage-3.5-agent-runtime-step-recovery-and-maintenance.md#2026-11-11-设计讨论已确认边界)、[ADR 0040](adr/0040-share-run-state-and-reuse-agent-sessions-for-runtime-repair.md)，影响见 [审查报告](stage-6-design-impact-review.md)。

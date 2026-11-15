@@ -31,6 +31,8 @@ Use `uv run --frozen lalc --developer` to open the developer workspace. Source d
 
 See [Windows build and resource preparation](docs/windows-packaging.md), [Workflow development](docs/developer-workflow-tutorial.md) and [Agent setup and usage](docs/agent-repair.md) for details.
 
+Mac Codex desktop can also use the Developer GUI's **Remote MCP** page over a private Tailscale connection. This has its own persistent workbench and does not require a local pi/model setup; see [Remote MCP setup and boundaries](docs/remote-mcp.md).
+
 ## pi and model setup
 
 pi runs Agent conversations. Deterministic Workflows do not require pi or a model service. LALC does not automatically install pi or read another pi instance's personal configuration.

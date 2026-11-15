@@ -1,5 +1,7 @@
 # Windows x64 本地构建和 #334 验收
 
+2026-11-15：新增远程 MCP，可选 `mcp` 依赖由构建脚本既有 `--all-extras` 一并安装；`LALC.spec` 收集官方 SDK 及传递依赖的分发元数据和许可证。两个包均提供 MCP，Tailscale 由用户另行部署；不用 pi 或模型即可使用远程工作台。安装与验收边界见[远程 MCP 指南](remote-mcp.md)，本次未在 macOS 交叉生成 Windows 包。
+
 2026-11-12：Run 日志图片采用 AVIF，`LALC.spec` 显式包含 Pillow AVIF 插件及 PIL 动态库；日志预览经 Pillow 解码为 JPEG 后由 Qt 显示，不依赖 Qt 原生 AVIF 插件。源码环境检查不替代 Windows 成品的编解码与日志预览验收。
 
 2026-11-05 双包更新：以下 with-pi／without-pi 命名由 with-agent／without-agent 替代，两包仍共用相同应用。新增输入和当前行为如下；原 #334 验收数字仅为历史。

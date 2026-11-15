@@ -8,6 +8,7 @@ import difflib
 import json
 from pathlib import Path
 import shutil
+from typing import Any
 from contextlib import contextmanager
 
 from .work_files import WorkDirectory
@@ -67,6 +68,7 @@ class DeveloperHost:
         self.preview = None
         self.monitored_window = None
         self.secrets = {}
+        self.session: Any = None
 
     def candidate_lock(self):
         """同一草稿的跨进程锁；不受运行数据目录影响。"""

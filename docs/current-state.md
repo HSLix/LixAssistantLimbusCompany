@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-15：远程 MCP V1 已接入独立持久工作台、控制会话、异步操作与 Developer GUI 独立页；工具复用 Construct 能力，断线不停止 Run，不接管 Runtime Recovery。用法见[远程 MCP](remote-mcp.md)，决定见 [ADR 0042](adr/0042-add-an-exclusive-remote-mcp-workbench.md)，测试、基线失败和未完成的真实跨设备／Windows／游戏验收见[实施记录](remote-mcp-implementation.md)。
+
 2026-11-15：新增 `control.scroll`，支持互斥的 `centerxy` 或 `x/y`、`up/down` 方向及默认 1 的 1–10 格滚动量，相邻格固定间隔 0.2 秒；保留 control 权限、Trace 与逐格中断检查。见[设计、影响审查与验证](scroll-action-design.md)。独立注入实验已获人工成功反馈，正式接入的 Windows／游戏验收仍待完成。
 
 2026-11-15：Agent 工具移除独立 `validate`，将 `publish` 更名为 `validate_and_publish`，直接复用发布入口的完整校验与不可变版本保存；修改 Candidate 后校验并发布，失败返回错误供修正。GUI／CLI 手工校验及发布不变，发布仍不改变 Default。见[Agent 用法](agent-repair.md)。已有数据目录的 Skills 不自动覆盖，旧指导需人工合并。

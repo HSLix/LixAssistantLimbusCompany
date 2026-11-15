@@ -31,6 +31,10 @@ resource. UnityPy and its dependencies retain their original licenses; their
 distribution metadata and license files are collected with the packaged application.
 Source: https://github.com/K0lb3/UnityPy.
 
+Remote MCP uses the official MCP Python SDK (MIT) and its HTTP/runtime dependencies.
+Their distribution metadata and license files are collected with the packaged application.
+Source: https://github.com/modelcontextprotocol/python-sdk.
+
 The optional with-pi ZIP also contains the complete official Windows x64 pi 1.4.0
 release under `pi/`, including its runtime resources, documentation and metadata.
 Pi is Copyright (c) 2025 Mario Zechner, under the MIT license reproduced in

@@ -1289,7 +1289,7 @@ class RepairPage(QWidget):
 
     def is_busy(self):
         state = self.window.service.status
-        return bool(self.window.jobs) or bool(state.get('activity')) or state['phase'] == 'running' or self.window.closing
+        return bool(self.window.jobs) or bool(state.get('activity')) or bool(state.get('remote_control')) or state['phase'] == 'running' or self.window.closing
 
     def build_menus(self):
         """菜单只改变入口位置；所有操作继续走原宿主校验和活动边界。"""

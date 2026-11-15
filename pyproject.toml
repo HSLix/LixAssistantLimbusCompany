@@ -20,6 +20,9 @@ automation = [
     "onnxruntime==1.31.1",
 ]
 agent = []
+mcp = [
+    "mcp>=2,<3",
+]
 
 [project.scripts]
 lalc = "lalc.__main__:main"

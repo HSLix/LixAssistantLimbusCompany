@@ -2310,5 +2310,44 @@ Original pixel region: {2}</source>
       <source>Execution stopped</source>
       <translation>执行已停止</translation>
     </message>
+    <message><source>Remote MCP</source><translation>远程 MCP</translation></message>
+    <message><source>Allow remote control</source><translation>允许远程控制</translation></message>
+    <message><source>Connection</source><translation>连接</translation></message>
+    <message><source>Copy Codex configuration</source><translation>复制 Codex 配置</translation></message>
+    <message><source>Copy token</source><translation>复制令牌</translation></message>
+    <message><source>Connection token — shown once</source><translation>连接令牌（仅显示一次）</translation></message>
+    <message><source>Generate / reset connection token</source><translation>生成／重置连接令牌</translation></message>
+    <message><source>Initialize / replace Candidate</source><translation>初始化／替换 Candidate</translation></message>
+    <message><source>Invalidate the old token, revoke remote control and stop related operations?</source><translation>使旧令牌失效、撤销远程控制并停止相关操作？</translation></message>
+    <message><source>Latest published Manifest</source><translation>最新已发布 Manifest</translation></message>
+    <message><source>Local port</source><translation>本机端口</translation></message>
+    <message><source>Mac Codex → Tailscale HTTPS → Windows LALC. Conversations stay in Codex.</source><translation>Mac Codex → Tailscale HTTPS → Windows LALC。对话保留在 Codex。</translation></message>
+    <message><source>Never used</source><translation>尚未使用</translation></message>
+    <message><source>No</source><translation>否</translation></message>
+    <message><source>Not initialized</source><translation>尚未初始化</translation></message>
+    <message><source>Off</source><translation>关闭</translation></message>
+    <message><source>On</source><translation>开启</translation></message>
+    <message><source>Persistent MCP workbench</source><translation>持久 MCP 工作台</translation></message>
+    <message><source>Recent remote operations</source><translation>近期远程操作</translation></message>
+    <message><source>Remote code can publish and execute Python with this Windows user's permissions. Validation is not a sandbox. Allow remote development until revoked or LALC exits?</source><translation>远程代码可使用当前 Windows 用户权限发布和执行 Python，校验不提供沙箱隔离。允许远程开发，直到撤销或退出 LALC？</translation></message>
+    <message><source>Replace MCP Candidate</source><translation>替换 MCP Candidate</translation></message>
+    <message><source>Replace the unpublished Candidate and its baseline? Page drafts, published versions, Assets and operation history are retained.</source><translation>替换未发布的 Candidate 及比较基线？页面草稿、已发布版本、Assets 和操作记录保留。</translation></message>
+    <message><source>Reset connection token</source><translation>重置连接令牌</translation></message>
+    <message><source>Revoke remote control</source><translation>撤销远程控制</translation></message>
+    <message><source>Save connection</source><translation>保存连接设置</translation></message>
+    <message><source>Save the Tailscale HTTPS address first.</source><translation>请先保存 Tailscale HTTPS 地址。</translation></message>
+    <message><source>Service: {0} · Authorized: {1} · Controller: {2}
+Run: {3} · Operation: {4}</source><translation>服务：{0} · 已授权：{1} · 控制者：{2}
+Run：{3} · 操作：{4}</translation></message>
+    <message><source>Source Manifest: {0}
+Last used: {1}</source><translation>来源 Manifest：{0}
+上次使用：{1}</translation></message>
+    <message><source>Start MCP service</source><translation>开启 MCP 服务</translation></message>
+    <message><source>Stop MCP service</source><translation>关闭 MCP 服务</translation></message>
+    <message><source>Tailscale HTTPS address</source><translation>Tailscale HTTPS 地址</translation></message>
+    <message><source>Yes</source><translation>是</translation></message>
+    <message><source>Configure Tailscale Serve once to forward HTTPS to http://127.0.0.1:&lt;port&gt;. The token is shown only when generated.</source><translation>首次配置 Tailscale Serve，将 HTTPS 转发至 http://127.0.0.1:&lt;端口&gt;。令牌仅在生成时显示。</translation></message>
+    <message><source>Paused</source><translation>已暂停</translation></message>
+    <message><source>Stopped</source><translation>已停止</translation></message>
 </context>
 </TS>

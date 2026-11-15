@@ -16,7 +16,7 @@ from typing import Any, Callable
 from .process_lock import ProcessLock
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
-from .run_logs import LIVE_LOG_LIMIT, is_live_log
+from .run_logs import LIVE_LOG_LIMIT, ACTION_ENDS, is_live_log
 from .control import InputSession
 from .ocr import ocr_service
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
@@ -65,6 +65,7 @@ class ApplicationService:
         self.on_change = on_change
         self._live_logs: deque[dict[str, Any]] = deque(maxlen=LIVE_LOG_LIMIT)
         self._live_logs_trimmed = False
+        self._mcp_logs: deque[dict[str, Any]] = deque(maxlen=5)
         self.logger = logger or logging.getLogger(__name__)
         self.recovery_choice = recovery_choice
         self.window_platform = window_platform
@@ -103,6 +104,14 @@ class ApplicationService:
         }
 
     @property
+    def remote_mcp(self):
+        """按需建立远程开发宿主，创建本身不监听网络或授予控制权。"""
+        if not hasattr(self, "_remote_mcp"):
+            from .remote_mcp import RemoteWorkbench
+            self._remote_mcp = RemoteWorkbench(self)
+        return self._remote_mcp
+
+    @property
     def pi_process(self):
         """按需持有 pi，独立于窗口与每轮事件循环。"""
         if not hasattr(self, "_pi_process"):
@@ -125,6 +134,7 @@ class ApplicationService:
         with self._condition:
             self._state["default_manifest_id"] = self.manifest_manager.default_manifest_id()
             self._state["activity"] = self._activity
+            self._state["remote_control"] = bool(getattr(self, "_remote_mcp", None) and self._remote_mcp.owner)
             return deepcopy(self._state)
 
     @property
@@ -133,6 +143,7 @@ class ApplicationService:
         with self._condition:
             self._state["default_manifest_id"] = self.manifest_manager.default_manifest_id()
             self._state["activity"] = self._activity
+            self._state["remote_control"] = bool(getattr(self, "_remote_mcp", None) and self._remote_mcp.owner)
             return {**deepcopy({key: value for key, value in self._state.items() if key != "trace"}),
                     "last_sequence": len(self._state["trace"])}
 
@@ -149,13 +160,19 @@ class ApplicationService:
     @contextmanager
     def activity(self, name: str, *, runtime: bool = False):
         """共享宿主排他操作；暂停中的 Run 仍占用执行环境。"""
+        remote = getattr(self, "_remote_mcp", None)
+        if remote is not None and remote.owner and name in remote.LOCAL_READS and not remote.in_operation:
+            yield
+            return
         with self._condition:
+            if remote is not None:
+                remote.check_local(name)
             if runtime and (name != "Agent" or threading.current_thread() is not self._thread
                             or self._state["phase"] != "running"):
                 raise StartError("runtime_not_authorized", "Runtime repair belongs to the active Run worker.")
             if self._activity or self._state["phase"] == "running" and not runtime:
                 raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or '运行'}")
-            if not runtime and (name == "Agent" or name.startswith("Capture")):
+            if not runtime and (name == "Agent" or name.startswith("Capture")) and not (remote and remote.game_lock):
                 lock = ProcessLock("game")
                 try:
                     lock.acquire()
@@ -172,6 +189,12 @@ class ApplicationService:
                     self._activity_lock.release()
                     self._activity_lock = None
                 self._activity = None
+                if remote is not None:
+                    try:
+                        if remote.owner and name in remote.LOCAL_ASSISTS and not remote.in_operation:
+                            remote.audit("local_assist", operation=name)
+                    finally:
+                        remote._finish_revoke()
                 self._changed_locked()
 
     def wait_for(self, predicate: Callable[[dict[str, Any]], bool]) -> dict[str, Any]:
@@ -192,10 +215,14 @@ class ApplicationService:
         with self._condition:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
+            remote = getattr(self, "_remote_mcp", None)
+            if remote is not None:
+                remote.check_local("Run")
+            remote_trial = bool(remote and remote.in_operation and self._activity == "Remote MCP")
             if self._state["phase"] == "running" or (self._activity and not (
-                    _developer_trial and self._activity == "Agent")):
+                    _developer_trial and (self._activity == "Agent" or remote_trial))):
                 raise StartError("run_already_active", "Another Run is already active.")
-            if _developer_trial and (self._activity != "Agent" or manifest_id is None):
+            if _developer_trial and (not (self._activity == "Agent" or remote_trial) or manifest_id is None):
                 raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
             manifest = self._loaded_manifest(manifest_id)
             if logical_name is None:
@@ -224,6 +251,8 @@ class ApplicationService:
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
             entry["developer_trial"] = _developer_trial
+            if remote_trial:
+                entry["remote_operation_id"] = remote.operation_id
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs, run_state, use_saved_config)
             self._run_options = options
             self._runtime_allowed = options["user_enabled"] and not _developer_trial
@@ -301,6 +330,8 @@ class ApplicationService:
 
     def tag_asset(self, name: str, image: Path, tags: list[str] | None = None) -> dict[str, Any]:
         """覆盖现有本地裁剪的标签，不连接游戏、不要求 Candidate。"""
+        if (remote := getattr(self, "_remote_mcp", None)) is not None:
+            remote.check_local("Asset 标签")
         return self.asset_library.set_tags(name, image, tags)
 
     def _window_platform(self) -> Any:
@@ -513,7 +544,8 @@ class ApplicationService:
     ) -> tuple[int, LoadedManifest, RunGate]:
         """为直接运行与 Plan 建立同一个持久 Run 边界。"""
 
-        if self._activity_lock is None:
+        remote = getattr(self, "_remote_mcp", None)
+        if self._activity_lock is None and not (remote and remote.game_lock and remote.in_operation):
             lock = ProcessLock("game")
             try:
                 lock.acquire()
@@ -545,6 +577,7 @@ class ApplicationService:
         self._trace_path = trace_path
         self._ledger = WorkflowRunLedger(self.data_root, run_id)
         self._live_logs.clear()
+        self._mcp_logs.clear()
         self._live_logs_trimmed = False
         self._state.update(
             phase="running", paused=False, pause_info=None, resume_pending=False,
@@ -605,6 +638,8 @@ class ApplicationService:
     def shutdown(self) -> None:
         """应用退出时请求协作式停止，并等运行线程完成输入释放和最终记录。"""
 
+        if (remote := getattr(self, "_remote_mcp", None)) is not None:
+            remote.close()
         try:
             self.stop()
         finally:
@@ -848,6 +883,8 @@ class ApplicationService:
             self._input_session = None
             self._gate = None
             self._active_executor = None
+            if (remote := getattr(self, "_remote_mcp", None)) is not None:
+                remote._finish_revoke()
             if self._runtime_chat is not None:
                 self._runtime_chat.tools.run_state = None
                 self._runtime_chat.tools.runtime_gate = None
@@ -913,6 +950,8 @@ class ApplicationService:
         except (OSError, TypeError, ValueError) as error:
             raise TraceWriteError(str(error)) from error
         self._state["trace"].append(record)
+        if event == "component_log" or event in ACTION_ENDS:
+            self._mcp_logs.append(record)
         if is_live_log(record):
             if len(self._live_logs) == LIVE_LOG_LIMIT:
                 self._live_logs_trimmed = True

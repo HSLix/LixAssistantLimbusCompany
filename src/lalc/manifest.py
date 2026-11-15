@@ -144,7 +144,7 @@ class ManifestManager:
         self.actions = MappingProxyType(dict(application_actions() if actions is None else actions))
         self.default: LoadedManifest | None = None
 
-    def publish(self, candidate_path: Path) -> ManifestResult:
+    def publish(self, candidate_path: Path, *, manifest_id: str | None = None) -> ManifestResult:
         """完整校验并发布开发者候选，但不改变 Default Manifest。"""
 
         candidate_path = Path(candidate_path)
@@ -155,7 +155,10 @@ class ManifestManager:
                 # 静态错误必须阻止整个批次导入，避免部分顶层代码提前执行。
                 return ManifestResult(errors=tuple(prepared.errors))
 
-            manifest_id = str(uuid.uuid4())
+            if manifest_id is None:
+                manifest_id = str(uuid.uuid4())
+            elif str(uuid.UUID(manifest_id)) != manifest_id:
+                raise ValueError("Invalid publication identity")
             assert prepared.manifest is not None
             manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
             manifest.update(AdditionalMessage=prepared.manifest.get("AdditionalMessage", ""),
