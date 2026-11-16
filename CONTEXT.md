@@ -45,11 +45,11 @@ A user-startable root Workflow marked by `@task_workflow`. It organizes Subworkf
 _Avoid_: Root node, top-level Subworkflow
 
 **Subworkflow**:
-A reusable Workflow whose `execute` entrypoint is marked by plain `@sub_workflow`. It combines Steps to complete one local responsibility and returns its result without deciding the whole task's final outcome. A Subworkflow cannot call another Subworkflow. It is not a recovery boundary.
+A reusable Workflow whose `execute` entrypoint is marked by plain `@sub_workflow`. It combines Steps to complete one local responsibility and returns its result without deciding the whole task's final outcome. A Subworkflow cannot call another Subworkflow; its failed entry can be recovered under the shared recovery model.
 _Avoid_: Task Workflow, shared node
 
 **Step**:
-The smallest independently observable and recoverable Python execution boundary, marked by plain `@step`. It must safely continue from any observable actionable, expected transitional, or completed state within its responsibility, without relying on lost state from an earlier invocation; unknown or stalled states produce an Execution Failure.
+A Python execution boundary for one independently observable and recoverable local goal, marked by plain `@step`. It re-observes actionable, transitional or completed states within that goal and may explicitly hand an unmet goal back to its caller for redispatch; a normal handback is distinct from business completion and an Execution Failure.
 _Avoid_: Every low-level action, YAML node
 
 **Deterministic Recovery**:

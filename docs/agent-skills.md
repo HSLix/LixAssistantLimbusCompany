@@ -1,5 +1,7 @@
 # Developer Skills
 
+2026-11-16：Workflow 指导已按[修订决定](agent-skills-revision-discussion.md)改为局部目标 Step、显式交回和有界循环分派；正常过渡集中等待，验证按变更范围并珍惜现场。替代此前“不能跨状态”“普通超时一律失败”“重试统一 3 次”“稳定后强制完整实跑”的指导；执行器、RunState 及工具权限不变，已有 Manifest 不自动迁移。影响及验证见[专项记录](agent-skills-revision-impact-review.md)。
+
 2026-11-11 Stage 6 已接入 Runtime 只读 Skills；随包指导已更新 RunState、非必要不改调用约定、发布问题简述及当前入口 Recheck。已有用户 `skills/` 仍不自动覆盖，需手动合并随包变更；程序组织的 Runtime 提示始终包含新接口及权限边界。见 [Stage 6 实施记录](stage-6-implementation.md)。
 
 开发 Agent 使用 pi 原生格式的 Skill 按需获取流程指导和只读参考资料；Skill 不授予权限，不执行附带脚本。GUI Construct、GUI Repair 和 CLI Repair 展示同一份目录，实际操作仍取决于本轮工具权限。Runtime 同样可只读加载 Skills，其可操作工具由 Runtime 白名单决定。
@@ -8,7 +10,7 @@
 
 Skill 位于应用实际数据目录的 `skills/`：默认 Windows 为 `%LOCALAPPDATA%\LALC\skills`，其他平台为 `~/.local/share/LALC/skills`；指定自定义数据目录时随之变化。在开始一轮开发 Agent 消息时按需准备，也可通过 Developer GUI 的 Session “+”→工作区与页面→“打开 Skills 文件夹”初始化并打开持久化源目录，不需要模型请求。
 
-- `skills/` 不存在：创建并复制随程序发布的七个默认 Skills。
+- `skills/` 不存在：创建并复制随程序发布的全部 Skills；检查必需入口存在，不限制额外 Skill 数量。
 - `skills/` 已存在：不补齐、不覆盖、不更新，空目录也保持为空。默认内容后续改进由开发者手动合入。
 - 开发者直接编辑、新增或移除目录中的文件；没有 GUI 编辑器，Agent 只能读取。若整个目录被删除，下轮会按“目录不存在”重新初始化。
 - 同名普通文件或根目录链接会报告错误，不覆盖。目录内链接／特殊文件排除并显示诊断，避免 pi 在发现阶段读到目录外资料。
@@ -43,7 +45,16 @@ Skill 名遵循 pi 格式，用小写字母、数字和连字符；参考资料�
 | validation-and-trial | Validate／Publish／显式版本运行及证据边界 |
 | human-feedback | 人工信息／操作请求、Confirm／Skip 含义和后续处理 |
 
+共用规范的 `references/dispatch-and-wait.md`、`references/recovery-rules.md` 分别在修改分派／等待和恢复规则时读取；它们是随 Skill 一起初始化、固定和分发的普通参考文件，不新增默认 Skill 入口。
+
 内置内容保留在 `src/lalc/skills/`，随 wheel 和 Windows 两种包完整发布，仅用于缺失目录的初始化。旧 `sop.md` 已在内容承接后删除；不再解析 XML、不叠加旧 SOP、不自动迁移任意旧安装中自行修改过的 SOP。
+
+## 合并本次指导到已有安装
+
+- 对照应用实际数据目录 `skills/`，合并本次更新的 workflow-conventions、workflow-development、workflow-repair、validation-and-trial、asset-management、page-development，以及后续补充的 human-feedback；workflow-conventions 的两个 references 文件也要复制。保留用户定制条款，消解与新指导冲突的旧规则，不以整目录重置代替合并。
+- 保留自建 limbuscompany-knowledge、图片及其他自定义 Skill；本次不需要删除整个 skills 目录，也不自动覆盖已有安装。
+- 内置 Agent 下一条用户消息刷新 Skill 副本；远程 MCP 使用接手时固定副本，当前控制会话空闲释放后重新接手才读取新合并内容。不要为刷新中断正在运行的任务。
+- 合并指导不等于迁移已发布 Workflow。按实际任务检查受影响调用方、Step 返回、Workflow 分派及过渡等待，再校验发布；不要将旧 None 返回批量认作未达成。
 
 ## 生效、权限与日志
 
