@@ -33,7 +33,9 @@ Manifest schema 2 只管理 `components` 和 `recovery_rules`，保存格式另�
 
 Step 按局部目标划分，可涵盖该目标的动作前、过渡中和完成后状态。通用动作 Step 参考一次短尝试，动作后建议等待至少 1 秒、也可 2 秒再确认；首次不预加补点，后续有证据且可安全重复再补。专门业务 Step 可采用其他有界形态。新建／改造的可交回动作 Step 用 completed／reason 明确结果，未达成（含入口不适用、局部超时）交回分派，参数和工具等真正异常仍传播；原有返回契约按需迁移并同步调用方。正常返回不等于业务完成，点击结束或固定等待不能证明目标达成；上层观察也不能替代 Step 重入时的局部入口检查。
 
-Task／Subworkflow 统一有界循环分流，每轮新观察、处理一个分支后重新完整分派。连续无效初始 3 次、未耗尽时等待 1 秒，确认局部目标达成才清零；另设固定总上限，需大量循环的单次 Task 取足够覆盖正常执行的稍大值，实际不足再调整，不为该常量扩展 RunState。Connecting／Combat Tips／Now Loading 等可靠确认的正常过渡由 Workflow 识别，交共用等待 Step（初始 60 轮、轮间 1 秒），不计无效也不清零；超限后 Workflow 再观察一次，仍在才抛失败。错误弹窗仍交 Recovery Rule，未知或识别失败不能当加载。详见[分派与等待](../src/lalc/skills/workflow-conventions/references/dispatch-and-wait.md)和[类型约定](../src/lalc/skills/workflow-conventions/SKILL.md#component-类型示例)；这些是业务编写指导，不是执行器自动迁移能力。
+Task／Subworkflow 默认直接观察、判断和分派；多个 Workflow 确实复用同一套场景分类或需独立验证识别能力时，再考虑提取识别 Step。统一有界循环分流，每轮新观察、处理一个分支后重新完整分派。连续无效初始 3 次、未耗尽时等待 1 秒，确认局部目标达成才清零；另设固定总上限，需大量循环的单次 Task 取足够覆盖正常执行的稍大值，实际不足再调整，不为该常量扩展 RunState。Connecting／Combat Tips／Now Loading 等可靠确认的正常过渡由 Workflow 识别，交共用等待 Step（初始 60 轮、轮间 1 秒），不计无效也不清零；超限后 Workflow 再观察一次，仍在才抛失败。错误弹窗仍交 Recovery Rule，未知或识别失败不能当加载。详见[分派与等待](../src/lalc/skills/workflow-conventions/references/dispatch-and-wait.md)和[类型约定](../src/lalc/skills/workflow-conventions/SKILL.md#component-类型示例)；这些是业务编写指导，不是执行器自动迁移能力。
+
+退出信号既可为新状态的特征出现，也可为原状态可靠特征消失。局部目标为关闭弹窗等离开原状态时，可靠消失可以确认完成；若要求到达特定目标，消失只证明停止原动作的依据，不代替目标证据。先检测退出再检查入口，限定适用范围，不把识别错误、短暂遮挡或任意陌生页面的未命中当作完成。
 
 验证按改动范围进行，不强制每次完整实跑。大部分现场只有一次低成本机会，运行后可能需重置副本或人工协助才能复现，不为反复验证擅自复位或消耗资源。先查询现有 Asset，选择标题、特色按钮等少量相对可靠特征，允许多次观察逐步改进，不因试跑昂贵而堆叠检测。必要时通过已发布的只观察临时 Step 检查当前页命中和误识别；清理走受控删除及登记／引用修订，不删除历史版本。试跑前明确起点、预期和证据，结束后用日志截图核对；终点零动作返回不能证明完整路径通过。详见[验证指导](../src/lalc/skills/validation-and-trial/SKILL.md)和[素材及识别试验](../src/lalc/skills/asset-management/SKILL.md)。
 
