@@ -185,6 +185,8 @@ def test_annotation_interface_scales_without_changing_original(monkeypatch):
 def test_browsing_evicts_old_pages_and_can_read_them_again(log_page):
     app, page, path, until = log_page
     while not page.older_done:
+        page.loading = True
+        page.view.scrollToBottom()
         page.more(True)
         until(lambda: not page.loading)
     assert len(page.model.rows) == 240
@@ -195,6 +197,84 @@ def test_browsing_evicts_old_pages_and_can_read_them_again(log_page):
     sequences = [row['record']['sequence'] for row in page.model.rows]
     assert sequences == sorted(set(sequences), reverse=True)
     assert sequences[0] > 240 and len(sequences) == 240
+
+
+@pytest.mark.parametrize('older', [True, False])
+def test_paging_preserves_latest_position_even_at_eviction_edge(log_page, monkeypatch, older):
+    """补页期间继续滚向远端，返回时仍保留最新阅读行及像素偏移。"""
+    app, page, _, _ = log_page
+    rows = read_page(page.read_root, page.run_id, page.boundary, limit=320)['rows']
+    page.loading = True
+    page.model.replace(rows[:240] if older else rows[-240:])
+    page.view.doItemsLayout()
+    page.view.scrollTo(page.model.index(230 if older else 2), page.view.ScrollHint.PositionAtTop)
+    app.processEvents()
+    pending = []
+    monkeypatch.setattr(page, 'submit', lambda operation, done: pending.append((operation, done)))
+    page.more(older)
+    page.view.scrollTo(page.model.index(2 if older else 230), page.view.ScrollHint.PositionAtTop)
+    bar = page.view.verticalScrollBar()
+    bar.setValue(bar.value() + 17)
+    anchor = page.anchor()
+    operation, done = pending.pop()
+    done(operation())
+    app.processEvents()
+    assert page.anchor() == anchor
+    assert len(page.model.rows) == 240
+    assert not pending
+    assert not (page.older_done if older else page.newer_done)
+
+
+def test_warning_then_info_and_small_scroll_keeps_reading_position(log_page):
+    """稀疏 Warning 扩大到 Info 后，小幅滚动补页仍停在 Warning 附近。"""
+    app, page, path, until = log_page
+    records = [json.loads(line) for line in path.read_text(encoding='utf-8').splitlines()]
+    for record in records:
+        if record['sequence'] in (80, 200):
+            record['level'] = 'warning'
+    path.write_text(''.join(json.dumps(record, ensure_ascii=False) + '\n' for record in records), encoding='utf-8')
+    page.boundary = snapshot(page.read_root, page.run_id)
+    for level, check in page.levels.items():
+        check.setChecked(level == 'warning')
+    until(lambda: not page.debounce.isActive() and not page.loading)
+    assert page.model.rows[0]['record']['sequence'] == 200
+    page.levels['info'].setChecked(True)
+    until(lambda: not page.debounce.isActive() and not page.loading)
+    for _ in range(6):
+        bar = page.view.verticalScrollBar()
+        bar.setValue(bar.value() + 20)
+        anchor = page.anchor()
+        until(lambda: not page.loading)
+        app.processEvents()
+        assert page.anchor() == anchor
+
+
+def test_restore_does_not_trigger_paging_or_leave_deferred_movement(log_page, monkeypatch):
+    """程序恢复位置不触发补页，也不在后续事件循环覆盖用户滚动。"""
+    app, page, _, _ = log_page
+    page.newer_done = False
+    calls = []
+    monkeypatch.setattr(page, 'more', lambda older: calls.append(older))
+    row = page.model.rows[0]
+    page.restore((row['offset'], row['end'], -20))
+    bar = page.view.verticalScrollBar()
+    bar.setValue(200)
+    anchor = page.anchor()
+    app.processEvents()
+    assert not calls
+    assert page.anchor() == anchor
+
+
+def test_resize_keeps_reading_anchor(log_page):
+    """同步位置恢复仍兼容窗口宽度变化引起的正文重新折行。"""
+    app, page, _, _ = log_page
+    page.view.scrollTo(page.model.index(20), page.view.ScrollHint.PositionAtTop)
+    bar = page.view.verticalScrollBar()
+    bar.setValue(bar.value() + 17)
+    anchor = page.anchor()
+    page.resize(900, 600)
+    app.processEvents()
+    assert page.anchor() == anchor
 
 
 def test_decoding_image_does_not_change_reserved_row_height(log_page):

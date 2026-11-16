@@ -545,9 +545,11 @@ class RunLogPage(QWidget):
         return row["offset"], row["end"], self.view.visualRect(index).top()
 
     def restore(self, anchor):
+        """同步排版并恢复阅读位置；程序定位不触发相邻页读取。"""
         if anchor is None:
             return
-        def move():
+        with QSignalBlocker(self.view.verticalScrollBar()):
+            self.view.doItemsLayout()
             if not self.model.rows:
                 return
             i = min(range(len(self.model.rows)), key=lambda n: abs(self.model.rows[n]["offset"] - anchor[0]))
@@ -557,7 +559,6 @@ class RunLogPage(QWidget):
             # 收起跨越屏幕的长项时，旧偏移可能超过新高度，至少保留该项的一部分。
             offset = max(anchor[2], 40 - self.view.visualRect(index).height())
             bar.setValue(bar.value() - min(0, offset))
-        QTimer.singleShot(0, move)
 
     def load_reset(self, anchor=None):
         """加载最新或锚点附近的一批；较旧侧无匹配才寻找较新项。"""
@@ -597,25 +598,33 @@ class RunLogPage(QWidget):
     def more(self, older):
         """双向读取相邻页并淘汰远端行，保留当前顶部日志的屏幕位置。"""
         self.loading = True
-        anchor, rows = self.anchor(), self.model.rows
+        rows = self.model.rows
         options = self.options()
         options.update(end=rows[-1]["offset"]) if older else options.update(start=rows[0]["end"], reverse=False)
         root, identity, boundary, cancelled = self.read_root, self.run_id, self.boundary, self.cancelled
         def shown(result):
+            anchor = self.anchor()
+            bottom = self.view.indexAt(self.view.viewport().rect().bottomLeft())
+            last_visible = bottom.row() if bottom.isValid() else len(rows) - 1
             added = result["rows"]
             if older:
                 self.older_done = len(added) < 60
                 combined = rows + added
-                if len(combined) > 240:
-                    self.newer_done = False
-                combined = combined[-240:]
+                start = max(0, len(combined) - 240)
             else:
                 self.newer_done = len(added) < 60
                 combined = added + rows
-                if len(combined) > 240:
-                    self.older_done = False
-                combined = combined[:240]
-            self.model.replace(combined)
+                start = 0
+                last_visible += len(added)
+            if anchor:
+                first_visible = next(i for i, row in enumerate(combined) if row["offset"] == anchor[0])
+                # 读取期间可继续滚动；淘汰范围必须避开返回时的整个可见区域。
+                start = max(0, last_visible - 239, min(start, first_visible))
+            if start:
+                self.newer_done = False
+            if start + 240 < len(combined):
+                self.older_done = False
+            self.model.replace(combined[start:start + 240])
             self.restore(anchor)
             self.loading = False
             self.report(result)
