@@ -15,6 +15,7 @@ import threading
 import uuid
 
 from .application import StartError
+from .agent_log import read_json
 from .developer import DeveloperHost, candidate_files
 from .process_lock import ProcessLock
 from .repair_tools import RepairTools
@@ -528,7 +529,8 @@ class RemoteWorkbench:
         if name == "remove_asset":
             arguments = {**arguments, "explicit_user_request": False}
         result_path = tools.call(name, arguments, tool_call_id=op["operation_id"] if op else str(uuid.uuid4()))
-        return object_json(Path(result_path))
+        # 工具结果落盘含去重引用；MCP 传输须完整展开并沿用日志路径及哈希校验。
+        return read_json(result_path)
 
     def invoke(self, name, arguments, control_token, operation_id=None):
         """读操作立即返回；其余操作独立串行执行，HTTP 结束不取消后台任务。"""

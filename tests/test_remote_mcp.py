@@ -82,6 +82,33 @@ def test_construct_tools_are_equal_but_not_aliased(remote):
     assert remote.invoke("list_skills", {}, token)["details"]["skills"]
 
 
+@pytest.mark.parametrize("name", ["list_manifests", "read_manifest", "add_component"])
+def test_tool_results_expand_log_references_before_mcp_transport(remote, monkeypatch, name):
+    """长文本、图片及字面标记经真实工具日志存储后仍完整返回，覆盖立即与异步路径。"""
+    import base64
+    from lalc.agent_log import read_json
+    from lalc.repair_tools import RepairTools
+
+    payload = {"source": "中文源码\n" * 400, "$lalc_log": {"user": "literal"}}
+    expected = RepairTools.text(payload)
+    expected["content"].append({"type": "image", "mimeType": "image/png",
+                                "data": base64.b64encode(bytes(range(256)) * 8).decode()})
+    monkeypatch.setattr(RepairTools, name, lambda self, **kwargs: expected)
+    token = acquired(remote)
+    if name == "add_component":
+        op = perform(remote, token, name, {})
+        assert op["status"] == "finished"
+        result = remote.query(token, operation_id=op["operation_id"])["result"]
+    else:
+        result = remote.invoke(name, {}, token)
+    assert result == expected
+    # 磁盘仍保留去重引用；仅对外输出展开，审计事件也能按原契约还原。
+    paths = list(remote.root.rglob("tool-*.json"))
+    assert len(paths) == 1
+    assert isinstance(json.loads(paths[0].read_text())["content"][0]["text"], dict)
+    assert read_json(paths[0]) == expected
+
+
 def test_token_hash_only_and_reset_revokes(remote):
     token = remote.reset_token()
     assert remote.authenticate(token)
@@ -295,6 +322,12 @@ def test_real_http_server_development_loop_and_shutdown(remote):
                        "clientInfo": {"name": "local-protocol-test", "version": "1"}})
     assert rpc("tools/list")["tools"]
     control = call("mcp_acquire", {})["control_token"]
+    listing = call("list_manifests", {"control_token": control})
+    assert listing["total"] >= 1 and isinstance(listing["items"], list)
+    manifest = call("read_manifest", {"control_token": control,
+                                      "manifest_id": remote.check()["source_manifest_id"]})
+    assert manifest["manifest_id"] == remote.check()["source_manifest_id"]
+    assert any(item["logical_name"] == "steps.total" for item in manifest["items"])
     source = call("read", {"control_token": control, "path": "steps.total.py"})
     assert "if value > 0" in source["text"]
     for name, args in (("edit", {"path": "steps.total.py", "old_text": " if value > 0", "new_text": ""}),
