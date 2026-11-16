@@ -209,6 +209,7 @@ def test_invalid_plan_support_declaration_rejected(declaration, tmp_path):
 
 def test_single_editor_handoff_autosaves_and_restores_independent_selection(owner, app):
     user = owner.user
+    deepseek_limit = user.settings_page.limit.value()
     user.settings_page.url.setText("http://local-before/v1")
     developer = owner.open_window(True)
     assert load_settings(owner.service.data_root)["base_url"] == "http://local-before/v1"
@@ -216,13 +217,12 @@ def test_single_editor_handoff_autosaves_and_restores_independent_selection(owne
     assert user.agent_controls.isEnabled() and user.user_enabled.isEnabled()
     assert developer.settings_page.isEnabled()
     page = developer.settings_page
-    page.provider.setCurrentIndex(page.provider.findData("deepseek"))
+    page.provider.setCurrentIndex(page.provider.findData("llama.cpp"))
     page.limit.setValue(7)
     page.limit.editingFinished.emit()
     assert load_settings(owner.service.data_root)["max_requests"] == 7
-    assert load_settings(owner.service.data_root, side="user")["provider"] == "llama.cpp"
+    assert load_settings(owner.service.data_root, side="user")["provider"] == "deepseek"
     assert not settings_document(owner.service.data_root)["user_enabled"]
-    page.provider.setCurrentIndex(page.provider.findData("llama.cpp"))
     page.url.setText("http://local-after/v1")
     page.url.editingFinished.emit()
     document = settings_document(owner.service.data_root)
@@ -237,9 +237,13 @@ def test_single_editor_handoff_autosaves_and_restores_independent_selection(owne
     assert developer.close()
     assert user.user_enabled.isEnabled() and user.user_enabled.isChecked()
     assert user.settings_page.isEnabled()
+    assert user.settings_page.provider.currentData() == "deepseek"
+    assert user.settings_page.url.text() == "http://local-before/v1"
+    user.settings_page.provider.setCurrentIndex(user.settings_page.provider.findData("llama.cpp"))
     assert user.settings_page.url.text() == "http://local-after/v1"
-    user.settings_page.provider.setCurrentIndex(user.settings_page.provider.findData("deepseek"))
     assert user.settings_page.limit.value() == 7
+    user.settings_page.provider.setCurrentIndex(user.settings_page.provider.findData("deepseek"))
+    assert user.settings_page.limit.value() == deepseek_limit
     assert load_settings(owner.service.data_root)["provider"] == "llama.cpp"
     assert load_settings(owner.service.data_root, side="user")["provider"] == "deepseek"
 
