@@ -1,4 +1,4 @@
-"""覆盖 Skill 初始化、固定副本、链接拒绝、失败回滚及取消，不启动 pi。
+"""覆盖 Skill 初始化、额外技能保留、固定副本、链接拒绝、回滚及取消，不启动 pi。
 
 项目根目录运行：.venv/bin/python -m pytest -q tests/test_agent_skills.py
 """
@@ -14,11 +14,20 @@ from lalc import agent_skills as skills
 
 def test_defaults_initialized_once_and_empty_directory_stays_empty(tmp_path):
     root = skills.initialize_skills(tmp_path)
-    assert {path.parent.name for path in root.glob("*/SKILL.md")} == set(skills.DEFAULT_SKILL_NAMES)
+    assert set(skills.DEFAULT_SKILL_NAMES) <= {path.parent.name for path in root.glob("*/SKILL.md")}
+    expected = {path.relative_to(skills.DEFAULT_SKILLS): path.read_bytes()
+                for path in skills.DEFAULT_SKILLS.rglob("*") if path.is_file()}
+    assert {path.relative_to(root): path.read_bytes()
+            for path in root.rglob("*") if path.is_file()} == expected
+    custom = root / "user-guide/SKILL.md"
+    custom.parent.mkdir()
+    custom.write_text("用户自行添加的指导", encoding="utf-8")
+    assert skills.initialize_skills(tmp_path) == root
+    assert custom.read_text(encoding="utf-8") == "用户自行添加的指导"
     for path in root.rglob("*"):
         if path.is_file():
             path.unlink()
-    for path in root.iterdir():
+    for path in sorted(root.rglob("*"), key=lambda path: len(path.parts), reverse=True):
         path.rmdir()
     assert skills.initialize_skills(tmp_path) == root
     assert list(root.iterdir()) == []
