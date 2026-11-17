@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-17：Session 聊天页右上角保留固定来源 Manifest，将重复的 Construct／Repair 标识替换为当前 Session 最近一次成功发布的 Manifest ID（包括 Agent 工具发布与会话内手动 Publish）。无发布记录显示“暂无 publish manifest”；发布失败保留上次 ID，重新打开 Session 从历史发布记录恢复，补载旧聊天不回退显示。发布与 Default 选择仍相互独立。
+
 2026-11-15：本文描述内置 pi 的开发接入。Mac Codex 桌面应用的远程 MCP 入口、独立工作台、异步操作及 Windows 审批见[远程 MCP 指南](remote-mcp.md)；两者复用底层服务，但不共享对话生命周期或控制凭据。
 
 2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。

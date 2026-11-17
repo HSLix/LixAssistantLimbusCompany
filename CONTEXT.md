@@ -146,7 +146,7 @@ A retained record of an explicitly removed Asset image, its original logical nam
 _Avoid_: Permanent deletion, Discard Index, separate Asset Library
 
 **Developer Trial**:
-An independent Top-level Execution of an explicitly selected saved Manifest and entry, undertaken to test a developer change and return actual evidence to the developing Agent. It does not resume a paused runtime caller or prove the developer's full objective has been completed.
+An independent Top-level Execution of an explicitly selected saved Manifest and entry, undertaken to test a developer change or deliberately advance the game to a state needed for further development, returning actual evidence to the developing Agent. It does not resume a paused runtime caller or prove the developer's full objective has been completed.
 _Avoid_: Runtime Step Recheck, Candidate execution
 
 **Runtime Policy**:

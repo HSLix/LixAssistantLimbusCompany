@@ -1147,8 +1147,10 @@ class RepairPage(QWidget):
         self.identity.setMinimumWidth(0)
         self.identity.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         title_row.addWidget(self.identity, 1)
-        self.mode_badge = QLabel()
-        title_row.addWidget(self.mode_badge)
+        self.publish_badge = QLabel()
+        self.publish_badge.setTextFormat(Qt.TextFormat.PlainText)
+        self.publish_badge.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        title_row.addWidget(self.publish_badge)
         body.addLayout(title_row)
         self.session_uuid = QLabel()
         self.session_uuid.setTextFormat(Qt.TextFormat.PlainText)
@@ -1666,6 +1668,7 @@ class RepairPage(QWidget):
         self.clear_raw_output()
         self.context_event_order = (-1, "")
         self.show_context_usage()
+        changed = self.session is None or self.session.identity != session.identity
         self.session, self.host = session, session.host
         self.history_reader = history_reader
         self.history_rounds = []
@@ -1674,12 +1677,19 @@ class RepairPage(QWidget):
         self.set_manifests(self.host.manager.list_manifests())
         self.baseline.setCurrentIndex(max(0, self.baseline.findData(metadata['source_manifest_id'])))
         self.identity.setToolTip(session.identity)
-        self.mode_badge.setText(('🛠 Construct' if session.mode == 'Construct' else '🔧 Repair'))
+        if history_reader is not None or changed:
+            self.show_published_manifest(history_reader.last_published_manifest if history_reader else None)
         self.diagnostics.set_path(self.host.conversation.log.path)
         if restore_history:
             self.reload_history(history_rows)
         self.refresh_sessions()
         self.render(bool(self.window.jobs))
+
+    def show_published_manifest(self, identity):
+        """显示本会话最近成功发布的版本；无记录时明确留空。"""
+        text = tr('Published Manifest: {0}').format(identity) if identity else tr('No publish manifest yet')
+        self.publish_badge.setText(text)
+        self.publish_badge.setToolTip(text)
 
     def reload_history(self, rows=None):
         """优先呈现最新完整轮次；旧轮次上滚时读取，不重复恢复模型历史。"""
@@ -1693,6 +1703,7 @@ class RepairPage(QWidget):
                 self.history_reader = RoundEventReader(events_path)
             if rows is None:
                 self.history_reader.refresh()
+            self.show_published_manifest(self.history_reader.last_published_manifest)
             self.history_rounds = sorted(self.history_reader.rounds)
             latest = self.history_rounds.pop() if self.history_rounds else None
             if rows is None:
@@ -1998,6 +2009,11 @@ class RepairPage(QWidget):
         kind, number = value.get("type"), event.get("round", 0)
         if event.get('conversation') and self.host.conversation and event['conversation'] != self.host.conversation.log.identity:
             return
+        if not getattr(self, '_replaying', False):
+            from .agent_log import published_manifest
+            identity = published_manifest(value)
+            if identity:
+                self.show_published_manifest(identity)
         live = (not getattr(self, '_replaying', False) and not self.window.closing
                 and not any(job.cancel_requested for job in self.window.jobs))
         if kind == 'round_finished':
@@ -2146,7 +2162,7 @@ class RepairPage(QWidget):
         preparing = self.session is None
         self.mode.setVisible(preparing)
         self.mode.setEnabled(preparing and not busy)
-        self.mode_badge.setVisible(not preparing)
+        self.publish_badge.setVisible(not preparing)
         self.context_button.setVisible(preparing)
         self.context_button.setEnabled(preparing and not busy)
         self.baseline.setEnabled(preparing and not busy)
