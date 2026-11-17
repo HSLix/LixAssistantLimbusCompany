@@ -798,6 +798,34 @@ def test_trial_caps_logs_and_preserves_surviving_scroll_anchor(gui):
     dialog.deleteLater()
 
 
+@pytest.mark.parametrize("logs_trimmed", [False, True])
+def test_trial_keeps_following_after_log_limit_and_layout(gui, logs_trimmed):
+    """达到上限后连续追加及延迟排版仍贴底，主动回看后不恢复跟随。"""
+    from lalc.developer_gui import TrialDialog
+    from lalc.run_logs import LIVE_LOG_LIMIT
+    app, window = gui
+    dialog = TrialDialog(window.service, window)
+    dialog.show()
+    records = [{"sequence": i, "event": "component_log", "message": f"entry-{i}"}
+               for i in range(1, LIVE_LOG_LIMIT + 1)]
+    dialog.render({"paused": False, "log_records": records})
+    app.processEvents()
+    bar = dialog.logs.verticalScrollBar()
+    bar.setValue(bar.maximum())
+    for sequence in range(LIVE_LOG_LIMIT + 1, LIVE_LOG_LIMIT + 5):
+        dialog.render({"paused": False, "logs_trimmed": logs_trimmed, "log_records": [
+            {"sequence": sequence, "event": "component_log", "message": "新增日志\n" * 4}]})
+        app.processEvents()
+        assert len(dialog.log_records) == LIVE_LOG_LIMIT
+        assert bar.value() == bar.maximum()
+    bar.setValue(bar.maximum() // 2)
+    dialog.render({"paused": False, "log_records": [
+        {"sequence": LIVE_LOG_LIMIT + 5, "event": "component_log", "message": "回看时新增"}]})
+    app.processEvents()
+    assert 0 < bar.value() < bar.maximum()
+    dialog.deleteLater()
+
+
 def test_trial_controls_use_light_status_without_full_trace(gui, monkeypatch):
     from lalc.developer_gui import TrialDialog
     _, window = gui
@@ -847,3 +875,17 @@ def test_manifest_reference_checkbox_saves_and_reloads(gui):
     assert not control.isChecked()
     control.click()
     assert settings_document(window.service.data_root)['manifest_reference_enabled'] is True
+
+
+def test_context_limits_save_and_reload(gui):
+    from lalc.agent_settings import settings_document
+    app, window = gui
+    page = window.settings_page
+    values = {'context_summary_min_tokens': 3000, 'context_deepseek_limit': 250000,
+              'context_llama_limit': 40000}
+    for name, value in values.items():
+        page.global_controls[name].setValue(value)
+    page.reload()
+    saved = settings_document(window.service.data_root)
+    for name, value in values.items():
+        assert saved[name] == page.global_controls[name].value() == value

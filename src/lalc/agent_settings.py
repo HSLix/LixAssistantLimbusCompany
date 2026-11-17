@@ -26,7 +26,9 @@ SETTINGS_LOCK = threading.RLock()
 OPTION_DEFAULTS = {"manifest_reference_enabled": True, "history_enabled": True, "runtime_feedback_enabled": False,
                    "automatic_repair_default": True, "recovery_limit": 10, "knowledge_enabled": True,
                    "context_image_limit": 12, "context_compaction_mode": "ratio",
-                   "context_compaction_ratio": 30, "context_compaction_tokens": 20000}
+                   "context_compaction_ratio": 30, "context_compaction_tokens": 20000,
+                   "context_summary_min_tokens": 2000, "context_deepseek_limit": 400000,
+                   "context_llama_limit": 50000}
 
 
 def checked_options(value: dict) -> dict:
@@ -39,11 +41,13 @@ def checked_options(value: dict) -> dict:
         elif name == "context_compaction_ratio":
             if type(result[name]) is not int or not 20 <= result[name] <= 90:
                 raise ValueError("Context compaction ratio must be 20–90")
-        elif name in {"recovery_limit", "context_image_limit", "context_compaction_tokens"}:
-            if type(result[name]) is not int or result[name] < 1:
+        elif name in {"recovery_limit", "context_image_limit", "context_compaction_tokens",
+                      "context_summary_min_tokens", "context_deepseek_limit", "context_llama_limit"}:
+            if type(result[name]) is not int or not 1 <= result[name] <= 2147483647:
                 label = {"recovery_limit": "连续恢复次数上限", "context_image_limit": "图片张数",
-                         "context_compaction_tokens": "压缩目标 token 数"}[name]
-                raise ValueError(f"{label}必须是正整数。")
+                         "context_compaction_tokens": "压缩目标 token 数", "context_summary_min_tokens": "摘要最小空间",
+                         "context_deepseek_limit": "DeepSeek 压缩触发值", "context_llama_limit": "llama.cpp 压缩触发值"}[name]
+                raise ValueError(f"{label}必须是 1–2147483647 的整数。")
         elif type(result[name]) is not bool:
             raise ValueError(f"{name} must be a boolean")
     return result

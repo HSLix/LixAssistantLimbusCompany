@@ -23,6 +23,12 @@ export function compactionTarget(used, policy) {
     : Math.floor(used * policy.context_compaction_ratio / 100);
 }
 
+/** 用户触发值不能越过模型为输出保留余量后的安全窗口。 */
+export function contextLimit(model, policy, provider = process.env.LALC_PI_PROVIDER) {
+  const product = provider === "deepseek" ? policy.context_deepseek_limit ?? 400000 : policy.context_llama_limit ?? 50000;
+  return Math.min(product, Math.max(1, (model?.contextWindow ?? product + 8192) - 8192));
+}
+
 export function imageWindow(entries, imageIds, sessionId, limit, currentIds = new Set<string>()) {
   const images = [];
   for (const entry of entries) {
@@ -59,7 +65,8 @@ export async function installContext(pi, emit, accounting) {
   const policy = bootstrap.policy;
   accounting.compactionRequests = bootstrap.compaction_requests ?? 0;
   const sessionPath = process.env.LALC_PI_SESSION_FILE!;
-  const productLimit = process.env.LALC_PI_PROVIDER === "deepseek" ? 400000 : 50000;
+  const productLimit = process.env.LALC_PI_PROVIDER === "deepseek" ? policy.context_deepseek_limit ?? 400000 : policy.context_llama_limit ?? 50000;
+  accounting.contextLimit = model => contextLimit(model, policy);
   let blocked = "";
   let pendingCompletion;
   let compactionStarted = 0;
@@ -82,13 +89,17 @@ export async function installContext(pi, emit, accounting) {
     }
     for (const hash of missing) imageIds[hash] = received[hash];
   }
-  const threshold = ctx => Math.min(productLimit, Math.max(1, (ctx.model?.contextWindow ?? productLimit + 8192) - 8192));
-  const count = entries => entries.reduce((sum, entry) => sum + entry.messages.reduce((n, m) => n + contextTokens(m), 0), 0);
+  const threshold = ctx => accounting.contextLimit(ctx.model);
+  // pi 投影包含历轮 system 增量；实际请求只采用当前入口的提示与启用工具。
+  const count = entries => entries.reduce((sum, entry) => sum + entry.messages.filter(m => m.role !== "system")
+    .reduce((n, m) => n + contextTokens(m), 0), 0);
   const usage = (tokens, ctx) => emit("lalc_context_usage", { tokens, limit: threshold(ctx),
     product_limit: productLimit, estimated: true, provider: process.env.LALC_PI_PROVIDER });
   const fail = error => {
+    pendingCompletion = undefined;
     blocked = String(error?.message ?? error);
     emit(compactionStarted ? "lalc_compaction" : "lalc_context_error", { phase: "failed", error: blocked,
+      response: error?.response,
       duration_ms: compactionStarted ? Date.now() - compactionStarted : undefined });
   };
   const complete = () => {
@@ -116,36 +127,46 @@ export async function installContext(pi, emit, accounting) {
           messages: [{ role: "user", timestamp: Date.now(), content: [{ type: "text", text:
             `已有摘要：\n${summary || "无"}\n下一段历史（可能在消息内部续接）：\n${chunk}` }] }],
         }, { signal, reasoning: "off", maxRetries: 0 });
+        emit("lalc_compaction_usage", { usage: response.usage, cost: null, requests: accounting.compactionRequests,
+          stop_reason: response.stopReason, raw_stop_reason: response.rawStopReason,
+          text_chars: textOf(response).length });
         if (response.stopReason !== "stop" || response.content.some(part => part.type === "toolCall")) {
-          throw new Error(`压缩未正常完成：${response.stopReason} ${response.errorMessage ?? ""}`);
+          const error = new Error(`压缩未正常完成：${response.stopReason} ${response.errorMessage ?? ""}`);
+          error["response"] = response;
+          throw error;
         }
         for (const key of ["input", "output", "cacheRead", "cacheWrite", "totalTokens"]) totals[key] += response.usage?.[key] ?? 0;
         summary = textOf(response).trim();
-        if (!summary) throw new Error("压缩返回空摘要。");
-        emit("lalc_compaction_usage", { usage: response.usage, cost: null, requests: accounting.compactionRequests });
+        if (!summary) {
+          throw Object.assign(new Error("压缩返回空摘要。"), { response });
+        }
       } finally { accounting.summarizing = false; }
     }
     return { text: summary, usage: totals };
   }
 
   async function compact(entries, ctx, measured = 0) {
-    const before = Math.max(count(entries) + 512, measured);
+    const fixed = contextTokens(accounting.systemState());
+    const before = Math.max(fixed + count(entries) + 512, measured);
     usage(before, ctx);
     if (before < threshold(ctx)) return [];
     const target = compactionTarget(before, policy);
     compactionStarted = Date.now();
     emit("lalc_compaction", { phase: "started", before, target, policy });
-    const fixed = entries.flatMap(entry => entry.messages).filter(m => m.role === "system")
-      .reduce((n, m) => n + contextTokens(m), 0);
     if (fixed >= threshold(ctx)) throw new Error("系统提示与工具声明已达到上下文触发线，无法压缩必要内容。");
     const available = Math.max(0, target - fixed);
+    const summaryBudget = Math.floor(available * 0.4);
+    const minimum = policy.context_summary_min_tokens ?? 2000;
+    if (summaryBudget < minimum) {
+      throw new Error(`剩余摘要空间不足：${summaryBudget} token，至少需要 ${minimum} token；已停止本轮并保留历史。`);
+    }
     // 近期原文与摘要共享剩余额度，不把用户的总目标误当 keepRecentTokens。
     const keepBudget = Math.floor(available * 0.6);
     let retained = 0, cut = entries.length;
     for (let i = entries.length - 1; i >= 0; i--) {
       const entry = entries[i];
       if (!entry.messages.some(m => m.role !== "system")) continue;
-      retained += entry.messages.reduce((n, m) => n + contextTokens(m), 0);
+      retained += count([entry]);
       if (retained > keepBudget) break;
       // 只能在 user 或 assistant 起点保留，不能从 toolResult 中间切断。
       if (entry.messages.some(m => ["user", "assistant"].includes(m.role))) cut = i;
@@ -156,16 +177,15 @@ export async function installContext(pi, emit, accounting) {
       ? message.content.map(part => part.type === "image" ? { type: "text", text:
         `[图片证据 session_id=${bootstrap.session_id}, image_id=${ids[digest(part.data)] ?? "未知"}]` } : part)
       : message.content }));
-    const generated = await summarize(stripped, "", ctx, Math.max(256, Math.floor(available * 0.4)), ctx.signal);
+    const generated = await summarize(stripped, "", ctx, summaryBudget, ctx.signal);
     const summary = generated.text + `\n历史证据：session_id=${bootstrap.session_id}，截至第 ${process.env.LALC_PI_CONVERSATION_ROUND} 轮；可通过已授权的 read_agent_session 按需查阅原始交互。`;
     const carried = selected.flatMap(message => Array.isArray(message.content)
       ? message.content.filter(part => part.type === "image") : []);
-    const after = 512 + carried.length * 1024 + fixed + count(entries.slice(cut)) - entries.slice(cut).flatMap(e => e.messages)
-      .filter(m => m.role === "system").reduce((n, m) => n + contextTokens(m), 0)
+    const after = 512 + carried.length * 1024 + fixed + count(entries.slice(cut))
       + contextTokens({ role: "user", content: summary });
+    if (after >= threshold(ctx)) throw new Error(`压缩后仍达到触发线：${after}/${threshold(ctx)}。`);
     pendingCompletion = { phase: "completed", before, target, after, target_met: after <= target,
       requests: accounting.compactionRequests, duration_ms: Date.now() - compactionStarted, estimated: true };
-    if (after >= threshold(ctx)) throw new Error(`压缩后仍达到触发线：${after}/${threshold(ctx)}。`);
     return [{ type: "compaction", summary, usage: generated.usage, firstKeptEntryId: entries[cut]?.sourceEntry.id ?? null,
       details: { lalc: true, before, target, after } },
       ...(carried.length ? [{ type: "custom_message", customType: "lalc_images", display: false,

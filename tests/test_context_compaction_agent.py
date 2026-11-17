@@ -235,6 +235,78 @@ def test_summary_failure_does_not_commit_compaction(conversation, failure):
     assert result['requests'] == 0
     path = chat.log.root / 'pi/session.jsonl'
     assert not path.exists() or not any(json.loads(line)['type'] == 'compaction' for line in path.read_text().splitlines())
+    if failure == 'length':
+        assert result['reason'] == 'output_limit'
+        assert result['diagnostics']['stage'] == 'compaction'
+        events = records(chat)
+        response = next(e['response'] for e in events if e['type'] == 'lalc_compaction' and e['phase'] == 'failed')
+        assert response['stopReason'] == 'length'
+        assert response['content'][0]['text'] == 'partial'
+        assert any(e['type'] == 'lalc_compaction_usage' and e['stop_reason'] == 'length' for e in events)
+
+
+def test_repeated_system_states_do_not_fill_context(conversation):
+    original, options, state = conversation
+    chat = DeveloperSession.create(original.host.service, original.host.manager.default_manifest_id(), entry='cli').conversation()
+    for _ in range(6):
+        result = asyncio.run(chat.run('继续检查，不修改文件', options))
+        assert result['status'] == 'completed', result
+        assert result['compaction_requests'] == 0
+    gauges = [e['tokens'] for e in records(chat) if e['type'] == 'lalc_context_usage' and 'product_limit' in e]
+    assert gauges[-1] - gauges[0] < 3000
+    assert len(state['calls']) == 6
+
+
+def test_insufficient_summary_space_stops_without_model_call(conversation):
+    chat, options, state = conversation
+    save_options(chat.host.service.data_root, context_summary_min_tokens=2147483647)
+    result = asyncio.run(chat.run('需要保留的历史 ' * 20000, options))
+    assert result['status'] == 'incomplete' and '剩余摘要空间不足' in result['error']
+    assert result['compaction_requests'] == result['requests'] == len(state['calls']) == 0
+    events = records(chat)
+    assert any(e['type'] == 'session_message' for e in events)
+    assert not any(e['type'] == 'lalc_compaction' and e['phase'] == 'completed' for e in events)
+    path = chat.log.root / 'pi/session.jsonl'
+    assert not path.exists() or not any(json.loads(line)['type'] == 'compaction' for line in path.read_text().splitlines())
+
+
+@pytest.mark.parametrize('provider,field,limit', [('deepseek', 'context_deepseek_limit', 100000),
+                                              ('llama.cpp', 'context_llama_limit', 40000)])
+def test_saved_threshold_applies_to_preparation_and_payload(conversation, provider, field, limit):
+    chat, options, state = conversation
+    options.provider = provider
+    if provider == 'deepseek':
+        options.model = 'deepseek-flash'
+        state['models'] = [{'id': 'deepseek-flash'}]
+    save_options(chat.host.service.data_root, **{field: limit})
+    result = asyncio.run(chat.run('只检查，不修改', options))
+    assert result['status'] == 'completed', result
+    gauges = [e for e in records(chat) if e['type'] == 'lalc_context_usage']
+    assert any('product_limit' in e for e in gauges) and any('bytes' in e for e in gauges)
+    assert all(e['limit'] == limit for e in gauges)
+    start = len(records(chat))
+    save_options(chat.host.service.data_root, **{field: 120000 if provider == 'deepseek' else 100000})
+    result = asyncio.run(chat.run('继续检查新的触发值', options))
+    assert result['status'] == 'completed', result
+    gauges = [e for e in records(chat)[start:] if e['type'] == 'lalc_context_usage']
+    assert gauges and all(e['limit'] == (120000 if provider == 'deepseek' else 65536 - 8192) for e in gauges)
+
+
+def test_tool_loop_summary_failure_keeps_evidence_and_does_not_replay(conversation):
+    chat, options, state = conversation
+    chat.tools.asset_tree = lambda **_: chat.tools.text({'large': 'tool-result ' * 30000})
+    state['respond'] = lambda body: tool('asset_tree', {}) if body.get('tools') else (
+        {'role': 'assistant', 'content': '尚未完成的摘要'}, 'length')
+    result = asyncio.run(chat.run('读取素材，不修改', options))
+    assert result['reason'] == 'output_limit' and result['requests'] == 1
+    assert result['diagnostics']['stage'] == 'compaction'
+    assert not any(e['type'] == 'lalc_compaction' and e['phase'] == 'completed' for e in records(chat))
+    state['respond'] = lambda body: answer() if body.get('tools') else (
+        {'role': 'assistant', 'content': '之前已读取素材清单，无需重复读取。'}, 'stop')
+    result = asyncio.run(chat.run('继续，不要重复工具操作', options))
+    assert result['status'] == 'completed', result
+    executed = [e for e in records(chat) if e['type'] == 'tool_execution_end' and e.get('toolName') == 'asset_tree']
+    assert len(executed) == 1
 
 
 def test_legacy_messages_migrate_once_without_old_image_upload(conversation, tmp_path):

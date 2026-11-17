@@ -473,6 +473,11 @@ class RepairConversation:
                             self.log.record(prepared)
                             if prepared.get("type") == "lalc_context_ready":
                                 break
+                            if prepared.get("type") == "lalc_compaction" and prepared.get("phase") == "failed":
+                                if prepared.get("response"):
+                                    raise model_error(prepared["response"], "compaction", self.log.requests,
+                                                      settings["max_requests"], self.log.transport_error)
+                                raise RuntimeError(prepared.get("error", "上下文处理失败"))
                             if prepared.get("type") == "extension_error" or prepared.get("type") == "response" and not prepared.get("success"):
                                 raise RuntimeError(str(prepared))
                         (session_file.parent / "initialized").write_text("1\n", encoding="utf-8")
@@ -501,6 +506,9 @@ class RepairConversation:
                                 if received.get("role") == "assistant":
                                     last = received
                             elif kind == "lalc_context_error" or kind == "lalc_compaction" and item.get("phase") == "failed":
+                                if item.get("response"):
+                                    raise model_error(item["response"], "compaction", self.log.requests,
+                                                      settings["max_requests"], self.log.transport_error)
                                 raise RuntimeError(item.get("error", "上下文处理失败"))
                             elif kind == "extension_error" or (kind == "response" and not item.get("success")):
                                 raise RuntimeError(str(item))

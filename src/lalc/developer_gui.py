@@ -200,6 +200,8 @@ class TrialDialog(QDialog):
         self._pause_notice_shown = False
 
     def render(self, state):
+        bar = self.logs.verticalScrollBar()
+        following = bar.value() >= bar.maximum() - 4
         for record in state.get("log_records", state.get("trace", ())):
             if record["sequence"] <= self.sequence:
                 continue
@@ -227,6 +229,10 @@ class TrialDialog(QDialog):
             self.pause_notice.clear()
         self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
         self.pause.setEnabled(not state.get("resume_pending", False))
+        # 首次显示历史提示会缩小日志视口，须在布局更新后恢复本轮刷新前的贴底选择。
+        self.layout().activate()
+        if following:
+            bar.setValue(bar.maximum())
 
     def append_log(self, record, level, message):
         """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
@@ -728,6 +734,9 @@ class SettingsPage(QWidget):
             for name, label, minimum, maximum in (
                 ("context_compaction_ratio", tr('Target percentage (20–90%)'), 20, 90),
                 ("context_compaction_tokens", tr('Target total tokens'), 1, 2147483647),
+                ("context_summary_min_tokens", tr('Minimum summary space (tokens)'), 1, 2147483647),
+                ("context_deepseek_limit", tr('DeepSeek compaction threshold (tokens)'), 1, 2147483647),
+                ("context_llama_limit", tr('llama.cpp compaction threshold (tokens)'), 1, 2147483647),
                 ("context_image_limit", tr('Recent images per message'), 1, 2147483647),
             ):
                 layout.addWidget(QLabel(label))
@@ -737,7 +746,7 @@ class SettingsPage(QWidget):
                 layout.addWidget(control)
                 control.valueChanged.connect(lambda value, name=name: self.change_option(name, value))
             mode.currentIndexChanged.connect(self.update_context_mode)
-            notice = QLabel(tr('DeepSeek: 400k; llama.cpp: 50k. Changes apply to the next message. Old images require history access.'))
+            notice = QLabel(tr('Changes apply to the next message. The model safety window may lower the threshold. Old images require history access.'))
             notice.setWordWrap(True)
             layout.addWidget(notice)
         self.provider = QComboBox()

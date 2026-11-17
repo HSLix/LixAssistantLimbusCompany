@@ -40,3 +40,5 @@ uv run python -m lalc.agent_log /absolute/conversation/events.jsonl --output /ab
 2026-10-25 交互 478bc276-1f3d-4f74-8974-964258b61cb0 的压缩包解压约 217.31 MB：完整请求快照约 156.15 MB、事件日志约 39.73 MB、PNG 约 8.07 MB、context.json 约 6.74 MB、工具 JSON 约 6.54 MB。不同图片载荷仅 8 份，却在请求快照中出现 188 次；重复图片载荷也出现在工具、消息及回合结束事件中。该记录用于说明去重动机，不代表新实现的压缩效果或性能验收。
 
 2026-11-12 上下文压缩增量：业务日志继续完整脱敏留存；`lalc_context_usage` 记录有效上下文估算与触发线，`lalc_compaction` 记录开始／完成／失败及前后量和目标，`lalc_compaction_request`／`lalc_compaction_usage` 单独计数和留存 `compact-N.json`。压缩记录不伪装成模型 thinking。pi 私有 Session 保存有效摘要和图片编辑，Sharing 不直接导出为可恢复执行状态。详见 [实施记录](context-compaction-implementation.md)。
+
+2026-11-17：`lalc_compaction_usage` 在检查结束原因前记录，包含 `stop_reason`、`raw_stop_reason`、`text_chars`；失败 `lalc_compaction` 的可选 `response` 保存实际模型响应，经既有脱敏与对象存储写入。截断在最终诊断中分类为 `output_limit`，阶段为 `compaction`；旧事件没有新增字段时仍可读取。摘要最小空间不足时没有模型请求，只有明确的压缩失败说明。

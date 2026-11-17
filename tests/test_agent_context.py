@@ -21,12 +21,23 @@ def test_context_defaults_and_provider_profiles(tmp_path):
                            context_compaction_ratio=90, context_image_limit=12)
     assert options['context_compaction_tokens'] == 1
     assert options['context_compaction_ratio'] == 90
+    assert options['context_summary_min_tokens'] == 2000
+    assert options['context_deepseek_limit'] == 400000 and options['context_llama_limit'] == 50000
+    save_options(tmp_path, context_summary_min_tokens=3000, context_deepseek_limit=200000, context_llama_limit=40000)
+    from lalc.agent_settings import settings_document
+    saved = settings_document(tmp_path)
+    bootstrap = context_bootstrap(RepairLog(tmp_path), [], saved)
+    assert bootstrap['policy']['context_summary_min_tokens'] == 3000
+    assert bootstrap['policy']['context_deepseek_limit'] == 200000
+    assert bootstrap['policy']['context_llama_limit'] == 40000
 
 
 @pytest.mark.parametrize('changes', [
     {'context_compaction_ratio': 19}, {'context_compaction_ratio': 91},
     {'context_compaction_ratio': True}, {'context_image_limit': 0},
     {'context_compaction_tokens': -1}, {'context_compaction_mode': 'other'},
+    {'context_summary_min_tokens': 0}, {'context_deepseek_limit': True},
+    {'context_llama_limit': -1}, {'context_deepseek_limit': 2147483648},
 ])
 def test_context_settings_reject_invalid_values(changes):
     with pytest.raises(ValueError):

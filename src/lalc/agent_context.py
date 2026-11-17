@@ -50,7 +50,8 @@ def context_bootstrap(log, history, options):
     return {"history": strip(history), "inputs": strip(inputs), "source_sequence": sequence,
             "session_id": log.identity, "image_ids": image_ids,
             "policy": {name: options[name] for name in (
-                "context_image_limit", "context_compaction_mode", "context_compaction_ratio", "context_compaction_tokens")}}
+                "context_image_limit", "context_compaction_mode", "context_compaction_ratio", "context_compaction_tokens",
+                "context_summary_min_tokens", "context_deepseek_limit", "context_llama_limit")}}
 
 
 def image_reference(session_id, image_id):
