@@ -8,6 +8,10 @@ LALC automates a Windows-native Unity game window during an exclusive focused au
 A user-installed, trusted GUI page that owns configuration under a stable page ID, independently of any Manifest. It may register multiple Loop Tasks or only provide shared settings. A disabled page retains its identity, tasks and configuration while contributing no active task choices.
 _Avoid_: Manifest Component, unreviewed generated page, untrusted plugin
 
+**Page Settings** (中文界面：页面配置):
+The saved business values owned by one Business Settings Page under its stable page ID, independently of its code package and any Manifest. They exclude Dashboard repetition choices and page availability.
+_Avoid_: Page package, task count, Agent settings
+
 **Loop Task**:
 A Dashboard repetition choice identified by a stable task ID registered by a Business Settings Page and explicitly supported by an Automation Plan. Its ID is distinct from the page ID and Component logical name; support declares configuration compatibility rather than successful execution.
 _Avoid_: Task Workflow, page ID, Component logical name

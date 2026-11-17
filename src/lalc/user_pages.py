@@ -36,7 +36,8 @@ class UserSettings:
         _strict_json(self.value)
 
     def save(self, section: str, identity: str, value: dict):
-        prepared = deepcopy(self.value)
+        """从最新文件合并单项，避免旧窗口覆盖刚导入的其他配置。"""
+        prepared = UserSettings(self.path.parent).value
         prepared[section][identity] = _strict_json(value)
         atomic_write_json(self.path, prepared)
         self.value = prepared
@@ -100,6 +101,7 @@ class PageContext:
 
     def __init__(self, store: UserSettings, page_id: str, package_root: Path | None = None):
         self.store, self.page_id, self.package_root = store, page_id, package_root
+        self.requires_reload = False
         from .i18n import current_language
         self.language = current_language()
 
@@ -111,6 +113,8 @@ class PageContext:
         return deepcopy(self.store.value["pages"].get(self.page_id, defaults or {}))
 
     def save(self, config: dict):
+        if self.requires_reload:
+            raise ValueError("页面配置已导入，请重载应用后再保存。")
         if type(config) is not dict:
             raise ValueError("页面必须提交 JSON 对象。")
         self.store.save("pages", self.page_id, config)

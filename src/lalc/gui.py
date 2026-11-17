@@ -807,9 +807,20 @@ class UserWindow(MainWindow):
         from .sharing_gui import open_sharing
         open_sharing(self, exporting=exporting)
 
+    def imported_page_settings(self, identities):
+        """隔离导入前的页面实例，重载时不再提交其旧值。"""
+        from .user_pages import UserSettings
+        self.page_store.value = UserSettings(self.service.data_root).value
+        for page in self.business_pages:
+            if page.page_id in identities:
+                page.context.requires_reload = True
+        self.render_state(self.service.status)
+
     def submit_pages(self):
         """运行与重载前强制提交所有已加载页面，错误保留页面身份。"""
         for page in self.business_pages:
+            if page.context.requires_reload:
+                continue
             try:
                 page.context.save(page.widget.submit())
             except Exception as error:
@@ -934,6 +945,8 @@ class UserWindow(MainWindow):
     def start_plan(self):
         """提交配置后固定 Manifest 和调度输入，不回读运行中的 GUI。"""
         from .user_pages import task_inputs
+        if any(page.context.requires_reload for page in self.business_pages):
+            raise ValueError(tr("Page settings were imported. Reload the application before running."))
         from .agent_settings import settings_document, load_settings, configuration_complete
         if settings_document(self.service.data_root)["user_enabled"]:
             self.settings_page.submit()
@@ -968,8 +981,10 @@ class UserWindow(MainWindow):
         if getattr(self, "_rendered_manifest_id", None) != identity or not hasattr(self, "latest_manifest_id"):
             self._rendered_manifest_id = identity
             self.refresh_manifest_card()
-        ready = getattr(self, "_agent_ready", True)
-        self.start_hint.setText("" if ready else tr('Complete the Agent settings or turn off User Agent'))
+        settings_reload = any(page.context.requires_reload for page in self.business_pages)
+        ready = getattr(self, "_agent_ready", True) and not settings_reload
+        self.start_hint.setText(tr("Page settings were imported. Reload the application before running.") if settings_reload else
+                                "" if ready else tr('Complete the Agent settings or turn off User Agent'))
         self.start_hint.setVisible(not ready)
         self.start_button.setEnabled(not busy and ready)
         controlled = bool(state.get("remote_control"))
@@ -980,7 +995,7 @@ class UserWindow(MainWindow):
             if count is not None:
                 count.setEnabled(not controlled)
         for page in self.business_pages:
-            page.widget.setEnabled(not controlled)
+            page.widget.setEnabled(not controlled and not page.context.requires_reload)
         self.start_button.setToolTip(tr('The current activity has not finished') if busy else
                                     tr("Run the Default Manifest's Python Plan") if ready else self.start_hint.text())
         if self.owns_run and state["phase"] == "running":
