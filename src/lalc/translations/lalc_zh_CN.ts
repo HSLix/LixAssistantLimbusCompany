@@ -2099,12 +2099,24 @@ Original pixel region: {2}</source>
       <translation>压缩后总 token 目标</translation>
     </message>
     <message>
+      <source>Minimum summary space (tokens)</source>
+      <translation>摘要最小空间（token）</translation>
+    </message>
+    <message>
+      <source>DeepSeek compaction threshold (tokens)</source>
+      <translation>DeepSeek 压缩触发值（token）</translation>
+    </message>
+    <message>
+      <source>llama.cpp compaction threshold (tokens)</source>
+      <translation>llama.cpp 压缩触发值（token）</translation>
+    </message>
+    <message>
       <source>Recent images per message</source>
       <translation>本轮保留的最近图片张数</translation>
     </message>
     <message>
-      <source>DeepSeek: 400k; llama.cpp: 50k. Changes apply to the next message. Old images require history access.</source>
-      <translation>DeepSeek 达 400k、llama.cpp 达 50k 时压缩。设置下轮生效；回读旧图需要历史读取权限。</translation>
+      <source>Changes apply to the next message. The model safety window may lower the threshold. Old images require history access.</source>
+      <translation>设置下轮生效；触发值仍受模型安全窗口限制。回读旧图需要历史读取权限。</translation>
     </message>
     <message>
       <source>Context —</source>

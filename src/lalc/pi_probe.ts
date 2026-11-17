@@ -2,7 +2,7 @@ import { access, readFile, realpath, writeFile } from "node:fs/promises";
 import { writeSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { createReadTool, createEditTool, loadSkills, formatSkillsForPrompt, detectSupportedImageMimeTypeFromFile } from "@earendil-works/pi-coding-agent";
-import { installContext, contextTokens } from "./pi_context.ts";
+import { installContext, contextTokens, contextLimit } from "./pi_context.ts";
 import { openAICompletionsApi, Type } from "@earendil-works/pi-ai";
 
 // 每次实际文件访问都检查解析后的路径，不能只检查模型提供的字符串。
@@ -130,7 +130,10 @@ export default async function (pi) {
   const api = openAICompletionsApi();
   // 新版 pi 重定向 console 和 stdout.write；协议事件显式写入原始 stdout 描述符。
   const emit = (type, fields) => writeSync(1, JSON.stringify({ type, ...fields }) + "\n");
-  const accounting = { summarizing: false, compactionRequests: 0, guard: () => {}, prompt: currentPrompt };
+  const accounting = { summarizing: false, compactionRequests: 0, guard: () => {}, prompt: currentPrompt,
+    systemState: () => ({ role: "system", content: currentPrompt(), toolsAdded: pi.getAllTools()
+      .filter(tool => pi.getActiveTools().includes(tool.name))
+      .map(({ name, description, parameters }) => ({ name, description, parameters })) }) };
   await installContext(pi, emit, accounting);
   pi.registerProvider("lalc-probe", {
     baseUrl: process.env.LALC_PI_BASE_URL,
@@ -202,8 +205,7 @@ export default async function (pi) {
             const bodyTokens = payload.messages.reduce((n, m) => n + contextTokens({ ...m,
               content: Array.isArray(m.content) ? m.content.map(p => p.type === "image_url"
                 ? { type: "image" } : p) : m.content }), 0) + Math.ceil(JSON.stringify(payload.tools ?? []).length / 4);
-            const threshold = Math.min(process.env.LALC_PI_PROVIDER === "deepseek" ? 400000 : 50000,
-              Number(process.env.LALC_PI_CONTEXT_WINDOW || 65536) - 8192);
+            const threshold = accounting.contextLimit?.(model) ?? contextLimit(model, {});
             emit("lalc_context_usage", { tokens: bodyTokens, limit: threshold,
               provider: process.env.LALC_PI_PROVIDER, estimated: true, bytes: payloadBytes });
           }

@@ -734,6 +734,9 @@ class SettingsPage(QWidget):
             for name, label, minimum, maximum in (
                 ("context_compaction_ratio", tr('Target percentage (20–90%)'), 20, 90),
                 ("context_compaction_tokens", tr('Target total tokens'), 1, 2147483647),
+                ("context_summary_min_tokens", tr('Minimum summary space (tokens)'), 1, 2147483647),
+                ("context_deepseek_limit", tr('DeepSeek compaction threshold (tokens)'), 1, 2147483647),
+                ("context_llama_limit", tr('llama.cpp compaction threshold (tokens)'), 1, 2147483647),
                 ("context_image_limit", tr('Recent images per message'), 1, 2147483647),
             ):
                 layout.addWidget(QLabel(label))
@@ -743,7 +746,7 @@ class SettingsPage(QWidget):
                 layout.addWidget(control)
                 control.valueChanged.connect(lambda value, name=name: self.change_option(name, value))
             mode.currentIndexChanged.connect(self.update_context_mode)
-            notice = QLabel(tr('DeepSeek: 400k; llama.cpp: 50k. Changes apply to the next message. Old images require history access.'))
+            notice = QLabel(tr('Changes apply to the next message. The model safety window may lower the threshold. Old images require history access.'))
             notice.setWordWrap(True)
             layout.addWidget(notice)
         self.provider = QComboBox()

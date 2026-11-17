@@ -875,3 +875,17 @@ def test_manifest_reference_checkbox_saves_and_reloads(gui):
     assert not control.isChecked()
     control.click()
     assert settings_document(window.service.data_root)['manifest_reference_enabled'] is True
+
+
+def test_context_limits_save_and_reload(gui):
+    from lalc.agent_settings import settings_document
+    app, window = gui
+    page = window.settings_page
+    values = {'context_summary_min_tokens': 3000, 'context_deepseek_limit': 250000,
+              'context_llama_limit': 40000}
+    for name, value in values.items():
+        page.global_controls[name].setValue(value)
+    page.reload()
+    saved = settings_document(window.service.data_root)
+    for name, value in values.items():
+        assert saved[name] == page.global_controls[name].value() == value
