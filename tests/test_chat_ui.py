@@ -19,6 +19,49 @@ from lalc.repair_chat import chat_title
 from test_developer_gui import gui, wait_jobs
 
 
+def test_publish_badge_tracks_session_successes_and_ignores_old_history(gui):
+    from lalc.agent_log import RoundEventReader, read_json
+    from lalc.developer_session import DeveloperSession
+
+    app, window = gui
+    page = window.repair_page
+    session = page.session
+    assert page.publish_badge.text() == tr('No publish manifest yet')
+    source = session.check()['source_manifest_id']
+    chat = page.host.conversation
+    chat.log.on_event = page.show_event
+    result = read_json(chat.tools.call('validate_and_publish', {}))
+    first = result['details']['manifest_id']
+    assert first in page.publish_badge.text() and source in page.source_label.text()
+    page.activate_session(session, restore_history=False)
+    assert first in page.publish_badge.text()
+    chat.log.on_event = None
+    page.publish()
+    wait_jobs(app, window)
+    latest = page.host.manager.list_manifests()[0]['manifest_id']
+    assert latest != first and latest in page.publish_badge.text()
+    chat.log.on_event = page.show_event
+    chat.log.record({'type': 'repair_tool', 'name': 'validate_and_publish', 'result': {
+        'isError': True, 'details': {'ok': False}}})
+    assert latest in page.publish_badge.text()
+    reader = RoundEventReader(chat.log.root / 'events.jsonl')
+    reader.refresh()
+    old_publish = next(row for row in reader.read(min(reader.rounds))
+                       if row['event'].get('type') == 'repair_tool')
+    page.replay_history([old_publish])
+    assert latest in page.publish_badge.text()
+    page.new()
+    item = next(page.history.item(i) for i in range(page.history.count())
+                if page.history.item(i).data(Qt.ItemDataRole.UserRole) == session.identity)
+    page.open_session(item)
+    wait_jobs(app, window)
+    assert latest in page.publish_badge.text()
+    other = DeveloperSession.create(window.service, source, entry='gui')
+    other.conversation()
+    page.activate_session(other)
+    assert page.publish_badge.text() == tr('No publish manifest yet')
+
+
 @pytest.mark.parametrize('mode', ['Construct', 'Repair'])
 def test_new_chat_defaults_to_latest_manifest_and_keeps_explicit_blank(gui, mode):
     from lalc.developer_gui import RepairPage
@@ -108,7 +151,7 @@ def test_chat_first_submit_fixes_mode_and_history_restores_candidate(gui, monkey
     wait_jobs(app, window)
     session, candidate = page.session.identity, page.host.candidate
     assert page.session.mode == mode and page.mode.isHidden()
-    assert mode in page.mode_badge.text() and page.context_button.isHidden()
+    assert page.publish_badge.text() == tr('No publish manifest yet') and page.context_button.isHidden()
     assert page.identity.text() == 'Build a useful flow.'
     page.new()
     item = next(page.history.item(i) for i in range(page.history.count())

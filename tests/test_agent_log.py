@@ -187,6 +187,34 @@ def test_round_reader_is_lazy_incremental_and_keeps_noncontiguous_rounds(tmp_pat
     assert len(reader.rounds[2]) == 1
 
 
+def test_round_reader_tracks_successful_publications_across_rounds(tmp_path):
+    from lalc.agent_log import RoundEventReader
+    log = RepairLog(tmp_path)
+    reader = RoundEventReader(log.root / 'events.jsonl')
+    reader.refresh()
+    assert reader.last_published_manifest is None
+    log.group = 1
+    log.record({'type': 'manual_publish', 'manifest_id': 'manual-first'})
+    reader.refresh()
+    assert reader.last_published_manifest == 'manual-first'
+    log.group = 2
+    log.record({'type': 'repair_tool', 'name': 'validate_and_publish', 'result': {
+        'details': {'ok': True, 'manifest_id': 'agent-latest', 'message': '长结果' * 2000}}})
+    log.record({'type': 'repair_tool', 'name': 'validate_and_publish', 'result': {
+        'isError': True, 'details': {'ok': False, 'manifest_id': 'failed'}}})
+    log.record({'type': 'repair_tool', 'name': 'read_manifest', 'result': {
+        'details': {'ok': True, 'manifest_id': 'reference'}}})
+    reader.refresh()
+    reader.refresh()
+    assert reader.last_published_manifest == 'agent-latest'
+    reopened = RoundEventReader(reader.path)
+    reopened.refresh()
+    assert reopened.last_published_manifest == 'agent-latest'
+    log.record({'type': 'manual_publish', 'manifest_id': 'manual-latest'})
+    reopened.refresh()
+    assert reopened.last_published_manifest == 'manual-latest'
+
+
 def test_round_reader_rejects_event_file_symlink_before_indexing(tmp_path):
     from lalc.agent_log import RoundEventReader
     log = RepairLog(tmp_path)

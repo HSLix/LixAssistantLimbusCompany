@@ -207,6 +207,19 @@ def read_events(path, *, expand=True):
             yield store.unpack(row) if expand else row
 
 
+def published_manifest(event):
+    """只提取宿主记录的成功发布，不把工具启动或模型文字当作发布。"""
+    if event.get('type') == 'manual_publish':
+        identity = event.get('manifest_id')
+    elif event.get('type') == 'repair_tool' and event.get('name') in {'validate_and_publish', 'publish'}:
+        result = event.get('result', {})
+        details = result.get('details', {})
+        identity = details.get('manifest_id') if not result.get('isError') and details.get('ok') is True else None
+    else:
+        return None
+    return identity if isinstance(identity, str) and identity.strip() else None
+
+
 class RoundEventReader:
     """增量索引事件位置，只展开被请求轮次；不改写原始日志。"""
 
@@ -214,17 +227,24 @@ class RoundEventReader:
         self.path = Path(path)
         self.offset = 0
         self.rounds = {}
+        self.last_published_manifest = None
 
     def refresh(self):
-        """只扫描新增的紧凑事件，不读取历史内容对象。"""
+        """增量索引轮次并提取发布结果，不展开无关的历史内容。"""
         if not self.path.exists():
             return
-        _store_for(self.path)
+        store = _store_for(self.path)
         with self.path.open('rb') as stream:
             stream.seek(self.offset)
             while line := stream.readline():
                 start = self.offset
                 row = json.loads(line)
+                event = row['event']
+                if event.get('type') == 'manual_publish' or (
+                        event.get('type') == 'repair_tool' and event.get('name') in {'validate_and_publish', 'publish'}):
+                    identity = published_manifest({**event, 'result': store.unpack(event.get('result', {}))})
+                    if identity:
+                        self.last_published_manifest = identity
                 self.offset = stream.tell()
                 self.rounds.setdefault(row.get('round', 0), []).append((start, len(line)))
 

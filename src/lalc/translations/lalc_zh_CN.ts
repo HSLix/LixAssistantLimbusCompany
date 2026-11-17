@@ -2349,5 +2349,7 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Configure Tailscale Serve once to forward HTTPS to http://127.0.0.1:&lt;port&gt;. The token is shown only when generated.</source><translation>首次配置 Tailscale Serve，将 HTTPS 转发至 http://127.0.0.1:&lt;端口&gt;。令牌仅在生成时显示。</translation></message>
     <message><source>Paused</source><translation>已暂停</translation></message>
     <message><source>Stopped</source><translation>已停止</translation></message>
+    <message><source>Published Manifest: {0}</source><translation>已发布 Manifest：{0}</translation></message>
+    <message><source>No publish manifest yet</source><translation>暂无 publish manifest</translation></message>
 </context>
 </TS>
