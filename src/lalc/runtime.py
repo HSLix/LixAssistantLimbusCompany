@@ -399,12 +399,13 @@ class WorkflowExecutor:
     def _wait_manual_resume(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
         parent_call_id: int | None, error: UserInterruption,
+        *, recovering: bool = False,
     ) -> None:
-        """保持暂停，直至一次手动恢复完成观察和适用的 Step condition 检查。"""
+        """保持暂停并重新观察；规则恢复未完成时不提前检查 Step condition。"""
 
         reason = str(error)
         diagnostic = _exception_fields(error)
-        restart_step = component.role == "step"
+        restart_step = component.role == "step" and not recovering
         condition = getattr(component.module, "condition", None) if restart_step else None
         while True:
             self.gate.pause()
@@ -412,7 +413,10 @@ class WorkflowExecutor:
                 "logical_name": logical_name,
                 "description": (
                     inspect.getdoc(component.module.execute) or inspect.getdoc(component.module) or logical_name
-                ) if restart_step else "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。",
+                ) if restart_step else (
+                    "恢复规则已中断；继续后重新检测恢复规则。" if recovering else
+                    "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。"
+                ),
                 "has_condition": callable(condition), "restart_step": restart_step,
                 "reason": reason, **diagnostic,
             })
@@ -507,11 +511,20 @@ class WorkflowExecutor:
                 self.gate.checkpoint()
                 execute = False
                 if not must_agent and self.run_state.recovery_count < self.recovery_limit:
-                    if isinstance(error, GameProcessExited):
-                        self._recover_game(logical_name, parent_call_id)
-                        recovered, problem = True, None
-                    else:
-                        recovered, problem = self._recover_rules()
+                    try:
+                        if isinstance(error, GameProcessExited):
+                            self._recover_game(logical_name, parent_call_id)
+                            recovered, problem = True, None
+                        else:
+                            recovered, problem = self._recover_rules()
+                    except UserInterruption as interrupted:
+                        if interrupted.reason == "cancel":
+                            raise
+                        if interrupted.reason != "focus":
+                            # 规则尚未完成，不能先检查失败 Step 的 condition 或重放 Workflow。
+                            self._wait_manual_resume(logical_name, original, inputs, parent_call_id,
+                                                     interrupted, recovering=True)
+                        continue
                     if recovered:
                         self.run_state._recovery_count += 1
                         execute = True

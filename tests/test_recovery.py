@@ -160,6 +160,79 @@ def _finish(service: ApplicationService, run_id: int) -> dict[str, Any]:
     return service.wait_for(lambda state: state["run_id"] == run_id and state["phase"] == "finished")
 
 
+@pytest.mark.parametrize("role", ["step", "sub_workflow", "task_workflow"])
+@pytest.mark.parametrize("phase", ["detect", "recover"])
+@pytest.mark.parametrize("intent", ["pause", "takeover", "cancel"])
+def test_interruption_inside_recovery_ocr_keeps_run_alive(tmp_path, monkeypatch, role, phase, intent):
+    """规则 OCR 中的暂停保留调用者和恢复额度，继续时重新检测，取消正常收尾。"""
+    from test_input_control import FakeWindow, finished, paused
+
+    manager = ManifestManager(tmp_path)
+    observation = 'ctx.action("observe.capture_screen"); ctx.action("observe.ocr"); '
+    rules = {"transient": _rule(
+        (observation if phase == "detect" else "") + "return True",
+        (observation if phase == "recover" else "") + "return None",
+    )}
+    source = STEP.replace("{nonce}", tmp_path.name).replace("@step", f"@{role}").replace(
+        "ExecutionFailure, step", f"ExecutionFailure, {role}",
+    )
+    if role == "step":
+        # condition 在环境修复前仍失败，暂停恢复不能提前要求它通过。
+        source += '\ndef condition(ctx, *, value: int) -> bool:\n    return calls != 1 or ctx.run_state.recovery_count > 0\n'
+        task_source, sub_source, step_source = TASK, SUB, source
+    elif role == "sub_workflow":
+        task_source = TASK.replace('ctx.call("steps.break", value=value)', '"already-done"')
+        task_source, sub_source, step_source = task_source, source, NEW_STEP
+    else:
+        task_source, sub_source, step_source = source, SUB, NEW_STEP
+    base = _publish(tmp_path, manager, step_source=step_source,
+                    task_source=task_source, sub_source=sub_source, rules=rules)
+    window = FakeWindow()
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=window)
+    ocr_calls = []
+
+    def interrupted_ocr(**kwargs):
+        ocr_calls.append(1)
+        if len(ocr_calls) == 1:
+            if intent == "takeover":
+                window.backend.monitor.record("鼠标", False)
+            else:
+                service.pause()
+            service._check_input()
+        return {"items": []}
+
+    monkeypatch.setattr(service, "_ocr", interrupted_ocr)
+    try:
+        service.start_plan(use_saved_config=False, manifest_id=base)
+        state = paused(service)
+        assert state["phase"] == "running"
+        assert not state["pause_info"]["restart_step"]
+        assert not state["pause_info"]["has_condition"]
+        assert service._active_executor.run_state.recovery_count == 0
+        assert not any(e["event"] == "plan_item_finished" for e in state["trace"])
+        if intent == "cancel":
+            service.stop()
+        else:
+            service.resume()
+        state = finished(service)
+        assert not state["result"].get("fatal")
+        if intent == "cancel":
+            assert state["result"]["failure_code"] == "user_cancelled"
+            assert len(ocr_calls) == 1
+        else:
+            assert state["result"]["status"] == "completed"
+            assert state["result"]["all_tasks_succeeded"]
+            assert len(state["result"]["items"]) == 1
+            assert len(ocr_calls) == 2
+            detections = [e for e in state["trace"] if e["event"] == "recovery_rule_started"
+                          and e["phase"] == "detect"]
+            assert len(detections) == 2
+            assert sum(e["event"] == "component_started" and e["logical_name"] == "tasks.run"
+                       for e in state["trace"]) == (2 if role == "task_workflow" else 1)
+    finally:
+        service.shutdown()
+
+
 @pytest.mark.parametrize("exception_name", ["ExecutionFailure", "ValueError", "OSError"])
 def test_step_failure_enters_recovery_without_unwinding_callers(tmp_path: Path, exception_name: str) -> None:
     """显式失败与原生异常都在 Step 边界恢复，原 Task 调用只进入一次。"""

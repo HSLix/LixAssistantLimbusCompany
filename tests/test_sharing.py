@@ -66,7 +66,7 @@ def source(tmp_path, monkeypatch):
     (root / "traces/1.jsonl").write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n", encoding="utf-8")
     (root / "evidence/1").mkdir(parents=True)
     (root / "evidence/1/2.png").write_bytes(png("white"))
-    (root / "user-settings.json").write_text('{"private":"must not export"}', encoding="utf-8")
+    (root / "user-settings.json").write_text('{"pages":{},"tasks":{}}', encoding="utf-8")
     def forbidden(*args, **kwargs):
         pytest.fail("分享不得执行 Workflow")
     monkeypatch.setattr(ManifestManager, "_load", forbidden)

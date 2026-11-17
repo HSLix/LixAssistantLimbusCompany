@@ -1,6 +1,7 @@
-"""General Settings 分享向导；四类别审查、资源冲突及统一人工提交。"""
+"""General Settings 分享向导；分类审查、资源冲突及统一人工提交。"""
 
 from pathlib import Path
+import json
 from datetime import datetime
 import time
 from typing import TypeVar, Callable, cast
@@ -212,7 +213,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
 
 def title(kind):
     return {"workflow": tr("Workflow"), "assets": tr("Assets"),
-            "pages": tr("Extension Pages"), "history": tr("Agent History"), "skills": tr("Skills")}[kind]
+            "pages": tr("Extension Pages"), "history": tr("Agent History"), "skills": tr("Skills"), "page_settings": tr("Page Settings")}[kind]
 
 
 def notice(text):
@@ -286,6 +287,7 @@ class ExportDialog(QDialog):
         layout.addWidget(TitleLabel(tr("Export Package")))
         layout.addWidget(notice(tr("Only selected objects are shared. Assets are independent of Workflow. Agent History is off by default.")))
         layout.addWidget(notice(tr("Assets are selected by default. Deselect groups you do not want to share.")))
+        layout.addWidget(notice(tr("Page Settings shares saved values only. Unsaved edits, task counts and page availability are excluded.")))
         first = QWidget()
         choices = QVBoxLayout(first)
         self.selectors = {}
@@ -408,7 +410,7 @@ class ImportDialog(QDialog):
         super().__init__(window)
         self.window_host, self.manager, self.package = window, window.host.manager, package
         self.allow_unknown_space = getattr(window, "allow_unknown_space", False)
-        self.selected = {obj["number"] for obj in package.objects if obj["kind"] != "skills"}
+        self.selected = {obj["number"] for obj in package.objects if obj["kind"] not in {"skills", "page_settings"}}
         self.reviewed, self.review_failed, self.asset_actions = {}, {}, {}
         self.viewed, self.checks = set(), {}
         self.by_kind = {kind: [obj for obj in package.objects if obj["kind"] == kind] for kind in KINDS}
@@ -503,6 +505,20 @@ class ImportDialog(QDialog):
         skills.addWidget(self.skill_details)
         self.skills.itemChanged.connect(lambda item: self.choose(self.number("skills", item.data(Qt.ItemDataRole.UserRole)), item.checkState() == Qt.CheckState.Checked))
         self.skills.currentRowChanged.connect(self.render_skill)
+        settings = self.panel("page_settings")
+        settings.addWidget(notice(tr("Page settings may contain private information. The matching page may not be installed; configuration compatibility is not verified.")))
+        self.page_settings = check_list([obj["id"] for obj in self.by_kind["page_settings"]], False)
+        settings.addWidget(self.page_settings, 1)
+        actions = QHBoxLayout()
+        for label, action in ((tr("Replace"), "replace"), (tr("Skip"), "skip")):
+            button = PushButton(label)
+            button.clicked.connect(lambda _, action=action: self.settings_action(action))
+            actions.addWidget(button)
+        settings.addLayout(actions)
+        self.settings_details = details()
+        settings.addWidget(self.settings_details, 2)
+        self.page_settings.itemChanged.connect(lambda item: self.choose(self.number("page_settings", item.data(Qt.ItemDataRole.UserRole)), item.checkState() == Qt.CheckState.Checked))
+        self.page_settings.currentRowChanged.connect(self.render_settings)
         self.error_box = notice("")
         layout.addWidget(self.error_box)
         self.trust = CheckBox(tr("I understand imported code and records are untrusted."))
@@ -529,6 +545,8 @@ class ImportDialog(QDialog):
             self.pages.setCurrentRow(0)
         if self.histories.count():
             self.histories.setCurrentRow(0)
+        if self.page_settings.count():
+            self.page_settings.setCurrentRow(0)
         self.result_data = None
 
     def done(self, result):
@@ -605,6 +623,12 @@ class ImportDialog(QDialog):
         elif obj["kind"] == "skills":
             lines.append(tr("Destination: {0}").format(self.manager.data_root / "skills" / obj["id"]))
             lines.extend(check.get("changed_files", []))
+        elif obj["kind"] == "page_settings":
+            lines.append(tr("Destination: {0}").format(self.manager.data_root / "user-settings.json"))
+            lines.append(tr("Current settings:"))
+            lines.append(json.dumps(check.get("current"), ensure_ascii=False, indent=2))
+            lines.append(tr("Imported settings (whole page replacement):"))
+            lines.append(json.dumps(check.get("config"), ensure_ascii=False, indent=2))
         elif obj["kind"] == "history":
             lines.append(tr("Destination: {0}").format(self.manager.data_root / "knowledge/imported-agent-history" / check.get("content_hash", "")))
         lines.append(tr("Files (including dependencies):"))
@@ -647,6 +671,19 @@ class ImportDialog(QDialog):
     def render_skill(self, *_):
         row = self.skills.currentRow()
         self.skill_details.setPlainText(self.object_text(self.by_kind["skills"][row]) if row >= 0 else tr("No contents in this category."))
+
+    def settings_action(self, action):
+        row = self.page_settings.currentRow()
+        if row >= 0:
+            obj = self.by_kind["page_settings"][row]
+            if self.checks.get(obj["number"], {}).get("conflict"):
+                self.asset_actions[obj["number"]] = action
+        self.update_state()
+
+    def render_settings(self, *_):
+        row = self.page_settings.currentRow()
+        obj = self.by_kind["page_settings"][row] if row >= 0 else None
+        self.settings_details.setPlainText(self.object_text(obj) if obj else tr("No contents in this category."))
 
     def asset_action(self, action):
         self.asset_actions.update({obj["number"]: action for obj in self.by_kind["assets"] if self.checks.get(obj["number"], {}).get("conflict")})
@@ -754,7 +791,7 @@ class ImportDialog(QDialog):
             if check.get("conflict"):
                 conflicts += obj["kind"] == "assets"
                 if number in self.selected and number not in self.asset_actions:
-                    errors.append(tr("Choose Replace all conflicts or Skip all conflicts for Assets / Skills."))
+                    errors.append(tr("Choose Replace or Skip for each selected conflict (Assets / Skills / Page Settings)."))
             if number in self.selected:
                 errors.extend(check.get("errors", []))
                 if number in self.review_failed:
@@ -786,14 +823,16 @@ class ImportDialog(QDialog):
             name = name[:80] if isinstance(name, str) else obj["id"]
             self.pages.item(index).setText((name + " · " if name != obj["id"] else "") + obj["id"] + " — " + status)
         self.pages.blockSignals(False)
-        self.skills.blockSignals(True)
-        for index, obj in enumerate(self.by_kind["skills"]):
-            check = self.checks.get(obj["number"], {})
-            status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
-            action = self.asset_actions.get(obj["number"])
-            self.skills.item(index).setText(obj["id"] + " — " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
-        self.skills.blockSignals(False)
+        for kind, widget in (("skills", self.skills), ("page_settings", self.page_settings)):
+            widget.blockSignals(True)
+            for index, obj in enumerate(self.by_kind[kind]):
+                check = self.checks.get(obj["number"], {})
+                status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
+                action = self.asset_actions.get(obj["number"])
+                widget.item(index).setText(obj["id"] + " — " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
+            widget.blockSignals(False)
         self.render_skill()
+        self.render_settings()
         self.error_box.setText("\n".join(dict.fromkeys(errors)))
         self.commit.setEnabled(bool(self.selected) and nonempty <= self.viewed and not errors and self.trust.isChecked())
 
@@ -841,6 +880,10 @@ class ImportDialog(QDialog):
         try:
             self.result_data = sharing_task(self, lambda: import_selected(self.manager, self.package, self.checks, self.selected,
                 asset_actions=self.asset_actions, reviewed=self.reviewed, allow_unreviewed=bool(unreviewed)), title="Import sharing package")
+            imported_settings = {item["id"] for item in self.result_data["completed"]
+                                 if item["kind"] == "page_settings" and item.get("status") == "imported"}
+            if imported_settings:
+                self.window_host.imported_page_settings(imported_settings)
             lines = [tr("Completed: {0}").format(len(self.result_data["completed"]))]
             for item in self.result_data["completed"]:
                 status = {"skipped": tr("Skipped"), "imported": tr("Imported"), "installed": tr("Installed")}.get(item.get("status"), item.get("manifest_id", item.get("path", "")))
@@ -849,7 +892,9 @@ class ImportDialog(QDialog):
                 failed = self.result_data["failed"]
                 lines.extend([tr("Failed: {0}").format(f"{title(failed['kind'])} · {failed['id']} · {failed['error']}"),
                               tr("Not processed: {0}").format(", ".join(title(item["kind"]) + " · " + item["id"] for item in self.result_data["unprocessed"]))])
-            if any(item.get("reload_required") for item in self.result_data["completed"]):
+            if imported_settings:
+                lines.append(tr("Page settings were imported. Reload the application before running."))
+            if any(item["kind"] == "pages" and item.get("reload_required") for item in self.result_data["completed"]):
                 lines.append(tr("Pages were installed. Reload the application manually to use them."))
             QMessageBox.information(self, tr("Import results"), self.window_host.clean_details("\n".join(lines)))
             if self.result_data["failed"]:
@@ -865,7 +910,7 @@ class ImportDialog(QDialog):
             self.recheck()
 
     def sync_selection(self):
-        for kind, widget in (("pages", self.pages), ("history", self.histories), ("skills", self.skills)):
+        for kind, widget in (("pages", self.pages), ("history", self.histories), ("skills", self.skills), ("page_settings", self.page_settings)):
             widget.blockSignals(True)
             for index, obj in enumerate(self.by_kind[kind]):
                 widget.item(index).setCheckState(Qt.CheckState.Checked if obj["number"] in self.selected else Qt.CheckState.Unchecked)

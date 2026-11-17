@@ -22,10 +22,12 @@ from .agent_log import FORMAT, LogStore
 from .assets import AssetLibrary, asset_name
 from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries,
                             page_filename, real_directory, snapshot_page)
+from .user_pages import UserSettings
+from .runtime import _strict_json
 from .process_lock import ProcessLock
 from .workflow_sharing import _prepare, import_workflow, inspect_workflow_import
 
-KINDS = ("workflow", "assets", "pages", "history", "skills")
+KINDS = ("workflow", "assets", "pages", "history", "skills", "page_settings")
 
 
 def digest(content):
@@ -237,6 +239,23 @@ def replace_skill(root, identity, files, expected):
             shutil.rmtree(work)
 
 
+def page_settings_config(identity, files):
+    """配置 ID 不是文件路径；仅接受单份 JSON 对象，不执行页面代码。"""
+    if type(identity) is not str or not identity.strip():
+        raise ValueError("页面配置 PAGE_ID 必须为非空字符串。")
+    if set(files) != {"settings.json"}:
+        raise ValueError("页面配置只允许 settings.json。")
+    config = strict_json(files["settings.json"])
+    if type(config) is not dict:
+        raise ValueError("页面配置必须是 JSON 对象。")
+    return _strict_json(config)
+
+
+def settings_version(config):
+    """区分缺失和空对象，并保留 JSON 布尔与数值的差异。"""
+    return digest(json_bytes(config)) if config is not None else None
+
+
 def catalog(manager):
     """枚举可显式选择的对象；不加载页面、Workflow 或可恢复 Session。"""
     root = manager.data_root
@@ -264,6 +283,7 @@ def catalog(manager):
                              else path.parent.relative_to(root).as_posix())
     return {"workflow": [item["manifest_id"] for item in manager.list_manifests()],
             "assets": sorted(names), "pages": sorted(handles), "history": histories,
+            "page_settings": sorted(UserSettings(root).value["pages"]),
             "skills": sorted(path.name for path in real_directory(root / "skills").iterdir()
                              if (path / "SKILL.md").exists()) if (root / "skills").exists() else []}
 
@@ -367,6 +387,10 @@ def build_export(manager, selection):
                 files = skill_files(manager.data_root, identity)
                 if files is None:
                     raise ValueError(f"Skill 不存在：{identity}")
+            elif kind == "page_settings":
+                config = UserSettings(manager.data_root).value["pages"][identity]
+                files = {"settings.json": json_bytes(config)}
+                page_settings_config(identity, files)
             elif kind == "pages":
                 path = installed_page(manager.data_root, identity)
                 files = {"page.py": FileContent.from_path(path)} if path.is_file() else tree_files(path)
@@ -400,7 +424,8 @@ def _index(objects):
     for obj in objects:
         if obj["kind"] not in KINDS or (obj["kind"], obj["id"]) in identities:
             raise ValueError("对象类别无效或重复。")
-        _relative(obj["id"])
+        if obj["kind"] != "page_settings":
+            _relative(obj["id"])
         identities.add((obj["kind"], obj["id"]))
         # 复用整包路径／Windows 别名检查，不把这一临时入口写入实际包。
         paths = {**obj["files"], "page.py": obj["files"].get("page.py", b"")}
@@ -516,7 +541,8 @@ class SharingPackage:
                         raise ValueError("包对象结构无效。")
                     if (obj["kind"], obj["id"]) in ids:
                         raise ValueError("包对象身份重复。")
-                    _relative(obj["id"])
+                    if obj["kind"] != "page_settings":
+                        _relative(obj["id"])
                     ids.add((obj["kind"], obj["id"]))
                     PageSnapshot({**{name: b"" for name in obj["files"]}, "page.py": b""})
                     for name, record in obj["files"].items():
@@ -617,6 +643,12 @@ def inspect_objects(manager, package):
                 result.update(before=files_version(old) if old is not None else None,
                               same=old == files, conflict=old is not None and old != files,
                               changed_files=[name for name in sorted(set(old or {}) | set(files)) if (old or {}).get(name) != files.get(name)])
+            elif kind == "page_settings":
+                config = page_settings_config(identity, files)
+                old = UserSettings(manager.data_root).value["pages"].get(identity)
+                before, after = settings_version(old), settings_version(config)
+                result.update(config=config, current=old, before=before,
+                              same=before == after, conflict=old is not None and before != after)
             elif kind == "pages":
                 page_filename(identity)
                 snapshot = PageSnapshot(files)
@@ -838,6 +870,20 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                             raise ValueError("Asset 冲突尚未选择替换或跳过。")
                         (replace_asset if kind == "assets" else replace_skill)(manager.data_root, identity, package.files(obj), check["before"])
                         outcome = {"status": "imported"}
+                elif kind == "page_settings":
+                    config = page_settings_config(identity, package.files(obj))
+                    store = UserSettings(manager.data_root)
+                    if settings_version(store.value["pages"].get(identity)) != check["before"]:
+                        raise ValueError("本地页面配置已变化，请重新检查。")
+                    if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
+                        outcome = {"status": "skipped"}
+                    else:
+                        if check["conflict"] and asset_actions.get(number) != "replace":
+                            raise ValueError("页面配置冲突尚未选择替换或跳过。")
+                        store.save("pages", identity, config)
+                        outcome = {"status": "imported", "reload_required": True}
+                    size = obj["files"]["settings.json"]["size"]
+                    transfer_file(size, size, "settings.json", finished=True)
                 elif kind == "pages":
                     if number not in reviewed and not allow_unreviewed:
                         raise ValueError("页面尚未 Review，也未明确确认跳过 Review 安装。")

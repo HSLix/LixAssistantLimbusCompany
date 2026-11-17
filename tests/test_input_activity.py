@@ -313,8 +313,8 @@ def test_evidence_path_follows_refreshed_observation_after_focus_wait(tmp_path, 
     assert state["result"]["status"] == "success", state["result"]
     result = state["result"]["output"]
     assert result["observation"] == 2
-    assert result["evidence_path"].endswith("/2.png")
-    assert [p.name for p in (tmp_path / "evidence" / str(state["run_id"])).iterdir()] == ["2.png"]
+    assert result["evidence_path"].endswith("/2.avif")
+    assert [p.name for p in (tmp_path / "evidence" / str(state["run_id"])).iterdir()] == ["2.avif"]
 
 
 def test_ocr_retries_if_focus_wait_refreshes_source_image(tmp_path, monkeypatch):

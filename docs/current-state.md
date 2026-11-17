@@ -1,5 +1,7 @@
 # 当前状态与文档入口
 
+2026-11-17：Sharing 新增默认全不选的「页面配置」独立分享类别，按 PAGE_ID 导入已保存业务值；冲突整页替换或跳过，已加载旧页面保护至重载。设计、影响与验证见[专项记录](page-settings-sharing-impact-review.md)。
+
 2026-11-16：User GUI 历史日志补页改为保留结果返回时的当前可见区域及像素偏移；程序恢复不触发补页，滚动条滑块仍随加载量变化。日志相关回归 57 passed，附件连续滚动离屏复测通过；相邻 GUI 的设置隔离测试随后按 DeepSeek 默认值更新。设计、影响及验收边界见[专项记录](run-log-scroll-impact-review.md)；Windows 成品未验收。
 
 2026-11-16：默认 Workflow Skills 已修订为局部目标与短尝试参考、completed／reason 交回、统一有界循环分派及正常过渡集中等待；Task 总上限用源码常量按路径设定，不规定固定数字、不扩展 RunState。验证按改动范围，珍惜可能不可逆的现场；先复用 Asset，可用仅观察临时 Step 检查识别。见[讨论决定](agent-skills-revision-discussion.md)、[影响及实施验证](agent-skills-revision-impact-review.md)、[已有安装合并说明](agent-skills.md#合并本次指导到已有安装)。此条替代下方 2026-11-12 旧指导中的 Step 超时一律失败、固定短超时及强制完整路径要求；历史证据保留。定向普通回归 22 passed，初始化检查允许额外 Skill、不限定总数。未迁移游戏 Manifest，未覆盖 Windows 用户 Skills；真实模型／游戏行为尚未验收。
