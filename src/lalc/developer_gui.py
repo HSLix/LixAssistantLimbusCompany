@@ -200,6 +200,8 @@ class TrialDialog(QDialog):
         self._pause_notice_shown = False
 
     def render(self, state):
+        bar = self.logs.verticalScrollBar()
+        following = bar.value() >= bar.maximum() - 4
         for record in state.get("log_records", state.get("trace", ())):
             if record["sequence"] <= self.sequence:
                 continue
@@ -227,6 +229,10 @@ class TrialDialog(QDialog):
             self.pause_notice.clear()
         self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
         self.pause.setEnabled(not state.get("resume_pending", False))
+        # 首次显示历史提示会缩小日志视口，须在布局更新后恢复本轮刷新前的贴底选择。
+        self.layout().activate()
+        if following:
+            bar.setValue(bar.maximum())
 
     def append_log(self, record, level, message):
         """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
