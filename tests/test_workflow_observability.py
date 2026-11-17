@@ -117,7 +117,7 @@ def test_invalid_log_level_fails_before_screenshot_or_trace_write(tmp_path, leve
     assert state['result']['status'] == 'failure'
     assert 'ValueError: log level must be' in state['result']['traceback']
     assert not [event for event in state['trace'] if event['event'] == 'component_log']
-    assert not list((tmp_path / 'evidence').rglob('*.png'))
+    assert not list((tmp_path / 'evidence').rglob('*.avif'))
     assert window.captures == 0
 
 
