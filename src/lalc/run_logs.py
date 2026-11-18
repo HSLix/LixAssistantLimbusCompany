@@ -56,9 +56,18 @@ def snapshot(root: Path, run_id: int) -> tuple:
     return stat.st_dev, stat.st_ino, end, stat.st_mtime_ns, stat.st_size
 
 
+def image_metadata(record: dict) -> dict:
+    """截图动作的证据随返回值写入，其他记录沿用原有字段。"""
+    if record.get("logical_name") == "observe.capture_screen":
+        result = record.get("return_value")
+        if isinstance(result, dict):
+            return result
+    return record.get("debug_image", record)
+
+
 def image_path(root: Path, run_id: int, record: dict) -> Path | None:
     """仅解析当前 Run 的证据 ID，不信任历史绝对路径。"""
-    metadata = record.get("debug_image", record)
+    metadata = image_metadata(record)
     identity = metadata.get("evidence_id", "") if isinstance(metadata, dict) else ""
     prefix, _, number = str(identity).partition("/")
     if prefix != str(run_id) or not number.isdecimal():

@@ -21,6 +21,12 @@ def action_annotations(record: dict) -> list[dict]:
         return [{"kind": "box", "number": i, **{key: item[key] for key in ("x", "y", "width", "height")}}
                 for i, item in enumerate(record["return_value"], 1) if isinstance(item, dict)
                 and all(type(item.get(key)) in {int, float} and isfinite(item[key]) for key in ("x", "y", "width", "height"))]
+    result = record.get("return_value")
+    if name == "observe.ocr" and isinstance(result, dict) and isinstance(result.get("items"), list):
+        keys = ("x", "y", "width", "height")
+        return [{"kind": "box", "text": item["text"], **{key: box[key] for key in keys}}
+                for item in result["items"] if isinstance(item, dict) and isinstance(item.get("text"), str)
+                and isinstance(box := item.get("box"), dict) and all(type(box.get(key)) is int for key in keys)]
     return []
 
 
@@ -43,9 +49,11 @@ def paint_annotations(painter, target: QRectF, image_size, annotations: list[dic
             painter.drawLine(QPointF(x, target.top()), QPointF(x, target.bottom()))
         elif item["kind"] == "box":
             painter.drawRect(QRectF(x, y, item["width"] * sx, item["height"] * sy))
-            label = QRectF(x, y, 32, 20)
+            text = item.get("text", str(item.get("number", "")))
+            label_width = min(target.width(), painter.fontMetrics().horizontalAdvance(text) + 8) if "text" in item else 32
+            label = QRectF(min(x, target.right() - label_width), y, label_width, 20)
             painter.fillRect(label, QColor("#a0000000"))
-            painter.drawText(label, Qt.AlignmentFlag.AlignCenter, str(item["number"]))
+            painter.drawText(label, Qt.AlignmentFlag.AlignCenter, text)
         elif item["kind"] == "arrow":
             end = point(item["end_x"], item["end_y"])
             painter.drawLine(QPointF(x, y), end)

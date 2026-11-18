@@ -70,9 +70,10 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path):
 
 
 @pytest.mark.parametrize('outcome', ['success', 'failed'])
-def test_match_never_auto_saves_even_on_error(tmp_path, monkeypatch, outcome):
+@pytest.mark.parametrize('save', [True, False])
+def test_match_only_references_existing_evidence(tmp_path, monkeypatch, outcome, save):
     service, window, manifest = make_service(tmp_path,
-        '    ctx.action("observe.capture_screen")\n'
+        f'    ctx.action("observe.capture_screen", save={save})\n'
         '    ctx.action("observe.match_asset", asset="ui/test")\n')
     def match(*args, **kwargs):
         if outcome == 'failed':
@@ -80,21 +81,28 @@ def test_match_never_auto_saves_even_on_error(tmp_path, monkeypatch, outcome):
         return []
     monkeypatch.setattr(service, '_match_asset', match)
     state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
-    assert not any(r['event'] == 'screenshot_saved' for r in state['trace'])
+    assert sum(r['event'] == 'screenshot_saved' for r in state['trace']) == int(save)
     action = next(r for r in state['trace'] if r['event'] == 'trusted_action_' + ('returned' if outcome == 'success' else 'failed')
                   and r['logical_name'] == 'observe.match_asset')
-    assert action['inputs']['asset'] == 'ui/test' and 'debug_image' not in action
+    assert action['inputs']['asset'] == 'ui/test'
+    assert bool(action['debug_image'].get('evidence_id')) is save
     assert window.captures == 1
 
 
-@pytest.mark.parametrize('name,arguments', [('observe.ocr', {}), ('control.drag', {'x': 1, 'y': 1, 'end_x': 2, 'end_y': 2, 'seconds': 0.01})])
-def test_ocr_and_drag_still_auto_save(tmp_path, monkeypatch, name, arguments):
+def test_ocr_does_not_backfill_after_an_unsaved_capture(tmp_path, monkeypatch):
     service, _, manifest = make_service(tmp_path,
         '    ctx.action("observe.capture_screen")\n'
-        f'    ctx.action({name!r}, **{arguments!r})\n')
-    monkeypatch.setattr(service, '_ocr', lambda **_: {'observation': 1, 'region': {'x': 0, 'y': 0, 'width': 1, 'height': 1}, 'items': []})
+        '    ctx.action("observe.ocr")\n'
+        '    ctx.action("observe.capture_screen", save=False)\n'
+        '    ctx.action("observe.ocr")\n')
+    monkeypatch.setattr(service, '_ocr', lambda **_: {'observation': service._focused_session.observation,
+                                                     'region': {'x': 0, 'y': 0, 'width': 1, 'height': 1}, 'items': []})
     state = finish(service, service.start('steps.drive', {}, manifest_id=manifest))
-    assert any(r['event'] == 'screenshot_saved' for r in state['trace']), state['result']
+    assert sum(r['event'] == 'screenshot_saved' for r in state['trace']) == 1
+    records = [r for r in state['trace'] if r['event'] == 'trusted_action_returned'
+               and r['logical_name'] == 'observe.ocr']
+    assert records[0]['debug_image']['observation'] == records[0]['return_value']['observation']
+    assert records[1]['debug_image'] == {'image_unavailable': True}
 
 
 def test_knowledge_switch_applies_to_both_policies_and_is_persisted(tmp_path):

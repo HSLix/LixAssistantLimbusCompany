@@ -161,7 +161,8 @@ def test_action_debug_records_reuse_capture_and_keep_matching_results(tmp_path):
     assert len(ended) == 4 and all(e['level'] == 'debug' for e in ended)
     matched, clicked = ended[1:3]
     assert len(matched['return_value']) == 2
-    assert 'debug_image' not in matched
+    assert matched['debug_image']['evidence_id'] == ended[0]['return_value']['evidence_id']
+    assert clicked['debug_image']['evidence_id'] == matched['debug_image']['evidence_id']
     assert clicked['debug_image']['captured_at'] <= clicked['recorded_at']
     assert window.captures == 1
     assert sum(e['event'] == 'screenshot_saved' for e in state['trace']) == 1

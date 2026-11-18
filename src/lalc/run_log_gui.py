@@ -16,7 +16,7 @@ from .work_files import WorkDirectory
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
-from .run_logs import read_page, snapshot
+from .run_logs import image_metadata, read_page, snapshot
 from .run_log_sharing import list_logs, export_log, import_log
 
 
@@ -148,7 +148,7 @@ class LogDelegate(QStyledItemDelegate):
             y += 26
         if row["image"]:
             painter.setPen(QColor(foreground))
-            painter.drawText(rect.x(), int(y + 16), tr("Screenshot") + ": " + str(record.get("debug_image", record).get("captured_at") or "—"))
+            painter.drawText(rect.x(), int(y + 16), tr("Screenshot") + ": " + str(image_metadata(record).get("captured_at") or "—"))
             target = QRectF(rect.x(), y + 24, rect.width(), image_height)
             image = self.page.images.get(str(row["image"]), "pending")
             if isinstance(image, QImage):

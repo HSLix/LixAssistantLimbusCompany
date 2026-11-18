@@ -79,9 +79,9 @@ def test_formal_sift_action(tmp_path, mode):
     actions = [e for e in state['trace'] if e.get('logical_name') == 'observe.match_feature'
                and e['event'] == 'trusted_action_returned']
     assert len(actions) == 1 and actions[0]['return_value']
-    assert 'debug_image' not in actions[0]
+    assert actions[0]['debug_image']['observation'] == event['observation']
+    assert sum(record['event'] == 'screenshot_saved' for record in state['trace']) == 1
     from lalc.image_annotations import action_annotations
     from lalc.run_logs import log_text
     assert len(action_annotations(actions[0])) == len(event['detections'])
     assert '#1: score=' in log_text(actions[0])
-    assert not any(e['event'] == 'screenshot_saved' for e in state['trace'])

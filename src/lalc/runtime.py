@@ -195,6 +195,7 @@ class WorkflowExecutor:
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
         debug_screenshot: Callable[[], dict[str, Any]] | None = None,
+        observation_evidence: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
         run_state: RunState | None = None,
         recovery_limit: int = 10,
@@ -207,6 +208,7 @@ class WorkflowExecutor:
         self.emit = emit
         self._save_screenshot = save_screenshot
         self._debug_screenshot = debug_screenshot
+        self._observation_evidence = observation_evidence
         self._capture_screen = capture_screen
         self._control_input = control_input
         self._check_input = check_input
@@ -715,9 +717,12 @@ class WorkflowExecutor:
         while True:
             self.gate.checkpoint()
             try:
-                if logical_name in {"control.click", "control.drag", "control.scroll", "observe.ocr"}:
+                if logical_name in {"control.click", "control.drag", "control.scroll"}:
                     fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
                               else {"image_unavailable": True}}
+                elif logical_name in {"observe.ocr", "observe.match_asset", "observe.match_feature"}:
+                    fields = {**fields, "debug_image": self._observation_evidence()
+                              if self._observation_evidence else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")
             except UserInterruption as error:
                 if (error.reason == "cancel" or caller.role == "recovery_rule"

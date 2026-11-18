@@ -18,14 +18,14 @@ class TrustedAction:
             raise ValueError("Trusted Action requires a callable and observe/control classification.")
 
 
-def capture_screen(ctx, *, save: bool = False, auto_park_cursor: bool = True) -> dict[str, int | str]:
+def capture_screen(ctx, *, save: bool = True, auto_park_cursor: bool = True) -> dict[str, int | str]:
     """重新捕获目标窗口客户区，替换当前内存帧，供后续匹配或 OCR 使用。
 
-    默认只更新内存，不保存截图文件；返回观察 ID、尺寸等截图元数据，不返回原始像素。
+    默认保存当前帧作为运行证据；返回截图元数据，不返回原始像素。
 
     参数：
         ctx：执行器自动传入的运行上下文，调用 ctx.action 时不要手动提供。
-        save：是否同时保存当前帧为运行证据；默认 False，True 时返回证据路径等信息。
+        save：是否同时保存当前帧为运行证据；默认 True，False 时只更新内存。
         auto_park_cursor：是否在截图前尝试将客户区内的鼠标移到窗口右下角外；默认 True。
             归位最多尝试三次，失败记录 warning 后继续截图；False 时跳过归位。
 
@@ -45,7 +45,7 @@ def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) ->
     """识别当前已捕获帧中的文字，不重新截图；不支持韩文。
 
     返回 observation、实际 region 和完整 items，含文字、置信度、原图框、轮廓和中心坐标。
-    执行器自动保留已有帧作为诊断图；未捕获截图或识别失败时抛出错误。
+    日志复用截图时已保存的帧，不补存图片；未捕获截图或识别失败时抛出错误。
 
     参数：
         ctx：执行器自动传入的运行上下文，调用 ctx.action 时不要手动提供。

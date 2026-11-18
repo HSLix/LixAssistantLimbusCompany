@@ -66,7 +66,7 @@ class RunContext:
         """记录带级别的语义日志；可附上已有截图，不重新截图。"""
         self._executor.log(message, level=level, screenshot=screenshot)
 
-    def capture_screen(self, *, save: bool = False, auto_park_cursor: bool = True) -> dict[str, Any]:
+    def capture_screen(self, *, save: bool = True, auto_park_cursor: bool = True) -> dict[str, Any]:
         """只供正在执行的 observe Trusted Action 刷新本次 Run 的截图。"""
 
         return self._executor.capture_screen(save, auto_park_cursor=auto_park_cursor)
