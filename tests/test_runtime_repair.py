@@ -12,6 +12,7 @@ from lalc.application import ApplicationService
 from lalc.agent_settings import save_options, save_selection, save_settings
 from lalc.manifest import ManifestManager, ManifestResult, ValidationError
 from lalc.agent_log import read_json
+from lalc.run_logs import AI_REPAIR_MESSAGES, read_page, snapshot
 from test_recovery import _publish, _rule, NEW_STEP, TASK, SUB
 from test_plan import _finished
 from runtime_support import add_plan
@@ -158,10 +159,41 @@ def execute(ctx, *, value: int) -> str:
     assert state["default_update"]["status"] == "changed"
     assert service.manifest_manager.default_manifest_id() == state["working_manifest_id"]
     assert service._runtime_chat.tools.run_state is None
+    run_id = state["run_id"]
+    live = [row for row in service.ui_snapshot()["log_records"] if row["event"] in AI_REPAIR_MESSAGES]
+    assert [row["event"] for row in live] == ["agent_invoked", "agent_recheck_started"] * 2
+    for start, retry in zip(live[::2], live[1::2]):
+        assert start["recovery_id"] == retry["recovery_id"]
+        assert start["sequence"] < retry["sequence"]
+        component = state["trace"][retry["sequence"]]
+        assert component["event"] == "component_started" and component["call_id"] == retry["call_id"]
+    history = read_page(tmp_path, run_id, snapshot(tmp_path, run_id), keyword="AI ")["rows"]
+    assert [row["record"]["sequence"] for row in history] == [row["sequence"] for row in reversed(live)]
+    assert all(row["level"] == "info" for row in history)
     # 相同存储和身份可在 Developer 入口继续，不继承原 Run 执行权。
     from lalc.developer_session import DeveloperSession
     continued = DeveloperSession(service, seen[0][0], entry="gui").conversation()
     assert continued.entry == "gui" and "recheck" not in continued.allowed
+
+
+@pytest.mark.parametrize("outcome", ["failed", "recheck"])
+def test_runtime_repair_does_not_announce_retry_without_valid_handoff(tmp_path, monkeypatch, outcome):
+    from uuid import uuid4
+    from lalc.agent_repair import RepairConversation
+
+    manager = ManifestManager(tmp_path)
+    broken = NEW_STEP.replace('return f"step-new:{value}"', 'raise ValueError("broken")')
+    base = _publish(tmp_path, manager, step_source=broken)
+    runtime_settings(tmp_path)
+
+    async def round(self, message, args, *, request_limit, **kwargs):
+        return {"status": outcome, "manifest_id": str(uuid4()), "requests": request_limit}
+
+    monkeypatch.setattr(RepairConversation, "run", round)
+    service = ApplicationService(tmp_path, manifest_manager=manager)
+    state = _finished(service, service.start("steps.break", {"value": 1}, manifest_id=base))
+    assert state["result"]["status"] == "failure"
+    assert [row["event"] for row in state["trace"] if row["event"] in AI_REPAIR_MESSAGES] == ["agent_invoked"]
 
 
 def test_rule_limit_hands_off_and_step_success_resets_counter(tmp_path, monkeypatch):

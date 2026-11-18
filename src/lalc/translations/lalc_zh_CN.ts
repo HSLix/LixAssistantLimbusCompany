@@ -1893,6 +1893,14 @@ Original pixel region: {2}</source>
       <translation>运行开始</translation>
     </message>
     <message>
+      <source>AI intervened and is attempting a repair</source>
+      <translation>AI 介入，开始尝试修复</translation>
+    </message>
+    <message>
+      <source>AI intervention ended. Retrying execution</source>
+      <translation>AI 结束介入，重新运行</translation>
+    </message>
+    <message>
       <source>Run paused</source>
       <translation>运行已暂停</translation>
     </message>

@@ -581,7 +581,10 @@ class WorkflowExecutor:
                 self.emit("step_reinvocation_started" if current.role == "step" else "workflow_reinvocation_started", fields)
                 try:
                     call_id = self._next_call_id
-                    result = self._invoke_component(logical_name, current, _json_copy(inputs), parent_call_id=parent_call_id)
+                    result = self._invoke_component(
+                        logical_name, current, _json_copy(inputs), parent_call_id=parent_call_id,
+                        agent_recheck=recheck and self.repair is not None,
+                    )
                     self.emit("step_reinvocation_returned" if current.role == "step" else "workflow_reinvocation_returned", fields)
                     if current.role == "step":
                         self.run_state._recovery_count = 0
@@ -798,6 +801,7 @@ class WorkflowExecutor:
         *,
         parent_call_id: int | None,
         skip_condition: bool = False,
+        agent_recheck: bool = False,
     ) -> Any:
         self.gate.checkpoint()
         inputs = self.prepare_inputs(component, arguments)
@@ -832,6 +836,12 @@ class WorkflowExecutor:
                 component.module.execute, globalns=component.module.execute.__globals__
             )["return"])
 
+        if agent_recheck:
+            self.gate.checkpoint()
+            self.emit("agent_recheck_started", {
+                "logical_name": logical_name, "manifest_id": self.manifest.manifest_id,
+                "recovery_id": self._recovery_key, "call_id": call_id,
+            })
         return self._invoke(invoke, identity, phase="execute", event="component")
 
     def _run_condition(

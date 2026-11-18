@@ -10,13 +10,24 @@ from .file_content import FileContent, open_image, require_memory
 
 
 ACTION_ENDS = {"trusted_action_returned", "trusted_action_failed", "trusted_action_interrupted"}
+AI_REPAIR_MESSAGES = {
+    "agent_invoked": "AI intervened and is attempting a repair",
+    "agent_recheck_started": "AI intervention ended. Retrying execution",
+}
 LIVE_LOG_LIMIT = 300
 LIVE_STATE_EVENTS = {
     "run_started", "run_paused", "paused_by_user", "run_resumed", "input_resumed",
     "input_resume_requested", "input_resume_rejected", "run_cancel_requested",
     "component_failed", "execution_anomaly", "safe_task_termination",
     "step_reinvocation_failed", "run_finished",
+    *AI_REPAIR_MESSAGES,
 }
+
+
+def ai_repair_message(event, translate=str) -> str | None:
+    """两处运行日志共用同一份 AI 修复文案。"""
+    message = AI_REPAIR_MESSAGES.get(event)
+    return translate(message) if message is not None else None
 
 
 def is_live_log(record: dict) -> bool:
@@ -262,7 +273,7 @@ def query_trace(root, run_ids, *, start_sequence=1, limit=100, levels=None, logi
 
 def read_page(root: Path, run_id: int, boundary: tuple, *, start=0, end=None,
               reverse=True, levels=("error", "warning", "info"), keyword="", images=False,
-              limit=60, cancelled=None) -> dict:
+              limit=60, cancelled=None, translate=str) -> dict:
     """读取一批匹配项；稀疏搜索可扫描全区间，但不全量保存或解码。"""
     cancelled = cancelled or Event()
     path = trace_path(root, run_id)
@@ -281,7 +292,8 @@ def read_page(root: Path, run_id: int, boundary: tuple, *, start=0, end=None,
             if not isinstance(record, dict):
                 raise ValueError("Invalid record")
             event = record.get("event")
-            if event != "component_log" and event not in ACTION_ENDS:
+            repair_message = ai_repair_message(event, translate)
+            if event != "component_log" and event not in ACTION_ENDS and repair_message is None:
                 continue
             if event in ACTION_ENDS and (not isinstance(record.get("logical_name"), str)
                                         or not isinstance(record.get("inputs", {}), dict)
@@ -290,7 +302,7 @@ def read_page(root: Path, run_id: int, boundary: tuple, *, start=0, end=None,
             level = "debug" if event in ACTION_ENDS else record.get("level", "info")
             if level not in levels:
                 continue
-            text = log_text(record)
+            text = log_text(record) if repair_message is None else repair_message
             if keyword.casefold() not in (str(record.get("logical_name", "")) + "\n" + text).casefold():
                 continue
             image = image_path(root, run_id, record)

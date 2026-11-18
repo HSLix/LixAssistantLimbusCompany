@@ -524,7 +524,7 @@ class RunLogPage(QWidget):
 
     def options(self):
         return dict(levels=tuple(k for k, v in self.levels.items() if v.isChecked()),
-                    keyword=self.search.text(), images=self.only_images.isChecked())
+                    keyword=self.search.text(), images=self.only_images.isChecked(), translate=tr)
 
     def filter_changed(self, *_):
         if self.run_id is not None and self.boundary:
