@@ -35,6 +35,7 @@ class RestartWindow(FakeWindow):
         self.normal_close = True
         self.creates_window = True
         self.launch_error = False
+        self.launch_exit_code = None
         self.launches = 0
         self.closes = 0
         self.on_start = lambda: None
@@ -73,7 +74,7 @@ class RestartWindow(FakeWindow):
         if self.creates_window:
             self.windows[42 + self.launches] = pid
         self.on_start()
-        return SimpleNamespace(pid=pid, poll=lambda: None)
+        return SimpleNamespace(pid=pid, poll=lambda: self.launch_exit_code)
 
     def capture(self, hwnd, width, height):
         self.on_capture()
@@ -128,6 +129,28 @@ def test_restart_closes_only_original_then_binds_and_discards_old_image(environm
     assert any("强制终止原游戏" in m for m in messages) is (not graceful)
 
 
+def test_restart_binds_delayed_window_after_launch_process_exits(environment, monkeypatch):
+    env = environment
+    env.platform.creates_window = False
+    env.platform.launch_exit_code = 1
+    find_windows = env.platform.find_windows
+
+    def find_delayed_window():
+        if env.platform.launches and 9 not in env.platform.processes:
+            if not env.platform.processes[8].dead:
+                env.platform.processes[8].dead = True
+                return []
+            env.platform.processes[9] = FakeProcess(9, env.platform.executable)
+            env.platform.windows[43] = 9
+        return find_windows()
+
+    monkeypatch.setattr(env.platform, "find_windows", find_delayed_window)
+    restart_game(env.root, env.inputs)
+    assert env.inputs.window.hwnd == 43 and env.inputs.process.pid == 9
+    assert env.platform.launches == 1
+    assert [event["exit_code"] for event in env.events if "exit_code" in event] == [1]
+
+
 @pytest.mark.parametrize("problem", ["missing_settings", "missing_exe", "wrong_install", "multiple", "unknown_window"])
 def test_invalid_launch_target_has_no_destructive_side_effect(environment, problem):
     env = environment
@@ -156,6 +179,7 @@ def test_restart_failure_is_terminal_and_logged(environment, problem, monkeypatc
         monkeypatch.setattr(env.inputs.process, "terminate", lambda: None)
     elif problem == "no_window":
         env.platform.creates_window = False
+        env.platform.launch_exit_code = 1
     elif problem == "focus_timeout":
         def focus(hwnd, *, checkpoint=None):
             while True:
@@ -166,6 +190,9 @@ def test_restart_failure_is_terminal_and_logged(environment, problem, monkeypatc
     with pytest.raises(EnvironmentFailure) as failure:
         restart_game(env.root, env.inputs)
     assert failure.value.code == "game_restart_failed"
+    if problem == "no_window":
+        assert str(failure.value) == "Timed out waiting for the new game window."
+        assert [event["exit_code"] for event in env.events if "exit_code" in event] == [1]
     assert env.platform.launches == (0 if problem in {"terminate_timeout", "launch_error"} else 1)
     assert env.events[-1]["level"] == "error"
 

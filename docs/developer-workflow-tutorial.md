@@ -47,6 +47,8 @@ Plan 的 `ctx.call("tasks.xxx")` 返回 `status`，成功含 `output`，失败�
 
 `ctx.action("control.restart_game")` 可由 Step 或 Recovery Rule 的 recover 阶段调用，无参数。应用先验证已保存的 Steam 客户端路径及唯一安装，正常关闭原游戏，5 秒未退出则只强制终止原进程并再等待 5 秒，随后启动 `LimbusCompany.exe`，最多等待 60 秒完成新窗口绑定及置前。返回只证明窗口可用，不证明完成登录、更新或进入业务页面。等待、关闭、启动、绑定、失败及取消过程均记录 Info／Warning／Error 日志，在 User Logs 默认可见；暂停和物理接管后须手动恢复，继续原重启阶段，避免重复启动。
 
+直接启动的进程提前退出时，非零退出码只记为警告，不提前结束窗口等待；仍须绑定同一 Steam 安装中的有效窗口并将其置前才算成功。
+
 运行中确认绑定进程退出时，应用内置 `builtin.game_crash` 规则优先处理并重新调用当前 Step，保留 Task／Subworkflow 的调用栈和局部结果。每个 Run 最多自动重启一次，显式调用不占此额度；再次退出或重启失败会终止整个 Run／Plan。失焦、最小化走活动等待后自动聚焦；进程仍在但窗口消失，以及用户接管仍走人工恢复。初次运行前没有游戏窗口仍拒绝启动；Step 外不新增自动恢复边界。见[重启契约与验证](game-restart-design.md)。
 
 开发者从根包导入 `RunContext`，给 execute、condition 或 detect/recover 的 ctx 参数添加注解。IDE 使用项目的 Python 环境，即可补全 Action 名称、对应关键字参数和返回类型；其他 Context 成员（例如 `ctx.call()` 和 `ctx.game_language`）也保留类型信息。

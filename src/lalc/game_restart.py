@@ -121,6 +121,7 @@ def restart_game(data_root: Path, inputs) -> None:
         log("已发起游戏启动。", process_id=launched.pid)
         stage = "bind"
         started = time.monotonic() - paused_seconds - inputs.focus_wait_seconds
+        launch_exit_code = None
 
         def bind_checkpoint():
             checkpoint()
@@ -128,12 +129,16 @@ def restart_game(data_root: Path, inputs) -> None:
                 raise TimeoutError("Timed out waiting for the new game window and foreground focus.")
 
         def bind():
+            nonlocal launch_exit_code
             matches = platform.find_windows()
             if len(matches) > 1:
                 raise ValueError("Multiple game windows appeared during restart.")
             if not matches:
-                if launched.poll() not in (None, 0):
-                    raise RuntimeError("LimbusCompany.exe exited before creating a window.")
+                if launch_exit_code is None:
+                    launch_exit_code = launched.poll()
+                    if launch_exit_code not in (None, 0):
+                        log(f"启动进程已退出（退出码 {launch_exit_code}），继续等待新游戏窗口。",
+                            level="warning", process_id=launched.pid, exit_code=launch_exit_code)
                 return False
             info = platform.window_info(matches[0])
             if not info["valid"] or not info["visible"] or info["width"] <= 0 or info["height"] <= 0:

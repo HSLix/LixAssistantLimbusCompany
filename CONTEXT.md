@@ -85,6 +85,10 @@ _Avoid_: Manifest attachment, staging library
 Mutable local Asset metadata summarizing the latest non-empty detection results, actual template identities and evidence references for developer and Agent inspection, independently of the Manifest and execution logs, without determining future search regions.
 _Avoid_: Component Usage Index, Asset Manifest
 
+**Mirror Dungeon Name Label** (中文界面：名称标签):
+The user-editable name of an E.G.O Gift or Theme Pack in one game language.
+_Avoid_: Asset tag, game language tag, archetype
+
 **Developer Candidate**:
 The temporary editable staging workspace for a complete Manifest draft, used to prepare, validate and publish changes. It is neither the authoritative source of released capabilities nor the Working Manifest of an active execution; unpublished contents remain drafts.
 _Avoid_: Formal source repository, released Manifest, active Working Manifest, global candidate registry
