@@ -25,7 +25,7 @@ from qfluentwidgets import (
     CaptionLabel, IconWidget, CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
 )
 
-from .run_logs import LIVE_LOG_LIMIT
+from .run_logs import LIVE_LOG_LIMIT, ai_repair_message
 from .i18n import tr
 from .run_log_gui import log_colors, log_time
 
@@ -132,6 +132,9 @@ class FeedbackDialog(QDialog):
 def _run_log_entry(record):
     """仅投影业务日志与用户可见运行状态，不改写原始 Trace。"""
     event = record.get("event")
+    repair_message = ai_repair_message(event, tr)
+    if repair_message is not None:
+        return "info", repair_message
     if event == "component_log":
         level = record.get("level", "info").lower()
         return (level, str(record.get("message", ""))) if level in {"info", "warning", "error"} else None

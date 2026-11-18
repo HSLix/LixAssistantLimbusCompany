@@ -154,6 +154,9 @@ def test_qt_fluent_and_application_resources(app, language, settings, cancel):
     if language == "zh_CN":
         assert len(app._lalc_translators) == 3
         assert any(isinstance(item, FluentTranslator) and not item.isEmpty() for item in app._lalc_translators)
+        from lalc.developer_gui import _run_log_entry
+        assert _run_log_entry({"event": "agent_invoked"}) == ("info", "AI 介入，开始尝试修复")
+        assert _run_log_entry({"event": "agent_recheck_started"}) == ("info", "AI 结束介入，重新运行")
 
 
 @pytest.mark.parametrize("language", ["zh_CN", "en_US"])
