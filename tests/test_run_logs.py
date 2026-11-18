@@ -83,6 +83,8 @@ def test_image_evidence_stays_in_run_and_dimensions_are_reserved(tmp_path):
         stream.write(json.dumps(image_record) + '\n')
     rows = read_page(tmp_path, 1, snapshot(tmp_path, 1), images=True)['rows']
     assert len(rows) == 1 and rows[0]['dimensions'] == (160, 90)
+    assert image_path(tmp_path, 1, {'logical_name': 'observe.capture_screen',
+                                   'return_value': {'evidence_id': '1/1'}}) == folder / '1.png'
     assert image_path(tmp_path, 1, {'evidence_id': '2/1'}) is None
     assert image_path(tmp_path, 1, {'evidence_path': '/etc/passwd'}) is None
     (folder / '1.png').unlink()
@@ -301,6 +303,18 @@ def test_matching_annotation_numbers_follow_return_order():
     assert [(item['number'], item['x']) for item in annotations] == [(1, 30), (2, 2)]
     assert action_annotations({'logical_name': 'control.drag', 'inputs': {
         'x': 1, 'y': 2, 'end_x': 20, 'end_y': 30}})[0]['kind'] == 'arrow'
+
+
+def test_ocr_annotation_uses_only_text_boxes_from_its_record():
+    from lalc.image_annotations import action_annotations
+
+    record = {'logical_name': 'observe.ocr', 'return_value': {'items': [
+        {'text': 'Connecting', 'box': {'x': 100, 'y': 10, 'width': 90, 'height': 20}},
+    ]}}
+    assert action_annotations(record) == [
+        {'kind': 'box', 'text': 'Connecting', 'x': 100, 'y': 10, 'width': 90, 'height': 20},
+    ]
+    assert action_annotations({**record, 'return_value': {'items': []}}) == []
 
 
 def test_image_resource_failure_finishes_as_unavailable(log_page, monkeypatch):

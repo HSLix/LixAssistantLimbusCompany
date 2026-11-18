@@ -73,6 +73,7 @@ class ApplicationService:
         self.asset_library = AssetLibrary(self.data_root)
         self.ocr_service = ocr_service
         self._focused_session: FocusedAutomationSession | None = None
+        self._capture_evidence: dict[str, Any] | None = None
         self._input_session: InputSession | None = None
         self._fatal = False
         self._condition = threading.Condition()
@@ -350,6 +351,7 @@ class ApplicationService:
     def _capture_screen(self, save: bool, *, auto_park_cursor: bool = True) -> dict[str, Any]:
         """Trusted Action 入口：刷新本次 Run 的内存图像并可显式保存。"""
 
+        self._capture_evidence = None
         if self._focused_session is None:
             self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
         try:
@@ -359,7 +361,8 @@ class ApplicationService:
                 self._input_session.check()
             raise
         if save:
-            result.update(self._save_screenshot())
+            self._capture_evidence = self._save_screenshot()
+            result.update(self._capture_evidence)
         return result
 
     def _save_screenshot(self) -> dict[str, Any]:
@@ -385,6 +388,15 @@ class ApplicationService:
                 raise
             return {"observation": observation, "evidence_path": str(path), "evidence_id": evidence_id,
                     "captured_at": session.captured_at}
+
+    def _observation_evidence(self) -> dict[str, Any]:
+        """只引用当前观察已有的运行证据，识别不触发编码或补拍。"""
+        session = self._focused_session
+        evidence = self._capture_evidence
+        if evidence and session is not None and session.image is not None:
+            if evidence["evidence_id"] == f"{self._state['run_id']}/{session.observation}":
+                return {key: evidence[key] for key in ("observation", "evidence_id", "captured_at")}
+        return {"image_unavailable": True}
 
     def _debug_screenshot(self) -> dict[str, Any]:
         """关联动作已有帧；无图不截图，有图则沿用正式证据写入边界。"""
@@ -722,6 +734,7 @@ class ApplicationService:
             manifest, gate, self._emit,
             capture_screen=self._capture_screen, save_screenshot=self._save_screenshot,
             debug_screenshot=self._debug_screenshot,
+            observation_evidence=self._observation_evidence,
             control_input=self._control_input, check_input=self._check_input,
             game_process_exited=self._game_process_exited,
             prepare_resume=self._prepare_input_resume,

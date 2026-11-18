@@ -1,6 +1,6 @@
 # User GUI 运行日志
 
-2026-11-12：Match 不再自动保存截图（包括失败），OCR／Click／Drag 及显式截图继续保留；新 Run 图片使用 AVIF quality=65、speed=8、默认色度采样，旧 PNG 原样可读。正文像素步长固定为 20，短标量 JSON 数组单行，外层结构保留展开。详见[决策](log-diagnostics-decisions.md)和[影响审查](log-diagnostics-impact-review.md)。
+2026-11-18：`observe.capture_screen` 默认保存原图，识别动作复用同一观察的已保存证据。每条日志独立展示本次识别的标注。新 Run 图片使用 AVIF quality=65、speed=8、默认色度采样，旧 PNG 原样可读。正文像素步长固定为 20，短标量 JSON 数组单行，外层结构保留展开。
 
 2026-11-11：左侧运行记录首次显示最近 10 条，滚动到底每次追加 10 条；来源先过滤再分页。重新进入／切换来源／导入后重置首批，旧选择仍在首批时保留，否则选择最新。后台仍扫描完整简要目录以按原始时间混排；右侧正文分页、快照及导入导出不变，见[影响审查](developer-panel-run-list-impact-review.md)。
 
@@ -30,7 +30,7 @@
 
 所有经过共用执行器的实际 Trusted Action 调用自动有 Debug 记录。沿用 `trusted_action_returned/failed/interrupted`，不重复复制成 `component_log`；保留参数、结果、错误和调用关系。开始事件也带 Debug 元数据，但页面只显示结束事件。校验前被拒绝的调用不冒充已执行。`ctx.log()` 仍不开放给正在执行的 Trusted Action。
 
-Click／Drag 固定动作前已有帧；OCR 关联实际识别帧，不额外截图。无帧标记 `image_unavailable`，不因此阻止操作；有帧则保存正式证据，证据／Trace 写入失败仍沿原失败边界传播。Match 仅保留完整参数、结果和错误，不自动落盘或在失败时补图。采集时间与记录时间分开保存，同一 observation 复用已保存证据，不重复编码。
+截图动作原样展示保存的原图；OCR、模板和特征匹配引用实际使用的已保存观察，并仅叠加当次结果。未命中显示原图而不画命中框。显式 `save=False` 时不落盘，识别不会补存；没有证据的识别保留文字日志。Click／Drag／Scroll 仍保留已有帧作为输入诊断，显式要求的日志附件仍可保存证据。采集时间与记录时间分开，同一观察不重复编码。
 
 | 动作 | 展示 |
 | --- | --- |

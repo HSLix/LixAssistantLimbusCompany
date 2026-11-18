@@ -53,7 +53,7 @@ A reusable Workflow whose `execute` entrypoint is marked by plain `@sub_workflow
 _Avoid_: Task Workflow, shared node
 
 **Step**:
-A Python execution boundary for one independently observable and recoverable local goal, marked by plain `@step`. It re-observes actionable, transitional or completed states within that goal and may explicitly hand an unmet goal back to its caller for redispatch; a normal handback is distinct from business completion and an Execution Failure.
+A Python execution boundary for one local responsibility, marked by plain `@step`. An action Step checks that its input still applies, makes at most one attempt and returns; an inapplicable input is a normal no-op. Business completion belongs to the calling Workflow. An observation Step can return evidence without making an input attempt.
 _Avoid_: Every low-level action, YAML node
 
 **Deterministic Recovery**:
@@ -216,7 +216,7 @@ Evidence that every required segment of a candidate plan has succeeded, assemble
 _Avoid_: Mandatory end-to-end replay, assumed prefix validity
 
 **Normal Outcome**:
-A normal Python return from a formal Component after its own contract has been satisfied. Returned data keeps distinct values associated with descriptive names or keys; a Task Workflow returns directly JSON-compatible data, with meaningful outcome checks recommended in ordinary Steps before normal return.
+A normal Python return from a formal Component after its own contract has been satisfied. A normal Step return does not establish a business outcome; the Workflow verifies it. Returned business data uses descriptive names or keys, and Task Workflow returns directly JSON-compatible data.
 _Avoid_: Execution Failure, Outcome routing table
 
 **Execution Failure**:
