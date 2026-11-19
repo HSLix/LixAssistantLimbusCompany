@@ -1,5 +1,5 @@
 ---
-name: validation-and-trial
+name: publish-and-trial
 description: 修改 LALC Workflow 后校验发布、试运行验证，或编写单个 Step 点击、按键以推进游戏到后续开发所需状态时使用。区分静态校验、发布、现场操作和真实游戏验收。
 ---
 # 验证与试运行
