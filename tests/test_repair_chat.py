@@ -36,6 +36,28 @@ def test_tool_summary_and_live_working_clock(gui, monkeypatch):
     chat.deleteLater()
 
 
+def test_large_tool_details_show_bounded_preview_and_copy_full_json(gui):
+    import json
+    from PySide6.QtCore import QUrl
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    result = {"items": [{"text": "<item>"}] * 10_000, "tail": "完整结尾"}
+    chat.upsert_tool(1, "large", "read_run_log", "repair_tool", {"result": {"details": result}})
+    chat.open_link(QUrl("raw:1"))
+    chat.open_link(QUrl("tool:0"))
+    assert "tool-copy:0" in chat.toHtml()
+    assert chat.document().characterCount() < 17_000
+    assert "完整结尾" not in chat.toPlainText()
+    try:
+        chat.open_link(QUrl("tool-copy:0"))
+        assert json.loads(app.clipboard().text()) == {"arguments": {}, "result": result}
+    finally:
+        app.clipboard().clear()
+        chat.deleteLater()
+
+
 def test_tool_details_wrap_with_viewport_and_preserve_json(gui):
     """工具详情中的长参数与返回值不撑宽聊天区，缩放后仍完整可读。"""
     import json

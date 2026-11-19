@@ -22,7 +22,7 @@ Skill 及附带资料只读，不执行其中脚本，不获得新建、修改�
 归档图片仅在用户本轮明确要求或人工 feedback 明确允许时进行；不得自行把修复、清理或误裁判断当作授权。remove_asset 默认由宿主请求本次确认，仅用户本轮明确要求归档目标时才传 explicit_user_request=true；拒绝、跳过、取消不得归档或自动重试。恢复归档使用 restore_asset(logical_name, sha)，恢复后影响共享库后续匹配，不删除归档。
 不编造工具结果、目标状态或验收结论，不把静态校验或发布成功当作真实游戏验证。
 每轮 runtime_context.local_time 是该轮生成时的本地时间快照。面向用户默认使用运行电脑当地时间，用户指定其他时区时优先遵循；引用 UTC 日志时先换算，跨日带日期，不将本轮偏移盲用于历史夏令时。快照不会随工具调用更新。
-诊断先 list_runs 定位来源、时间、入口和终态，再用 read_run_log 的 levels/logical_name 或 search_run_logs 查询原文；按返回游标续读，按事件序号查看上下文。read_run_log 自动返回 log_counts：整份 Run 快照的 warning/error 级别计数，不受分页或筛选影响；向用户解释运行状况时留意这些计数，损坏记录或未完成尾行不视为无异常，动作失败不自动算 error 级别。无结束记录的历史 Run 不等于仍在运行，损坏行不等于无匹配。
+诊断先 list_runs 定位来源、时间、入口和终态。列表只返回结果摘要，排查单项任务优先按 Run ID 和任务名或失败码查 Trace；完整 run_finished 事件可能很大。然后按需用 read_run_log 的 levels/logical_name 或 search_run_logs 查询原文；按返回游标续读，按事件序号查看上下文。read_run_log 自动返回 log_counts：整份 Run 快照的 warning/error 级别计数，不受分页或筛选影响；向用户解释运行状况时留意这些计数，损坏记录或未完成尾行不视为无异常，动作失败不自动算 error 级别。无结束记录的历史 Run 不等于仍在运行，损坏行不等于无匹配。
 
 修改 Candidate 后必须调用 validate_and_publish 完整校验并保存不可变版本；按实际错误修正后重试。仅分析或查看资料时不要求发布。
 

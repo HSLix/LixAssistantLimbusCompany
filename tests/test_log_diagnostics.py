@@ -71,6 +71,25 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path):
         tools.search_run_logs('hit', run_id=1, all_runs=True)
 
 
+def test_list_runs_summarizes_large_terminal_result(tmp_path):
+    host, _ = host_for(tmp_path)
+    tools = host.conversation.tools
+    result = {"status": "interrupted", "items": [{"result": "failure"}] * 10_000,
+              "all_tasks_succeeded": False, "failure_code": "branch_limit", "failure_message": "故障" * 2_000,
+              "output": {"raw": "omitted"}}
+    write_trace(host.service.data_root, 1, [
+        {"sequence": 1, "event": "run_started"},
+        {"sequence": 2, "event": "run_finished", "result": result},
+    ])
+    listing = tools.list_runs(limit=1)
+    row = listing["details"]["runs"][0]
+    assert row["status"] == "interrupted"
+    assert row["result"] == {"task_count": 10_000, "all_tasks_succeeded": False, "failure_code": "branch_limit"}
+    assert len(row["failure_reason"]) == 512 and row["failure_reason"].endswith("…")
+    assert len(listing["content"][0]["text"].encode("utf-8")) < 2_000
+    assert tools.read_run_log(1, start_sequence=2, limit=1)["details"]["events"][0]["result"] == result
+
+
 @pytest.mark.parametrize('extension', ['avif', 'png'])
 def test_tool_renders_exact_action_on_shared_evidence(tmp_path, extension):
     host, _ = host_for(tmp_path)

@@ -6,7 +6,7 @@ import time
 
 from PySide6.QtCore import Signal, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QTextDocument, QTextCursor, QImage
-from PySide6.QtWidgets import QTextBrowser
+from PySide6.QtWidgets import QApplication, QTextBrowser
 
 from .i18n import tr
 from .agent_prompts import user_message_text, chat_title
@@ -261,20 +261,34 @@ class RepairChat(QTextBrowser):
         toggle = tr('Hide details') if entry["expanded"] else tr('Show details')
         body = f'<p style="color:{color}">{title}　<a href="tool:{entry['index']}">{toggle}</a></p>'
         if entry["expanded"]:
-            events = entry["events"]
-            host, end = events.get("repair_tool", {}), events.get("tool_execution_end", {})
-            result = host.get("result", end.get("result", {}))
-            if isinstance(result, dict):
-                result = result.get("details", result)
-            if "validation" in events:
-                value = events["validation"]
-                result = {"ok": value["ok"], "errors": value.get("errors", [])}
-            shown = {"arguments": host.get("arguments", events.get("tool_execution_start", {}).get("args", {})),
-                     "result": result}
-            if host and end.get("isError") and not host.get("result", {}).get("isError"):
-                shown["pi_error"] = end.get("result")
-            body += '<pre style="white-space: pre-wrap">' + escape(json.dumps(shown, ensure_ascii=False, indent=2)) + '</pre>'
+            remaining = 16_000
+            preview = []
+            for part in json.JSONEncoder(ensure_ascii=False, indent=2).iterencode(self.tool_details(entry)):
+                preview.append(part[:remaining])
+                if len(part) > remaining:
+                    body += (f'<p>{tr("Showing a preview of large tool details.")} '
+                             f'<a href="tool-copy:{entry["index"]}">{tr("Copy full JSON")}</a></p>')
+                    break
+                remaining -= len(part)
+            body += '<pre style="white-space: pre-wrap">' + escape(''.join(preview)) + '</pre>'
         return body
+
+    @staticmethod
+    def tool_details(entry):
+        """预览和复制使用相同的参数与结果，保留宿主和 pi 的错误信息。"""
+        events = entry["events"]
+        host, end = events.get("repair_tool", {}), events.get("tool_execution_end", {})
+        result = host.get("result", end.get("result", {}))
+        if isinstance(result, dict):
+            result = result.get("details", result)
+        if "validation" in events:
+            value = events["validation"]
+            result = {"ok": value["ok"], "errors": value.get("errors", [])}
+        shown = {"arguments": host.get("arguments", events.get("tool_execution_start", {}).get("args", {})),
+                 "result": result}
+        if host and end.get("isError") and not host.get("result", {}).get("isError"):
+            shown["pi_error"] = end.get("result")
+        return shown
 
     def format_retry(self, round_number):
         """同轮格式纠正只占一条系统摘要；每次实际重试仍准确计数。"""
@@ -293,10 +307,17 @@ class RepairChat(QTextBrowser):
             activity = self.activities[int(url.path())]
             activity['expanded'] = not activity['expanded']
             self.render(follow=False)
-        elif url.scheme() == "tool":
-            index = int(url.path())
-            self.entries[index]["expanded"] = not self.entries[index]["expanded"]
-            self.render(follow=False)
+        elif url.scheme() in {"tool", "tool-copy"}:
+            if not url.path().isdecimal() or int(url.path()) >= len(self.entries):
+                return
+            entry = self.entries[int(url.path())]
+            if entry["role"] != "工具":
+                return
+            if url.scheme() == "tool":
+                entry["expanded"] = not entry["expanded"]
+                self.render(follow=False)
+            else:
+                QApplication.clipboard().setText(json.dumps(self.tool_details(entry), ensure_ascii=False, indent=2))
         elif url.scheme() in {"http", "https"}:
             QDesktopServices.openUrl(url)
 
