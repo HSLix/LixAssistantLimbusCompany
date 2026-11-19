@@ -1,5 +1,7 @@
 # Stage 5 — Agent 工作台
 
+2026-11-19：Manifest 查询新增 `search_manifest_source(manifest_id, query, offset=0, limit=50)`。按指定版本登记的全部 Python 源码逐行做不区分大小写的字面子串匹配，覆盖 Recovery Rule。每条命中返回 `section`、`logical_name`、`component_id`、从 1 开始的 `line_number` 和原文 `text`。`offset` 是从 0 开始的命中偏移，`limit` 为 1–200，用 `next_offset` 续页。宿主校验每个成员的路径与内容哈希，校验失败则报告工具错误。新工具沿用同组权限，内置 Agent 在下一轮应用设置，远程 MCP 在取得控制权时应用设置。
+
 2026-11-15：新增独立远程 MCP 开发入口，复用 Construct 能力和本地审批，但不把外部对话保存为 pi Developer Session；单个持久工作台及独占控制会话按 [ADR 0042](adr/0042-add-an-exclusive-remote-mcp-workbench.md) 和[远程 MCP 指南](remote-mcp.md)执行。本文内置 pi Session、模式及 Runtime 边界保持；MCP 的工具名和异步查询方式见独立指南。
 
 2026-11-13：Developer GUI → Agent Settings 新增“允许查询已发布 Manifest”（`manifest_reference_enabled`），默认开启，保存后下一轮生效；统一控制 GUI Construct／Repair、CLI Repair 和 Runtime Repair 的 `list_manifests`、`read_manifest`、`read_manifest_source`。关闭后不向模型提供这三个工具，宿主同时拒绝调用；不影响历史检索、外部知识、Candidate 编辑、发布或试运行。仍允许附加 Manifest 引用并验证 ID，附件不重新授予工具权限；已进入上下文的历史内容不清除。旧配置缺字段时默认开启，无须手工迁移。

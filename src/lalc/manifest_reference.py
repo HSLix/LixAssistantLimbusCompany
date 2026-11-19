@@ -99,3 +99,27 @@ class ManifestReference:
         return {"manifest_id": manifest_id, "section": section, "logical_name": logical_name,
                 "component_id": identity, "start_line": offset + 1,
                 "source": "".join(page.pop("items")), **page}
+
+    def search_source(self, manifest_id, query, offset=0, limit=50, *, checkpoint=None):
+        """逐行搜索已校验的登记源码，计入全部命中但只保留当前页。"""
+        self._bounds(offset, limit)
+        if not isinstance(query, str) or not query:
+            raise ValueError("query 必须是非空文本。")
+        needle = query.casefold()
+        value = self.read(manifest_id)
+        items = []
+        total = 0
+        end = offset + limit
+        for section in SECTIONS:
+            for name, entry in value[section].items():
+                if checkpoint is not None:
+                    checkpoint()
+                source = self.source_content(value, section, name).decode("utf-8")
+                for line_number, line in enumerate(source.splitlines(), 1):
+                    if needle in line.casefold():
+                        if offset <= total < end:
+                            items.append({"section": section, "logical_name": name, **entry,
+                                          "line_number": line_number, "text": line})
+                        total += 1
+        return {"manifest_id": manifest_id, "items": items, "offset": offset, "total": total,
+                "next_offset": end if end < total else None, "truncated": end < total}

@@ -76,6 +76,7 @@ class RepairTools:
                        "restore_asset": self.restore_asset,
                        "list_manifests": self.list_manifests, "read_manifest": self.read_manifest,
                        "read_manifest_source": self.read_manifest_source,
+                       "search_manifest_source": self.search_manifest_source,
                        "knowledge_list": self.knowledge_list, "knowledge_read": self.knowledge_read,
                        "knowledge_search_literal": self.knowledge_search_literal,
                        "knowledge_search_hybrid": self.knowledge_search_hybrid, "knowledge_git": self.knowledge_git,
@@ -304,7 +305,17 @@ class RepairTools:
         return self.text(ManifestReference(self.host.manager).structure(manifest_id, offset, limit))
 
     def read_manifest_source(self, manifest_id, section, logical_name, offset=0, limit=100):
+        """按逻辑名分页读取指定 Manifest 的已校验源码。可先用 search_manifest_source 定位命中行。"""
         return self.text(ManifestReference(self.host.manager).source(manifest_id, section, logical_name, offset, limit))
+
+    def search_manifest_source(self, manifest_id, query, offset=0, limit=50):
+        """在指定已发布 Manifest 的全部已校验 Python 源码中搜索非空字面子串，包含 Recovery Rule，忽略大小写。
+
+        不执行源码。每行命中返回 section、logical_name、component_id、从 1 开始的 line_number 和原文 text。
+        offset 是从 0 开始的命中偏移，limit 为 1–200，使用 next_offset 续页。用 read_manifest_source 读取上下文。
+        """
+        return self.text(ManifestReference(self.host.manager).search_source(
+            manifest_id, query, offset, limit, checkpoint=self.checkpoint))
 
     def delete_component(self, filename, impact):
         """仅删除经本次人工确认的候选 Python 文件；不修改登记或历史版本。"""

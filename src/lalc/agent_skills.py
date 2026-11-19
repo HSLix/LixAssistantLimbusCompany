@@ -12,7 +12,7 @@ from .process_lock import ProcessLock
 
 DEFAULT_SKILLS = Path(__file__).with_name("skills")
 DEFAULT_SKILL_NAMES = ("workflow-development", "workflow-repair", "workflow-conventions", "asset-management",
-                       "page-development", "validation-and-trial", "human-feedback")
+                       "page-development", "publish-and-trial", "human-feedback")
 
 
 def skill_files(root, diagnostics):

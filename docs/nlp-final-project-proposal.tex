@@ -1,0 +1,180 @@
+% Compile with pdflatex (twice). This file needs no external bibliography.
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=18mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{array,booktabs,tabularx}
+\usepackage[hidelinks]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\newcommand{\topic}[1]{\par\medskip\textbf{#1}\par\smallskip}
+\newcommand{\todo}[1]{\textit{[To fill: #1]}}
+\begin{document}
+\begin{center}
+  {\Large\bfseries Runtime Repair of Game Automation Workflows\\with LLM Agents}\par
+  \vspace{3pt}
+  NLP Final Project Proposal
+\end{center}
+\textbf{Team:} \todo{names, student IDs, and course codes}.\\
+\textbf{Track:} A (Agents \& Harness), custom study related to A4 (bounded recovery).
+
+\topic{1. Question and motivation}
+At a fixed model-request budget, how do game-state knowledge, workflow-repair
+guidance, and reference repositories affect an LLM agent's ability to repair a
+failing game-automation workflow and complete its task? We study these resources
+in LALC, an existing system that lets a coding agent inspect screenshots and
+execution feedback, edit workflow code, and submit revisions for executor-controlled
+resumption. The contribution is a controlled evaluation of runtime repair, rather
+than workflow generation, model training, or a claim of a new agent algorithm.
+
+\topic{2. Closest prior work}
+Voyager uses execution feedback to improve executable game skills~\cite{voyager}.
+SWE-agent studies interfaces for interactive code repair~\cite{sweagent}.
+AndroidWorld emphasizes task initialization and independent success
+checks~\cite{androidworld}. We instead evaluate repair of an existing Python
+workflow during execution in a real desktop game, and isolate the contribution
+of three reference resources under a shared request allowance.
+
+\topic{3. Environment, cases, and held-out evaluation}
+In \emph{Limbus Company}, the fixed task is to start at the main menu, enter the
+first floor of a dungeon (the game's ``Mirror Dungeon''), leave the dungeon, and
+return to the main menu. No full dungeon completion is required. A verified clean
+workflow serves as the starting artifact. Ten candidate single-fault cases are
+listed below; the supplied version IDs are abbreviated for readability.
+
+\begingroup
+\small
+\renewcommand{\arraystretch}{1.12}
+\begin{tabularx}{\linewidth}{@{}l l X@{}}
+\toprule
+Case & Version prefix & Injected fault or changed condition \\
+\midrule
+% 22fae48e-9f41-48aa-8102-e8c3b2f0b1b1
+C1 & \texttt{22fae48e} & Read \texttt{repetitions["tests"]}: wrong key, \texttt{KeyError}. \\
+% 7193ac2f-6d68-48e0-9c67-b270159df771
+C2 & \texttt{7193ac2f} & Concatenate a string and numeric \texttt{total}: \texttt{TypeError}. \\
+% d999b5a3-8bec-4c12-912a-15452aa0fb68
+C3 & \texttt{d999b5a3} & Log undefined \texttt{total\_count}: \texttt{NameError}. \\
+% 8b5fa5b5-ddf4-4d66-b35f-b53b9af3aea1
+C4 & \texttt{8b5fa5b5} & Index \texttt{SUPPORTED\_TASK\_IDS[1]}: \texttt{IndexError}. \\
+% e77c8b6c-45a2-437a-be7d-502ac05f18e4
+C5 & \texttt{e77c8b6c} & Call \texttt{.strip()} on a numeric repetition count: \texttt{AttributeError}. \\
+% 86197633-024e-44d5-ad00-39f66f1398a9
+C6 & \texttt{86197633} & Reject valid counts with \texttt{total >= 0}: faulty validation logic. \\
+% cd8e2552-0efe-4b36-b7dc-5dc6e3f788e5
+C7 & \texttt{cd8e2552} & Read local \texttt{phase} before assignment: \texttt{UnboundLocalError}. \\
+% 6d96202d-36b0-409c-8754-f0c455297bd3 (also the clean workflow)
+C8 & \texttt{6d96202d} & Clean workflow with an icon-position change: stale targeting. \\
+% 08c3f7b2-0f84-4027-9d37-3a0b4af3e4c4
+C9 & \texttt{08c3f7b2} & Icon-appearance change: stale visual recognition. \\
+% ea2b202a-b244-496d-ac0e-ca0e04bd2c7a
+C10 & \texttt{ea2b202a} & Remove module-level \texttt{\_main\_evidence()}: missing callable. \\
+\bottomrule
+\end{tabularx}
+\endgroup
+
+Before freezing the benchmark, we will verify clean execution and each fault's
+reproducible runtime manifestation. Visual cases are identified by workflow
+\emph{and} UI/asset condition; C8 shares its code version with the clean control.
+Separate pilot faults will be used for setup. The ten evaluation cases, prompts,
+resource snapshots, and scoring rubric will then be frozen; no tuning on their
+results is allowed. Clean source, injected diffs, and reference fixes are hidden
+from the agent, while ordinary failing code and runtime feedback remain visible.
+
+\topic{4. Baseline and 5. Targeted change}
+The baseline is the existing LALC repair agent without the three optional
+reference resources. All conditions retain identical required API contracts,
+tools, permissions, and deterministic recovery rules. We test resource
+availability, with five conditions: \textbf{Baseline} (none), \textbf{Full} (all),
+\textbf{Full--Game}, \textbf{Full--Repair}, and \textbf{Full--Repositories}.
+Game knowledge and repair guidance are read-only Skill documents; repositories
+are version-pinned, searchable code and documentation from similar automation
+projects. We log actual resource reads. Full versus Baseline is the main contrast;
+single removals estimate each resource's contribution within Full, not all
+interactions. Baseline performance is unknown and will be measured, not assumed.
+
+\newpage
+\topic{6. Protocol, scale, and metrics}
+Each condition runs once on each of the ten cases:
+\textbf{5 conditions $\times$ 10 cases = 50 repair episodes}.
+Each episode resets the main-menu state, faulty artifact, and session, without
+inherited patches or history. Model version, settings, task instructions, account
+configuration, resolution, and assets are fixed across conditions; run order is
+balanced. The operator initializes and observes, without repair hints or manual
+task completion.
+
+Each episode receives \textbf{at most 100 model requests in total}, shared across
+all repair interventions and failed revisions, without resetting on re-entry.
+There is \textbf{no episode wall-clock limit}; actual elapsed time is measured
+from faulty-workflow startup through completion, abandonment, or request-budget
+exhaustion. Manual setup and assessment time are recorded separately.
+
+\textbf{Primary metric:} independently verified end-to-end task success within
+the request allowance (successful episodes / evaluable episodes). A reviewer
+checks preserved screenshots or video and execution traces against the frozen
+rubric: actual entry to the first floor, actual exit, and return to the main menu.
+Normal program termination, bypassing the task, or an agent's success claim alone
+does not count. The rubric cannot be edited by the agent.
+
+\textbf{Secondary metrics:} requests, input/output tokens, API cost, elapsed time,
+and total API cost divided by successes. Report abandonment, budget exhaustion,
+and false completion claims (incorrect / all success claims). Show case-level
+outcomes and include failed attempts in costs. Document and rerun infrastructure
+interruptions under a predeclared rule. Archive configurations, version IDs,
+resource reads, patches, and traces.
+
+Prioritizing ten cases over repeated runs follows TA feedback. With one episode
+per case and condition, results are exploratory paired comparisons; model
+variance and general game competence cannot be established.
+
+\topic{7. Resource budget}
+Use one Windows machine, an authorized game account, and an API model; no
+training-GPU hours are needed. The main study allows \textbf{5,000 model requests},
+excluding separately tracked pilots; token usage determines actual spend.
+\textbf{Before launch:} \todo{model/provider, pilot allowance, and API spending cap
+based on pilot costs}. Pin repository commits and Skills. Existing LALC
+engineering predates this study; benchmark construction, experiments, analysis,
+and reproducibility materials constitute the course contribution.
+
+\topic{8. Four-week plan}
+\textbf{W1:} verify the clean route and faults, pilot on separate cases, finalize
+model and cost cap, and freeze the benchmark/resources/rubric.
+\textbf{W2:} run the five-condition matrix with resets and preserved traces.
+\textbf{W3:} independently score results, compare paired case outcomes and costs,
+and analyze failures and resource use.
+\textbf{W4:} audit headline results against logs, reproduce selected cases,
+prepare a live or recorded repair demo, and complete the report and poster.
+
+\topic{9. Fallback experiment}
+If resources do not improve success, retain the negative result and analyze
+whether references were unused, redundant, or unhelpful for particular faults.
+If the pilot predicts excessive cost, reduce the predeclared design to Baseline
+versus Full on all ten cases (20 episodes), preserving case coverage and the
+100-request allowance. If visual perturbations cannot be made reproducible,
+freeze a code-fault-only study and explicitly narrow its claims before evaluation.
+
+\topic{10. Risks and teaching-team support}
+Simple plan-level faults may produce ceiling effects and reveal little about
+game knowledge. Two visual cases cannot establish general update robustness.
+Audit reference overlap and exclude benchmark answers. Control game updates,
+account state, and accidental resource spending. We seek feedback on case
+diversity and analysis scope. The TA has confirmed the topic, scoped task, and
+initial scale, prioritizing additional cases over repetitions.
+
+\begingroup
+\small
+\setlength{\parskip}{0pt}
+\begin{thebibliography}{3}
+\setlength{\itemsep}{0pt}
+\bibitem{voyager} G. Wang et al. (2023).
+\emph{Voyager: An Open-Ended Embodied Agent with Large Language Models}.
+\href{https://arxiv.org/abs/2305.16291}{arXiv:2305.16291}.
+\bibitem{sweagent} J. Yang et al. (2024).
+\emph{SWE-agent: Agent-Computer Interfaces Enable Automated Software Engineering}.
+\href{https://arxiv.org/abs/2405.15793}{arXiv:2405.15793}.
+\bibitem{androidworld} C. Rawles et al. (2024).
+\emph{AndroidWorld: A Dynamic Benchmarking Environment for Autonomous Agents}.
+\href{https://arxiv.org/abs/2405.14573}{arXiv:2405.14573}.
+\end{thebibliography}
+\endgroup
+\end{document}

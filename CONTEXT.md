@@ -93,6 +93,10 @@ _Avoid_: Component Usage Index, Asset Manifest
 The user-editable name of an E.G.O Gift or Theme Pack in one game language.
 _Avoid_: Asset tag, game language tag, archetype
 
+**Theme Pack Selection Preference** (中文界面：选择偏好):
+The one preference a user assigns to a Theme Pack: prioritize, default, or avoid when possible.
+_Avoid_: Theme Pack weight
+
 **Developer Candidate**:
 The temporary editable staging workspace for a complete Manifest draft, used to prepare, validate and publish changes. It is neither the authoritative source of released capabilities nor the Working Manifest of an active execution; unpublished contents remain drafts.
 _Avoid_: Formal source repository, released Manifest, active Working Manifest, global candidate registry

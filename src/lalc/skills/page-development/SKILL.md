@@ -12,6 +12,6 @@ description: 开发、修改和预览 LALC Business Settings Page 时使用，�
 6. page_list(filename=...) 列举包内文件；page_read(path=..., image=true) 查看图片；page_resource 只改当前草稿资源。图片通过 context.resource_path("assets/banner.png") 定位。源码和资源共同构成批准版本，不写私人配置，不新增第三方依赖，不因此取得正式页或共享素材的写权限。
 7. 调用 page_preview 并提供简洁修改说明供审查。预览失败时按工具错误修正草稿，必要时重新预览；加载成功不表示配置兼容或业务验证通过。
 8. 安装必须经过 page_preview 的专用人工审批，其他反馈不构成批准。等待结果：installed 表示固定内容版本已安装；关闭或跳过不安装，可继续修改；取消轮次则停止。草稿改变后重新预览和审批。
-9. 总结页面修改、兼容性影响、预览和安装状态及未验证业务行为。试填配置不会随安装保存；提醒开发者主动重启应用以应用变更，安装不会自动重启。Workflow 修改和运行另读 `../validation-and-trial/SKILL.md`。
+9. 总结页面修改、兼容性影响、预览和安装状态及未验证业务行为。试填配置不会随安装保存；提醒开发者主动重启应用以应用变更，安装不会自动重启。Workflow 修改和运行另读 `../publish-and-trial/SKILL.md`。
 10. page_list(scope="installed") 包含启用及停用页面，enabled 表示重启后采用的保存状态。通过实际启用的 page_set_enabled(filename, enabled, summary) 请求启用/停用，必须等待专用弹窗的真实确认；普通反馈、历史确认、关闭或取消不授权。GUI Construct 与受控远程 MCP 可提供页面工具，按当前入口权限判断；没有页面永久删除工具，不新增管理入口。
 11. 停用保留源码、资源、页面配置和任务勾选/次数，重启后隐藏页面及其全部任务，关联任务传 0；重新启用恢复原设置，但仍受 Plan 支持列表约束。更新、覆盖安装及 Sharing 不改变本机启停状态。启停与安装一样在轮次结束并清理后统一提示重启；未重启前不改变当前页面或运行任务。

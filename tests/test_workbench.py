@@ -94,6 +94,13 @@ def test_manifest_reference_is_versioned_paged_and_never_imports(tmp_path, monke
     assert first_source['component_id'] != second_source['component_id']
     monkeypatch.setattr(host.manager, '_load_module', lambda *a, **k: pytest.fail('read imported Python'))
     assert reader.source(first.manifest_id, 'components', 'steps.total') == first_source
+    old_hits = reader.search_source(first.manifest_id, 'IF VALUE > 0')
+    assert old_hits['items'] == [{
+        'section': 'components', 'logical_name': 'steps.total', 'component_id': first_source['component_id'],
+        'line_number': 9, 'text': '    return sum(value for value in values if value > 0)',
+    }]
+    assert reader.search_source(second_id, 'IF VALUE > 0')['items'] == []
+    assert reader.search_source(second_id, 'steps.total')['total'] == 0
     assert reader.structure(second_id, limit=1)['truncated']
     page = reader.source(second_id, 'components', 'steps.total', limit=1)
     assert page['start_line'] == 1 and page['next_offset'] == 1 and page['truncated']
@@ -137,6 +144,8 @@ def test_manifest_reference_rejects_corrupt_identity_and_paths(tmp_path, failure
         manifest_path.write_text(json.dumps(value), encoding="utf-8")
     with pytest.raises(ValueError):
         reader.source(loaded.manifest_id, 'components', 'steps.total')
+    with pytest.raises(ValueError):
+        reader.search_source(loaded.manifest_id, 'unmatched')
 
 
 def test_reference_read_does_not_execute_even_registered_side_effect_source(tmp_path):
@@ -147,8 +156,21 @@ def test_reference_read_does_not_execute_even_registered_side_effect_source(tmp_
     digest = hashlib.sha256(content).hexdigest()
     (host.manager.components_dir / f'{digest}.py').write_bytes(content)
     value['components']['steps.total']['component_id'] = 'sha256:' + digest
+    value['recovery_rules']['rules.example'] = {'component_id': 'sha256:' + digest}
     (host.manager.manifests_dir / f'{loaded.manifest_id}.json').write_text(json.dumps(value), encoding="utf-8")
     assert reader.source(loaded.manifest_id, 'components', 'steps.total')['source'] == content.decode()
+    first = reader.search_source(loaded.manifest_id, 'runtimeerror("', limit=1)
+    assert first['total'] == 2 and first['next_offset'] == 1 and first['truncated']
+    assert first['items'][0]['logical_name'] == 'steps.total'
+    last = reader.search_source(loaded.manifest_id, 'runtimeerror("', offset=first['next_offset'], limit=1)
+    assert last['items'] == [{
+        'section': 'recovery_rules', 'logical_name': 'rules.example', 'component_id': 'sha256:' + digest,
+        'line_number': 1, 'text': content.decode().rstrip('\n'),
+    }]
+    assert last['next_offset'] is None and not last['truncated']
+    assert reader.search_source(loaded.manifest_id, 'RuntimeError', offset=100)['items'] == []
+    with pytest.raises(ValueError, match='query'):
+        reader.search_source(loaded.manifest_id, '')
 
 
 def test_first_send_uses_final_choices_and_preserves_manual_candidate(gui, monkeypatch):

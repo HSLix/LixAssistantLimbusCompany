@@ -46,7 +46,7 @@ Skill 名遵循 pi 格式，用小写字母、数字和连字符；参考资料�
 | workflow-conventions | 调用层级、Step 职责、完成证据、Plan 成败日志及源码约定 |
 | asset-management | 素材、截图、OCR、预览保存及归档 |
 | page-development | 页面整包、配置兼容、Plan 接线和人工安装 |
-| validation-and-trial | Validate／Publish／显式版本运行及证据边界 |
+| publish-and-trial | Validate／Publish／显式版本运行及证据边界 |
 | human-feedback | 人工信息／操作请求、Confirm／Skip 含义和后续处理 |
 
 共用规范的 `references/dispatch-and-wait.md`、`references/recovery-rules.md` 分别在修改分派／等待和恢复规则时读取；它们是随 Skill 一起初始化、固定和分发的普通参考文件，不新增默认 Skill 入口。
@@ -55,7 +55,7 @@ Skill 名遵循 pi 格式，用小写字母、数字和连字符；参考资料�
 
 ## 合并本次指导到已有安装
 
-- 对照应用实际数据目录 `skills/`，合并本次更新的 workflow-conventions、workflow-development、workflow-repair、validation-and-trial、asset-management、page-development，以及后续补充的 human-feedback；workflow-conventions 的两个 references 文件也要复制。保留用户定制条款，消解与新指导冲突的旧规则，不以整目录重置代替合并。
+- 对照应用实际数据目录 `skills/`，合并本次更新的 workflow-conventions、workflow-development、workflow-repair、publish-and-trial、asset-management、page-development，以及后续补充的 human-feedback；workflow-conventions 的两个 references 文件也要复制。保留用户定制条款，消解与新指导冲突的旧规则，不以整目录重置代替合并。
 - 保留自建 limbuscompany-knowledge、图片及其他自定义 Skill；本次不需要删除整个 skills 目录，也不自动覆盖已有安装。
 - 内置 Agent 下一条用户消息刷新 Skill 副本；远程 MCP 使用接手时固定副本，当前控制会话空闲释放后重新接手才读取新合并内容。不要为刷新中断正在运行的任务。
 - 合并指导不等于迁移已发布 Workflow。按实际任务检查受影响调用方、Step 返回、Workflow 分派及过渡等待，再校验发布；不要将旧 None 返回批量认作未达成。

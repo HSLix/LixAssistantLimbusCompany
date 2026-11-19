@@ -20,7 +20,7 @@ description: LALC Workflow 的共用编写规范。创建、修改或审查 Plan
 - Recovery Rule 只处理独特特征确认的外部异常，不在每个正常轮询中遍历错误弹窗；规则只推进当前异常，有界等待后可交回，不需内部循环到整条异常链结束。编写或排查规则时读取 [references/recovery-rules.md](references/recovery-rules.md)。
 - 循环检测状态前及时调用 observe.capture_screen 刷新截图，尤其注意循环内动作、等待或子流程返回后的状态变化；继续判断前重新截图，或回到会重新截图的循环顶部，不在旧帧上反复空检测。match_asset／match_feature／ocr 读取当前内存帧，不自动刷新；observe.wait 也不刷新。换帧后重新获取匹配、OCR 及派生状态，不沿用旧变量。未发生动作或等待的同轮纯条件分流可复用一帧，不必每个 if 都截图；同帧先用足够的匹配证据，再按需局部／全屏 OCR，避免无条件全屏 OCR。
 - edit 的 oldText／newText 可直接使用中文，不需要手写 Unicode 转义。oldText 从最新读取的文件复制，选短且唯一的代码锚点；匹配失败先重读并修正，不重复提交同一错误文本。
-- 选状态特征时先查询现有 Asset，优先复用标题、特色按钮等少量易识别且较少误判的特征，不凭共有 Confirm／Enter 或导航标志推断页面。允许根据多次现场证据逐步改进，不要求首次找齐或堆砌检测；TODO 记录待采集的情景和特征，不等于已实现保护。素材及只读识别试验见 `../asset-management/SKILL.md`，验证和试运行统一见 `../validation-and-trial/SKILL.md`。
+- 选状态特征时先查询现有 Asset，优先复用标题、特色按钮等少量易识别且较少误判的特征，不凭共有 Confirm／Enter 或导航标志推断页面。允许根据多次现场证据逐步改进，不要求首次找齐或堆砌检测；TODO 记录待采集的情景和特征，不等于已实现保护。素材及只读识别试验见 `../asset-management/SKILL.md`，验证和试运行统一见 `../publish-and-trial/SKILL.md`。
 
 ## Component 类型示例
 

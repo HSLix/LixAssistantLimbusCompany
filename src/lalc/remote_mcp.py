@@ -26,14 +26,14 @@ MCP_TOOLS = (
     "read", "edit", "asset_tree", "asset_directory", "asset_images", "action_contracts",
     "game_screenshot", "preview_crop", "crop_asset", "remove_asset", "restore_asset",
     "add_component", "add_recovery_rule", "delete_component", "validate_and_publish", "trial_run",
-    "list_runs", "read_run_log", "search_run_logs", "list_manifests", "read_manifest", "read_manifest_source",
+    "list_runs", "read_run_log", "search_run_logs", "list_manifests", "read_manifest", "read_manifest_source", "search_manifest_source",
     "list_game_versions", "search_agent_sessions", "read_agent_session",
     "knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git",
     "request_feedback", "page_list", "page_read", "page_create", "page_update", "page_resource",
     "page_preview", "page_set_enabled",
 )
 READ_TOOLS = frozenset(("read", "asset_tree", "asset_directory", "asset_images", "action_contracts",
-    "list_runs", "read_run_log", "search_run_logs", "list_manifests", "read_manifest", "read_manifest_source",
+    "list_runs", "read_run_log", "search_run_logs", "list_manifests", "read_manifest", "read_manifest_source", "search_manifest_source",
     "list_game_versions", "search_agent_sessions", "read_agent_session", "page_list", "page_read", "list_skills"))
 
 
