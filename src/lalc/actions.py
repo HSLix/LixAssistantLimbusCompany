@@ -6,6 +6,17 @@ from dataclasses import dataclass
 from typing import Any, Callable, overload
 
 
+ACTION_ACCESS = {
+    ("automation_plan", "execute"): {"page_resource"},
+    ("task_workflow", "execute"): {"observe", "page_resource"},
+    ("sub_workflow", "execute"): {"observe", "page_resource"},
+    ("step", "execute"): {"observe", "control", "page_resource"},
+    ("step", "condition"): {"observe"},
+    ("recovery_rule", "detect"): {"observe"},
+    ("recovery_rule", "recover"): {"observe", "control"},
+}
+
+
 @dataclass(frozen=True)
 class TrustedAction:
     """由应用提供的固定分类与可调用实现，签名和 docstring 即调用契约。"""
@@ -14,8 +25,8 @@ class TrustedAction:
     classification: str
 
     def __post_init__(self) -> None:
-        if self.classification not in {"observe", "control"} or not callable(self.execute):
-            raise ValueError("Trusted Action requires a callable and observe/control classification.")
+        if self.classification not in {"observe", "control", "page_resource"} or not callable(self.execute):
+            raise ValueError("Trusted Action requires a callable and observe/control/page_resource classification.")
 
 
 def capture_screen(ctx, *, save: bool = True, auto_park_cursor: bool = True) -> dict[str, int | str]:
@@ -324,6 +335,16 @@ def restart_game(ctx) -> None:
     ctx.control_input("restart_game")
 
 
+def read_page_json(ctx, *, page_id: str, name: str) -> dict[str, Any] | None:
+    """读取指定页面的最新 JSON 对象，资源缺失时返回 None。"""
+    return ctx._page_json_resources().read_json(page_id, name)
+
+
+def write_page_json(ctx, *, page_id: str, name: str, value: dict[str, Any]) -> None:
+    """整份保存页面 JSON，正式运行和试跑均立即写入同一本机资源。"""
+    ctx._page_json_resources().write_json(page_id, name, value)
+
+
 def application_actions() -> dict[str, TrustedAction]:
     """构建应用唯一动作表；测试可由应用层提供替身表。"""
     return {
@@ -338,4 +359,6 @@ def application_actions() -> dict[str, TrustedAction]:
         "control.scroll": TrustedAction(scroll, "control"),
         "observe.wait": TrustedAction(wait, "observe"),
         "control.restart_game": TrustedAction(restart_game, "control"),
+        "page_resource.read_json": TrustedAction(read_page_json, "page_resource"),
+        "page_resource.write_json": TrustedAction(write_page_json, "page_resource"),
     }

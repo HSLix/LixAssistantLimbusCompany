@@ -58,6 +58,14 @@ class RunContext:
     def action(self, logical_name: str, **arguments: Any) -> Any:
         return self._executor.trusted_action(logical_name, arguments)
 
+    def _page_json_resources(self):
+        """仅由已进入执行边界的页面资源动作使用。"""
+        from .runtime import ExecutionFailure
+
+        if self._executor._active_action != "page_resource" or self._executor._page_resources is None:
+            raise ExecutionFailure("Page JSON resources are unavailable outside a registered page resource action.")
+        return self._executor._page_resources
+
     @property
     def run_state(self) -> RunState:
         return self._executor.run_state

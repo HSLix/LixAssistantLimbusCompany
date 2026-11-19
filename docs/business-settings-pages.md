@@ -102,3 +102,5 @@ TASKS = [
 GUI Construct Agent 可使用 page_list 查询包括停用页面在内的列表及 enabled 状态，通过 page_set_enabled 请求专用人工确认。停用与启用均需确认，关闭/取消不修改；保留全部资源、配置及 ID 占用，不提供永久删除或专门管理入口。变更重启后生效，覆盖安装不改变状态，恢复后仍按 Plan 支持项执行。详情见设计与影响审查。
 
 页面配置可以在设置 → Sharing 的「页面配置」类别中按 PAGE_ID 独立分享，默认全不选，仅包含已保存业务值。导入后的已加载页面暂时锁定，重载前不再提交旧值；详见[分享说明](sharing.md)。
+
+页面通过 `context.read_resource_json(name)` 和 `context.write_resource_json(name, value)` 访问 Workflow 共享的[页面 JSON 资源](page-json-resources.md)。每次读取取得最新值，页面可按需刷新展示。页面包预览的两侧各用独立的内存资源，Developer Trial 则共享正式运行的本机资源。

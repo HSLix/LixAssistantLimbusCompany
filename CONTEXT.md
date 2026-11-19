@@ -12,6 +12,10 @@ _Avoid_: Manifest Component, unreviewed generated page, untrusted plugin
 The saved business values owned by one Business Settings Page under its stable page ID, independently of its code package and any Manifest. They exclude Dashboard repetition choices and page availability.
 _Avoid_: Page package, task count, Agent settings
 
+**Page JSON Resource** (中文界面：页面 JSON 资源):
+Persistent business data owned by a Business Settings Page and shared with Workflows. It keeps runtime changes across Runs, including Developer Trials, independently of the page form and its installed package.
+_Avoid_: Page Settings snapshot, Page Package resource, Run State
+
 **Loop Task**:
 A Dashboard repetition choice identified by a stable task ID registered by a Business Settings Page and explicitly supported by an Automation Plan. Its ID is distinct from the page ID and Component logical name; support declares configuration compatibility rather than successful execution.
 _Avoid_: Task Workflow, page ID, Component logical name
@@ -69,7 +73,7 @@ An application-owned Recovery Rule shared by every Manifest. The game-crash rule
 _Avoid_: Manifest Component, Runtime Agent, automatic task replay
 
 **Trusted Action**:
-A shipped or human-approved low-level Python operation registered by the application once as `observe` or `control` and shared by all Manifests. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed permission matrix, validation, timing, and Trace; the Agent cannot create, replace, or reclassify it, and a Manifest does not select its implementation.
+A shipped or human-approved low-level Python operation registered by the application once as `observe`, `control`, or `page_resource` and shared by all Manifests. Formal source calls its literal logical name through `ctx.action()` under the executor's fixed permission matrix, validation, timing, and Trace; the Agent cannot create, replace, or reclassify it, and a Manifest does not select its implementation.
 Observation includes cooperative waiting without game input; it does not imply an immediate return.
 _Avoid_: Step, Agent-generated function, unrestricted Python call
 

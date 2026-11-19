@@ -10,6 +10,7 @@ from pathlib import Path
 from .work_files import work_file
 from .runtime import _strict_json
 from .user_pages import UserSettings, PageAvailability, check_page_registration
+from .page_resources import PageJsonResources
 from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries, page_entry,
                             page_filename, real_directory, snapshot_page)
 
@@ -34,6 +35,7 @@ class MemorySettings:
 
     def __init__(self, value):
         self.value = deepcopy(value)
+        self.page_resources = PageJsonResources()
 
     def save(self, section, identity, value):
         self.value[section][identity] = deepcopy(_strict_json(value))

@@ -15,6 +15,7 @@ from typing import Any
 
 from .runtime import _strict_json, atomic_write_json
 from .page_packages import page_entries, page_entry, resource_path
+from .page_resources import PageJsonResources
 
 
 class UserSettings:
@@ -22,6 +23,7 @@ class UserSettings:
 
     def __init__(self, data_root: Path):
         self.path = data_root / "user-settings.json"
+        self.page_resources = PageJsonResources(data_root / "page-resources")
         self.value = json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {"pages": {}, "tasks": {}}
         if (type(self.value) is not dict or set(self.value) != {"pages", "tasks"} or
                 type(self.value["pages"]) is not dict or type(self.value["tasks"]) is not dict):
@@ -124,6 +126,14 @@ class PageContext:
         if self.package_root is None:
             raise ValueError("当前页面没有资源目录。")
         return resource_path(self.package_root, relative)
+
+    def read_resource_json(self, name: str) -> dict[str, Any] | None:
+        """读取本页与 Workflow 共享的最新 JSON 资源。"""
+        return self.store.page_resources.read_json(self.page_id, name)
+
+    def write_resource_json(self, name: str, value: dict[str, Any]) -> None:
+        """整份保存本页 JSON 资源；页面包预览只写本侧内存。"""
+        self.store.page_resources.write_json(self.page_id, name, value)
 
 
 @dataclass
