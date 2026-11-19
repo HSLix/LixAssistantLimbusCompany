@@ -106,6 +106,7 @@ pi 请求的连接异常和响应流读取异常会分别记录 `lalc_transport_
 - `list_runs(offset=0, limit=100)`：按 Run ID 新到旧分页，返回 ID 与开始／结束时间、耗时、状态、入口 logical name、Manifest ID、来源（Agent 试运行／用户运行／未知）、结果和失败原因。缺失字段不推断，缺少结束记录不等于仍运行。
 - `read_run_log(run_id, start_sequence=1, limit=100, levels=..., logical_name=..., evidence_id=...)`：按事件序号读取原始 Trace；levels 内取并集，与精确 logical name 取交集，limit 计匹配条数，沿 next_sequence 续读并保留条件。每次自动附带 `log_counts`（`scope=full_run`、`warning`、`error`、`damaged_records`），统计整份 Run 完整行快照的显式日志等级，独立于分页和筛选；大小写归一，动作失败或正文中的 warning/error 字样不冒充等级。损坏行单独计数，未写完的尾行暂不计入，活动 Run 后续读取时统计可增长。统计流式扫描整份日志，超大日志可能增加读取耗时。可选查看该 Run 真实引用的 PNG／AVIF 证据，返回 JPEG 预览；日志截图不作为素材来源。记录已清理时明确报不可用。
 - `search_run_logs(keyword, run_id=...)`：不区分大小写的原始事件 JSON 子串查询（含参数、结果和错误），可显式使用 `all_runs=true` 替代 run_id 搜索全部保留 Run。支持相同 levels／logical_name 条件；Run ID 降序、Run 内序号升序。返回 matches（run_id、sequence、完整 record）及 next（start_run_id、start_sequence），沿游标续读时保留全部查询条件。按命中序号调用 read_run_log 读取上下文；damaged_records 非零表示扫描遇到损坏行，不能宣称完整无匹配。没有持久索引，大范围查询可能耗时。
+- 查看匹配框、OCR 文字框或点击十字线时，先从日志定位动作结束事件并记下其 `sequence`，再用 `read_run_log(run_id=123, render_sequence=456)` 读取该事件与标注 JPEG。此用法只传这两个参数；如需无标注的截图预览，单独传 `evidence_id`。OCR、模板匹配和特征匹配只引用当前已保存的观察。点击有缓存帧时保存或复用该帧，十字线表示点击参数中的目标位置。事件没有可读截图时会明确报错。
 
 开发者面板 Agent 设置的“允许查询外部知识库”默认开启，同时控制开发者和运行时 Agent；每轮开始固定开关，轮次内不变。关闭时 knowledge_* 和从知识库复制页面资源均不可用；历史记录和 Skills 不属于该开关。
 

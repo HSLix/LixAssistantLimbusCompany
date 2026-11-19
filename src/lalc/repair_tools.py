@@ -444,38 +444,66 @@ class RepairTools:
         return self.text({"run_ids": ids[offset:offset + limit], "runs": runs,
                           "next_offset": offset + limit if offset + limit < len(ids) else None})
 
-    def read_run_log(self, run_id, start_sequence=1, limit=100, evidence_id=None, levels=None, logical_name=None):
-        """按事件序号读取 Trace；仅允许查看该 Trace 实际引用的截图。"""
-        if (type(run_id) is not int or run_id < 1 or type(start_sequence) is not int or start_sequence < 1
-                or type(limit) is not int or not 1 <= limit <= 200):
-            raise ValueError("run_id/start_sequence 必须为正整数，limit 必须为 1–200 的整数。")
-        from .run_logs import image_path, query_trace, run_log_counts, trace_records, trace_path
+    def read_run_log(self, run_id, start_sequence=1, limit=100, evidence_id=None, levels=None, logical_name=None,
+                     *, render_sequence=None):
+        """读取 Trace；用 evidence_id 查看原图，或只传 run_id 和 render_sequence 查看指定匹配、OCR 或点击事件的标注图。
+
+        先通过 search_run_logs 或本工具找到动作结束事件的 sequence，再传给 render_sequence。
+        OCR 和匹配仅引用已保存的当前观察；点击保存或复用当前缓存帧。事件需有可读截图证据。
+        """
+        if type(run_id) is not int or run_id < 1:
+            raise ValueError("run_id 必须为正整数。")
+        from .run_logs import ACTION_ENDS, image_metadata, image_path, query_trace, run_log_counts, trace_records, trace_path
         from .file_content import FileContent, image_preview
         root = self.library.data_root
         try:
             trace_path(root, run_id)
         except (ValueError, OSError) as error:
             raise ValueError("Run 日志不可用：记录不存在或已清理。") from error
+        if render_sequence is not None:
+            if type(render_sequence) is not int or render_sequence < 1:
+                raise ValueError("render_sequence 必须为正整数。")
+            if (evidence_id is not None or levels is not None or logical_name is not None
+                    or type(start_sequence) is not int or start_sequence != 1 or type(limit) is not int or limit != 100):
+                raise ValueError("render_sequence 仅与 run_id 一起使用。")
+            start_sequence, limit = render_sequence, 1
         page = query_trace(root, [run_id], start_sequence=start_sequence, limit=limit,
                            levels=levels, logical_name=logical_name, check=self.checkpoint)
         details = {"run_id": run_id, "events": [item["record"] for item in page["matches"]],
                    "next_sequence": page["next"]["start_sequence"] if page["next"] else None,
                    "damaged_records": page["damaged_records"],
                    "log_counts": run_log_counts(root, run_id, check=self.checkpoint)}
-        if evidence_id is None:
+        annotations = []
+        if render_sequence is not None:
+            from .image_annotations import action_annotations
+
+            events = details["events"]
+            if not events or events[0]["sequence"] != render_sequence:
+                raise ValueError("指定的事件序号不存在。")
+            record = events[0]
+            if (record.get("event") not in ACTION_ENDS
+                    or record.get("logical_name") not in ("observe.match_asset", "observe.match_feature", "observe.ocr", "control.click")):
+                raise ValueError("请选择匹配、OCR 或点击的动作结束事件。")
+            metadata = image_metadata(record)
+            evidence_id = metadata.get("evidence_id") if isinstance(metadata, dict) else None
+            details.update(render_sequence=render_sequence, next_sequence=None)
+            annotations = action_annotations(record)
+        elif evidence_id is not None:
+            def referenced(value):
+                if isinstance(value, dict):
+                    return value.get("evidence_id") == evidence_id or any(referenced(item) for item in value.values())
+                return isinstance(value, list) and any(referenced(item) for item in value)
+
+            prefix, separator, observation = str(evidence_id).partition("/")
+            if (prefix != str(run_id) or not separator or not observation.isdecimal()
+                    or not any(referenced(record) for record in trace_records(root, run_id, check=self.checkpoint) if record)):
+                raise ValueError("截图必须是该 Run 日志引用的 evidence_id。")
+        else:
             return self.text(details)
-        def referenced(value):
-            if isinstance(value, dict):
-                return value.get("evidence_id") == evidence_id or any(referenced(item) for item in value.values())
-            return isinstance(value, list) and any(referenced(item) for item in value)
-        prefix, separator, observation = str(evidence_id).partition("/")
-        if (prefix != str(run_id) or not separator or not observation.isdecimal()
-                or not any(referenced(record) for record in trace_records(root, run_id, check=self.checkpoint) if record)):
-            raise ValueError("截图必须是该 Run 日志引用的 evidence_id。")
         path = image_path(root, run_id, {"evidence_id": evidence_id})
-        if path is None:
-            raise ValueError("截图路径越界。")
-        content = image_preview(FileContent.from_path(path))
+        if path is None or not path.is_file():
+            raise ValueError("截图证据不可用：缺失、已清理或路径越界。")
+        content = image_preview(FileContent.from_path(path), annotations=annotations)
         filename = self.log.path / f"tool-{self.sequence}-run-preview.jpg"
         filename.write_bytes(content)
         self.log.store.register_image(filename)

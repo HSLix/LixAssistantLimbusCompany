@@ -181,6 +181,7 @@ _Avoid_: User settings, Python stack snapshot, persistent checkpoint
 The executor-owned chronological record of what one real execution attempt actually did from its entry position. It records actual components, plans, actions, observations, results, evidence, and interruptions for diagnosis, recovery, Agent context, and audit, but does not carry normal Workflow business data or determine task success.
 The live running window is a bounded presentation of this record; removing an entry from that presentation does not remove execution evidence.
 Diagnostic screenshots may be lossy and are not a source of Asset pixels; Assets are obtained from fresh game observations through the authorized capture tools.
+Multiple action events can refer to the same diagnostic screenshot. An annotated preview combines that screenshot with the inputs or results of one action event.
 _Avoid_: Candidate Workflow, Agent memory, capability snapshot
 
 **Agent Interaction Log**:

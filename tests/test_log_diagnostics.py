@@ -4,7 +4,9 @@
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_log_diagnostics.py
 """
 
+import base64
 import json
+from io import BytesIO
 
 import pytest
 from PIL import Image
@@ -67,6 +69,59 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path):
         tools.search_run_logs('hit')
     with pytest.raises(ValueError):
         tools.search_run_logs('hit', run_id=1, all_runs=True)
+
+
+@pytest.mark.parametrize('extension', ['avif', 'png'])
+def test_tool_renders_exact_action_on_shared_evidence(tmp_path, extension):
+    host, _ = host_for(tmp_path)
+    tools, root = host.conversation.tools, host.service.data_root
+    common = {'event': 'trusted_action_returned', 'debug_image': {'evidence_id': '1/2'}}
+    write_trace(root, 1, [
+        dict(common, sequence=1, logical_name='observe.match_asset',
+             return_value=[{'x': 200, 'y': 220, 'width': 200, 'height': 180}]),
+        dict(common, sequence=2, logical_name='observe.ocr', return_value={'items': [
+            {'text': '確認', 'box': {'x': 600, 'y': 420, 'width': 200, 'height': 150}}]}),
+        dict(common, sequence=3, logical_name='control.click', inputs={'centerxy': [900, 300]}),
+        dict(common, sequence=4, logical_name='observe.match_asset', return_value=[]),
+        dict(common, sequence=6, logical_name='observe.ocr', debug_image={'image_unavailable': True}),
+        dict(common, sequence=7, logical_name='control.click', debug_image={'evidence_id': '2/2'}),
+        dict(common, sequence=8, logical_name='control.scroll'),
+        dict(common, sequence=9, logical_name='observe.match_asset', event='trusted_action_started'),
+    ])
+    path = root / f'evidence/1/2.{extension}'
+    path.parent.mkdir(parents=True)
+    Image.new('RGB', (2560, 1280), 'white').save(path)
+    original = path.read_bytes()
+
+    def preview(result):
+        part = result['content'][-1]
+        assert part['mimeType'] == 'image/jpeg'
+        with Image.open(BytesIO(base64.b64decode(part['data']))) as image:
+            assert image.size == (1280, 640)
+            return image.copy()
+
+    def red_near(image, x, y):
+        return any(r > g + 70 for r, g, _ in image.crop((x - 2, y - 2, x + 3, y + 3)).get_flattened_data())
+
+    raw = preview(tools.read_run_log(1, evidence_id='1/2'))
+    for sequence, point in [(1, (200, 160)), (2, (400, 260)), (3, (450, 330))]:
+        result = tools.read_run_log(1, render_sequence=sequence)
+        assert [e['sequence'] for e in result['details']['events']] == [sequence]
+        assert result['details']['render_sequence'] == sequence
+        assert result['details']['next_sequence'] is None
+        rendered = preview(result)
+        assert not red_near(raw, *point) and red_near(rendered, *point)
+        if sequence == 2:
+            assert not red_near(rendered, 200, 160)
+            assert any(r > g + 70 for r, g, _ in rendered.crop((305, 213, 324, 226)).get_flattened_data())
+    assert preview(tools.read_run_log(1, render_sequence=4)).tobytes() == raw.tobytes()
+    assert path.read_bytes() == original
+    for sequence, message in [(True, '正整数'), (5, '事件序号不存在'), (6, '截图证据不可用'),
+                              (7, '截图证据不可用'), (8, '动作结束事件'), (9, '动作结束事件')]:
+        with pytest.raises(ValueError, match=message):
+            tools.read_run_log(1, render_sequence=sequence)
+    with pytest.raises(ValueError, match='仅与 run_id'):
+        tools.read_run_log(1, evidence_id='1/2', render_sequence=1)
 
 
 @pytest.mark.parametrize('outcome', ['success', 'failed'])
