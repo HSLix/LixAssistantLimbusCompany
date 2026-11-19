@@ -46,7 +46,7 @@ class _Signals(QObject):
     done = Signal(int, object)
 
 
-class _Task(QRunnable):
+class ReadTask(QRunnable):
     """线程池中的一次独立读取，结果由页面代际编号判断是否过期。"""
     def __init__(self, identity, operation):
         super().__init__()
@@ -308,7 +308,7 @@ class RunLogPage(QWidget):
         """将文件读取移出主线程；旧筛选或旧运行的结果不能覆盖当前页。"""
         self.serial += 1
         identity, generation = self.serial, self.generation
-        task = _Task(identity, operation)
+        task = ReadTask(identity, operation)
         self.tasks[identity] = task
         self.callbacks[identity] = (generation, done)
         task.signals.done.connect(self.completed, Qt.ConnectionType.QueuedConnection)

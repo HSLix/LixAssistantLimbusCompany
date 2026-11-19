@@ -4,6 +4,12 @@ import re
 from datetime import datetime
 
 
+RUNTIME_REPAIR_REQUEST = (
+    "Runtime 修复：仅修复当前失败入口，保留原调用者。完成后先填写修复说明并 Publish，"
+    "再调用 recheck(manifest_id) 交还执行权；无须输出成功声明或独立试运行。\n"
+)
+
+
 CORE_PROMPT = """# Core
 ## 角色
 你是 LALC Developer Policy 开发助手，按开发者需求实际检查、修改并校验 Workflow / Asset / Page。

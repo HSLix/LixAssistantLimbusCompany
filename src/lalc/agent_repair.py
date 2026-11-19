@@ -310,7 +310,7 @@ class RepairConversation:
         self.log.save_json("context.json", self.history)
 
     async def run(self, message, args, *, images=(), key=None, on_event=None, manifest_references=(), on_feedback=None, on_page_preview=None,
-                  request_limit=None):
+                  request_limit=None, parent_run_id=None):
         """GUI/CLI 共用一轮处理；错误、超限和取消均保留已有修改，不自动追加提示。"""
         with self.host.candidate_lock(), self.host.service.activity("Agent", runtime=self.entry == "runtime"):
             if self.session:
@@ -540,6 +540,8 @@ class RepairConversation:
                                 if tools.requested_manifest_id is not None:
                                     result = {"status": "recheck", "reason": "executor_handoff",
                                               "manifest_id": tools.requested_manifest_id}
+                                    if parent_run_id is not None:
+                                        result["parent_run_id"] = parent_run_id
                                 elif last.get("stopReason") != "stop":
                                     error = model_error(last, "provider_request", self.log.requests, settings["max_requests"], self.log.transport_error)
                                     reason = error.evidence["failure_code"]

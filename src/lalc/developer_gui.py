@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import Qt, QThread, Signal, QRect, QTimer, QSize, QPoint
+from PySide6.QtCore import Qt, QThread, QThreadPool, Signal, Slot, QRect, QTimer, QSize, QPoint, QSignalBlocker
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -27,13 +27,63 @@ from qfluentwidgets import (
 
 from .run_logs import LIVE_LOG_LIMIT, ai_repair_message
 from .i18n import tr
-from .run_log_gui import log_colors, log_time
+from .run_log_gui import ReadTask, log_colors, log_time
 
 from .repair_chat import RepairChat, chat_title, process_text_parts
 from .chat_input import ChatInput
 from .chat_attachments import AttachmentTray, draft_attachments, history_attachments
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot, settings_document, save_options
 from .agent_diagnostics import check_settings, details_text
+
+
+def saved_round_result(log, number, rows):
+    """读取轮次结果；旧 Recheck 的父 Run 编号来自宿主生成的故障说明。"""
+    from .agent_log import read_json
+    from .agent_prompts import RUNTIME_REPAIR_REQUEST, user_message_text
+
+    path = log.root / f'round-{number}/result.json'
+    if not path.exists():
+        return None
+    result = read_json(path)
+    if result.get('status') != 'recheck' or result.get('parent_run_id') is not None:
+        return result
+    for row in rows:
+        event = row['event']
+        if row.get('round') != number or event.get('type') != 'session_message':
+            continue
+        message = event.get('message', {})
+        if message.get('role') != 'user':
+            continue
+        for part in message.get('content', []):
+            if part.get('type') != 'text':
+                continue
+            text = user_message_text(part['text'])
+            if text.startswith(RUNTIME_REPAIR_REQUEST):
+                try:
+                    context = json.loads(text.removeprefix(RUNTIME_REPAIR_REQUEST))
+                except ValueError:
+                    continue
+                if isinstance(context, dict) and type(context.get('run_id')) is int and context['run_id'] > 0:
+                    result['parent_run_id'] = context['run_id']
+                    return result
+    return result
+
+
+def read_session_history(host, reader=None):
+    """在 Candidate 锁内读取同一次快照的最新轮及其结果。"""
+    from .agent_log import RoundEventReader
+
+    log = host.conversation.log
+    with host.candidate_lock():
+        if reader is None:
+            reader = RoundEventReader(log.root / 'events.jsonl')
+        reader.refresh()
+        rounds = sorted(reader.rounds)
+        rows = reader.read(rounds.pop()) if rounds else []
+        result = saved_round_result(log, log.group, rows)
+        if result is not None:
+            result.setdefault('requests', log.requests)
+    return reader, rounds, rows, result, load_settings(host.service.data_root)['max_requests']
 
 
 class Operation(QThread):
@@ -1085,6 +1135,7 @@ class RepairPage(QWidget):
         self.history_rounds = []
         self.images, self.manifest_references = [], []
         self.tool_errors, self.titles = {}, {}
+        self.session_list_generation = 0
         self.session_menu = self.rename_dialog = None
         self._round_running = False
         self._page_preview_requests = []
@@ -1102,7 +1153,7 @@ class RepairPage(QWidget):
         self.refresh_button = TransparentToolButton(FluentIcon.SYNC, self)
         self.refresh_button.setToolTip(tr('Refresh Sessions'))
         self.refresh_button.setAccessibleName(tr('Refresh Sessions'))
-        self.refresh_button.clicked.connect(self.refresh_sessions)
+        self.refresh_button.clicked.connect(self.request_session_refresh)
         row.addWidget(self.refresh_button)
         side.addLayout(row)
         self.new_button = button(tr('New Chat'), self.new, side)
@@ -1249,7 +1300,7 @@ class RepairPage(QWidget):
         self.build_menus()
         self.mode.currentItemChanged.connect(self.update_source)
         self.message.textChanged.connect(lambda: self.update_actions(self.is_busy()))
-        self.diagnostics.errors.currentIndexChanged.connect(lambda: self.update_actions(self.is_busy()))
+        self.diagnostics.errors.currentIndexChanged.connect(self.update_history_actions)
         self.refresh_sessions()
         self.baseline.setCurrentIndex(min(1, self.baseline.count() - 1))
         self.show_empty_chat()
@@ -1414,6 +1465,11 @@ class RepairPage(QWidget):
         self.send_button.setAccessibleName(title)
         self.send_button.setToolTip(title + ('\n' + self.request_progress.text() if self.request_progress.text() else ''))
 
+    def update_history_actions(self):
+        """整轮回放只刷新一次操作状态，避免逐条历史事件重新读取服务状态。"""
+        if not self.chat.batch_render:
+            self.update_actions(self.is_busy())
+
     def send_or_cancel(self):
         if self._round_running and self.window.jobs:
             if not any(job.cancel_requested for job in self.window.jobs):
@@ -1481,7 +1537,7 @@ class RepairPage(QWidget):
     def update_source_label(self):
         """已有 Session 显示固定来源；新对话显示当前选择。"""
         if self.session is not None:
-            source = json.loads((self.session.path / 'session.json').read_text(encoding="utf-8"))['source_manifest_id']
+            source = self.session.source_manifest_id
         else:
             source = self.baseline.currentData()
         text = tr('Based on Manifest: {0}').format(source or tr('None'))
@@ -1495,15 +1551,16 @@ class RepairPage(QWidget):
 
     def set_manifests(self, values):
         previous = self.baseline.currentData()
-        self.baseline.clear()
-        self.baseline.addItem(tr('Select a published Manifest'), userData=None)
-        for value in values:
-            self.baseline.addItem(value['manifest_id'], userData=value['manifest_id'])
-        index = self.baseline.findData(previous)
-        if previous is not None and index < 0:
-            self.baseline.addItem(previous, userData=previous)
-            index = self.baseline.count() - 1
-        self.baseline.setCurrentIndex(max(0, index))
+        with QSignalBlocker(self.baseline):
+            self.baseline.clear()
+            self.baseline.addItem(tr('Select a published Manifest'), userData=None)
+            for value in values:
+                self.baseline.addItem(value['manifest_id'], userData=value['manifest_id'])
+            index = self.baseline.findData(previous)
+            if previous is not None and index < 0:
+                self.baseline.addItem(previous, userData=previous)
+                index = self.baseline.count() - 1
+            self.baseline.setCurrentIndex(max(0, index))
         self.update_source()
 
     def saved_title(self, path):
@@ -1591,12 +1648,36 @@ class RepairPage(QWidget):
         self.window.launch(session.delete, done)
 
     def refresh_sessions(self):
-        """列表只读取不可变身份；打开时在锁内校验并恢复全部状态。"""
-        root = self.window.service.data_root / 'developer-sessions'
-        self.history.clear()
-        if root.is_symlink():
-            self.set_status(tr('Invalid Session directory'))
+        self.apply_session_list(self.read_session_list(self.titles.copy()))
+
+    def request_session_refresh(self):
+        """后台读取列表，不占用 Agent、试运行或关闭窗口的活动门槛。"""
+        titles = self.titles.copy()
+        self.session_list_generation += 1
+        task = ReadTask(self.session_list_generation, lambda: self.read_session_list(titles))
+        task.signals.done.connect(self.session_refresh_finished, Qt.ConnectionType.QueuedConnection)
+        QThreadPool.globalInstance().start(task)
+
+    @Slot(int, object)
+    def session_refresh_finished(self, generation, result):
+        """丢弃已被打开会话或更新列表取代的后台快照。"""
+        if generation != self.session_list_generation or self.window.closing:
             return
+        if isinstance(result, Exception):
+            def report():
+                raise result
+            self.window._interact(report)
+        else:
+            self.apply_session_list(result)
+
+    def read_session_list(self, titles):
+        """读取列表快照，保留活动会话已有的标题缓存。"""
+        from .developer_session import saved_session_title
+
+        root = self.window.service.data_root / 'developer-sessions'
+        if root.is_symlink():
+            return None
+        entries = []
         if root.exists():
             paths = (path for path in root.iterdir() if not path.name.startswith('.'))
             for path in sorted(paths, key=lambda item: item.lstat().st_mtime, reverse=True):
@@ -1607,29 +1688,40 @@ class RepairPage(QWidget):
                     if value['mode'] not in {'Construct', 'Repair'}:
                         raise ValueError('Invalid Session mode')
                     try:
-                        title, full = self.saved_title(path)
+                        title, full = saved_session_title(path, titles)
                     except OSError:
-                        title, full = self.titles.get(path.name, (tr('Chat in use'), ''))
+                        title, full = titles.get(path.name, (tr('Chat in use'), ''))
                     mode_label = '🛠 Construct' if value['mode'] == 'Construct' else '🔧 Repair'
                     label = f"{title or tr('New Chat')}\n{mode_label}"
                 except (ValueError, OSError, KeyError, TypeError):
                     label = tr('Unavailable Session')
                     full = ''
-                item = QListWidgetItem(label)
-                item.setData(Qt.ItemDataRole.UserRole, path.name)
-                item.setToolTip((full + '\n' if full else '') + path.name)
-                item.setSizeHint(QSize(240, 66))
-                self.history.addItem(item)
-                if self.session and self.session.identity == path.name:
-                    self.history.setCurrentItem(item)
+                entries.append((path.name, label, full))
+        return entries, titles, self.window.host.manager.list_manifests()
+
+    def apply_session_list(self, snapshot):
+        """保留当前会话的选中项，并一次提交列表与来源控件。"""
+        self.session_list_generation += 1
+        self.history.clear()
+        if snapshot is None:
+            self.set_status(tr('Invalid Session directory'))
+            return
+        entries, self.titles, manifests = snapshot
+        for identity, label, full in entries:
+            item = QListWidgetItem(label)
+            item.setData(Qt.ItemDataRole.UserRole, identity)
+            item.setToolTip((full + '\n' if full else '') + identity)
+            item.setSizeHint(QSize(240, 66))
+            self.history.addItem(item)
+            if self.session and self.session.identity == identity:
+                self.history.setCurrentItem(item)
         if self.session:
             title, full = self.titles.get(self.session.identity, ('', ''))
             self.session_uuid.setText(tr('Chat ID: {0}').format(self.session.identity))
             self.session_uuid.show()
             self.identity.setText(title or tr('New Chat'))
             self.identity.setToolTip((full + '\n' if full else '') + self.session.identity)
-        if hasattr(self, 'baseline'):
-            self.set_manifests(self.window.host.manager.list_manifests())
+        self.set_manifests(manifests)
 
     def new(self):
         """回到未创建 Session 的准备状态，默认采用最新已发布来源。"""
@@ -1660,41 +1752,40 @@ class RepairPage(QWidget):
         self.render(False)
 
     def open_session(self, item):
-        if self.window.jobs or self.window.service.status.get('activity') or self.window.service.status['phase'] == 'running':
+        if self.is_busy():
             return
         from .developer_session import DeveloperSession
         identity = item.data(Qt.ItemDataRole.UserRole)
+        titles = self.titles.copy()
         def operation():
             session = DeveloperSession(self.window.service, identity, entry='gui')
             session.host.secrets = self.window.host.secrets
             session.conversation(load_history=False)
-            from .agent_log import RoundEventReader
-            reader = RoundEventReader(session.host.conversation.log.root / 'events.jsonl')
-            reader.refresh()
-            rows = reader.read(max(reader.rounds)) if reader.rounds else []
-            return session, reader, rows
-        self.window.launch(operation, lambda value: self.activate_session(
-            value[0], history_reader=value[1], history_rows=value[2]))
+            return session, read_session_history(session.host), self.read_session_list(titles)
+        def opened(value):
+            session, history, snapshot = value
+            self.activate_session(session, restore_history=False)
+            self.apply_session_list(snapshot)
+            self.baseline.setCurrentIndex(max(0, self.baseline.findData(session.source_manifest_id)))
+            self.reload_history(history, refresh=False)
+        self.window.launch(operation, opened)
 
-    def activate_session(self, session, *, restore_history=True, history_reader=None, history_rows=None):
+    def activate_session(self, session, *, restore_history=True):
         self.clear_raw_output()
         self.context_event_order = (-1, "")
         self.show_context_usage()
         changed = self.session is None or self.session.identity != session.identity
         self.session, self.host = session, session.host
-        self.history_reader = history_reader
+        self.history_reader = None
         self.history_rounds = []
         self.mode.setCurrentItem(session.mode)
-        metadata = json.loads((session.path / 'session.json').read_text(encoding="utf-8"))
-        self.set_manifests(self.host.manager.list_manifests())
-        self.baseline.setCurrentIndex(max(0, self.baseline.findData(metadata['source_manifest_id'])))
+        self.baseline.setCurrentIndex(max(0, self.baseline.findData(session.source_manifest_id)))
         self.identity.setToolTip(session.identity)
-        if history_reader is not None or changed:
-            self.show_published_manifest(history_reader.last_published_manifest if history_reader else None)
+        if changed:
+            self.show_published_manifest(None)
         self.diagnostics.set_path(self.host.conversation.log.path)
         if restore_history:
-            self.reload_history(history_rows)
-        self.refresh_sessions()
+            self.reload_history()
         self.render(bool(self.window.jobs))
 
     def show_published_manifest(self, identity):
@@ -1703,45 +1794,34 @@ class RepairPage(QWidget):
         self.publish_badge.setText(text)
         self.publish_badge.setToolTip(text)
 
-    def reload_history(self, rows=None):
+    def reload_history(self, history=None, *, refresh=True):
         """优先呈现最新完整轮次；旧轮次上滚时读取，不重复恢复模型历史。"""
         if self.session is None:
             return
         self.clear_raw_output()
-        from .agent_log import RoundEventReader, read_json
-        with self.host.candidate_lock():
-            events_path = self.host.conversation.log.root / 'events.jsonl'
-            if self.history_reader is None:
-                self.history_reader = RoundEventReader(events_path)
-            if rows is None:
-                self.history_reader.refresh()
-            self.show_published_manifest(self.history_reader.last_published_manifest)
-            self.history_rounds = sorted(self.history_reader.rounds)
-            latest = self.history_rounds.pop() if self.history_rounds else None
-            if rows is None:
-                rows = self.history_reader.read(latest) if latest is not None else []
-            number = self.host.conversation.log.group
-            result_path = events_path.parent / f'round-{number}/result.json'
-            result = read_json(result_path) if result_path.exists() else None
-            if result is not None:
-                result.setdefault('requests', self.host.conversation.log.requests)
+        self.history_reader, self.history_rounds, rows, result, request_limit = (
+            history if history is not None else read_session_history(self.host, self.history_reader))
+        self.show_published_manifest(self.history_reader.last_published_manifest)
         self.chat.batch_render = True
-        self.chat.clear()
-        self.tool_errors.clear()
-        self.diagnostics.errors.clear()
-        self.replay_history(rows)
+        try:
+            self.chat.clear()
+            self.tool_errors.clear()
+            self.diagnostics.errors.clear()
+            self.replay_history(rows)
+            self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
+                self.host.conversation.log.group, self.host.conversation.log.requests, request_limit))
+            if not self.window.jobs and not self.window.closing:
+                if result is not None:
+                    self.show_result_status(result)
+                else:
+                    self.set_status('')
+        finally:
+            self.chat.batch_render = False
         self.chat.render()
         self.chat.verticalScrollBar().setValue(self.chat.verticalScrollBar().maximum())
-        self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(
-            self.host.conversation.log.group, self.host.conversation.log.requests,
-            load_settings(self.host.service.data_root)['max_requests']))
-        if not self.window.jobs and not self.window.closing:
-            if result is not None:
-                self.show_result_status(result)
-            else:
-                self.set_status('')
-                self.status.setToolTip('')
-        self.refresh_sessions()
+        self.update_history_actions()
+        if refresh:
+            self.refresh_sessions()
 
     def load_older_history(self):
         """补载上一轮并补偿新增高度，保持原来正在阅读的内容位置。"""
@@ -1750,8 +1830,10 @@ class RepairPage(QWidget):
         number = self.history_rounds[-1]
         def operation():
             with self.host.candidate_lock():
-                return self.history_reader.read(number)
-        def loaded(rows):
+                rows = self.history_reader.read(number)
+                return rows, saved_round_result(self.host.conversation.log, number, rows)
+        def loaded(value):
+            rows, result = value
             self.history_rounds.pop()
             bar = self.chat.verticalScrollBar()
             cursor = self.chat.cursorForPosition(QPoint(0, 0))
@@ -1761,9 +1843,12 @@ class RepairPage(QWidget):
             count = len(self.chat.entries)
             self.replay_history(rows)
             self.chat.entries[:] = self.chat.entries[count:] + self.chat.entries[:count]
+            if result and result.get('status') == 'recheck' and not result.get('error'):
+                self.chat.activity(number)['status'] = self.handoff_summary(result)
             self.chat.render(follow=False)
             cursor.setPosition(position + self.chat.document().characterCount() - characters)
             bar.setValue(bar.value() + self.chat.cursorRect(cursor).top() - top)
+            self.update_history_actions()
         self.window.launch(operation, loaded)
 
     def replay_history(self, rows):
@@ -1771,6 +1856,7 @@ class RepairPage(QWidget):
         from .agent_repair import final_answer, FORMAT_RETRY_PREFIX
         from .agent_prompts import user_message_text
         activity_round = self.chat.activity_round
+        batch_render = self.chat.batch_render
         self._replaying = True
         self.chat.batch_render = True
         try:
@@ -1800,7 +1886,7 @@ class RepairPage(QWidget):
                     self.show_event(row)
         finally:
             self._replaying = False
-            self.chat.batch_render = False
+            self.chat.batch_render = batch_render
             self.chat.activity_round = activity_round
 
     def open_pages(self):
@@ -1965,11 +2051,23 @@ class RepairPage(QWidget):
 
     def show_result_status(self, result):
         """实时收尾和历史恢复共用结果摘要，不弹窗或修改聊天及运行状态。"""
-        summary = tr('Error: ') + result['error'] if result.get('error') else {
-            'answered': tr('Round complete'), 'user_cancelled': tr('Round cancelled'),
-            'host_interrupted': tr('Interrupted; results may be unknown. No operations replayed.'),
-        }.get(result.get('reason'), tr('Round incomplete'))
+        if result.get('error'):
+            summary = tr('Error: ') + result['error']
+        elif result.get('status') == 'recheck':
+            summary = self.handoff_summary(result)
+        else:
+            summary = {
+                'answered': tr('Round complete'), 'user_cancelled': tr('Round cancelled'),
+                'host_interrupted': tr('Interrupted; results may be unknown. No operations replayed.'),
+            }.get(result.get('reason'), tr('Round incomplete'))
         self.set_status(summary, tr('{0}; actual requests: {1}').format(summary, result.get('requests', 0)))
+
+    @staticmethod
+    def handoff_summary(result):
+        """交接状态引用该轮提交的版本及父 Run。"""
+        run_id = result.get('parent_run_id')
+        return tr('Handed back to the executor · Manifest {0} · Run {1}').format(
+            result.get('manifest_id') or '—', f'#{run_id}' if type(run_id) is int and run_id > 0 else tr('unknown'))
 
     def open_page_drafts(self):
         def action():
@@ -2068,6 +2166,7 @@ class RepairPage(QWidget):
             if not self.titles.get(identity, ('', ''))[0]:
                 self.titles[identity] = chat_title(value['session'].host.conversation.log.clean(value['message']))
             self.activate_session(value['session'], restore_history=False)
+            self.refresh_sessions()
             self.chat.add_message('你', value['message'], value['round'], attachments=value.get('attachments', ()))
             self.chat.start_work(value['round'])
             self.message.clear()
@@ -2112,7 +2211,7 @@ class RepairPage(QWidget):
         if live and status is not None:
             self.set_status(status)
             self.status.setToolTip(status)
-        self.update_actions(self.is_busy())
+        self.update_history_actions()
 
     def show_diff(self):
         if self.session is None:

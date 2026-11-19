@@ -170,6 +170,7 @@ class DeveloperSession:
                                     or '\n' in metadata['title'] or '\r' in metadata['title']):
             raise ValueError("Session 标题必须是非空单行文字。")
         self.mode = metadata["mode"]
+        self.source_manifest_id = source
         if json.loads((self.path / "log/log-format.json").read_text(encoding="utf-8")) != FORMAT:
             raise ValueError("不支持该 Session 日志格式。")
         if any(path.is_symlink() for path in (self.path / "log").rglob("*")):
