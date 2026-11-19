@@ -4,6 +4,8 @@ description: 定位和修复 LALC Workflow 或素材故障。有故障描述、�
 ---
 # 故障修复
 
+发布前按 `../validation-and-trial/SKILL.md` 更新 Manifest 的 `AdditionalMessage`，概括本版修复及主要变更，再完整校验和发布。
+
 1. 根据用户描述、已有日志和当前 Candidate 确认故障；需要现场证据时再截图，不根据旧截图猜测当前状态。
 2. 读取相关源码和动作契约，定位有证据支持的原因；证据不足时明确缺少的信息，避免无依据的大范围改写。
    相关日志出现恢复介入时，结合故障现场检查是否误触发，读取 `../workflow-conventions/references/recovery-rules.md`；不要默认既有规则正确。正常加载在局部超时后可能已经结束，零规则匹配不能证明业务仍有故障或已完成。

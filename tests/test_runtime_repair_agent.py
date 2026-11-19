@@ -14,7 +14,7 @@ from test_recovery import _publish, NEW_STEP
 from lalc.application import ApplicationService
 from lalc.manifest import ManifestManager
 from lalc.agent_settings import save_settings, save_selection
-from lalc.agent_log import read_events
+from lalc.agent_log import read_events, read_json
 
 pytestmark = pytest.mark.agent
 
@@ -54,6 +54,9 @@ def test_real_pi_recheck_ends_round_without_another_request_and_resumes_parent(t
         assert chat is not None
         rows = list(read_events(chat.log.root / "events.jsonl"))
         assert any(row["event"].get("status") == "recheck" for row in rows)
+        handoff = read_json(chat.log.root / "round-1/result.json")
+        assert handoff["parent_run_id"] == state["run_id"]
+        assert handoff["manifest_id"] == state["working_manifest_id"]
         assert manager.load(state["working_manifest_id"]).loaded.manifest["AdditionalMessage"] == "修复运行时失败，保留调用约定"
         assert manager.default_manifest_id() == state["working_manifest_id"]
         tools = {item["function"]["name"] for item in server["calls"][0]["tools"]}

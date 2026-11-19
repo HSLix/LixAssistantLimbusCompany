@@ -1,5 +1,7 @@
 # Developer Skills
 
+2026-11-19：Workflow 开发、修复及验证指导要求每次 Publish 前更新 `AdditionalMessage`，概括本版主要改动。Developer 编辑 Candidate 的 `manifest.json`，Runtime 继续提供发布工具的 `summary`。已初始化的 Skills 手动合并这三个随包文件。
+
 2026-11-17：`workflow-development` 与 `validation-and-trial` 明确 Developer 可在任务授权范围内自行编写点击坐标、模板中心点击或键盘操作的 Step，校验发布后指定 Manifest ID 和 Step 逻辑名进行独立试运行，把现场推进到后续开发需要的状态；试运行不限于代码验证。操作后重新观察，现有现场保护及 Runtime 无独立试运行的边界保持。已有 `skills/` 需手动合并这两个随包文件，不自动覆盖用户内容。
 
 2026-11-16：Workflow 指导已按[修订决定](agent-skills-revision-discussion.md)改为局部目标 Step、显式交回和有界循环分派；正常过渡集中等待，验证按变更范围并珍惜现场。替代此前“不能跨状态”“普通超时一律失败”“重试统一 3 次”“稳定后强制完整实跑”的指导；执行器、RunState 及工具权限不变，已有 Manifest 不自动迁移。影响及验证见[专项记录](agent-skills-revision-impact-review.md)。

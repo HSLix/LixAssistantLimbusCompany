@@ -241,11 +241,17 @@ class MainWindow(FluentWindow):
         ):
             page.setObjectName(identity)
             self.addSubInterface(page, icon, name)
+        self.pages.currentChanged.connect(self._refresh_workbench_on_entry)
         self.widgetLayout.removeWidget(self.stackedWidget)
         layout.addWidget(self.stackedWidget, 1)
         self.notifications = NotificationList(self)
         self.widgetLayout.addWidget(root)
         self.render_state(service.status)
+
+    def _refresh_workbench_on_entry(self, _):
+        """重新进入工作台时发现其他入口新增的 Session。"""
+        if self.pages.currentWidget() is self.repair_page:
+            self.repair_page.request_session_refresh()
 
     def launch(self, operation, done=None):
         """后台服务完成清理后再恢复交互，错误保留原始异常链。"""

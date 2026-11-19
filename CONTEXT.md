@@ -253,6 +253,9 @@ _Avoid_: Independent trial, arbitrary entry selection
 
 **Recheck**:
 An Agent handoff asking the executor to freshly invoke the current failed entry through the selected immutable Working Manifest, using original call-argument snapshots and current shared Run State after the applicable rule recovery. It returns the actual result to waiting callers once, or ends the Run on a normal top-level Plan return; it is not an Agent success claim.
+
+**Executor Handoff**:
+The end of a Runtime Repair round that submits a saved Manifest for Recheck in its parent Run. The handoff identifies the submitted Manifest and parent Run. The executor owns the subsequent retry and its outcome.
 _Avoid_: Developer Trial, line-level resume, new Run
 
 **Execution Anomaly**:

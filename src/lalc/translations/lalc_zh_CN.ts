@@ -1261,6 +1261,14 @@ Original pixel region: {2}</source>
       <translation>本轮未完成</translation>
     </message>
     <message>
+      <source>Handed back to the executor · Manifest {0} · Run {1}</source>
+      <translation>已交回执行器 · Manifest {0} · Run {1}</translation>
+    </message>
+    <message>
+      <source>unknown</source>
+      <translation>未知</translation>
+    </message>
+    <message>
       <source>Agent is responding…</source>
       <translation>Agent 正在处理…</translation>
     </message>

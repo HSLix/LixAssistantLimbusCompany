@@ -813,6 +813,7 @@ class ApplicationService:
         import asyncio
         from types import SimpleNamespace
         from .developer_session import DeveloperSession
+        from .agent_prompts import RUNTIME_REPAIR_REQUEST
         from .agent_settings import load_settings, FIELDS
         context = {"run_id": self._state["run_id"], **context}
         if context["recovery_id"] != self._runtime_session_key:
@@ -830,16 +831,14 @@ class ApplicationService:
         chat.tools.runtime_gate = self._gate
         settings = load_settings(self.data_root, side="user")
         arguments = SimpleNamespace(**{field: settings[field] for field in FIELDS}, ask_api_key=False, pi="pi")
-        prompt = ("Runtime 修复：仅修复当前失败入口，保留原调用者。完成后先填写修复说明并 Publish，"
-                  "再调用 recheck(manifest_id) 交还执行权；无须输出成功声明或独立试运行。\n"
-                  + json.dumps(context, ensure_ascii=False))
+        prompt = RUNTIME_REPAIR_REQUEST + json.dumps(context, ensure_ascii=False)
 
         async def run_round():
             self._runtime_loop = asyncio.get_running_loop()
             self._runtime_task = asyncio.current_task()
             try:
                 return await chat.run(prompt, arguments, request_limit=self._runtime_remaining,
-                                      on_feedback=self.on_runtime_feedback)
+                                      on_feedback=self.on_runtime_feedback, parent_run_id=context["run_id"])
             finally:
                 self._runtime_task = None
 

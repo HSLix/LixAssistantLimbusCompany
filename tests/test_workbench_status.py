@@ -5,10 +5,11 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_workbench_sta
 """
 
 import asyncio
+import json
 import threading
 
 import pytest
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QThreadPool, Qt
 
 from lalc.agent_log import read_json
 from lalc.gui import MainWindow
@@ -19,6 +20,8 @@ from test_developer_gui import gui, wait_jobs
 @pytest.mark.parametrize('reopen', [False, True])
 @pytest.mark.parametrize('result,expected', [
     ({'status': 'completed', 'reason': 'answered'}, 'Round complete'),
+    ({'status': 'recheck', 'reason': 'executor_handoff', 'manifest_id': 'repair-version', 'parent_run_id': 348},
+     'Handed back to the executor · Manifest repair-version · Run #348'),
     ({'status': 'cancelled', 'reason': 'user_cancelled'}, 'Round cancelled'),
     ({'status': 'incomplete', 'reason': 'request_limit'}, 'Round incomplete'),
     ({'status': 'incomplete', 'reason': 'error', 'error': 'provider failed'}, 'Error: '),
@@ -70,6 +73,70 @@ def test_open_history_restores_latest_round_status(gui, monkeypatch, reopen, res
         if reopen:
             window.close()
             app.processEvents()
+
+
+@pytest.mark.parametrize('run_id', [348, None])
+def test_legacy_handoff_restores_parent_run_from_its_own_round(gui, monkeypatch, run_id):
+    from lalc.agent_prompts import RUNTIME_REPAIR_REQUEST
+
+    app, window = gui
+    page = window.repair_page
+    log = page.host.conversation.log
+    for number, saved_id in ((1, 12), (2, run_id)):
+        log.group = number
+        (log.root / f'round-{number}').mkdir()
+        if saved_id is not None:
+            log.record({'type': 'session_message', 'message': {'role': 'user', 'content': [
+                {'type': 'text', 'text': RUNTIME_REPAIR_REQUEST + json.dumps({'run_id': saved_id})}]}})
+        result = {'status': 'recheck', 'reason': 'executor_handoff', 'manifest_id': f'manifest-{number}'}
+        log.save_json(f'round-{number}/result.json', result)
+        log.record({'type': 'round_finished', **result})
+
+    def unavailable(*args, **kwargs):
+        pytest.fail('显示交接历史无需读取执行日志')
+
+    monkeypatch.setattr('lalc.run_logs.trace_path', unavailable)
+    page.open_session(page.history.currentItem())
+    wait_jobs(app, window)
+    expected_run = f'#{run_id}' if run_id else tr('unknown')
+    summary = tr('Handed back to the executor · Manifest {0} · Run {1}')
+    assert page.status.text() == summary.format('manifest-2', expected_run)
+    page.load_older_history()
+    wait_jobs(app, window)
+    assert page.chat.activities[1]['status'] == summary.format('manifest-1', '#12')
+    assert page.status.text() == summary.format('manifest-2', expected_run)
+    assert 'parent_run_id' not in read_json(log.root / 'round-2/result.json')
+
+
+def test_enter_workbench_refreshes_sessions_and_open_reads_list_once_in_background(gui, monkeypatch):
+    from lalc.developer_session import DeveloperSession
+
+    app, window = gui
+    page = window.repair_page
+    original = page.session
+    window.switchTo(window.capture_page)
+    newly_saved = DeveloperSession.create(window.service, None, mode='Construct', entry='gui')
+    assert page.history.count() == 1
+    calls = []
+    read_list = page.read_session_list
+
+    def read(titles):
+        calls.append(threading.get_ident())
+        return read_list(titles)
+
+    monkeypatch.setattr(page, 'read_session_list', read)
+    window.switchTo(page)
+    assert not window.jobs
+    assert QThreadPool.globalInstance().waitForDone(3000)
+    app.processEvents()
+    assert page.history.count() == 2
+    assert page.history.currentItem().data(Qt.ItemDataRole.UserRole) == original.identity
+    item = next(page.history.item(i) for i in range(page.history.count())
+                if page.history.item(i).data(Qt.ItemDataRole.UserRole) == newly_saved.identity)
+    page.open_session(item)
+    wait_jobs(app, window)
+    assert page.session.identity == newly_saved.identity
+    assert len(calls) == 2 and all(identity != threading.get_ident() for identity in calls)
 
 
 @pytest.mark.parametrize('event', [
