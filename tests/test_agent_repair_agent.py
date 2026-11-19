@@ -897,12 +897,22 @@ def test_live_raw_output_is_forwarded_without_preflight_or_history_storage(conve
 
 def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation, monkeypatch):
     """真实 pi 验证新工具声明与每轮快照；不调用真实模型。"""
+    from PIL import Image
+
     from lalc.agent_policy import KNOWLEDGE_TOOLS
     from lalc.agent_settings import save_options
     from lalc import agent_prompts
     chat, options, state = conversation
     chat.entry = 'gui'
     root = chat.host.service.data_root
+    trace = root / 'traces/1.jsonl'
+    trace.parent.mkdir(exist_ok=True)
+    trace.write_text(json.dumps({'sequence': 1, 'event': 'trusted_action_returned',
+                                 'logical_name': 'control.click', 'inputs': {'x': 32, 'y': 32},
+                                 'debug_image': {'evidence_id': '1/1'}}) + '\n', encoding='utf-8')
+    evidence = root / 'evidence/1/1.png'
+    evidence.parent.mkdir(parents=True)
+    Image.new('RGB', (64, 64), 'white').save(evidence)
     save_options(root, knowledge_enabled=False)
     ticks = iter([{'now': '2026-11-12T10:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'},
                   {'now': '2026-11-12T11:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'}])
@@ -914,7 +924,9 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
             assert not names & set(KNOWLEDGE_TOOLS)
         if len(state['calls']) == 1:
             save_options(root, knowledge_enabled=True)
-            return tool('action_contracts', {})
+            return tool('read_run_log', {'run_id': 1, 'render_sequence': 1})
+        if len(state['calls']) == 2:
+            assert 'data:image/jpeg;base64,' in json.dumps(body)
         return answer()
     state['respond'] = respond
     assert asyncio.run(chat.run('first', options))['status'] == 'completed'
@@ -929,7 +941,9 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
     assert '10:00:00' in first_input['prompt']['message']
     assert '11:00:00' in second_input['prompt']['message']
     functions = {item['function']['name']: item['function'] for item in state['calls'][0]['tools']}
-    assert {'levels', 'logical_name'} <= functions['read_run_log']['parameters']['properties'].keys()
+    properties = functions['read_run_log']['parameters']['properties']
+    assert {'levels', 'logical_name'} <= properties.keys()
+    assert properties['render_sequence']['type'] == 'integer'
 
 
 def test_manifest_reference_switch_changes_next_round_and_rejects_calls(conversation):

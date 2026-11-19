@@ -273,8 +273,9 @@ def test_streamable_http_authentication_discovery_and_tool_call(remote):
         assert client.post("/mcp", json=initialize, headers={**headers, "Host": "windows.example.ts.net:8443",
             "Origin": "https://windows.example.ts.net:8443"}).status_code == 200
         listing = client.post("/mcp", json={"jsonrpc": "2.0", "id": 2, "method": "tools/list"}, headers=headers)
-        names = {tool["name"] for tool in listing.json()["result"]["tools"]}
-        assert set(MCP_TOOLS) <= names and "recheck" not in names and "pause" not in names
+        tools = {tool["name"]: tool for tool in listing.json()["result"]["tools"]}
+        assert set(MCP_TOOLS) <= tools.keys() and "recheck" not in tools and "pause" not in tools
+        assert tools["read_run_log"]["inputSchema"]["properties"]["render_sequence"]["type"] == ["integer", "null"]
         call = client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
             "name": "mcp_status", "arguments": {}}}, headers=headers)
         assert call.status_code == 200 and not call.json()["result"]["isError"]

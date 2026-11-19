@@ -264,13 +264,18 @@ def open_image(content, *, decoding=False):
             Image.MAX_IMAGE_PIXELS = previous
 
 
-def image_preview(content, size=(1280, 1280)):
+def image_preview(content, size=(1280, 1280), *, annotations=()):
     """按需生成传输／显示用 JPEG，原始资源不改写；资源不足只影响预览。"""
     with open_image(content) as image:
+        original_size = image.size
         image.draft('RGB', size)
         require_memory(image.width * image.height * 12)
         checkpoint()
         image.thumbnail(size)
         output = BytesIO()
-        image.convert('RGB').save(output, format='JPEG', quality=85)
+        preview = image.convert('RGB')
+        if annotations:
+            from .image_annotations import draw_preview_annotations
+            draw_preview_annotations(preview, original_size, annotations)
+        preview.save(output, format='JPEG', quality=85)
         return output.getvalue()
