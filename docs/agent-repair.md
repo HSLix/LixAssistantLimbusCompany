@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-19：开启“允许查询已发布 Manifest”时，可用 `search_manifest_source` 按版本 ID 搜索登记的 Python 源码，包括 Recovery Rule。关键词按字面子串匹配，忽略大小写。结果包含成员逻辑名和行号，可用 `read_manifest_source` 读取上下文。分页与权限见 [Stage 5 规格](stage-5-agent-workbench.md)。
+
 2026-11-17：Session 聊天页右上角保留固定来源 Manifest，将重复的 Construct／Repair 标识替换为当前 Session 最近一次成功发布的 Manifest ID（包括 Agent 工具发布与会话内手动 Publish）。无发布记录显示“暂无 publish manifest”；发布失败保留上次 ID，重新打开 Session 从历史发布记录恢复，补载旧聊天不回退显示。发布与 Default 选择仍相互独立。
 
 2026-11-15：本文描述内置 pi 的开发接入。Mac Codex 桌面应用的远程 MCP 入口、独立工作台、异步操作及 Windows 审批见[远程 MCP 指南](remote-mcp.md)；两者复用底层服务，但不共享对话生命周期或控制凭据。

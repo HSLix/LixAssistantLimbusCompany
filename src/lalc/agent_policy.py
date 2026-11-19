@@ -3,12 +3,12 @@
 BASE_TOOLS = ("read", "edit", "asset_tree", "asset_directory", "asset_images",
               "action_contracts", "game_screenshot", "crop_asset", "add_component", "add_recovery_rule",
               "validate_and_publish", "trial_run", "list_runs", "read_run_log", "search_run_logs", "preview_crop", "remove_asset", "restore_asset",
-              "list_manifests", "read_manifest", "read_manifest_source",
+              "list_manifests", "read_manifest", "read_manifest_source", "search_manifest_source",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
 KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git")
 GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback", "delete_component")
 PAGE_TOOLS = ("page_list", "page_read", "page_create", "page_update", "page_resource", "page_preview", "page_set_enabled")
-MANIFEST_REFERENCE_TOOLS = ("list_manifests", "read_manifest", "read_manifest_source")
+MANIFEST_REFERENCE_TOOLS = ("list_manifests", "read_manifest", "read_manifest_source", "search_manifest_source")
 HISTORY_TOOLS = ("list_game_versions", "search_agent_sessions", "read_agent_session")
 RUNTIME_TOOLS = tuple(name for name in BASE_TOOLS if name not in {"remove_asset", "restore_asset", "trial_run"}) + (
     "knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid",

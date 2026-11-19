@@ -517,6 +517,7 @@ def test_gui_references_are_shared_readonly_tools_and_survive_cli_resume(convers
     before = {path: path.read_bytes() for path in session.host.candidate.rglob('*') if path.is_file()}
     script(state, [tool('list_manifests', {'limit': 1}),
                    tool('read_manifest', {'manifest_id': other_id, 'limit': 1}),
+                   tool('search_manifest_source', {'manifest_id': source, 'query': 'IF VALUE > 0'}),
                    tool('read_manifest_source', {'manifest_id': source, 'section': 'components',
                                                  'logical_name': 'steps.total', 'limit': 2}),
                    answer('references inspected')])
@@ -528,8 +529,12 @@ def test_gui_references_are_shared_readonly_tools_and_survive_cli_resume(convers
     assert gui_chat.host.manager.default_manifest_id() == source
     payload = state['calls'][-1]
     assert source in json.dumps(payload) and other_id in json.dumps(payload)
-    assert {'list_manifests', 'read_manifest', 'read_manifest_source'} <= {
-        item['function']['name'] for item in payload['tools']}
+    functions = {item['function']['name']: item['function'] for item in payload['tools']}
+    assert {'list_manifests', 'read_manifest', 'read_manifest_source', 'search_manifest_source'} <= functions.keys()
+    assert 'literal substring' in functions['search_manifest_source']['description']
+    search_result = next(message for message in payload['messages']
+                         if message.get('tool_call_id') == 'call-search_manifest_source')
+    assert json.loads(search_result['content'])['items'][0]['logical_name'] == 'steps.total'
     if mode == 'Construct':
         with pytest.raises(ValueError, match='CLI'):
             DeveloperSession(chat.host.service, session.identity).conversation()

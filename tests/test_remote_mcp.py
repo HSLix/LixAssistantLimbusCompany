@@ -276,9 +276,26 @@ def test_streamable_http_authentication_discovery_and_tool_call(remote):
         tools = {tool["name"]: tool for tool in listing.json()["result"]["tools"]}
         assert set(MCP_TOOLS) <= tools.keys() and "recheck" not in tools and "pause" not in tools
         assert tools["read_run_log"]["inputSchema"]["properties"]["render_sequence"]["type"] == ["integer", "null"]
+        search = tools["search_manifest_source"]
+        assert search["annotations"]["readOnlyHint"]
+        assert set(search["inputSchema"]["required"]) == {"control_token", "manifest_id", "query"}
+        assert "operation_id" not in search["inputSchema"]["properties"]
+        assert "next_offset" in search["description"]
         call = client.post("/mcp", json={"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
             "name": "mcp_status", "arguments": {}}}, headers=headers)
         assert call.status_code == 200 and not call.json()["result"]["isError"]
+        remote.allow()
+        control_token = acquired(remote)
+        call = client.post("/mcp", json={"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {
+            "name": "search_manifest_source", "arguments": {
+                "control_token": control_token, "manifest_id": remote.check()["source_manifest_id"],
+                "query": "IF VALUE > 0",
+            }}}, headers=headers)
+        assert call.status_code == 200
+        result = call.json()["result"]
+        assert not result["isError"]
+        hits = result["structuredContent"]
+        assert hits["total"] == 1 and hits["items"][0]["logical_name"] == "steps.total"
 
 
 def test_real_http_server_development_loop_and_shutdown(remote):
@@ -372,7 +389,7 @@ def test_existing_privacy_switches_are_enforced_at_acquisition(remote, monkeypat
     monkeypatch.setattr(agent_settings, "settings_document", lambda root: {
         **original(root), "history_enabled": False, "knowledge_enabled": False, "manifest_reference_enabled": False})
     token = acquired(remote)
-    for name in ("list_game_versions", "knowledge_list", "list_manifests"):
+    for name in ("list_game_versions", "knowledge_list", "list_manifests", "search_manifest_source"):
         with pytest.raises(ValueError, match="关闭"):
             remote.invoke(name, {}, token)
     assert remote.invoke("read", {"path": "manifest.json"}, token)

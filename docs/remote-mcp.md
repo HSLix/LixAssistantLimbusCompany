@@ -47,7 +47,7 @@ MCP 初始化会向 Codex提供跨工具指导和实际工具 Schema；工具描
 1. `mcp_status` 查看服务、授权、工作台及当前控制者。它不返回控制凭据。
 2. `mcp_acquire` 获取独占 `control_token`，同时返回上次使用时间；首次为 `null`。名称仅供显示，不是已验证的设备／聊天身份。
 3. `list_skills` 发现指导，用 `read(scope="skills", path=...)` 读取固定副本；用 `action_contracts` 查询当前 Action 契约。
-4. `read`、`edit`、新增组件、素材、知识库和页面工具按发现到的参数使用。Candidate 只允许编辑已有文件，新增仍走组件专用入口；只读参考不会获得写权限。
+4. `read`、`edit`、新增组件、素材、知识库和页面工具按发现到的参数使用。Candidate 只允许编辑已有文件，新增仍走组件专用入口；只读参考不会获得写权限。用 `search_manifest_source` 按版本 ID 查找已发布源码中的字面子串。该工具属于 Manifest 查询权限组，使用控制凭据即可直接获取结果。
 5. 写入、发布、试运行及可能等待人工确认的工具必须携带标准 UUID `operation_id`。先取得操作编号，再用 `mcp_query(operation_id=...)` 查询，直到 `finished`、`failed` 或 `unknown`；`waiting_local` 表示需在 Windows 确认。
 6. `validate_and_publish` 完整校验后发布不可变 Manifest，不改变 Default；随后 `trial_run` 使用明确的已发布 ID。启动操作返回实际 Run ID 后，通过 `mcp_query(run_id=...)` 查询。
 7. Run 查询只返回状态和最近五条业务／Trusted Action 日志，包含 Debug；停止后附最终结果。完整日志和引用图片通过 `read_run_log` 等工具按需读取。

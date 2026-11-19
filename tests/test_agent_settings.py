@@ -268,11 +268,12 @@ def test_platform_secret_replacement_and_clear_preserve_other_key(tmp_path, monk
 
 @pytest.mark.parametrize(('mode', 'entry'), [('Construct', 'gui'), ('Repair', 'gui'),
                                                ('Repair', 'cli'), ('Repair', 'runtime')])
-def test_manifest_reference_switch_filters_only_three_tools(mode, entry):
+def test_manifest_reference_switch_filters_only_manifest_tools(mode, entry):
     from lalc.agent_policy import MANIFEST_REFERENCE_TOOLS, allowed_tools
     enabled = set(allowed_tools(mode, entry))
     disabled = set(allowed_tools(mode, entry, manifest_reference_enabled=False))
     assert set(MANIFEST_REFERENCE_TOOLS) <= enabled
+    assert 'search_manifest_source' in enabled - disabled
     assert enabled - disabled == set(MANIFEST_REFERENCE_TOOLS)
     assert disabled <= enabled
 
