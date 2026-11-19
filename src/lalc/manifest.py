@@ -16,7 +16,7 @@ from typing import Any
 from types import MappingProxyType
 
 from .work_files import create_work_file
-from .actions import TrustedAction, application_actions
+from .actions import ACTION_ACCESS, TrustedAction, application_actions
 from .runtime import _exception_fields, atomic_write_json, sha256_bytes
 
 SCHEMA_VERSION = 2
@@ -918,17 +918,8 @@ class ManifestManager:
         actions: dict[str, str],
         errors: list[ValidationError],
     ) -> None:
-        allowed = {
-            ("automation_plan", "execute"): set(),
-            ("task_workflow", "execute"): {"observe"},
-            ("sub_workflow", "execute"): {"observe"},
-            ("step", "execute"): {"observe", "control"},
-            ("step", "condition"): {"observe"},
-            ("recovery_rule", "detect"): {"observe"},
-            ("recovery_rule", "recover"): {"observe", "control"},
-        }
         for function_name, nodes in self._top_functions(tree).items():
-            permission = allowed.get((role, function_name))
+            permission = ACTION_ACCESS.get((role, function_name))
             if permission is None:
                 continue
             for function in nodes:

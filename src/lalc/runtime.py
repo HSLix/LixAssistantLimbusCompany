@@ -14,10 +14,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
 
+from .actions import ACTION_ACCESS
 from .run_context import RunContext as RunContext, RunState as RunState
 
 if TYPE_CHECKING:
     from .manifest import LoadedComponent, LoadedManifest, ManifestManager
+    from .page_resources import PageJsonResources
 
 
 class UserInterruption(Exception):
@@ -166,15 +168,6 @@ class _Frame:
 class WorkflowExecutor:
     """同步执行 Component；各入口处理自身失败，共享一次 Run 的状态。"""
 
-    _ACTION_ACCESS = {
-        ("task_workflow", "execute"): {"observe"},
-        ("sub_workflow", "execute"): {"observe"},
-        ("step", "execute"): {"observe", "control"},
-        ("step", "condition"): {"observe"},
-        ("recovery_rule", "detect"): {"observe"},
-        ("recovery_rule", "recover"): {"observe", "control"},
-    }
-
     def __init__(
         self,
         manifest: LoadedManifest,
@@ -198,6 +191,7 @@ class WorkflowExecutor:
         observation_evidence: Callable[[], dict[str, Any]] | None = None,
         task_finished: Callable[[dict[str, Any], dict[str, Any], float], None] | None = None,
         run_state: RunState | None = None,
+        page_resources: PageJsonResources | None = None,
         recovery_limit: int = 10,
         repair: Callable[[dict[str, Any]], str | None] | None = None,
     ) -> None:
@@ -214,6 +208,7 @@ class WorkflowExecutor:
         self._check_input = check_input
         self._game_process_exited = game_process_exited
         self.run_state = run_state if run_state is not None else RunState()
+        self._page_resources = page_resources
         self.recovery_limit = recovery_limit
         self.repair = repair
         self._recovery_key: int | None = None
@@ -676,7 +671,7 @@ class WorkflowExecutor:
         action = self.manifest_manager.actions.get(logical_name) if self.manifest_manager else None
         if action is None:
             raise ExecutionFailure("execution_failed", f"Unknown Trusted Action: {logical_name}")
-        allowed = self._ACTION_ACCESS.get((caller.role, caller.phase), set())
+        allowed = ACTION_ACCESS.get((caller.role, caller.phase), set())
         if action.classification not in allowed:
             raise ExecutionFailure(
                 "execution_failed",
@@ -685,7 +680,8 @@ class WorkflowExecutor:
             )
 
         self.gate.checkpoint()
-        if self._check_input is not None and logical_name != "control.restart_game":
+        if (self._check_input is not None and logical_name != "control.restart_game"
+                and action.classification != "page_resource"):
             try:
                 self._check_input()
             except UserInterruption as error:
@@ -935,6 +931,11 @@ def _normalize_value(value: Any, annotation: Any, path: str) -> Any:
             return normalized
     if annotation in {None, type(None)} and value is None:
         return None
+    if annotation == dict[str, Any] and type(value) is dict:
+        try:
+            return _strict_json(value)
+        except (TypeError, ValueError) as error:
+            raise InputValidationError(f"{path}: {error}") from error
 
     origin = get_origin(annotation)
     arguments = get_args(annotation)

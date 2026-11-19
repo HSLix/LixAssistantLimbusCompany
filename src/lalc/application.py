@@ -21,6 +21,7 @@ from .control import InputSession
 from .ocr import ocr_service
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
 from .manifest import LoadedManifest, ManifestManager, ValidationError
+from .page_resources import PageJsonResources
 from .runtime import (
     InputValidationError,
     RunGate,
@@ -61,6 +62,7 @@ class ApplicationService:
         game_language: str = "en",
     ) -> None:
         self.data_root = Path(data_root)
+        self.page_resources = PageJsonResources(self.data_root / "page-resources")
         self.manifest_manager = manifest_manager or ManifestManager(self.data_root)
         self.on_change = on_change
         self._live_logs: deque[dict[str, Any]] = deque(maxlen=LIVE_LOG_LIMIT)
@@ -744,7 +746,7 @@ class ApplicationService:
             game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
             ocr=self._ocr,
             task_finished=self._finish_plan_task,
-            run_state=run_state, recovery_limit=options["recovery_limit"],
+            run_state=run_state, page_resources=self.page_resources, recovery_limit=options["recovery_limit"],
         )
         self._active_executor = executor
         if self._runtime_allowed:
