@@ -216,7 +216,7 @@ def run_log_counts(root, run_id, *, check=lambda: None):
 
 
 def run_summary(root, run_id, *, check=lambda: None):
-    """只读首尾事件，缺失终态时不把历史 Run 冒充正在运行。"""
+    """只读首尾事件，给列表提供终态摘要，完整结果留在 Trace。"""
     first = next((r for r in trace_records(root, run_id, check=check) if r), {})
     last = next((r for r in trace_records(root, run_id, reverse=True, check=check) if r), {})
     start = first if first.get("event") == "run_started" else {}
@@ -230,11 +230,23 @@ def run_summary(root, run_id, *, check=lambda: None):
         duration = (datetime.fromisoformat(end["recorded_at"]) - datetime.fromisoformat(start["recorded_at"])).total_seconds()
     except (KeyError, TypeError, ValueError):
         pass
+    failure = result.get("failure_message") or result.get("reason")
+    if not isinstance(failure, str):
+        failure = None
+    elif len(failure) > 512:
+        failure = failure[:511] + "…"
+    summary = {}
+    if isinstance(result.get("failure_code"), str):
+        summary["failure_code"] = result["failure_code"][:128]
+    if isinstance(result.get("items"), list):
+        summary["task_count"] = len(result["items"])
+    if isinstance(result.get("all_tasks_succeeded"), bool):
+        summary["all_tasks_succeeded"] = result["all_tasks_succeeded"]
     return {"run_id": run_id, "started_at": start.get("recorded_at"), "finished_at": end.get("recorded_at"),
             "duration_seconds": duration, "status": result.get("status", "unknown"),
             "logical_name": start.get("logical_name"), "manifest_id": start.get("base_manifest_id"),
             "source": "agent_trial" if trial is True else "user" if trial is False else "unknown",
-            "result": result or None, "failure_reason": result.get("failure_message") or result.get("reason")}
+            "result": summary if result else None, "failure_reason": failure}
 
 
 def query_trace(root, run_ids, *, start_sequence=1, limit=100, levels=None, logical_name=None,

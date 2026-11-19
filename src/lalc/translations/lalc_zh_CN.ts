@@ -919,6 +919,14 @@ Log: {1}</source>
       <translation>展开详情</translation>
     </message>
     <message>
+      <source>Showing a preview of large tool details.</source>
+      <translation>工具详情较长，此处显示预览。</translation>
+    </message>
+    <message>
+      <source>Copy full JSON</source>
+      <translation>复制完整 JSON</translation>
+    </message>
+    <message>
       <location filename="../gui.py" line="62" />
       <location filename="../gui.py" line="66" />
       <source>Show error details</source>

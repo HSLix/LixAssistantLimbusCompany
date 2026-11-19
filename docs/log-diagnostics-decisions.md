@@ -28,13 +28,14 @@
 
 ## 已确认：Run 列表元数据
 
-- `list_runs` 提供 Run ID、开始／结束时间、耗时、状态、入口 logical name、Manifest ID、运行来源、最终结果和失败原因；记录不足时明确未知，不根据缺失结束事件断言仍在运行。
+- `list_runs` 提供 Run ID、开始／结束时间、耗时、状态、入口 logical name、Manifest ID、运行来源、结果摘要和失败原因；记录不足时明确未知，不根据缺失结束事件断言仍在运行。
+- 2026-11-19 用户确认列表中的 `result` 只提供失败码、Plan 任务总数和全任务成功标志等现有摘要信息。逐项结果、业务输出和异常详情按 Run ID 查看 Trace 原文。见 [Run 列表与聊天卡顿影响审查](run-list-and-chat-stall-impact-review.md)。
 - 用户要求来源名称使用“Agent 试运行”，替代“开发者试运行”；另一来源为用户运行，旧记录无法确认时为未知。
 
 ## 已确认：Session 工具缩略信息
 
 - 用户要求 Agent Session 工具缩略信息更丰富，read、edit 必须显示操作文件名。
-- 工具摘要显示文件／路径、Run ID、logical name 等操作对象；完整参数继续放在展开详情，摘要限制长度。
+- 工具摘要显示文件／路径、Run ID、logical name 等操作对象。展开后显示参数和结果，超过 16,000 字符时显示预览并提供“复制完整 JSON”。
 - 用户再次明确 click／drag 的自动落盘图片必须保留；仅 match 关闭自动落盘，OCR 保留。
 
 ## 已确认：日志过滤、搜索和工具描述
