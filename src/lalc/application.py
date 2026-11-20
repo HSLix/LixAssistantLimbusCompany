@@ -76,6 +76,7 @@ class ApplicationService:
         self.ocr_service = ocr_service
         self._focused_session: FocusedAutomationSession | None = None
         self._capture_evidence: dict[str, Any] | None = None
+        self._staged_crops: dict[str, tuple[bytes, tuple[int, int], dict[str, int], int]] = {}
         self._input_session: InputSession | None = None
         self._fatal = False
         self._condition = threading.Condition()
@@ -419,6 +420,8 @@ class ApplicationService:
                 self._input_session.check()
             raise
         assert session.image is not None and session.size is not None
+        if options.get("_group"):
+            options["_checkpoint"] = self._input_checkpoint
         return self.asset_library.match(
             name, session.image, session.size,
             run_id=self._state["run_id"], observation=session.observation, emit=self._emit, **options,
@@ -434,6 +437,38 @@ class ApplicationService:
             name, session.image, session.size, region,
             run_id=self._state["run_id"], observation=observation["observation"], tags=tags,
         )
+        self._emit("asset_created", result)
+        return result
+
+    def _stage_asset_crop(self, region: dict[str, int]) -> str:
+        """冻结当前区域的 PNG 和来源，后续截图可独立刷新。"""
+        session = self._focused_session
+        if session is None or session.image is None or session.size is None:
+            raise WindowError("No current screenshot for staging a crop; capture explicitly first.")
+        session.check()
+        assert session.image is not None and session.size is not None
+        size, observation = session.size, session.observation
+        content, area = self.asset_library.crop_content(session.image, size, region)
+        if (len(self._staged_crops) >= 256
+                or len(content) + sum(len(crop[0]) for crop in self._staged_crops.values()) > 64 * 1024 ** 2):
+            raise ValueError("Staged crop limit reached; save or discard existing crops first.")
+        crop_id = uuid.uuid4().hex
+        self._staged_crops[crop_id] = (content, size, area, observation)
+        return crop_id
+
+    def _finish_asset_crop(self, crop_id: str, name: str | None, tags: list[str] | None) -> dict[str, Any] | None:
+        """保存成功才消费暂存图；显式丢弃可重试。"""
+        if name is None:
+            self._staged_crops.pop(crop_id, None)
+            return None
+        if crop_id not in self._staged_crops:
+            raise ValueError("Unknown or expired crop_id for this Run.")
+        content, size, region, observation = self._staged_crops[crop_id]
+        result = self.asset_library.save_crop_content(
+            name, content, size, region, run_id=self._state["run_id"], observation=observation,
+            tags=tags, preserve_existing_tags=True,
+        )
+        del self._staged_crops[crop_id]
         self._emit("asset_created", result)
         return result
 
@@ -677,6 +712,7 @@ class ApplicationService:
             self.logger.exception("Unhandled execution failure")
             errors.append(_exception_fields(error))
         finally:
+            self._staged_crops.clear()
             try:
                 if self._input_session is not None:
                     self._input_session.close()
@@ -744,6 +780,7 @@ class ApplicationService:
             choose_manifest=self.recovery_choice,
             select_manifest=self._select_working_manifest,
             game_language=self.game_language, match_asset=self._match_asset, crop_asset=self._crop_asset,
+            stage_asset_crop=self._stage_asset_crop, finish_asset_crop=self._finish_asset_crop,
             ocr=self._ocr,
             task_finished=self._finish_plan_task,
             run_state=run_state, page_resources=self.page_resources, recovery_limit=options["recovery_limit"],

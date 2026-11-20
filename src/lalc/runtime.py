@@ -186,6 +186,8 @@ class WorkflowExecutor:
         match_asset: Callable[..., list[dict[str, Any]]] | None = None,
         ocr: Callable[..., dict[str, Any]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
+        stage_asset_crop: Callable[[dict[str, int]], str] | None = None,
+        finish_asset_crop: Callable[[str, str | None, list[str] | None], dict[str, Any] | None] | None = None,
         save_screenshot: Callable[[], dict[str, Any]] | None = None,
         debug_screenshot: Callable[[], dict[str, Any]] | None = None,
         observation_evidence: Callable[[], dict[str, Any]] | None = None,
@@ -225,6 +227,8 @@ class WorkflowExecutor:
         self._match_asset = match_asset
         self._ocr = ocr
         self._crop_asset = crop_asset
+        self._stage_asset_crop = stage_asset_crop
+        self._finish_asset_crop = finish_asset_crop
         self.attempted_manifest_ids = [manifest.manifest_id]
 
     @staticmethod
@@ -719,7 +723,8 @@ class WorkflowExecutor:
                 if logical_name in {"control.click", "control.drag", "control.scroll"}:
                     fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
                               else {"image_unavailable": True}}
-                elif logical_name in {"observe.ocr", "observe.match_asset", "observe.match_feature"}:
+                elif logical_name in {"observe.ocr", "observe.match_asset", "observe.match_asset_group",
+                                      "observe.match_feature", "observe.stage_asset_crop"}:
                     fields = {**fields, "debug_image": self._observation_evidence()
                               if self._observation_evidence else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")
@@ -780,6 +785,16 @@ class WorkflowExecutor:
         if self._active_action != "observe" or self._crop_asset is None:
             raise ExecutionFailure("execution_failed", "Asset cropping requires an observe Trusted Action.")
         return self._crop_asset(logical_name, region, tags)
+
+    def stage_asset_crop(self, region: dict[str, int]) -> str:
+        if self._active_action != "observe" or self._stage_asset_crop is None:
+            raise ExecutionFailure("execution_failed", "Staging a crop requires an observe Trusted Action.")
+        return self._stage_asset_crop(region)
+
+    def finish_asset_crop(self, crop_id: str, logical_name: str | None, tags: list[str] | None) -> dict[str, Any] | None:
+        if self._active_action != "observe" or self._finish_asset_crop is None:
+            raise ExecutionFailure("execution_failed", "Finishing a crop requires an observe Trusted Action.")
+        return self._finish_asset_crop(crop_id, logical_name, tags)
 
     def control_input(self, operation: str, arguments: dict[str, Any]) -> None:
         """原生输入仅允许 control Action；observe Action 只可复用无输入的等待。"""

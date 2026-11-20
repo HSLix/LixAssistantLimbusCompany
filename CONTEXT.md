@@ -85,6 +85,10 @@ _Avoid_: Asset Component, image version, absolute resource path
 The shared collection of template images grouped by Asset logical name, with optional hash-to-tag metadata for each group. Every image in a group is a matching candidate; absent metadata means an empty tag list, not an unavailable image. Optional priority tags select a preferred group by any-tag overlap; a match in that group excludes the remaining templates, otherwise all remaining templates are considered. Changes become visible to the next matching invocation, including within the same Run, without publishing or selecting a Manifest.
 _Avoid_: Manifest attachment, staging library
 
+**Asset Group**:
+A collection of Assets identified by a shared logical-name path. In the Mirror Dungeon Gift collection, the path segment under `mirror/gift` identifies the Gift's archetype.
+_Avoid_: Asset tag
+
 **Asset Usage Index**:
 Mutable local Asset metadata summarizing the latest non-empty detection results, actual template identities and evidence references for developer and Agent inspection, independently of the Manifest and execution logs, without determining future search regions.
 _Avoid_: Component Usage Index, Asset Manifest

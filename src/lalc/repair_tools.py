@@ -493,7 +493,8 @@ class RepairTools:
                 raise ValueError("指定的事件序号不存在。")
             record = events[0]
             if (record.get("event") not in ACTION_ENDS
-                    or record.get("logical_name") not in ("observe.match_asset", "observe.match_feature", "observe.ocr", "control.click")):
+                    or record.get("logical_name") not in ("observe.match_asset", "observe.match_asset_group",
+                                                             "observe.match_feature", "observe.ocr", "control.click")):
                 raise ValueError("请选择匹配、OCR 或点击的动作结束事件。")
             metadata = image_metadata(record)
             evidence_id = metadata.get("evidence_id") if isinstance(metadata, dict) else None
