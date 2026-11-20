@@ -42,6 +42,10 @@ class RepairLog:
         self.key = key
         self.group = 0
         self.requests = 0
+        self.compaction_requests = 0
+        self.reported_tokens = 0
+        self.requests_with_token_usage = 0
+        self._pending_usage = set()
         self.transport_error = None
         self.on_event = on_event
         self.raw_content = {}
@@ -61,14 +65,34 @@ class RepairLog:
     def clean(self, value):
         return redact(value, self.keys)
 
+    def reset_round_usage(self):
+        """逐轮重置请求额度和计量，避免把前一轮的用量算入本轮。"""
+        self.requests = self.compaction_requests = 0
+        self.reported_tokens = self.requests_with_token_usage = 0
+        self._pending_usage.clear()
+
+    def _record_usage(self, request_type, usage):
+        """每个已发起的模型请求只采集一次响应中的 Token 用量。"""
+        if request_type in self._pending_usage:
+            self._pending_usage.remove(request_type)
+            tokens = usage.get("totalTokens") if isinstance(usage, dict) else None
+            # pi 也用全零 Usage 表示未收到服务端统计。
+            if type(tokens) is int and tokens > 0:
+                self.reported_tokens += tokens
+                self.requests_with_token_usage += 1
+
     def record(self, value):
         if isinstance(value, dict) and value.get("type") in {"message_start", "message_end", "repair_error", "round_finished"}:
             self.raw_content.clear()
         if isinstance(value, str):
             value = {"type": "stderr", "message": value}
-        if value.get("type") == "lalc_compaction_request":
-            self.compaction_requests = value["requests"]
-        if value.get("type") in {"lalc_request", "lalc_compaction_request"}:
+        kind = value.get("type")
+        if kind in {"lalc_request", "lalc_compaction_request"}:
+            if kind == "lalc_request":
+                self.requests = value["requests"]
+            else:
+                self.compaction_requests = value["requests"]
+            self._pending_usage.add(kind)
             self.transport_error = None
             if value.get("payload_path"):
                 source = Path(value["payload_path"])
@@ -80,7 +104,11 @@ class RepairLog:
                 self.store.write_json(target, self.clean(json.loads(source.read_text(encoding="utf-8"))))
                 source.unlink()
                 value = {**value, "payload_path": str(target)}
-        elif value.get("type") == "lalc_transport_error":
+        elif kind == "lalc_compaction_usage":
+            self._record_usage("lalc_compaction_request", value.get("usage"))
+        elif kind == "message_end" and value.get("message", {}).get("role") == "assistant":
+            self._record_usage("lalc_request", value["message"].get("usage"))
+        elif kind == "lalc_transport_error":
             self.transport_error = self.clean(value)
         self.event_sequence += 1
         image_number = 0
@@ -337,8 +365,7 @@ class RepairConversation:
             started = time.monotonic()
             self.log.on_event = on_event
             self.log.group += 1
-            self.log.requests = 0
-            self.log.compaction_requests = 0
+            self.log.reset_round_usage()
             prefix = f"round-{self.log.group}"
             round_path = self.log.path / prefix
             round_path.mkdir()
@@ -360,6 +387,7 @@ class RepairConversation:
                 self.log.snapshot("baseline", baseline)
             self.log.snapshot(f"{prefix}/original", before)
             result = {"status": "incomplete", "reason": "setup_error"}
+            provider = model_id = None
             tools = self.tools
             tools.on_feedback = on_feedback
             tools.on_page_preview = on_page_preview
@@ -410,6 +438,7 @@ class RepairConversation:
                 stage = "settings"
                 settings, actual_key = settings_snapshot(args, self.host.service.data_root,
                                                          temporary_keys=self.host.secrets, key=key)
+                provider = settings["provider"]
                 if request_limit is not None:
                     settings["max_requests"] = min(settings["max_requests"], request_limit)
                 context["settings"] = settings
@@ -432,6 +461,7 @@ class RepairConversation:
                 with configured_pi(options, self.host.candidate.resolve(), self.log.key, self.system_prompt,
                                    require_image=bool(attachments), on_warning=self.log.record,
                                    startup=startup, models=models) as (command, env, temporary, model):
+                    model_id = model["id"]
                     self.log.transport_dir = Path(temporary)
                     payloads = Path(temporary) / "payloads"
                     payloads.mkdir()
@@ -495,7 +525,7 @@ class RepairConversation:
                         input_record["skills"] = ready.get("skills", [])
                         self.log.save_json(f"{prefix}/input.json", input_record)
                         stage = "agent"
-                        self.log.record({"type": "round_started", "editable_files": names, "model": model["id"], "prompt": prompt})
+                        self.log.record({"type": "round_started", "editable_files": names, "model": model_id, "prompt": prompt})
                         # 原图经 context hook 注入，不进入 pi 的 RPC 图片转码流程。
                         await send({"type": "prompt", "message": "/lalc_run"})
                         last = {}
@@ -507,7 +537,6 @@ class RepairConversation:
                                 continue
                             self.log.record(item)
                             if kind == "lalc_request":
-                                self.log.requests = item["requests"]
                                 if item.get("budget_message"):
                                     self.history.append(self.log.clean(item["budget_message"]))
                             elif kind == "message_end":
@@ -620,7 +649,10 @@ class RepairConversation:
                     details = failed(error, "artifacts")
                     result.update(status="incomplete", artifact_error=details["message"],
                                   error=details["message"], diagnostics=details)
-                result.update(compaction_requests=getattr(self.log, "compaction_requests", 0), requests=self.log.requests, round=self.log.group, log_path=str(self.log.path),
+                result.update(requests=self.log.requests, compaction_requests=self.log.compaction_requests,
+                              provider=provider, model=model_id, reported_tokens=self.log.reported_tokens,
+                              requests_with_token_usage=self.log.requests_with_token_usage,
+                              round=self.log.group, log_path=str(self.log.path),
                               duration_seconds=max(0.0, time.monotonic() - started))
                 self.log.save_json(f"{prefix}/result.json", result)
                 self.log.save_json("result.json", result)

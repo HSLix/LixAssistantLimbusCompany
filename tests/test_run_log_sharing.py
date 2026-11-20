@@ -14,7 +14,7 @@ import pytest
 from PIL import Image
 
 from lalc.file_content import file_operation
-from lalc.run_log_sharing import export_log, import_log, list_logs
+from lalc.run_log_sharing import AI_REPAIR_SUMMARY, export_log, import_log, list_logs
 from lalc.run_logs import read_page, snapshot
 from test_run_logs import write_logs, log_page
 
@@ -58,6 +58,49 @@ def test_roundtrip_snapshot_images_and_same_number(tmp_path):
     assert entry['started_at'] == '2026-11-06T12:00:00Z'
     export_log(entry['root'], 1, tmp_path / 'again.zip')
     assert len(list(zipfile.ZipFile(tmp_path / 'again.zip').namelist())) == 3
+
+
+def test_ai_summary_uses_export_snapshot_and_survives_import(tmp_path):
+    trace, _ = write_logs(tmp_path, 1)
+    old_result = dict(duration_seconds=1.5, requests=2, compaction_requests=0, status='incomplete')
+    new_result = dict(duration_seconds=2.5, requests=1, compaction_requests=1, status='recheck',
+                      provider='deepseek', model='deepseek-flash', reported_tokens=23,
+                      requests_with_token_usage=2, log_path='local-only')
+    records = [
+        dict(event='agent_invoked', session_id='first'),
+        dict(event='runtime_agent_result', session_id='first', round=1, result=old_result),
+        dict(event='agent_invoked', session_id='second'),
+        dict(event='runtime_agent_result', session_id='second', round=1, result=new_result),
+        dict(event='agent_invoked', session_id='second'),
+    ]
+    with trace.open('a', encoding='utf-8') as stream:
+        for record in records:
+            stream.write(json.dumps(record) + '\n')
+    boundary = snapshot(tmp_path, 1)
+    with trace.open('a', encoding='utf-8') as stream:
+        stream.write('{"event":"run_finished"}\n')
+
+    archive = tmp_path / 'with-ai.zip'
+    export_log(tmp_path, 1, archive, boundary)
+    with zipfile.ZipFile(archive) as bundle:
+        assert json.loads(bundle.read('run.json'))['version'] == 2
+        content = bundle.read(AI_REPAIR_SUMMARY)
+    summary = json.loads(content)
+    assert summary['run_id'] == 1 and not summary['run_finished'] and summary['unreported_rounds'] == 1
+    assert summary['totals'] == dict(duration_seconds=4, total_requests=4, requests=3, compaction_requests=1,
+                                     reported_tokens=23, requests_with_token_usage=2)
+    assert not summary['token_usage_complete']
+    first, second = summary['rounds']
+    assert first['provider'] is first['model'] is first['reported_tokens'] is None
+    assert (second['provider'], second['model'], second['round']) == ('deepseek', 'deepseek-flash', 1)
+    assert second['session_id'] == 'second' and 'log_path' not in second
+    key = import_log(tmp_path, archive)
+    imported = tmp_path / 'imported-run-logs' / key
+    assert (imported / AI_REPAIR_SUMMARY).read_bytes() == content
+    again = tmp_path / 'again.zip'
+    export_log(imported, 1, again)
+    with zipfile.ZipFile(again) as bundle:
+        assert bundle.read(AI_REPAIR_SUMMARY) == content
 
 
 @pytest.mark.parametrize('problem', ['path', 'hash', 'duplicate', 'size', 'extra', 'format'])

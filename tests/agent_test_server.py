@@ -68,6 +68,9 @@ def agent_server(tmp_path):
                     chunk = {"id": "test", "model": "gemma4-test", "choices": [
                         {"index": 0, "delta": change, "finish_reason": reason}]}
                     self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
+                if usage := state.get("usage"):
+                    chunk = {"id": "test", "model": "gemma4-test", "choices": [], "usage": usage}
+                    self.wfile.write(("data: " + json.dumps(chunk) + "\n\n").encode())
                 self.wfile.write(b"data: [DONE]\n\n")
             except (BrokenPipeError, ConnectionResetError):
                 pass

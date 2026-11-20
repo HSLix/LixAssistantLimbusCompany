@@ -5,6 +5,7 @@
 """
 
 import json
+import zipfile
 
 import pytest
 
@@ -15,6 +16,7 @@ from lalc.application import ApplicationService
 from lalc.manifest import ManifestManager
 from lalc.agent_settings import save_settings, save_selection
 from lalc.agent_log import read_events, read_json
+from lalc.run_log_sharing import AI_REPAIR_SUMMARY, export_log
 
 pytestmark = pytest.mark.agent
 
@@ -43,6 +45,7 @@ def test_real_pi_recheck_ends_round_without_another_request_and_resumes_parent(t
         return answer("unexpected extra request")
 
     server["respond"] = respond
+    server["usage"] = {"prompt_tokens": 11, "completion_tokens": 3, "total_tokens": 14}
     service = ApplicationService(tmp_path, manifest_manager=manager)
     try:
         service.start("tasks.run", {"value": 5}, manifest_id=base)
@@ -57,6 +60,17 @@ def test_real_pi_recheck_ends_round_without_another_request_and_resumes_parent(t
         handoff = read_json(chat.log.root / "round-1/result.json")
         assert handoff["parent_run_id"] == state["run_id"]
         assert handoff["manifest_id"] == state["working_manifest_id"]
+        archive = tmp_path / "run-log.zip"
+        export_log(tmp_path, state["run_id"], archive)
+        with zipfile.ZipFile(archive) as bundle:
+            summary = json.loads(bundle.read(AI_REPAIR_SUMMARY))
+        assert summary["run_finished"] and summary["token_usage_complete"]
+        assert summary["totals"] == {
+            "duration_seconds": handoff["duration_seconds"], "total_requests": 4, "requests": 4, "compaction_requests": 0,
+            "reported_tokens": 56, "requests_with_token_usage": 4,
+        }
+        round_stats, = summary["rounds"]
+        assert (round_stats["provider"], round_stats["model"]) == ("llama.cpp", "gemma4-test")
         assert manager.load(state["working_manifest_id"]).loaded.manifest["AdditionalMessage"] == "修复运行时失败，保留调用约定"
         assert manager.default_manifest_id() == state["working_manifest_id"]
         tools = {item["function"]["name"] for item in server["calls"][0]["tools"]}
@@ -87,6 +101,8 @@ def test_stop_during_runtime_agent_finishes_run_and_releases_activity(tmp_path, 
         assert service._runtime_chat.tools.run_state is None
         assert manager.default_manifest_id() == base and state["default_update"] is None
         assert (service._runtime_chat.log.path / "round-1" / "result.json").exists()
+        trace_result = next(row["result"] for row in state["trace"] if row["event"] == "runtime_agent_result")
+        assert trace_result["requests"] == 1 and trace_result["requests_with_token_usage"] == 0
     finally:
         server["release"].set()
         service.shutdown()
