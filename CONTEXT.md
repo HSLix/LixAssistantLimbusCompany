@@ -94,7 +94,7 @@ Mutable local Asset metadata summarizing the latest non-empty detection results,
 _Avoid_: Component Usage Index, Asset Manifest
 
 **Mirror Dungeon Name Label** (中文界面：名称标签):
-The user-editable name of an E.G.O Gift or Theme Pack in one game language.
+A name associated with an E.G.O Gift or Theme Pack. A Gift can have multiple user-editable name labels without language slots. Any of its name labels can identify that Gift.
 _Avoid_: Asset tag, game language tag, archetype
 
 **Theme Pack Selection Preference** (中文界面：选择偏好):
