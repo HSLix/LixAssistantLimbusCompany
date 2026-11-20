@@ -13,6 +13,8 @@ from pathlib import Path
 import uuid
 from typing import Any
 
+from .assets import AssetLibrary, asset_name
+from .process_lock import ProcessLock
 from .runtime import _strict_json, atomic_write_json
 from .page_packages import page_entries, page_entry, resource_path
 from .page_resources import PageJsonResources
@@ -134,6 +136,52 @@ class PageContext:
     def write_resource_json(self, name: str, value: dict[str, Any]) -> None:
         """整份保存本页 JSON 资源；页面包预览只写本侧内存。"""
         self.store.page_resources.write_json(self.page_id, name, value)
+
+    def read_asset_image(self, logical_name: str, sha256: str) -> bytes | None:
+        """按确切素材名和完整哈希读取原图；预览无现场素材，已移除的图片返回 None。"""
+        root = self.store.page_resources.root
+        if root is None:
+            return None
+        try:
+            return AssetLibrary(root.parent).read({
+                "path": f"{asset_name(logical_name)}/{sha256}.png", "sha256": sha256,
+            })
+        except FileNotFoundError:
+            return None
+
+    def list_asset_images(self, logical_name: str) -> list[str]:
+        """返回指定 Asset 目录的直接候选哈希；页面预览不访问现场素材。"""
+        root = self.store.page_resources.root
+        return AssetLibrary(root.parent).image_hashes(logical_name) if root is not None else []
+
+    def list_asset_image_groups(self, group: str) -> dict[str, list[str]]:
+        """查询组中包含图片候选的素材及哈希；页面预览不访问现场素材。"""
+        root = self.store.page_resources.root
+        return AssetLibrary(root.parent).group_image_hashes(group) if root is not None else {}
+
+    def commit_resource_json(self, name: str, expected: dict | None, value: dict,
+                             *, asset_rename: tuple[str, str] | None = None) -> None:
+        """用当前资源版本提交页面编辑，并在保存失败时撤回同组素材改名。"""
+        if self.requires_reload:
+            raise ValueError("页面配置已导入，请重载应用后再保存。")
+        root = self.store.page_resources.root
+        if root is None:
+            self.write_resource_json(name, value)
+            return
+        with ProcessLock("game"):
+            if self.read_resource_json(name) != expected:
+                raise ValueError("运行中已更新页面资源，请刷新后重试。")
+            if asset_rename is None:
+                self.write_resource_json(name, value)
+                return
+            old, new = asset_rename
+            assets = AssetLibrary(root.parent)
+            assets.rename_directory(old, new)
+            try:
+                self.write_resource_json(name, value)
+            except BaseException:
+                assets.rename_directory(new, old)
+                raise
 
 
 @dataclass

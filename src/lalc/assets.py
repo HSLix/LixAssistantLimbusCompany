@@ -7,7 +7,7 @@ import os
 import re
 import uuid
 from datetime import UTC, datetime
-from pathlib import Path, PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Callable
 
 from .work_files import create_work_file
@@ -55,6 +55,58 @@ class AssetLibrary:
         if sha256_bytes(content) != digest:
             raise ValueError(f"Asset hash mismatch: {entry['path']}")
         return content
+
+    def image_hashes(self, name: str) -> list[str]:
+        """枚举该逻辑名的直接图片候选，不读内容、不遍历子组。"""
+        folder = self.path(asset_name(name))
+        if folder != self.root.resolve() / name:
+            raise ValueError("Asset image listing does not accept path aliases.")
+        try:
+            return sorted(path.stem for path in folder.iterdir()
+                          if re.fullmatch(r"[0-9a-f]{64}\.png", path.name)
+                          and not path.is_symlink() and not path.is_junction() and path.is_file())
+        except FileNotFoundError:
+            return []
+
+    def group_image_hashes(self, group: str) -> dict[str, list[str]]:
+        """以逻辑名为键枚举组内图片候选，不跟随目录链接或读取图片内容。"""
+        root = self.path(asset_name(group))
+        if root != self.root.resolve() / group:
+            raise ValueError("Asset image listing does not accept path aliases.")
+
+        def on_error(error: OSError) -> None:
+            if not isinstance(error, FileNotFoundError):
+                raise error
+
+        result = {}
+        for folder, children, files in os.walk(root, onerror=on_error):
+            directory = Path(folder)
+            children[:] = [name for name in sorted(children)
+                           if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_-]*", name)
+                           and not (directory / name).is_symlink() and not (directory / name).is_junction()]
+            if any(name.endswith(".png") for name in files):
+                name = directory.relative_to(self.root.resolve()).as_posix()
+                hashes = self.image_hashes(name)
+                if hashes:
+                    result[name] = hashes
+        return result
+
+    def rename_directory(self, old: str, new: str) -> None:
+        """同组重命名一个素材目录，保留图片哈希和标签，拒绝覆盖或移动子组。"""
+        source, target = (self.root.resolve() / asset_name(name) for name in (old, new))
+        if source.parent != target.parent or PureWindowsPath(target.name).is_reserved():
+            raise ValueError("Asset rename requires a valid name in the same group.")
+        if source != self.path(old) or target != self.path(new) or source.is_symlink():
+            raise ValueError("Asset rename does not accept path aliases.")
+        if not source.is_dir():
+            raise FileNotFoundError(f"Asset logical name does not exist: {old}")
+        if old == new:
+            return
+        if any(entry.name.casefold() == target.name.casefold() for entry in target.parent.iterdir()):
+            raise FileExistsError(f"Asset logical name already exists: {new}")
+        if any(entry.is_symlink() or not entry.is_file() for entry in source.iterdir()):
+            raise ValueError("Asset rename requires a directory containing only regular files.")
+        source.rename(target)
 
     @staticmethod
     def tags(value: list[str] | None) -> list[str]:
