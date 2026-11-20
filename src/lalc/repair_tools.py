@@ -616,6 +616,7 @@ class RepairTools:
         return result
 
     def action_contracts(self):
+        """读取已注册 Trusted Action 的分类、签名和说明。observe.ocr 的 det_options 在这里查询。"""
         return self.text({"actions": [
             {"logical_name": name, "classification": action.classification,
              "signature": str(inspect.signature(action.execute)), "docstring": inspect.getdoc(action.execute)}
@@ -634,7 +635,10 @@ class RepairTools:
         return session, metadata, path
 
     def game_screenshot(self, *, auto_park_cursor: bool = True):
-        """返回同次原图、网格图及完整 OCR；识别失败保留图片并说明错误，不支持韩文。"""
+        """返回同次原图、网格图及默认设置的完整 OCR；识别失败保留图片并说明错误，不支持韩文。
+
+        Workflow 的局部识别与检测调参见 action_contracts 中的 observe.ocr。
+        """
         from .recognition import client_image
 
         session, metadata, path = self.capture(auto_park_cursor=auto_park_cursor)

@@ -472,7 +472,8 @@ class ApplicationService:
         self._emit("asset_created", result)
         return result
 
-    def _ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
+    def _ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0,
+             det_options: dict[str, Any] | None = None) -> dict[str, Any]:
         """读取已有截图；推理前后核验输入所有权及窗口，不刷新或保存。"""
         from .recognition import client_image
 
@@ -489,8 +490,10 @@ class ApplicationService:
         while True:
             checkpoint()
             observation = session.observation
-            result = self.ocr_service.recognize(client_image(session.image, session.size), region=region,
-                                                min_score=min_score, checkpoint=checkpoint)
+            result = self.ocr_service.recognize(
+                client_image(session.image, session.size), region=region, min_score=min_score,
+                det_options=det_options, checkpoint=checkpoint,
+            )
             checkpoint()
             if session.observation == observation:
                 return {"observation": observation, **result}

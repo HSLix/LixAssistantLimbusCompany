@@ -61,7 +61,14 @@ def test_readonly_tree_directory_images_and_actual_action_contracts(tools):
     for index, item in enumerate([first, second]):
         assert base64.b64decode(result["content"][index * 2 + 1]["data"]) == tools.library.read(item)
         assert result["details"]["images"][index]["sha256"] == item["sha256"]
-    actions = invoke(tools, "action_contracts")["details"]["actions"]
+    contracts = invoke(tools, "action_contracts")
+    actions = contracts["details"]["actions"]
+    ocr = next(item for item in actions if item["logical_name"] == "observe.ocr")
+    assert "det_options" in ocr["signature"]
+    assert all(key in ocr["docstring"] for key in (
+        "thresh", "box_thresh", "unclip_ratio", "use_dilation", "score_mode", "max_candidates"))
+    assert '{"thresh": 0.15}' in ocr["docstring"]
+    assert json.loads(contracts["content"][0]["text"])["actions"] == actions
     scroll = next(item for item in actions if item["logical_name"] == "control.scroll")
     assert scroll["classification"] == "control"
     assert "steps" in scroll["signature"] and "0.2" in scroll["docstring"]

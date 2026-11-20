@@ -775,11 +775,12 @@ class WorkflowExecutor:
         common = {key: options.pop(key) for key in ("region", "nms", "nms_iou_threshold")}
         return self.match_asset(logical_name, {**common, "_feature_options": options})
 
-    def ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, Any]:
+    def ocr(self, *, region: dict[str, int] | None = None, min_score: float = 0.0,
+            det_options: dict[str, Any] | None = None) -> dict[str, Any]:
         """保持 OCR 的 observe 权限边界，原始失败交由现有执行路径处理。"""
         if self._active_action != "observe" or self._ocr is None:
             raise ExecutionFailure("execution_failed", "OCR requires an observe Trusted Action.")
-        return self._ocr(region=region, min_score=min_score)
+        return self._ocr(region=region, min_score=min_score, det_options=det_options)
 
     def crop_asset(self, logical_name: str, region: dict[str, int], tags: list[str] | None = None) -> dict[str, Any]:
         if self._active_action != "observe" or self._crop_asset is None:
