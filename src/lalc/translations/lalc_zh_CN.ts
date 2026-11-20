@@ -2175,6 +2175,22 @@ Original pixel region: {2}</source>
       <translation>上下文压缩失败</translation>
     </message>
     <message>
+      <source>Connection timed out</source>
+      <translation>连接超时</translation>
+    </message>
+    <message>
+      <source>Could not resolve model service address</source>
+      <translation>无法解析模型服务地址</translation>
+    </message>
+    <message>
+      <source>{0}. Connection retry {1}/{2} (1 second between attempts).</source>
+      <translation>{0}。连接重试 {1}/{2}，间隔 1 秒。</translation>
+    </message>
+    <message>
+      <source>Model service connection restored after {0} retry attempt(s).</source>
+      <translation>已重试 {0} 次，模型服务连接恢复。</translation>
+    </message>
+    <message>
       <source>: {0} → {1} tokens</source>
       <translation>：{0} → {1} token</translation>
     </message>

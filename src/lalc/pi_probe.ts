@@ -1,6 +1,7 @@
 import { access, readFile, realpath, writeFile } from "node:fs/promises";
 import { writeSync } from "node:fs";
 import { isAbsolute, join, relative, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { createReadTool, createEditTool, loadSkills, formatSkillsForPrompt, detectSupportedImageMimeTypeFromFile } from "@earendil-works/pi-coding-agent";
 import { installContext, contextTokens, contextLimit } from "./pi_context.ts";
 import { openAICompletionsApi, Type } from "@earendil-works/pi-ai";
@@ -32,16 +33,52 @@ export function transportCause(error, depth = 0) {
   return result;
 }
 
-export function diagnosticFetch(fetcher, report, requestNumber) {
+function connectionFailure(error) {
+  switch (error?.code) {
+    case "ETIMEDOUT": return !error.syscall || error.syscall === "connect" ? "connection_timeout" : undefined;
+    case "UND_ERR_CONNECT_TIMEOUT": return "connection_timeout";
+    case "EAI_AGAIN": return "dns_temporary";
+    case "ENOTFOUND": return "dns_not_found";
+    case "ECONNREFUSED": return "connection_refused";
+  }
+  if (error?.name === "TimeoutError") return "connection_timeout";
+  if (error?.cause) return connectionFailure(error.cause);
+  if (error?.errors?.length) {
+    const codes = error.errors.map(connectionFailure);
+    if (codes.includes("connection_refused")) return "connection_refused";
+    if (codes.every(Boolean)) return codes[0];
+  }
+}
+
+export function diagnosticFetch(fetcher, report, requestNumber, retryLimit, signal) {
   return async (input, init) => {
-    const started = Date.now();
     const parsed = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
     const url = parsed.origin + parsed.pathname;
-    const failed = (phase, error) => report({ requests: requestNumber(), url, phase,
-      elapsed_ms: Date.now() - started, error: transportCause(error) });
+    const abort = signal ?? init?.signal;
+    let started: number;
     let response;
-    try { response = await fetcher(input, init); }
-    catch (error) { failed("connect", error); throw error; }
+    for (let retry = 0; ; retry++) {
+      abort?.throwIfAborted();
+      started = Date.now();
+      try {
+        response = await fetcher(input, init);
+      } catch (error) {
+        const cause = transportCause(error);
+        const code = connectionFailure(cause);
+        const details = { requests: requestNumber(), url, phase: "connect",
+          elapsed_ms: Date.now() - started, error: cause, failure_code: code };
+        if (abort?.aborted || init?.signal?.aborted || retry >= retryLimit
+            || !code || !["connection_timeout", "dns_temporary", "dns_not_found"].includes(code)) {
+          report("lalc_transport_error", { ...details, retries_used: retry, retry_limit: retryLimit });
+          throw error;
+        }
+        report("lalc_connection_retry", { ...details, retry: retry + 1, retry_limit: retryLimit });
+        await delay(1000, undefined, { signal: abort });
+        continue;
+      }
+      if (retry) report("lalc_connection_restored", { requests: requestNumber(), url, retry, retry_limit: retryLimit });
+      break;
+    }
     if (!response.body) return response;
     const reader = response.body.getReader();
     const body = new ReadableStream({
@@ -49,7 +86,11 @@ export function diagnosticFetch(fetcher, report, requestNumber) {
         try {
           const { done, value } = await reader.read();
           if (done) controller.close(); else controller.enqueue(value);
-        } catch (error) { failed("response_body", error); controller.error(error); }
+        } catch (error) {
+          report("lalc_transport_error", { requests: requestNumber(), url, phase: "response_body",
+            elapsed_ms: Date.now() - started, error: transportCause(error) });
+          controller.error(error);
+        }
       },
       cancel(reason) { return reader.cancel(reason); },
     });
@@ -158,12 +199,13 @@ export default async function (pi) {
       return api.streamSimple(model, context, {
         ...options,
         maxRetries: 0,
-        fetch: diagnosticFetch(options?.fetch ?? globalThis.fetch, details => {
+        fetch: diagnosticFetch(options?.fetch ?? globalThis.fetch, (type, details) => {
           const key = process.env.LALC_PI_API_KEY!;
           const clean = JSON.parse(JSON.stringify(details, (_name, value) =>
             typeof value === "string" && key !== "lalc-no-key" ? value.replaceAll(key, "[REDACTED]") : value));
-          emit("lalc_transport_error", clean);
-        }, () => requests),
+          emit(type, { ...clean, stage: accounting.summarizing ? "compaction" : "provider_request" });
+        }, () => accounting.summarizing ? accounting.compactionRequests : requests,
+        Number(process.env.LALC_PI_CONNECTION_RETRY_LIMIT) || 0, options?.signal),
         async onPayload(payload, model) {
           payload = options?.onPayload ? (await options.onPayload(payload, model)) ?? payload : payload;
           // 历史 GUI 工具声明不能随续聊进入 CLI；最终请求也按当前启用集合限权。

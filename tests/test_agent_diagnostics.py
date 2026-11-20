@@ -6,6 +6,8 @@
 import asyncio
 import io
 import json
+import socket
+import ssl
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 
@@ -13,7 +15,7 @@ import pytest
 
 from lalc.agent_diagnostics import check_settings, error_details, redact
 from lalc.agent_settings import load_settings, validate_settings
-from lalc.pi_probe import _models
+from lalc.pi_probe import _models, session_models
 from test_agent_repair import host_for, candidate_files
 
 
@@ -73,8 +75,15 @@ def test_http_details_keep_body_cause_and_redact_before_logging(tmp_path, monkey
     assert "ERROR" in caplog.text
 
 
-@pytest.mark.parametrize("reason", [URLError("connection refused"), URLError(TimeoutError()), TimeoutError()])
-def test_unreachable_errors_keep_nonempty_reason(monkeypatch, reason):
+@pytest.mark.parametrize("reason,code", [
+    (URLError(ConnectionRefusedError()), "connection_refused"),
+    (URLError(TimeoutError()), "connection_timeout"),
+    (TimeoutError(), "connection_timeout"),
+    (URLError(socket.gaierror(socket.EAI_NONAME, "not found")), "dns_not_found"),
+    (URLError(socket.gaierror(socket.EAI_AGAIN, "try again")), "dns_temporary"),
+    (URLError(ssl.SSLEOFError("unexpected EOF")), "connection_failed"),
+])
+def test_unreachable_errors_keep_nonempty_reason(monkeypatch, reason, code):
     def fail(*args, **kwargs):
         raise reason
     monkeypatch.setattr("lalc.pi_probe.urlopen", fail)
@@ -82,7 +91,40 @@ def test_unreachable_errors_keep_nonempty_reason(monkeypatch, reason):
         _models("http://host/v1", "lalc-no-key")
     details = error_details(caught.value, "check")
     assert details["message"] and details["cause"] and details["traceback"]
+    assert details["failure_code"] == code
     assert details["url"] == "http://host/v1/models"
+
+
+@pytest.mark.parametrize("outcome", ["restored", "exhausted", "refused", "cancelled"])
+def test_session_model_list_connection_retries(monkeypatch, outcome):
+    from lalc.agent_diagnostics import AgentDiagnosticError
+    import lalc.pi_probe as probe
+
+    events, waits, calls = [], [], []
+    def load(*_):
+        calls.append(None)
+        if outcome == "restored" and len(calls) == 2:
+            return [{"id": "test"}]
+        code = "connection_refused" if outcome == "refused" else "dns_not_found"
+        raise AgentDiagnosticError("failed", "service_check", failure_code=code)
+    async def wait(seconds):
+        waits.append(seconds)
+        if outcome == "cancelled":
+            raise asyncio.CancelledError
+    monkeypatch.setattr(probe, "_pi_models", load)
+    monkeypatch.setattr(probe, "CONNECTION_RETRY_LIMIT", 2)
+    monkeypatch.setattr(probe, "asyncio", SimpleNamespace(to_thread=asyncio.to_thread, sleep=wait))
+
+    operation = session_models(None, "lalc-no-key", events.append)
+    if outcome == "restored":
+        assert asyncio.run(operation) == [{"id": "test"}]
+    else:
+        with pytest.raises(asyncio.CancelledError if outcome == "cancelled" else AgentDiagnosticError):
+            asyncio.run(operation)
+    assert len(calls) == {"restored": 2, "exhausted": 3, "refused": 1, "cancelled": 1}[outcome]
+    assert waits == {"restored": [1], "exhausted": [1, 1], "refused": [], "cancelled": [1]}[outcome]
+    assert [event["retry"] for event in events if event["type"] == "lalc_connection_retry"] == list(range(1, len(waits) + 1))
+    assert any(event["type"] == "lalc_connection_restored" for event in events) == (outcome == "restored")
 
 
 @pytest.mark.parametrize("body", [b"not json", b'{}', b'{"data":[1]}'])
@@ -94,18 +136,15 @@ def test_invalid_model_responses_are_diagnostic(monkeypatch, body):
 
 @pytest.mark.parametrize("error_stage", ["settings", "pi_start", "model_preflight", "agent", "cancel_cleanup"])
 def test_repair_failure_preserves_candidate_context_and_full_details(tmp_path, monkeypatch, caplog, error_stage):
-    from contextlib import contextmanager
     from lalc.agent_diagnostics import AgentDiagnosticError
     host, _ = host_for(tmp_path)
     chat = host.conversation
     before = candidate_files(host.candidate)
     history = {"role": "user", "content": [{"type": "text", "text": "prior"}]}
     chat.history.append(history)
-    @contextmanager
-    def fail(*args, **kwargs):
+    async def fail(*args, **kwargs):
         raise AgentDiagnosticError("test-secret failure", error_stage)
-        yield
-    monkeypatch.setattr("lalc.agent_repair.configured_pi", fail)
+    monkeypatch.setattr("lalc.agent_repair.session_models", fail)
     ticks = iter((100.0, 165.5))
     monkeypatch.setattr('lalc.agent_repair.time', SimpleNamespace(monotonic=lambda: next(ticks)))
     result = asyncio.run(chat.run("test", SimpleNamespace(pi="pi", ask_api_key=False), key="test-secret"))
@@ -133,16 +172,13 @@ def test_redaction_covers_nested_auth_fields_and_rotated_keys():
 
 
 def test_next_round_reads_new_saved_settings_without_new_conversation(tmp_path, monkeypatch):
-    from contextlib import contextmanager
     from lalc.agent_settings import save_settings
     host, _ = host_for(tmp_path)
     chat, models = host.conversation, []
-    @contextmanager
-    def fail(options, *args, **kwargs):
+    async def fail(options, *args, **kwargs):
         models.append(options.model)
         raise ValueError("stop before pi")
-        yield
-    monkeypatch.setattr("lalc.agent_repair.configured_pi", fail)
+    monkeypatch.setattr("lalc.agent_repair.session_models", fail)
     options = SimpleNamespace(pi="pi", ask_api_key=False)
     save_settings(host.service.data_root, {"provider": "llama.cpp", "model": "first"})
     asyncio.run(chat.run("first", options))

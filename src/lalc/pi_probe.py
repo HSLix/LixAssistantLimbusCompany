@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from collections import deque
+import errno
 import json
 import logging
 import os
 from pathlib import Path
 import shutil
+import socket
 import subprocess
 import sys
 import threading
@@ -21,6 +23,7 @@ from .agent_diagnostics import AgentDiagnosticError, redact
 
 
 PI_VERSION = "1.5.0"
+CONNECTION_RETRY_LIMIT = 999
 _spawn_lock = threading.Lock()
 
 
@@ -155,9 +158,21 @@ def _models(base_url: str, key: str) -> list[dict]:
                                    response_body=redact(body, [key]),
                                    hint="检查 API Key 和服务权限。" if error.code in {401, 403} else
                                    "检查模型服务或代理日志；HTTP 状态码不能单独确定故障来源。") from error
-    except (URLError, TimeoutError, ConnectionError) as error:
-        raise AgentDiagnosticError("模型服务无法连接或连接超时，请查看错误详情。", "service_check",
-                                   url=request.full_url, cause=redact(str(error) or type(error).__name__, [key]),
+    except OSError as error:
+        cause = error.reason if isinstance(error, URLError) else error
+        if isinstance(cause, TimeoutError) or getattr(cause, "errno", None) == errno.ETIMEDOUT:
+            code, message = "connection_timeout", "连接模型服务超时"
+        elif isinstance(cause, socket.gaierror) and cause.errno == socket.EAI_AGAIN:
+            code, message = "dns_temporary", "模型服务域名暂时无法解析"
+        elif isinstance(cause, socket.gaierror) and cause.errno in {socket.EAI_NONAME, getattr(socket, "EAI_NODATA", None)}:
+            code, message = "dns_not_found", "模型服务域名未解析"
+        elif isinstance(cause, ConnectionRefusedError):
+            code, message = "connection_refused", "模型服务拒绝连接"
+        else:
+            code, message = "connection_failed", "模型服务连接失败"
+        raise AgentDiagnosticError(message + "，请查看错误详情。", "service_check",
+                                   url=request.full_url, failure_code=code,
+                                   cause=redact(str(error) or type(error).__name__, [key]),
                                    hint="检查服务是否启动、客户端网络/Tailscale、地址和代理设置。") from error
     except (ValueError, UnicodeError) as error:
         raise AgentDiagnosticError("模型列表响应格式不正确，请检查 Base URL 和服务响应。", "service_check",
@@ -276,16 +291,43 @@ async def rpc_session(command: list[str], env: dict[str, str], cwd: str, show, *
             raise failure
 
 
-@contextmanager
-def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None, startup=None):
-    """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
+def _pi_models(args, key):
+    """先拒绝无效的启动配置，再查询模型列表。"""
     if not shutil.which(args.pi) and not (getattr(sys, "frozen", False) and args.pi == "pi" and
             (Path(sys.executable).resolve().parent / "pi" / "pi.exe").is_file()):
         raise AgentDiagnosticError(f"pi executable not found: {args.pi}", "pi_start")
-    base = args.base_url.rstrip("/")
     if not args.model:
         raise AgentDiagnosticError("Agent model is required; supply --model 或在 Agent Settings 中填写模型。", "settings")
-    models = _models(base, key)
+    return _models(args.base_url.rstrip("/"), key)
+
+
+async def session_models(args, key, record):
+    """仅 Session 的模型列表查询可重连；等待期间可取消当前轮。"""
+    for retry in range(CONNECTION_RETRY_LIMIT + 1):
+        try:
+            models = await asyncio.to_thread(_pi_models, args, key)
+        except AgentDiagnosticError as error:
+            code = error.evidence.get("failure_code")
+            if retry == CONNECTION_RETRY_LIMIT or code not in {"connection_timeout", "dns_temporary", "dns_not_found"}:
+                if retry:
+                    error.evidence.update(retries_used=retry, retry_limit=CONNECTION_RETRY_LIMIT)
+                raise
+            record({"type": "lalc_connection_retry", "stage": "service_check", **error.evidence,
+                    "retry": retry + 1, "retry_limit": CONNECTION_RETRY_LIMIT})
+            await asyncio.sleep(1)
+        else:
+            if retry:
+                record({"type": "lalc_connection_restored", "stage": "service_check", "retry": retry,
+                        "retry_limit": CONNECTION_RETRY_LIMIT})
+            return models
+
+
+@contextmanager
+def configured_pi(args, root: Path, key: str, system_prompt: str, *, require_image: bool = True, on_warning=None, startup=None, models=None):
+    """隔离连接配置；版本差异仅警告，保留实际版本供终端、GUI 和日志检查。"""
+    if models is None:
+        models = _pi_models(args, key)
+    base = args.base_url.rstrip("/")
     matching = [m for m in models if m["id"] == args.model]
     if len(matching) != 1:
         raise AgentDiagnosticError("Select exactly one model with --model：模型不存在或 ID 不唯一。", "model_status")

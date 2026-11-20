@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import uuid
 
-from .pi_probe import PI_VERSION, PiStartup, configured_pi, rpc_event, rpc_session
+from .pi_probe import CONNECTION_RETRY_LIMIT, PI_VERSION, PiStartup, configured_pi, rpc_event, rpc_session, session_models
 from .repair_tools import RepairTools
 from .agent_policy import allowed_tools
 from .manifest_reference import ManifestReference
@@ -211,7 +211,11 @@ def model_error(message, stage, requests, request_limit, transport=None):
         code = "output_limit"
         summary = f"模型单次输出被长度上限截断（stopReason=length，输出 {usage.get('output', '未知')} token）；不是本轮请求次数超限。"
     else:
-        code, summary = "provider_error", original or f"模型请求未正常结束（stopReason={stop or '未提供'}），服务未返回具体错误说明。"
+        code = (transport or {}).get("failure_code") or "provider_error"
+        summary = {"connection_timeout": "连接模型服务超时。", "dns_temporary": "模型服务域名暂时无法解析。",
+                   "dns_not_found": "模型服务域名未解析。", "connection_refused": "模型服务拒绝连接。"}.get(code)
+        if not summary:
+            summary = original or f"模型请求未正常结束（stopReason={stop or '未提供'}），服务未返回具体错误说明。"
     parts = message.get("content", [])
     if transport:
         summary += " 底层连接信息：" + json.dumps(transport.get("error", {}), ensure_ascii=False)
@@ -424,9 +428,10 @@ class RepairConversation:
                 self.log.save_json(f"{prefix}/input.json", input_record)
                 stage = "pi_start"
                 startup = PiStartup()
+                models = await session_models(options, self.log.key, self.log.record)
                 with configured_pi(options, self.host.candidate.resolve(), self.log.key, self.system_prompt,
                                    require_image=bool(attachments), on_warning=self.log.record,
-                                   startup=startup) as (command, env, temporary, model):
+                                   startup=startup, models=models) as (command, env, temporary, model):
                     self.log.transport_dir = Path(temporary)
                     payloads = Path(temporary) / "payloads"
                     payloads.mkdir()
@@ -440,6 +445,7 @@ class RepairConversation:
                     env["LALC_PI_PAYLOAD_DIR"] = str(payloads)
                     env["LALC_PI_CONVERSATION_ROUND"] = str(self.log.group)
                     env["LALC_PI_ROUND_REQUEST_LIMIT"] = str(settings["max_requests"])
+                    env["LALC_PI_CONNECTION_RETRY_LIMIT"] = str(CONNECTION_RETRY_LIMIT)
                     env["LALC_PI_REPAIR_FILES"] = json.dumps([str((self.host.candidate / name).resolve()) for name in names])
                     history_path = Path(temporary) / "history.json"
                     history_path.write_text(json.dumps(self.log.clean(prior_history)), encoding="utf-8")
@@ -468,9 +474,14 @@ class RepairConversation:
                         self.log.save_json(f"{prefix}/input.json", input_record)
                         ready = await configure_session(send, event, self.log, expected)
                         await send({"id": "lalc_prepare", "type": "prompt", "message": "/lalc_prepare"})
+                        preparing_summary = False
                         while True:
-                            prepared = await rpc_event(event, "持久上下文准备")
+                            prepared = await event() if preparing_summary else await rpc_event(event, "持久上下文准备")
                             self.log.record(prepared)
+                            if prepared.get("type") == "lalc_compaction_request":
+                                preparing_summary = True
+                            elif prepared.get("type") == "lalc_compaction_usage":
+                                preparing_summary = False
                             if prepared.get("type") == "lalc_context_ready":
                                 break
                             if prepared.get("type") == "lalc_compaction" and prepared.get("phase") == "failed":
@@ -631,8 +642,11 @@ def run_repair(args, manager):
         conversation = session.conversation()
         images = args.image or []
         message = args.problem + ("\n异常信息：" + args.exception if args.exception else "")
+        def show_retry(row):
+            if row["event"].get("type") in {"lalc_connection_retry", "lalc_connection_restored"}:
+                print(json.dumps(row, ensure_ascii=False), file=sys.stderr, flush=True)
         while True:
-            result = asyncio.run(conversation.run(message, args, images=images))
+            result = asyncio.run(conversation.run(message, args, images=images, on_event=show_retry))
             result["session_id"] = session.identity
             print(json.dumps(result, ensure_ascii=False), flush=True)
             if not args.chat:
