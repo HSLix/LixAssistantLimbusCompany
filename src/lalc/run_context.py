@@ -90,12 +90,13 @@ class RunContext:
     def match_asset(
         self, logical_name: str, *, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
+        _group: bool = False,
     ) -> list[dict[str, Any]]:
         """仅供 observe Action 在现有内存截图中匹配语义 Asset。"""
 
         return self._executor.match_asset(logical_name, {
             "priority_tags": priority_tags, "region": region, "threshold": threshold, "nms": nms,
-            "nms_iou_threshold": nms_iou_threshold,
+            "nms_iou_threshold": nms_iou_threshold, **({"_group": True} if _group else {}),
         })
 
     def match_feature(self, logical_name: str, *, region: dict[str, int] | None = None,
@@ -121,6 +122,14 @@ class RunContext:
         """仅供 observe Action 请求现场截图裁剪；只新增文件，不改 Manifest。"""
 
         return self._executor.crop_asset(logical_name, region, tags)
+
+    def stage_asset_crop(self, *, region: dict[str, int]) -> str:
+        """仅供 observe Action 暂存当前帧的裁剪。"""
+        return self._executor.stage_asset_crop(region)
+
+    def finish_asset_crop(self, crop_id: str, logical_name: str | None, tags: list[str] | None) -> dict[str, Any] | None:
+        """仅供 observe Action 保存或释放暂存裁剪。"""
+        return self._executor.finish_asset_crop(crop_id, logical_name, tags)
 
     def control_input(self, operation: str, **arguments: Any) -> None:
         """供 control Action 进入输入会话；observe Action 仅可调用无输入的 wait。"""

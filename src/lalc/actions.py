@@ -121,6 +121,20 @@ def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, regi
                            nms_iou_threshold=nms_iou_threshold)
 
 
+def match_asset_group(ctx, *, group: str, region: dict[str, int] | None = None,
+                      threshold: float = 0.9, nms: bool = True,
+                      nms_iou_threshold: float = 0.5) -> list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]]:
+    """用当前内存帧匹配指定路径及其子目录的全部 Asset 模板。
+
+    group 使用斜杠分隔的逻辑路径，例如 mirror/gift/bleed。每条命中保留原 logical_name，
+    其余字段、客户区坐标及可选 region、threshold 和 NMS 参数与 observe.match_asset 一致。
+    所有模板共享一次 NMS，不作优先标签短路。组路径缺失、空组或无命中均返回 []；
+    非法路径、坏模板或无当前帧时报错。
+    """
+    return ctx.match_asset(group, region=region, threshold=threshold, nms=nms,
+                           nms_iou_threshold=nms_iou_threshold, _group=True)
+
+
 def match_feature(ctx, *, asset: str, region: dict[str, int] | None = None,
                   nms: bool = True, nms_iou_threshold: float = 0.4,
                   grayscale: bool = True, scale: int = 3, clahe: bool = True,
@@ -218,6 +232,32 @@ def crop_asset(ctx, *, asset: str, region: dict[str, int], tags: list[str] | Non
             不是追加；同名同哈希再次裁剪也会整体替换标签，None 或 [] 会清空已有标签。
     """
     return ctx.crop_asset(asset, region=region, tags=tags)
+
+
+def stage_asset_crop(ctx, *, region: dict[str, int]) -> str:
+    """从当前内存帧暂存一块原图裁剪并返回本 Run 的 crop_id。
+
+    region 使用客户区原图像素矩形 {x, y, width, height}。可以连续暂存多块；后续截图不会覆盖
+    暂存图。该动作不截图、不写盘。每个 Run 最多同时暂存 256 块、合计 64 MiB；Run 结束释放。
+    """
+    return ctx.stage_asset_crop(region=region)
+
+
+def save_asset_crop(ctx, *, crop_id: str, asset: str,
+                    tags: list[str] | None = None) -> dict[str, str | int | bool | list[str] | dict[str, int]]:
+    """按完整 Asset 逻辑名保存本 Run 的暂存裁剪，保留裁剪时的原始观察和区域。
+
+    成功后释放 crop_id。失效 ID 报错；同名同哈希复用已有图及已登记标签。
+    返回素材路径、哈希、标签和来源。保存后的模板可从下一次匹配起使用。
+    """
+    result = ctx.finish_asset_crop(crop_id, asset, tags)
+    assert result is not None
+    return result
+
+
+def discard_asset_crop(ctx, *, crop_id: str) -> None:
+    """释放本 Run 的暂存裁剪；已释放或未知的 ID 可直接略过。"""
+    ctx.finish_asset_crop(crop_id, None, None)
 
 
 @overload
@@ -351,8 +391,12 @@ def application_actions() -> dict[str, TrustedAction]:
         "observe.capture_screen": TrustedAction(capture_screen, "observe"),
         "observe.ocr": TrustedAction(ocr, "observe"),
         "observe.match_asset": TrustedAction(match_asset, "observe"),
+        "observe.match_asset_group": TrustedAction(match_asset_group, "observe"),
         "observe.match_feature": TrustedAction(match_feature, "observe"),
         "observe.crop_asset": TrustedAction(crop_asset, "observe"),
+        "observe.stage_asset_crop": TrustedAction(stage_asset_crop, "observe"),
+        "observe.save_asset_crop": TrustedAction(save_asset_crop, "observe"),
+        "observe.discard_asset_crop": TrustedAction(discard_asset_crop, "observe"),
         "control.click": TrustedAction(click, "control"),
         "control.key_press": TrustedAction(key_press, "control"),
         "control.drag": TrustedAction(drag, "control"),

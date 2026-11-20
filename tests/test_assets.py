@@ -1,4 +1,4 @@
-"""覆盖模板检测、文件约束、优先标签分组、使用索引、现场裁剪及同 Run 可见性。
+"""覆盖模板检测、按路径组匹配、使用索引、现场和暂存裁剪及同 Run 可见性。
 
 在项目根目录运行：
 UV_CACHE_DIR=.generated/uv-cache uv run --frozen --extra automation pytest -q tests/test_assets.py
@@ -355,3 +355,81 @@ def test_crop_is_fresh_and_keeps_original_pixels_and_provenance(tmp_path):
     for crop in (first, second):
         record = json.loads((tmp_path / "asset-provenance" / f"{crop['provenance_id']}.json").read_text(encoding="utf-8"))
         assert record["sha256"] == crop["sha256"] and record["region"] == inputs["region"]
+
+
+def test_group_matching_uses_path_segments_and_global_nms(tmp_path):
+    library = AssetLibrary(tmp_path)
+    entry(tmp_path, "gifts/bleed")
+    entry(tmp_path, "gifts/bleed/nested/gift")
+    entry(tmp_path, "gifts/bleeding/gift")
+    events = []
+    found = library.match("gifts/bleed", pixels(screenshot()), (12, 8), run_id=3,
+                          observation=7, emit=lambda _, event: events.append(event),
+                          threshold=.999, _group=True)
+    assert [hit["logical_name"] for hit in found] == ["gifts/bleed"] * 2
+    assert [item["path"].rsplit("/", 1)[0] for item in events[0]["templates"]] == [
+        "gifts/bleed", "gifts/bleed/nested/gift",
+    ]
+
+
+def test_formal_staged_crops_survive_frame_refresh_and_are_immediately_matchable(tmp_path):
+    from runtime_support import add_plan
+
+    first = template()
+    second = np.flip(first, axis=0).copy()
+    image = screenshot()
+    image[5:7, 8:10] = second
+
+    class ChangingWindow(Window):
+        def capture(self, hwnd, width, height):
+            self.image = np.zeros_like(image) if self.captures == 1 else image
+            return super().capture(hwnd, width, height)
+
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    (candidate / "step.py").write_text(
+        '''"""校验暂存裁剪受正式动作保护，并保留点击前画面。"""
+from lalc import step
+
+@step
+def execute(ctx) -> str:
+    ctx.action("observe.capture_screen", save=False)
+    assert ctx.action("observe.match_asset_group", group="gifts") == []
+    left = {"x": 2, "y": 1, "width": 2, "height": 2}
+    right = {"x": 8, "y": 5, "width": 2, "height": 2}
+    one = ctx.action("observe.stage_asset_crop", region=left)
+    two = ctx.action("observe.stage_asset_crop", region=right)
+    unused = ctx.action("observe.stage_asset_crop", region=right)
+    ctx.action("observe.discard_asset_crop", crop_id=unused)
+    ctx.action("observe.stage_asset_crop", region=right)
+    ctx.action("observe.capture_screen", save=False)
+    ctx.action("observe.save_asset_crop", crop_id=two, asset="gifts/burn/second")
+    ctx.action("observe.save_asset_crop", crop_id=one, asset="gifts/bleed/first", tags=["en"])
+    ctx.action("observe.capture_screen", save=False)
+    hits = ctx.action("observe.match_asset_group", group="gifts", threshold=.999)
+    return ",".join(hit["logical_name"] for hit in hits)
+''', encoding="utf-8",
+    )
+    manifest = candidate / "manifest.json"
+    manifest.write_text(json.dumps({"schema_version": 2, "components": {
+        "steps.find": {"source_path": "step.py"}}, "recovery_rules": {}}), encoding="utf-8")
+    add_plan(manifest)
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(manifest)
+    assert published.ok, published.errors
+    window = ChangingWindow()
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=window)
+    state = finish(service, service.start("steps.find", {}, manifest_id=published.loaded.manifest_id))
+    assert state["result"]["status"] == "success", state["result"]
+    assert state["result"]["output"] == "gifts/bleed/first,gifts/burn/second"
+    assert window.captures == 3
+    assert not (tmp_path / "evidence").exists()
+    assert not service._staged_crops
+    captured = [record for record in state["trace"] if record["event"] == "asset_created"]
+    assert len(captured) == 2
+    assert captured[0]["observation"] == captured[1]["observation"]
+    for record, expected in zip(captured, (second, first), strict=True):
+        assert np.array_equal(decode_image((tmp_path / "assets" / record["path"]).read_bytes()), expected)
+    index = json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8"))
+    assert set(index) == {"gifts/bleed/first", "gifts/burn/second"}
+    assert all(row["observation"] > captured[0]["observation"] for row in index.values())

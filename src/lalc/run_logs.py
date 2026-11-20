@@ -122,7 +122,7 @@ def log_text(record: dict) -> str:
         status += " (attempted)"
     text = f"{record['logical_name']} · {status}\n" + json.dumps(record.get("inputs", {}), ensure_ascii=False)
     result = record.get("return_value")
-    if record["logical_name"] in {"observe.match_asset", "observe.match_feature"} and isinstance(result, list):
+    if record["logical_name"] in {"observe.match_asset", "observe.match_asset_group", "observe.match_feature"} and isinstance(result, list):
         text += "\n" + "\n".join(f"#{i}: score={item['score']}" for i, item in enumerate(result, 1))
     if result is not None:
         text += "\n" + display_json(result)

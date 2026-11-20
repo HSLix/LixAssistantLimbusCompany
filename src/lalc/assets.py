@@ -139,8 +139,19 @@ class AssetLibrary:
         """保存现场裁剪和来源；开发者替换标签，Agent 可要求保留已有图的标签。"""
         asset_name(name)
         self.tags(tags)
-        self._tag_mapping(name)
         content, area = self.crop_content(pixels, size, region)
+        return self.save_crop_content(name, content, size, area, run_id=run_id, observation=observation,
+                                      tags=tags, preserve_existing_tags=preserve_existing_tags)
+
+    def save_crop_content(
+        self, name: str, content: bytes, size: tuple[int, int], area: dict[str, int], *,
+        run_id: int | None, observation: int, tags: list[str] | None = None,
+        preserve_existing_tags: bool = False,
+    ) -> dict[str, Any]:
+        """保存应用内已编码的原图裁剪，沿用完整哈希和裁剪来源契约。"""
+        asset_name(name)
+        self.tags(tags)
+        self._tag_mapping(name)
         digest = sha256_bytes(content)
         relative = f"{name}/{digest}.png"
         path = self.path(relative)
@@ -328,6 +339,7 @@ class AssetLibrary:
         priority_tags: list[str] | None = None, region: dict[str, int] | None = None,
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
         record_usage: bool = True, _feature_options: dict[str, Any] | None = None,
+        _group: bool = False, _checkpoint: Callable[[], None] | None = None,
     ) -> list[dict[str, Any]]:
         """每次读取目录及标签；内部 SIFT 参数切换算法，调试可关闭使用索引。"""
         import math
@@ -342,15 +354,34 @@ class AssetLibrary:
         if type(record_usage) is not bool:
             raise ValueError("record_usage must be bool.")
         directory = self.path(name)
-        if not directory.is_dir():
+        if _group and directory != self.root.resolve() / name:
+            raise ValueError("Asset group does not accept path aliases.")
+        if not directory.is_dir() and (not _group or directory.exists()):
             raise FileNotFoundError(f"Asset logical name does not exist: {name}")
-        mapping = self._tag_mapping(name)
+        directories = [(name, directory)] if not _group else []
+        if _group and directory.is_dir():
+            def on_error(error: OSError) -> None:
+                raise error
+
+            for folder, children, files in os.walk(directory, onerror=on_error):
+                if _checkpoint is not None:
+                    _checkpoint()
+                current = Path(folder)
+                for child in children:
+                    if (current / child).is_symlink():
+                        raise ValueError(f"Asset group does not accept directory symlinks: {child}")
+                if any(filename.endswith(".png") for filename in files):
+                    relative = current.relative_to(directory).as_posix()
+                    logical_name = name if relative == "." else f"{name}/{relative}"
+                    directories.append((asset_name(logical_name), current))
         candidates = []
-        for path in sorted(directory.glob("*.png")):
-            if not re.fullmatch(r"[0-9a-f]{64}", path.stem):
-                raise ValueError(f"Asset filename must be a complete SHA-256: {path.name}")
-            candidates.append({"path": f"{name}/{path.name}", "sha256": path.stem,
-                               "tags": list(mapping.get(path.stem, []))})
+        for logical_name, folder in sorted(directories):
+            mapping = self._tag_mapping(logical_name)
+            for path in sorted(folder.glob("*.png")):
+                if not re.fullmatch(r"[0-9a-f]{64}", path.stem):
+                    raise ValueError(f"Asset filename must be a complete SHA-256: {path.name}")
+                candidates.append({"path": f"{logical_name}/{path.name}", "sha256": path.stem,
+                                   "tags": list(mapping.get(path.stem, []))})
         image = client_image(pixels, size)
         area = checked_region(region, *size)
         preferred = [entry for entry in candidates if set(entry["tags"]) & set(preferred_tags)]
@@ -361,6 +392,8 @@ class AssetLibrary:
         for label, entries in (("preferred", preferred), ("remaining", remaining)):
             detections = []
             for entry in entries:
+                if _checkpoint is not None:
+                    _checkpoint()
                 attempted.append(entry)
                 template = decode_image(self.read({key: entry[key] for key in ("path", "sha256")}))
                 # 跨模板统一 NMS，避免先抑制同模板的框导致最终结果丢失。
@@ -376,7 +409,7 @@ class AssetLibrary:
                                        "centerxy": (detection["x"] + detection["width"] // 2,
                                                     detection["y"] + detection["height"] // 2),
                                        "normalized_region": normalized,
-                                       "logical_name": name, "observation": observation})
+                                       "logical_name": entry["path"].rsplit("/", 1)[0], "observation": observation})
             if detections:
                 detections.sort(key=lambda d: (-d["score"], d["y"], d["x"], d["sha256"]))
                 output = suppress_overlaps(detections, nms_iou_threshold) if nms else detections
@@ -390,10 +423,23 @@ class AssetLibrary:
         if _feature_options is not None:
             event.update(method="sift", feature_options=_feature_options)
             event.pop("threshold")
+        if _group:
+            event["asset_group"] = event.pop("logical_name")
+        if _checkpoint is not None:
+            _checkpoint()
         emit("asset_matched", event)
         if output and record_usage:
             index_path = self.data_root / "asset-usage.json"
             index = json.loads(index_path.read_text(encoding="utf-8")) if index_path.exists() else {}
-            index[name] = {**event, "last_used_at": datetime.now(UTC).isoformat()}
+            last_used = datetime.now(UTC).isoformat()
+            if _group:
+                for logical_name in {hit["logical_name"] for hit in output}:
+                    index[logical_name] = {
+                        **event, "logical_name": logical_name, "last_used_at": last_used,
+                        "templates": [entry for entry in attempted if entry["path"].rsplit("/", 1)[0] == logical_name],
+                        "detections": [hit for hit in output if hit["logical_name"] == logical_name],
+                    }
+            else:
+                index[name] = {**event, "last_used_at": last_used}
             atomic_write_json(index_path, index)
         return output
