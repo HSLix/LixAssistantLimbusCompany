@@ -52,7 +52,8 @@ def capture_screen(ctx, *, save: bool = True, auto_park_cursor: bool = True) -> 
     return ctx.capture_screen(save=save, auto_park_cursor=auto_park_cursor)
 
 
-def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) -> dict[str, int | dict[str, int] | list[dict[str, str | float | dict[str, int] | list[int] | list[list[int]]]]]:
+def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0,
+        det_options: dict[str, Any] | None = None) -> dict[str, int | dict[str, int] | list[dict[str, str | float | dict[str, int] | list[int] | list[list[int]]]]]:
     """识别当前已捕获帧中的文字，不重新截图；不支持韩文。
 
     返回 observation、实际 region 和完整 items，含文字、置信度、原图框、轮廓和中心坐标。
@@ -63,6 +64,18 @@ def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) ->
         region：客户区原图像素矩形 {x, y, width, height}；默认 None 表示全图。
             坐标须为整数，宽高须为正且矩形完全位于客户区内；返回坐标仍相对于原图。
         min_score：保留文字项的最低置信度，范围 0–1，默认 0.0；提高会过滤更多低置信度文字。
+        det_options：仅本次调用生效的 RapidOCR 文字检测设置，未指定的项沿用原默认值。
+            thresh：文字像素阈值，0–1，默认 0.3。
+            box_thresh：检测框评分阈值，0–1，默认 0.5。
+            unclip_ratio：检测框扩张比例，(0, 10]，默认 1.6。
+            use_dilation：是否在找轮廓前膨胀文字掩码，布尔值，默认 True。
+            score_mode：检测框评分方式，"fast"（矩形，默认）或 "slow"（轮廓）。
+            max_candidates：最多检查的候选轮廓数，整数 1–10000，默认 1000。
+
+    标题分框异常时，可用同一帧和同一区域对照默认值与调参结果，例如：
+        ctx.action("observe.ocr", region=title_region, det_options={"thresh": 0.15})
+    降低 thresh 会让更多像文字的边缘像素参与找轮廓，可能补全笔画，也可能纳入背景或连起相邻文字。
+    min_score 在识别后过滤整条结果，调整它不会改变分框。
 
     返回值：
         字典，包含 observation、region、items：
@@ -77,7 +90,7 @@ def ocr(ctx, *, region: dict[str, int] | None = None, min_score: float = 0.0) ->
             centerxy：文字包围框中心 [x, y]，坐标为整数。
         所有位置均相对于完整客户区左上角，已加回 region 偏移，调用方不要重复平移。
     """
-    return ctx.ocr(region=region, min_score=min_score)
+    return ctx.ocr(region=region, min_score=min_score, det_options=det_options)
 
 
 def match_asset(ctx, *, asset: str, priority_tags: list[str] | None = None, region: dict[str, int] | None = None,

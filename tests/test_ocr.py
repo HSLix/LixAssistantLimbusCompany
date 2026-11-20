@@ -52,6 +52,54 @@ def test_bad_threshold_never_loads_model(score):
     assert service._engine is None
 
 
+@pytest.mark.parametrize("options, key", [
+    ({"thresh": float("nan")}, "thresh"),
+    ({"box_thresh": 1.1}, "box_thresh"),
+    ({"unclip_ratio": 0}, "unclip_ratio"),
+    ({"use_dilation": 1}, "use_dilation"),
+    ({"score_mode": "unknown"}, "score_mode"),
+    ({"max_candidates": True}, "max_candidates"),
+    ({"model_path": "other.onnx"}, "model_path"),
+])
+def test_bad_detection_options_never_load_model(options, key):
+    service = OcrService()
+    with pytest.raises(ValueError, match=key):
+        service.recognize(np.zeros((4, 4, 3), dtype=np.uint8), det_options=options, checkpoint=lambda: None)
+    assert service._engine is None
+
+
+def test_detection_options_are_scoped_to_one_call_even_on_error():
+    class Postprocess:
+        def __init__(self, **settings):
+            self.settings = settings
+
+    defaults = {"thresh": 0.3, "box_thresh": 0.5, "unclip_ratio": 1.6,
+                "use_dilation": True, "score_mode": "fast", "max_candidates": 1000}
+    original = Postprocess(**defaults)
+    detector = SimpleNamespace(postprocess_op=original)
+    overrides = {"thresh": 0.4, "unclip_ratio": 1.2, "use_dilation": False}
+
+    class Engine:
+        cfg = SimpleNamespace(Det=defaults)
+
+        def _load_det_model(self):
+            return detector
+
+        def __call__(self, *args, **kwargs):
+            if detector.postprocess_op is not original:
+                assert detector.postprocess_op.settings == defaults | overrides
+                raise OSError("inference failed")
+            return output()
+
+    service = OcrService()
+    service._engine = Engine()
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    with pytest.raises(OSError, match="inference failed"):
+        service.recognize(image, det_options=overrides, checkpoint=lambda: None)
+    assert detector.postprocess_op is original
+    assert len(service.recognize(image, checkpoint=lambda: None)["items"]) == 2
+
+
 def test_region_validation_empty_output_and_malformed_output():
     service = OcrService()
     image = np.zeros((8, 8, 3), dtype=np.uint8)
@@ -140,7 +188,7 @@ from lalc import step
 @step
 def execute(ctx) -> list[str]:
     ctx.action("observe.capture_screen")
-    result = ctx.action("observe.ocr", min_score=0.9)
+    result = ctx.action("observe.ocr", min_score=0.9, det_options={"unclip_ratio": 1.2})
     return [item["text"] for item in result["items"]]
 ''', encoding="utf-8")
     manifest_path = candidate / "manifest.json"
@@ -156,14 +204,18 @@ def execute(ctx) -> list[str]:
     recognized = {"region": {"x": 0, "y": 0, "width": 2, "height": 2}, "items": [
         {"text": "战斗开始", "score": 0.97, "box": {"x": 0, "y": 0, "width": 2, "height": 2},
          "polygon": [[0, 0], [1, 0], [1, 1], [0, 1]], "centerxy": [0, 0]}]}
-    service.ocr_service = SimpleNamespace(recognize=lambda *args, **kwargs: recognized)
+    def recognize(image, *, region, min_score, det_options, checkpoint):
+        assert region is None and min_score == 0.9 and det_options == {"unclip_ratio": 1.2}
+        return recognized
+
+    service.ocr_service = SimpleNamespace(recognize=recognize)
     run = service.start("steps.ocr", {})
     state = service.wait_for(lambda state: state["phase"] == "finished")
     assert state["result"]["status"] == "success", state["result"]
     events = [json.loads(line) for line in (tmp_path / "traces" / f"{run}.jsonl").read_text(encoding="utf-8").splitlines()]
     event = next(event for event in events if event["event"] == "trusted_action_returned"
                  and event["logical_name"] == "observe.ocr")
-    assert event["inputs"] == {"region": None, "min_score": 0.9}
+    assert event["inputs"] == {"region": None, "min_score": 0.9, "det_options": {"unclip_ratio": 1.2}}
     assert event["return_value"] == {"observation": 1, **recognized}
     assert event["duration_ms"] >= 0 and service.window_platform.captures == 1
     executor = WorkflowExecutor(published.loaded, RunGate(), lambda *args: None, ocr=service._ocr)

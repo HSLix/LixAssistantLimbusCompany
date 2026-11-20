@@ -14,6 +14,31 @@ MODEL_HASHES = {
     "PP-OCRv6_det_small.onnx": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f",
     "PP-OCRv6_rec_small.onnx": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
 }
+_DET_OPTIONS = ("thresh", "box_thresh", "unclip_ratio", "use_dilation", "score_mode", "max_candidates")
+
+
+def _check_det_options(options: dict[str, Any] | None) -> None:
+    """仅放行有限范围内的检测后处理参数。"""
+    if options is None:
+        return
+    if type(options) is not dict:
+        raise ValueError("det_options must be a dictionary.")
+    for name, value in options.items():
+        match name:
+            case "thresh" | "box_thresh":
+                valid = type(value) in {int, float} and 0 <= value <= 1
+            case "unclip_ratio":
+                valid = type(value) in {int, float} and 0 < value <= 10
+            case "use_dilation":
+                valid = type(value) is bool
+            case "score_mode":
+                valid = type(value) is str and value in ("fast", "slow")
+            case "max_candidates":
+                valid = type(value) is int and 1 <= value <= 10000
+            case _:
+                raise ValueError(f"Unknown OCR det_options key: {name!r}.")
+        if not valid:
+            raise ValueError(f"Invalid OCR det_options.{name} value.")
 
 
 def model_files() -> dict[str, Path]:
@@ -60,13 +85,15 @@ class OcrService:
         return RapidOCR(params=params)
 
     def recognize(self, image, *, region: dict[str, int] | None = None,
-                  min_score: float = 0.0, checkpoint) -> dict[str, Any]:
+                  min_score: float = 0.0, det_options: dict[str, Any] | None = None,
+                  checkpoint) -> dict[str, Any]:
         """识别一张 BGR 内存图；区域越界报错，不纠错、摘要或缓存结果。"""
         import numpy as np
         from .recognition import checked_region
 
         if type(min_score) not in {int, float} or not math.isfinite(min_score) or not 0 <= min_score <= 1:
             raise ValueError("min_score must be finite and between 0 and 1.")
+        _check_det_options(det_options)
         if image.dtype != np.uint8 or image.ndim != 3 or image.shape[2] != 3 or not image.size:
             raise ValueError("OCR requires a non-empty uint8 BGR image.")
         area = checked_region(region, image.shape[1], image.shape[0])
@@ -75,12 +102,22 @@ class OcrService:
         # SDK 会修改实例上的推理参数，同一实例不能并发使用。
         with self._lock:
             checkpoint()
+            detector = None
+            default_postprocess = None
             try:
                 if self._engine is None:
                     self._engine = self._load_engine()
+                if det_options:
+                    # 固定版本的 SDK 只支持逐次覆盖部分参数；替换后处理以复用模型并隔离本次设置。
+                    detector = self._engine._load_det_model()
+                    default_postprocess = detector.postprocess_op
+                    settings = {key: self._engine.cfg.Det[key] for key in _DET_OPTIONS}
+                    detector.postprocess_op = type(default_postprocess)(**(settings | det_options))
                 checkpoint()
                 result = self._engine(image[y:y + height, x:x + width].copy(), use_cls=False, text_score=0.0)
             finally:
+                if detector is not None:
+                    detector.postprocess_op = default_postprocess
                 # 原生推理不能即时中断，返回或抛错前均先检查取消和所有权。
                 checkpoint()
         items = []
