@@ -196,6 +196,63 @@ def test_transport_error_preserves_cause_and_request_without_retry(conversation,
     assert "test-private-key" not in json.dumps(result)
 
 
+@pytest.mark.parametrize("code,failures,outcome", [
+    ("ENOTFOUND", 1, "completed"),
+    ("UND_ERR_CONNECT_TIMEOUT", 2, "connection_timeout"),
+    ("ECONNREFUSED", 1, "connection_refused"),
+    ("EAI_AGAIN", 2, "user_cancelled"),
+])
+def test_retry_at_model_connection_boundary(conversation, tmp_path, monkeypatch, code, failures, outcome):
+    """真实 pi 注入底层连接错误，核对请求额度、恢复、耗尽及取消。"""
+    from contextlib import contextmanager
+    from lalc import agent_repair
+
+    chat, options, state = conversation
+    configured = agent_repair.configured_pi
+    monkeypatch.setattr(agent_repair, "CONNECTION_RETRY_LIMIT", 1)
+
+    @contextmanager
+    def faulty_connection(*args, **kwargs):
+        with configured(*args, **kwargs) as (command, env, cwd, model):
+            index = command.index("--extension") + 1
+            source = Path(command[index])
+            (tmp_path / "pi_context.ts").write_text(source.with_name("pi_context.ts").read_text())
+            extension = tmp_path / source.name
+            extension.write_text(f"""
+let remaining = {failures};
+const faultyFetch = (upstream) => async (...args) => {{
+  if (remaining-- > 0) {{
+    throw new TypeError("fetch failed", {{ cause: Object.assign(new Error("test connection failure"), {{ code: "{code}" }}) }});
+  }}
+  return upstream(...args);
+}};
+""" + source.read_text().replace("diagnosticFetch(options?.fetch ?? globalThis.fetch,",
+                                 "diagnosticFetch(faultyFetch(options?.fetch ?? globalThis.fetch),"))
+            command[index] = str(extension)
+            yield command, env, cwd, model
+
+    monkeypatch.setattr(agent_repair, "configured_pi", faulty_connection)
+
+    async def run():
+        def on_event(row):
+            if outcome == "user_cancelled" and row["event"]["type"] == "lalc_connection_retry":
+                asyncio.current_task().cancel()
+        return await chat.run("test connection retries", options, on_event=on_event, request_limit=1)
+
+    result = asyncio.run(run())
+    if outcome == "completed":
+        assert result["status"] == "completed", result
+    else:
+        assert result["reason"] == outcome, result
+    assert result["requests"] == 1 and len(state["calls"]) == (outcome == "completed")
+    events = [row["event"] for row in read_events(chat.log.path / "events.jsonl")]
+    retries = [event for event in events if event["type"] == "lalc_connection_retry"]
+    assert len(retries) == (code != "ECONNREFUSED")
+    if retries:
+        assert retries[0]["retry"] == retries[0]["retry_limit"] == retries[0]["requests"] == 1
+    assert any(event["type"] == "lalc_connection_restored" for event in events) == (outcome == "completed")
+
+
 @pytest.mark.parametrize("explicit", [True, False])
 def test_agent_previews_archives_and_restores_asset(conversation, explicit):
     from test_focused_observation import FakeWindowPlatform

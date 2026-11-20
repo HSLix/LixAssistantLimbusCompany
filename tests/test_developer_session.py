@@ -177,9 +177,9 @@ def test_idle_object_reloads_latest_state_before_new_round(session, monkeypatch)
     stale = session.conversation()
     other = session.conversation()
     other.append_user(message("from another entry"))
-    def no_pi(*args, **kwargs):
+    async def no_pi(*args, **kwargs):
         raise RuntimeError("stop before pi")
-    monkeypatch.setattr("lalc.agent_repair.configured_pi", no_pi)
+    monkeypatch.setattr("lalc.agent_repair.session_models", no_pi)
     result = asyncio.run(stale.run("new user input", SimpleNamespace(base_url="http://localhost:1/v1", model="test", max_requests=2, ask_api_key=False)))
     assert result["status"] == "incomplete"
     assert stale.history[0] == message("from another entry")
@@ -258,9 +258,9 @@ def test_cli_requires_exactly_one_source(source):
 def test_cli_chat_releases_lock_while_waiting_and_reloads_other_entry(session, monkeypatch, capsys):
     import lalc.__main__ as cli
     monkeypatch.setattr(cli, "default_data_root", lambda: session.host.service.data_root)
-    def no_pi(*args, **kwargs):
+    async def no_pi(*args, **kwargs):
         raise RuntimeError("stop before pi")
-    monkeypatch.setattr("lalc.agent_repair.configured_pi", no_pi)
+    monkeypatch.setattr("lalc.agent_repair.session_models", no_pi)
     identities = []
     def next_message(_prompt):
         rows = [json.loads(line) for line in capsys.readouterr().out.splitlines()]

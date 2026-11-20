@@ -2175,6 +2175,19 @@ class RepairPage(QWidget):
         if kind == "lalc_request":
             self.request_progress.setText(tr('Conversation round: {0}; model requests this round: {1}/{2}').format(number, value['requests'], value.get('request_limit', '—')))
             status = tr('Agent is responding…')
+        elif kind in {"lalc_connection_retry", "lalc_connection_restored"}:
+            if kind == "lalc_connection_retry":
+                reason = (tr('Connection timed out') if value['failure_code'] == 'connection_timeout'
+                          else tr('Could not resolve model service address'))
+                status = tr('{0}. Connection retry {1}/{2} (1 second between attempts).').format(reason, value['retry'], value['retry_limit'])
+            else:
+                status = tr('Model service connection restored after {0} retry attempt(s).').format(value['retry'])
+            activity = self.chat.activity(number)
+            timeline = activity['timeline']
+            key = (value['stage'], value.get('requests'))
+            index = activity.setdefault('connection_retries', {}).setdefault(key, len(timeline))
+            timeline[index:index + 1] = [status]
+            self.chat.render()
         elif kind == "repair_error":
             self.diagnostics.add_error(value)
         elif kind == "final_answer_retry":

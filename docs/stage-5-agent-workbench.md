@@ -38,6 +38,8 @@ Developer GUI 统一为一个“Agent 工作台 / Agent Workbench”页面，保
 
 一个 Developer Session 对应一段可继续的开发对话，拥有独立 Candidate、固定 Diff 基线、聊天、模式及页面草稿，关联完整 Agent Interaction Log。Session 是持久开发状态，日志是证据，二者不能混为一个目录快照或仅靠聊天文字推断状态。
 
+轮内允许[模型连接重试](agent-repair.md#连接错误诊断)。连接超时和 DNS 解析失败按原请求重连，当前轮可取消。聊天实时显示重试进度，重新打开 Session 可在对应轮次的时间线中查看。
+
 ### 创建与来源
 
 - Construct 可从空白草稿（含最小 Python Plan）开始，或显式选择已发布 Manifest 作为扩展基线；Repair 必须选择已发布 Manifest 作为修复基线。

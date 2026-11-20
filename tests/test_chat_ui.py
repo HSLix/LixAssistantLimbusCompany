@@ -504,6 +504,26 @@ def test_live_retry_and_budget_failure_keep_one_diagnostic_per_failed_response(g
     assert page.diagnostics.errors.itemData(1)['budget_exhausted']
 
 
+def test_connection_retry_updates_live_chat_and_replays_history(gui):
+    app, window = gui
+    page = window.repair_page
+    page.host.conversation.log.group = 1
+    details = {'stage': 'provider_request', 'requests': 2, 'retry_limit': 999}
+    retries = [{'round': 1, 'event': {**details, 'type': 'lalc_connection_retry',
+                                      'failure_code': 'dns_not_found', 'retry': attempt}}
+               for attempt in (1, 2)]
+    for row in retries:
+        page.show_event(row)
+    assert '2/999' in page.chat.activity(1)['status']
+    assert len(page.chat.activity(1)['timeline']) == 1
+    page.chat.activities.clear()
+    restored = {'round': 1, 'event': {**details, 'type': 'lalc_connection_restored', 'retry': 2}}
+    page.replay_history([*retries, restored])
+    timeline = page.chat.activity(1)['timeline']
+    assert len(timeline) == 1 and 'restored after 2' in timeline[0]
+    assert page.diagnostics.errors.count() == 0
+
+
 def test_history_loads_latest_round_then_prepends_on_scroll_without_replay(gui, monkeypatch):
     app, window = gui
     page = window.repair_page
