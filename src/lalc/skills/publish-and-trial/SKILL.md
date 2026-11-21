@@ -4,7 +4,7 @@ description: 修改 LALC Workflow 后校验发布、试运行验证，或编写�
 ---
 # 验证与试运行
 
-1. 每次 Publish 前更新 Candidate 的 `manifest.json` 中的 `AdditionalMessage`，用简短文字概括本版最主要的实际改动。Developer 先用 `edit` 更新该字段，再调用 `validate_and_publish`。Runtime 将说明传给 `validate_and_publish(summary="本版主要改动")`，由宿主在校验前写入同一字段。校验失败后若改动范围变化，重试发布前同步修订说明。完整校验通过后才保存不可变版本。
+1. 发布说明只记录本次实际变更和要点。GUI Agent 和 Runtime 必须调用 `validate_and_publish(summary="本次变更要点")`，由宿主在校验前整段覆盖 `AdditionalMessage`；不要用 `edit` 修改该字段。用户明确要求不写附加信息时传 `summary="None"`。CLI Repair 仍在发布前用 `edit` 整段覆盖 Candidate 的 `AdditionalMessage`。校验失败后若改动范围变化，重试发布前同步修订说明。完整校验通过后才保存不可变版本。
 2. 新修改运行前必须先 Publish 为不可变版本。Developer 用返回的 Manifest ID 调用 `trial_run`；Runtime 用该 ID 调用 `recheck(manifest_id)` 结束本轮并交还执行器，仅重调当前失败入口。Publish 本身不执行或设置 Default。Validator 会导入 Python，不是安全沙箱；校验通过也不等于真实游戏验证通过。
 3. Developer trial_run 的 use_saved_config 默认 true，采用已保存页面配置及启用任务次数；设为 false 才使用显式 run_state（task_repetitions、settings），省略为空。inputs 只承载普通 Component 参数，Plan 无业务入口参数。试运行失败交回当前 Developer Session，不启动 Runtime Agent。
 4. 按改动范围验证，不要求每次完整游戏实跑：核对调用方与业务数据，检查分支切换重计、前三次执行、第四次不执行与总预算耗尽，识别试验核对命中与误识别。可用无游戏输入的局部检查时先利用；替身检查不等于游戏验收。完整路径仅按用户要求或变更需要运行。

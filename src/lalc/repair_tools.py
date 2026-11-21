@@ -28,7 +28,7 @@ REPAIR_TOOLS = list(BASE_TOOLS)
 class RepairTools:
     """通过宿主实现固定工具集；图片与返回值独立留存在本次交互目录。"""
 
-    def __init__(self, data_root, log, *, platform=None, host=None, allowed=None):
+    def __init__(self, data_root, log, *, platform=None, host=None, allowed=None, require_publish_summary=False):
         self.allowed = frozenset(REPAIR_TOOLS if allowed is None else allowed)
         self.host = host
         self.created_files = set()
@@ -39,6 +39,7 @@ class RepairTools:
         self.cancelled = threading.Event()
         self.requested_manifest_id = None
         self.run_state = None
+        self.require_publish_summary = require_publish_summary
         self.runtime_gate = None
         self.read_other_runs = True
         self.parent_run_id = None
@@ -383,14 +384,15 @@ class RepairTools:
 
     def publish(self, summary=None):
         """在当前 Agent 活动中完整校验并保存不可变版本，不改变 Default。"""
-        if self.run_state is not None:
+        if self.require_publish_summary or self.run_state is not None:
             if not isinstance(summary, str) or not summary.strip():
-                raise ValueError("Runtime 发布前必须提供本次修复问题的简要说明 summary。")
+                raise ValueError('发布必须提供非空 summary；用户明确要求不写附加信息时传入字符串 "None"。')
             from .runtime import atomic_write_json
             path = self.host.candidate / "manifest.json"
-            value = json.loads(path.read_text(encoding="utf-8"))
-            value["AdditionalMessage"] = summary.strip()
-            atomic_write_json(path, value)
+            value, errors = self.host.manager._read_json(path)
+            if not errors and isinstance(value, dict):
+                value["AdditionalMessage"] = summary.strip()
+                atomic_write_json(path, value)
         result = self.host.manager.publish(self.host.candidate / "manifest.json")
         if not result.ok:
             return {**self.text({"ok": False, "errors": [error.as_dict() for error in result.errors]}),

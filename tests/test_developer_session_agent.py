@@ -601,10 +601,11 @@ def test_blank_construct_adds_task_publishes_and_trials_plan(conversation, monke
             return tool('edit', {'path': 'plan.py', 'oldText': '    return None',
                                  'newText': '    ctx.call("tasks.built")\n    return None'})
         if count == 3:
-            return tool('validate_and_publish', {})
+            return tool('validate_and_publish', {'summary': '新增任务并接入 Plan'})
         if count == 4:
-            identity = chat.host.manager.list_manifests()[0]['manifest_id']
-            return tool('trial_run', {'manifest_id': identity})
+            published = chat.host.manager.list_manifests()[0]
+            assert published['AdditionalMessage'] == '新增任务并接入 Plan'
+            return tool('trial_run', {'manifest_id': published['manifest_id']})
         return answer('built and tried')
     state['respond'] = respond
     result = asyncio.run(chat.run('construct a new task and trial the published plan', options))
