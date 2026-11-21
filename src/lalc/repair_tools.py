@@ -67,7 +67,8 @@ class RepairTools:
         try:
             if name not in self.allowed:
                 raise ValueError("当前模式和入口不允许此工具。")
-            methods = {"asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
+            methods = {"read": self.read_page_scope, "edit": self.edit_page_scope,
+                       "asset_tree": self.asset_tree, "asset_directory": self.asset_directory,
                        "asset_images": self.asset_images, "action_contracts": self.action_contracts,
                        "game_screenshot": self.game_screenshot, "crop_asset": self.crop_asset,
                        "delete_component": self.delete_component,
@@ -113,6 +114,28 @@ class RepairTools:
     def page_list(self, **arguments):
         return self.text(self.page_drafts().list(**arguments))
 
+    def read_page_scope(self, scope, *, filename=None, path=None, image=False, **paging):
+        """Agent 的页面读取沿用页面权限、分页和图片预览。"""
+        if "page_list" not in self.allowed:
+            raise ValueError("读取页面需要 Construct 页面权限。")
+        if scope == "page_settings":
+            if filename is not None or path is not None or image:
+                raise ValueError("page_settings 只接受分页参数。")
+            return self.page_read(scope="settings", **paging)
+        if scope not in {"page_draft", "page_installed"} or not filename:
+            raise ValueError("读取页面文件须指定页面范围和逻辑文件名。")
+        return self.page_read(scope="drafts" if scope == "page_draft" else "installed",
+                              filename=filename, path="page.py" if path is None else path,
+                              image=image, **paging)
+
+    def edit_page_scope(self, scope, path, *, source=None, edits=None):
+        """只在具备页面权限时修改当前 Session 的草稿入口。"""
+        if "page_list" not in self.allowed:
+            raise ValueError("编辑页面需要 Construct 页面权限。")
+        if scope != "page_draft":
+            raise ValueError("页面编辑仅支持 page_draft。")
+        return self.text(self.page_drafts().update(path, source, edits=edits))
+
     def page_read(self, *, image=False, **arguments):
         if not image:
             return self.text(self.page_drafts().read(**arguments))
@@ -129,8 +152,9 @@ class RepairTools:
     def page_create(self, **arguments):
         return self.text(self.page_drafts().create(**arguments))
 
-    def page_update(self, **arguments):
-        return self.text(self.page_drafts().update(**arguments))
+    def page_update(self, filename, source):
+        """远程 MCP 通过完整源码更新当前草稿。"""
+        return self.text(self.page_drafts().update(filename, source))
 
     def page_resource(self, filename, path, *, content_base64=None, copy_from=None, remove=False):
         """只写 Session 草稿资源；复制来源限页面、Asset 和已授权知识库。"""

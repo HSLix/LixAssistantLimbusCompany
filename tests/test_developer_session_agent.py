@@ -40,9 +40,9 @@ def test_large_page_source_streamed_in_fragments(conversation, gui):
     drafts = PageDrafts(session)
     drafts.create('large.py', source=SOURCE)
     source = SOURCE + ('\n# 中文 "quoted" \\ escaped' * 10000) + '\n'
-    arguments = json.dumps({'filename': 'large.py', 'source': source}, ensure_ascii=False)
+    arguments = json.dumps({'scope': 'page_draft', 'path': 'large.py', 'source': source}, ensure_ascii=False)
     changes = [{'role': 'assistant', 'tool_calls': [{'index': 0, 'id': 'large-page', 'type': 'function',
-                'function': {'name': 'page_update', 'arguments': ''}}]}]
+                'function': {'name': 'edit', 'arguments': ''}}]}]
     changes.extend({'tool_calls': [{'index': 0, 'function': {'arguments': arguments[offset:offset + 128]}}]}
                    for offset in range(0, len(arguments), 128))
     script(state, [(changes, 'tool_calls'), answer('updated')])
@@ -102,19 +102,27 @@ def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mod
                        tool('page_resource', {'filename': 'sample.py', 'path': 'assets/info.txt', 'content_base64': base64.b64encode(b'hello').decode()}),
                        tool('page_list', {'scope': 'drafts'}),
                        tool('page_list', {'scope': 'drafts', 'filename': 'sample.py'}),
-                       tool('page_read', {'scope': 'drafts', 'filename': 'sample.py', 'path': 'assets/info.txt'}),
-                       tool('page_read', {'scope': 'settings'}),
-                       tool('page_update', {'filename': 'sample.py', 'source': SOURCE.replace('"Sample"', '"Updated"')}),
+                       tool('read', {'scope': 'page_draft', 'filename': 'sample.py', 'path': 'assets/info.txt'}),
+                       tool('read', {'scope': 'page_settings'}),
+                       tool('edit', {'scope': 'page_draft', 'path': 'sample.py',
+                                     'edits': [{'oldText': '"Sample"', 'newText': '"Updated"'}]}),
                        tool('page_preview', {'filename': 'sample.py', 'summary': '保留字段和 ID，未改变 Plan 参数。'}),
                        answer('review closed')])
     else:
-        script(state, [tool('page_list', {}), answer('not permitted')])
+        script(state, [tool('read', {'scope': 'page_settings'}),
+                       tool('edit', {'scope': 'page_draft', 'path': 'sample.py', 'source': SOURCE}),
+                       answer('not permitted')])
     result = asyncio.run(chat.run('review page', options, on_page_preview=preview))
     assert result['status'] == 'completed', result
     declared = {item['function']['name'] for item in state['calls'][-1]['tools']}
     assert (set(PAGE_TOOLS) <= declared) if mode == 'Construct' else not (set(PAGE_TOOLS) & declared)
+    assert not {'page_read', 'page_update'} & declared
     assert chat.tools.on_page_preview is None
     if mode == 'Construct':
+        reads = [item for item in chat.history if item.get('toolName') == 'read']
+        assert len(reads) == 2 and not any(item.get('isError') for item in reads)
+        assert reads[0]['details']['source'] == 'hello'
+        assert set(json.loads(reads[1]['details']['source'])) >= {'pages', 'tasks'}
         assert len(seen) == 1 and seen[0].done.is_set()
         assert not seen[0].finish({'status': 'installed'})
         assert any(message.get('role') == 'tool' and 'not_installed' in str(message) for message in state['calls'][-1]['messages'])
@@ -125,6 +133,8 @@ def test_page_tool_declarations_same_round_and_restored_drafts(conversation, mod
         assert not (chat.host.service.data_root / 'pages').exists()
     else:
         assert not seen and not (session.path / 'page-drafts').exists()
+        rejected = [item for item in chat.history if item.get('toolName') in {'read', 'edit'}]
+        assert len(rejected) == 2 and all(item['isError'] for item in rejected)
 
 
 @pytest.mark.parametrize('invalid_first', [False, True])
@@ -144,7 +154,7 @@ def test_actual_gui_page_install_returns_to_agent(conversation, gui, invalid_fir
     steps = [tool('page_create', {'filename': 'sample.py', 'source': initial}),
              tool('page_preview', {'filename': 'sample.py', 'summary': '新增页面；不改现有字段。'})]
     if invalid_first:
-        steps.extend([tool('page_update', {'filename': 'sample.py', 'source': SOURCE}),
+        steps.extend([tool('edit', {'scope': 'page_draft', 'path': 'sample.py', 'source': SOURCE}),
                       tool('page_preview', {'filename': 'sample.py', 'summary': '已补齐 PAGE_ID，字段不变。'})])
     script(state, [*steps, answer('installed; reload manually')])
     seen = []

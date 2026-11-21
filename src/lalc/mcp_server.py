@@ -66,7 +66,7 @@ def tool_catalog():
         "read": RemoteWorkbench.read, "edit": RemoteWorkbench.edit, "list_skills": RemoteWorkbench.list_skills,
         "validate_and_publish": RepairTools.publish,
         "page_list": PageDrafts.list, "page_read": PageDrafts.read, "page_create": PageDrafts.create,
-        "page_update": PageDrafts.update,
+        "page_update": RepairTools.page_update,
         "knowledge_list": KnowledgeLibrary.list, "knowledge_read": KnowledgeLibrary.read,
         "knowledge_search_literal": KnowledgeLibrary.search, "knowledge_search_hybrid": KnowledgeLibrary.search_hybrid,
         "knowledge_git": KnowledgeLibrary.git_operation,

@@ -41,7 +41,7 @@ User GUI → General Settings → Sharing 提供 `Export…` / `Import…`。分
 
 页面维护自己的目录 `pages/<name>/page.py`，资源如 `assets/banner.png` 通过 `context.resource_path(...)` 定位；配置仍位于包外。普通加载、草稿工具、固定版本预览、安装及 Sharing 共用整包边界。旧顶层 `.py` 和旧 Session 草稿继续可读可改，复制／导出时包装，正式安装或增添草稿资源时转换，不批量迁移。
 
-GUI Construct 的 `page_create`／`page_update`／`page_list`／`page_read`／`page_resource`／`page_preview` 已支持整包。资源工具仅修改当前 Session 草稿的非 Python 资源，来源限明确的页面、Asset、知识库文件，不能访问任意本地路径。Agent 的专用人工审批仍直接安装；Sharing 可跳过 Review 的额外确认不授予 Agent 绕过安装审批的权限。接口示例见[页面说明](business-settings-pages.md)。
+GUI Construct 通过 `page_create`、`page_list`、`page_resource` 和 `page_preview` 管理整包，使用带页面范围的 `read` 和 `edit` 读取文件及更新草稿入口。资源工具仅修改当前 Session 草稿的非 Python 资源，来源限明确的页面、Asset、知识库文件，不能访问任意本地路径。Agent 的专用人工审批仍直接安装；Sharing 可跳过 Review 的额外确认不授予 Agent 绕过安装审批的权限。接口示例见[页面说明](business-settings-pages.md)。
 
 ## ZIP 格式与资源检查
 
