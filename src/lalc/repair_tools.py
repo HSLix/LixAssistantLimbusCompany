@@ -40,6 +40,10 @@ class RepairTools:
         self.requested_manifest_id = None
         self.run_state = None
         self.runtime_gate = None
+        self.read_other_runs = True
+        self.parent_run_id = None
+        self.trial_run_ids = set()
+        self.legacy_runtime = False
         self.on_feedback: Callable[[Any], None] | None = None
         self.on_page_preview: Callable[[Any], None] | None = None
         self.knowledge = KnowledgeLibrary(data_root, self.checkpoint, host.service.codesearch if host is not None else None)
@@ -402,10 +406,11 @@ class RepairTools:
                 if request["inputs"]:
                     raise ValueError("Plan 无业务入口参数，请通过 run_state 提供配置。")
                 run_id = service.start_plan(**configuration, use_saved_config=use_saved_config,
-                                            manifest_id=manifest_id, _developer_trial=True)
+                                            manifest_id=manifest_id, _developer_trial=True, _trial_session_id=self.log.identity)
             else:
                 run_id = service.start(logical_name, request["inputs"], manifest_id=manifest_id,
-                                       _developer_trial=True, use_saved_config=use_saved_config, **configuration)
+                                       _developer_trial=True, _trial_session_id=self.log.identity,
+                                       use_saved_config=use_saved_config, **configuration)
         except StartError as error:
             return self.text({**request, "status": "rejected", "run_id": None,
                               "code": error.code, "message": str(error), "errors": error.errors,
@@ -439,13 +444,41 @@ class RepairTools:
                           "feedback": "用户主动停止了本次运行，建议总结并等待用户的下个指示。" if stopped else
                           outcome + "按 Run ID 查看日志；需要再试时调用 trial_run，修改 Candidate 后须先 Publish。"})
 
+    def can_read_run(self, run_id):
+        """按宿主记录确定归属，兼容尚未登记试运行 Session 或父 Run 的旧记录。"""
+        if self.read_other_runs or run_id == self.parent_run_id:
+            return True
+        from .run_logs import trace_records
+        try:
+            records = trace_records(self.library.data_root, run_id, check=self.checkpoint)
+            start = next(records, None)
+            if not start or start.get("event") != "run_started" or start.get("run_id") != run_id:
+                return False
+            if start.get("developer_trial") is True:
+                owner = start.get("trial_session_id")
+                return owner == self.log.identity if owner is not None else run_id in self.trial_run_ids
+            if self.legacy_runtime and self.parent_run_id is None and any(
+                record and record.get("event") == "agent_invoked" and record.get("session_id") == self.log.identity
+                for record in records
+            ):
+                self.parent_run_id = run_id
+                return True
+        except (OSError, ValueError):
+            return False
+        return False
+
+    def visible_run_ids(self):
+        """先按权限筛选，再交给列表分页或检索。"""
+        from .run_logs import retained_runs
+        return [run_id for run_id in retained_runs(self.library.data_root) if self.can_read_run(run_id)]
+
     def list_runs(self, offset=0, limit=100):
         """列出保留 Run 的首尾元数据；旧记录不能确认的字段明确未知。"""
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 200:
             raise ValueError("offset 必须非负，limit 必须为 1–200 的整数。")
-        from .run_logs import retained_runs, run_summary
+        from .run_logs import run_summary
         root = self.library.data_root
-        ids = retained_runs(root)
+        ids = self.visible_run_ids()
         runs = [run_summary(root, identity, check=self.checkpoint) for identity in ids[offset:offset + limit]]
         if self.host is not None:
             current = self.host.service.status
@@ -468,9 +501,11 @@ class RepairTools:
         from .file_content import FileContent, image_preview
         root = self.library.data_root
         try:
+            if not self.can_read_run(run_id):
+                raise ValueError("Run outside scope")
             trace_path(root, run_id)
-        except (ValueError, OSError) as error:
-            raise ValueError("Run 日志不可用：记录不存在或已清理。") from error
+        except (ValueError, OSError):
+            raise ValueError("Run 日志不可用：没有访问权限、记录不存在或已清理。") from None
         if render_sequence is not None:
             if type(render_sequence) is not int or render_sequence < 1:
                 raise ValueError("render_sequence 必须为正整数。")
@@ -526,14 +561,16 @@ class RepairTools:
     def search_run_logs(self, keyword, run_id=None, *, all_runs=False, start_run_id=None,
                         start_sequence=1, limit=100, levels=None, logical_name=None):
         """显式选择单 Run 或所有保留 Run，按原文子串检索并返回可续读游标。"""
-        from .run_logs import query_trace, retained_runs
+        from .run_logs import query_trace
         if not isinstance(keyword, str) or not keyword.strip() or type(all_runs) is not bool:
             raise ValueError("keyword 必须非空，all_runs 必须为布尔值。")
         if (all_runs and run_id is not None) or (not all_runs and (type(run_id) is not int or run_id < 1)):
             raise ValueError("指定正整数 run_id，或显式 all_runs=true，不能同时选择。")
         if start_run_id is not None and (type(start_run_id) is not int or start_run_id < 1):
             raise ValueError("start_run_id 必须为正整数。")
-        ids = retained_runs(self.library.data_root) if all_runs else [run_id]
+        if not all_runs and not self.can_read_run(run_id):
+            raise ValueError("Run 日志不可用：没有访问权限、记录不存在或已清理。")
+        ids = self.visible_run_ids() if all_runs else [run_id]
         if start_run_id is not None:
             if not all_runs and start_run_id != run_id:
                 raise ValueError("游标不属于选定 Run。")

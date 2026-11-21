@@ -31,9 +31,12 @@ def test_compaction_is_persisted_and_counted_separately(conversation, mode):
     def respond(body):
         return answer('done') if body.get('tools') else ({'role': 'assistant', 'content': '已整理旧资料；继续当前任务。'}, 'stop')
     state['respond'] = respond
+    state['usage'] = {'prompt_tokens': 11, 'completion_tokens': 3, 'total_tokens': 14}
     result = asyncio.run(chat.run('请整理资料：' + 'historical material ' * 20000, options))
     assert result['status'] == 'completed', result
     assert result['requests'] == 1 and result['compaction_requests'] > 0
+    assert result['requests_with_token_usage'] == result['requests'] + result['compaction_requests']
+    assert result['reported_tokens'] == result['requests_with_token_usage'] * 14
     events = records(chat)
     completed = [e for e in events if e['type'] == 'lalc_compaction' and e['phase'] == 'completed']
     assert completed and completed[-1]['after'] < 50000
@@ -44,6 +47,7 @@ def test_compaction_is_persisted_and_counted_separately(conversation, mode):
     restored = DeveloperSession(chat.host.service, chat.session.identity, entry='cli').conversation()
     result = asyncio.run(restored.run('继续下一步', options))
     assert result['status'] == 'completed', result
+    assert result['requests_with_token_usage'] == 1 and result['reported_tokens'] == 14
     assert 'historical material ' * 100 not in json.dumps(state['calls'][-1])
     assert '已整理旧资料' in json.dumps(state['calls'][-1], ensure_ascii=False)
 

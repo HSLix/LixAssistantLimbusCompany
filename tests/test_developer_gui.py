@@ -799,7 +799,8 @@ def test_trial_caps_logs_and_preserves_surviving_scroll_anchor(gui):
 
 
 @pytest.mark.parametrize("logs_trimmed", [False, True])
-def test_trial_keeps_following_after_log_limit_and_layout(gui, logs_trimmed):
+@pytest.mark.parametrize("has_screenshot", [False, True])
+def test_trial_keeps_following_after_log_limit_and_layout(gui, logs_trimmed, has_screenshot):
     """达到上限后连续追加及延迟排版仍贴底，主动回看后不恢复跟随。"""
     from lalc.developer_gui import TrialDialog
     from lalc.run_logs import LIVE_LOG_LIMIT
@@ -813,9 +814,13 @@ def test_trial_keeps_following_after_log_limit_and_layout(gui, logs_trimmed):
     bar = dialog.logs.verticalScrollBar()
     bar.setValue(bar.maximum())
     for sequence in range(LIVE_LOG_LIMIT + 1, LIVE_LOG_LIMIT + 5):
+        record = {"sequence": sequence, "event": "component_log", "message": "新增日志\n" * 4}
+        if has_screenshot:
+            record.update(evidence_id=f"1/{sequence}", width=1920, height=1080)
         dialog.render({"paused": False, "logs_trimmed": logs_trimmed, "log_records": [
-            {"sequence": sequence, "event": "component_log", "message": "新增日志\n" * 4}]})
+            record]})
         app.processEvents()
+        assert dialog.log_records[sequence] == record
         assert len(dialog.log_records) == LIVE_LOG_LIMIT
         assert bar.value() == bar.maximum()
     bar.setValue(bar.maximum() // 2)
@@ -863,18 +868,19 @@ def test_trial_history_notice_has_theme_background(gui, dark):
         setTheme(previous)
 
 
-def test_manifest_reference_checkbox_saves_and_reloads(gui):
+@pytest.mark.parametrize("option", ["manifest_reference_enabled", "other_run_logs_enabled"])
+def test_agent_access_checkbox_saves_and_reloads(gui, option):
     from lalc.agent_settings import settings_document
     app, window = gui
     page = window.settings_page
-    control = page.global_controls['manifest_reference_enabled']
+    control = page.global_controls[option]
     assert control.isChecked()
     control.click()
-    assert settings_document(window.service.data_root)['manifest_reference_enabled'] is False
+    assert settings_document(window.service.data_root)[option] is False
     page.reload()
     assert not control.isChecked()
     control.click()
-    assert settings_document(window.service.data_root)['manifest_reference_enabled'] is True
+    assert settings_document(window.service.data_root)[option] is True
 
 
 def test_context_limits_save_and_reload(gui):

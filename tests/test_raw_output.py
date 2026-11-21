@@ -132,9 +132,9 @@ def test_stream_redacts_accumulated_snapshot_without_persistence(tmp_path):
         {'type': 'toolcall_delta', 'contentIndex': 1, 'delta': '{"path": "st'},
     ]:
         log.stream({'type': 'message_update', 'assistantMessageEvent': event})
+    assert len(events) == 2
     assert events[-1] == {'round': 2, 'event': {'type': 'raw_output', 'content': [
-        {'type': 'text', 'text': '[REDACTED]'},
-        {'type': 'toolCall', 'name': 'read', 'partialArgs': '{"path": "st'}]}}
+        {'type': 'text', 'text': '[REDACTED]'}]}}
     assert not (log.path / 'events.jsonl').exists()
     log.record({'type': 'message_end', 'message': {'role': 'assistant'}})
     log.stream({'assistantMessageEvent': {'type': 'text_delta', 'contentIndex': 0, 'delta': 'next'}})

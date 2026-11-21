@@ -24,22 +24,45 @@ from test_developer_gui import gui
 pytestmark = pytest.mark.agent
 
 
-def test_large_page_source_streamed_in_fragments(conversation):
-    """长源码经分段工具参数传输后完整落盘，不丢中文、引号或换行。"""
+def test_large_page_source_streamed_in_fragments(conversation, gui):
+    """真实工作台更新大页面时不逐片发送源码给 GUI，完整源码仍落盘。"""
+    from lalc.agent_settings import save_settings
     from lalc.page_drafts import PageDrafts
+    from test_developer_gui import wait_jobs
     from test_page_drafts import SOURCE
-    original, options, state = conversation
-    chat = DeveloperSession.create(original.host.service, None, mode='Construct', entry='gui').conversation()
+    _, options, state = conversation
+    app, window = gui
+    save_settings(window.service.data_root, {'provider': 'llama.cpp', 'base_url': options.base_url,
+                                            'model': options.model, 'max_requests': 20})
+    session = DeveloperSession.create(window.service, None, mode='Construct', entry='gui')
+    session.conversation()
+    window.repair_page.activate_session(session)
+    drafts = PageDrafts(session)
+    drafts.create('large.py', source=SOURCE)
     source = SOURCE + ('\n# 中文 "quoted" \\ escaped' * 10000) + '\n'
     arguments = json.dumps({'filename': 'large.py', 'source': source}, ensure_ascii=False)
     changes = [{'role': 'assistant', 'tool_calls': [{'index': 0, 'id': 'large-page', 'type': 'function',
-                'function': {'name': 'page_create', 'arguments': ''}}]}]
+                'function': {'name': 'page_update', 'arguments': ''}}]}]
     changes.extend({'tool_calls': [{'index': 0, 'function': {'arguments': arguments[offset:offset + 128]}}]}
                    for offset in range(0, len(arguments), 128))
-    script(state, [(changes, 'tool_calls'), answer('created')])
-    result = asyncio.run(chat.run('创建长源码页面草稿', options))
+    script(state, [(changes, 'tool_calls'), answer('updated')])
+    streamed = []
+    def watch(row):
+        if row['event']['type'] == 'raw_output':
+            streamed.extend(part['type'] for part in row['event']['content'])
+    window.operation_event.connect(watch)
+    try:
+        window.repair_page.message.setPlainText('更新长源码页面草稿')
+        window.repair_page.send()
+        wait_jobs(app, window)
+    finally:
+        window.operation_event.disconnect(watch)
+        window.cancel_operation()
+        wait_jobs(app, window)
+    result = read_json(session.path / 'log' / 'result.json')
     assert result['status'] == 'completed' and result['requests'] == 2, result
-    assert PageDrafts(chat.session).snapshot('large.py')['source'] == source.encode()
+    assert streamed and 'toolCall' not in streamed
+    assert drafts.snapshot('large.py')['source'] == source.encode()
 
 
 @pytest.mark.parametrize('name,arguments', [
