@@ -4,7 +4,7 @@ description: 按开发者需求构建、扩展或修复 LALC Workflow。涉及�
 ---
 # Workflow 开发
 
-发布前按 `../publish-and-trial/SKILL.md` 更新 Manifest 的 `AdditionalMessage`，概括本版主要改动，再完整校验和发布。
+按 `../publish-and-trial/SKILL.md` 提交本次实际变更和要点。GUI Agent 用发布工具的 `summary` 提交说明，由宿主覆盖 `AdditionalMessage`。
 
 1. 明确本轮目标和完成条件；先检查当前 Candidate，按需读取参考 Manifest、源码和 action_contracts，不猜测未提供的接口或游戏状态。
 2. 先读取 `../workflow-conventions/SKILL.md`，按局部目标划分 Step，默认由 Workflow 直接观察、判断和分派，并集中等待正常过渡；多个 Workflow 确实复用同一套场景分类，或需独立验证识别能力时，再考虑提取识别 Step。先核对已有 Component、action_contracts 及调用方，复用实际签名，执行满足目标的最小修改。改返回格式、拆组件或改名时同步所有受影响调用、Manifest 登记及相关素材引用，不顺带批量迁移无关旧接口。涉及 Recovery Rule 时再读共用规范链接的规则参考。

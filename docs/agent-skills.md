@@ -1,5 +1,7 @@
 # Developer Skills
 
+2026-11-21：GUI Agent 和 Runtime 调用 `validate_and_publish` 必须提交非空 `summary`，只记录本次实际变更和要点。宿主在校验前用它覆盖 Candidate 的 `AdditionalMessage`。用户明确要求不写附加信息时，传入字符串 `"None"`。CLI Repair 仍直接更新 Candidate 的说明。已有 `skills/` 可按下文合并 `workflow-development`、`workflow-repair` 和 `publish-and-trial`。
+
 2026-11-19：Workflow 开发、修复及验证指导要求每次 Publish 前更新 `AdditionalMessage`，概括本版主要改动。Developer 编辑 Candidate 的 `manifest.json`，Runtime 继续提供发布工具的 `summary`。已初始化的 Skills 手动合并这三个随包文件。
 
 2026-11-17：`workflow-development` 与 `validation-and-trial` 明确 Developer 可在任务授权范围内自行编写点击坐标、模板中心点击或键盘操作的 Step，校验发布后指定 Manifest ID 和 Step 逻辑名进行独立试运行，把现场推进到后续开发需要的状态；试运行不限于代码验证。操作后重新观察，现有现场保护及 Runtime 无独立试运行的边界保持。已有 `skills/` 需手动合并这两个随包文件，不自动覆盖用户内容。

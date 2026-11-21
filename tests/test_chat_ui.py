@@ -30,7 +30,7 @@ def test_publish_badge_tracks_session_successes_and_ignores_old_history(gui):
     source = session.check()['source_manifest_id']
     chat = page.host.conversation
     chat.log.on_event = page.show_event
-    result = read_json(chat.tools.call('validate_and_publish', {}))
+    result = read_json(chat.tools.call('validate_and_publish', {'summary': '更新当前版本'}))
     first = result['details']['manifest_id']
     assert first in page.publish_badge.text() and source in page.source_label.text()
     page.activate_session(session, restore_history=False)

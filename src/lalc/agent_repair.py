@@ -317,7 +317,8 @@ class RepairConversation:
         self.log = RepairLog(host.service.data_root, path=session.path / "log" if session else None,
                              identity=session.identity if session else None)
         self.history = []
-        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform, host=host, allowed=self.allowed)
+        self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform,
+                                 host=host, allowed=self.allowed, require_publish_summary=entry == "gui")
         self.tools.read_other_runs = entry in {"gui", "runtime"} and options["other_run_logs_enabled"]
         self.tools.parent_run_id = session.parent_run_id if session else None
 

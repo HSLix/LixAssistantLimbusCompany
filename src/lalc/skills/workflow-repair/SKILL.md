@@ -4,7 +4,7 @@ description: 定位和修复 LALC Workflow 或素材故障。有故障描述、�
 ---
 # 故障修复
 
-发布前按 `../publish-and-trial/SKILL.md` 更新 Manifest 的 `AdditionalMessage`，概括本版修复及主要变更，再完整校验和发布。
+按 `../publish-and-trial/SKILL.md` 提交本次实际修复和变更要点。GUI Agent 和 Runtime 用发布工具的 `summary` 提交说明，由宿主覆盖 `AdditionalMessage`。
 
 1. 根据用户描述、已有日志和当前 Candidate 确认故障；需要现场证据时再截图，不根据旧截图猜测当前状态。
 2. 读取相关源码和动作契约，定位有证据支持的原因；证据不足时明确缺少的信息，避免无依据的大范围改写。

@@ -258,3 +258,29 @@ def test_validate_and_publish_replaces_old_agent_tools(tmp_path):
     assert identity != original.manifest_id
     assert identity in {item["manifest_id"] for item in host.manager.list_manifests()}
     assert host.manager.default_manifest_id() == original.manifest_id
+
+
+@pytest.mark.parametrize("mode,summary", [("Construct", "本次改动"), ("Repair", "None")])
+def test_gui_agent_publish_requires_and_replaces_summary(tmp_path, mode, summary):
+    """GUI Agent 发布漏填说明时拒绝，成功后只保存本次说明。"""
+    from lalc.agent_log import read_json
+    from lalc.developer_session import DeveloperSession
+
+    host, original = host_for(tmp_path)
+    chat = DeveloperSession.create(host.service, original.manifest_id, mode=mode, entry="gui").conversation()
+    path = chat.host.candidate / "manifest.json"
+    candidate = json.loads(path.read_text(encoding="utf-8"))
+    candidate["AdditionalMessage"] = "旧版本说明"
+    path.write_text(json.dumps(candidate, ensure_ascii=False), encoding="utf-8")
+    before = host.manager.list_manifests()
+    for arguments in ({}, {"summary": "   "}):
+        failed = read_json(chat.tools.call("validate_and_publish", arguments))
+        assert failed["isError"] and "summary" in failed["details"]["message"]
+    assert host.manager.list_manifests() == before
+    assert json.loads(path.read_text(encoding="utf-8")) == candidate
+
+    published = read_json(chat.tools.call("validate_and_publish", {"summary": f" {summary} "}))
+    assert published["details"]["ok"]
+    identity = published["details"]["manifest_id"]
+    assert host.manager.load(identity).loaded.manifest["AdditionalMessage"] == summary
+    assert json.loads(path.read_text(encoding="utf-8"))["AdditionalMessage"] == summary
