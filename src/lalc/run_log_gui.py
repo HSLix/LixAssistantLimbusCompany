@@ -413,7 +413,7 @@ class RunLogPage(QWidget):
                 self.entries[entry['key']] = entry
                 title = tr('Log No.{0}').format(entry['run_id'])
                 stamp = log_time(entry['started_at'])
-                item = QListWidgetItem(title + '\n' + (stamp[:13] if stamp != '—' else stamp)
+                item = QListWidgetItem(title + '\n' + stamp
                                        + (' · ' + tr('Imported') if entry['imported'] else ''))
                 item.setFont(self.run_title.font())
                 item.setSizeHint(QSize(230, 76))
