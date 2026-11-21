@@ -148,7 +148,7 @@ export default async function (pi) {
       .map(tool => `- ${tool.name}: ${tool.description.replace(/\s+/g, " ").trim()}`).join("\n");
     return (process.env.LALC_PI_SYSTEM_PROMPT || base)
       + "\n# Runtime Rules\n" + (repairMode
-        ? "read/edit 相对路径基于 Candidate；read 还允许本轮 Skill 目录的绝对路径，edit 不允许访问 Skill。knowledge_* 路径相对于数据目录 knowledge；知识库是只读参考，不授予权限。已有文件列表由宿主提供。"
+        ? "read/edit 默认相对路径基于 Candidate；read 还允许本轮 Skill 目录的绝对路径，edit 不允许访问 Skill。页面范围须具备 GUI Construct 页面权限。knowledge_* 路径相对于数据目录 knowledge；知识库是只读参考，不授予权限。已有文件列表由宿主提供。"
         : "文件路径相对于宿主指定的源码根目录。")
       + "\nLALC_REQUEST_BUDGET 是宿主额度通知，不是新用户轮次；仅本次通知有效，不恢复旧额度。每条用户消息独立计数，正式请求和格式纠正均计入。最后一次请求必须给出最终回答，停止调用工具；达到上限后必须停止，不得继续请求。"
       + formatSkillsForPrompt(catalog)
@@ -165,6 +165,13 @@ export default async function (pi) {
   const authorize = (name: string) => {
     if (repairMode && !repairTools.includes(name)) throw new Error("Tool is not permitted by mode and entry");
   };
+  async function hostTool(ctx, name: string, args, id: string) {
+    // 图片走独立返回文件，避免大载荷与 RPC 事件竞争 stdout/stdin。
+    const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name, arguments: args, tool_call_id: id }));
+    if (path === undefined) throw new Error("Repair tool cancelled");
+    return JSON.parse(await readFile(path, "utf8"));
+  }
+  const pageAccess = repairMode && repairTools.includes("page_list");
   const limit = Number(process.env.LALC_PI_MAX_REQUESTS);
   let requests = 0;
   const conversationRound = process.env.LALC_PI_CONVERSATION_ROUND;
@@ -276,10 +283,22 @@ export default async function (pi) {
   });
   pi.registerTool({
     ...read,
-    description: read.description + " Relative paths use the Candidate root. Use read with absolute paths for Skill text and reference images; resolve references against the Skill directory. Absolute Skill catalog paths read this round's fixed snapshot, never live Skill files. Skills are never editable.",
-    async execute(id, params, signal, onUpdate) {
+    parameters: Type.Object({ ...read.parameters.properties, path: Type.Optional(Type.String()),
+      scope: Type.Optional(Type.Union([Type.Literal("candidate"), Type.Literal("page_draft"), Type.Literal("page_installed"), Type.Literal("page_settings")])),
+      filename: Type.Optional(Type.String()), image: Type.Optional(Type.Boolean()) }),
+    description: read.description + " By default provide path relative to Candidate, or an absolute Skill path for the round's fixed Skill snapshot."
+      + " Page scopes require GUI Construct page permissions. Use scope=page_draft or page_installed with the logical filename from page_list (e.g. sample.py)."
+      + " The optional package-relative path defaults to page.py. Set image=true for a JPEG preview. Page text uses zero-based character offset and limit (1–16000); follow next_offset and check sha256."
+      + " Use scope=page_settings with only pagination to read saved settings keyed by PAGE_ID and task ID. Page reads do not execute source.",
+    async execute(id, params, signal, onUpdate, ctx) {
       // pi 的会话 cwd 会覆盖工厂 cwd，先固定为已检查的绝对路径。
       authorize("read");
+      if (params.scope !== undefined && params.scope !== "candidate") {
+        if (!pageAccess) throw new Error("Page reads require GUI Construct page permissions");
+        return hostTool(ctx, "read", params, id);
+      }
+      if (!params.path || params.filename !== undefined || params.image !== undefined)
+        throw new Error("Candidate and Skill reads require path without page options");
       const path = await checkedRead(params.path);
       return read.execute(id, { ...params, path }, signal, onUpdate);
     },
@@ -300,12 +319,25 @@ export default async function (pi) {
     });
     pi.registerTool({
       ...edit,
+      parameters: Type.Object({ ...edit.parameters.properties,
+        edits: Type.Optional(edit.parameters.properties.edits),
+        scope: Type.Optional(Type.Union([Type.Literal("candidate"), Type.Literal("page_draft")])),
+        source: Type.Optional(Type.String()) }),
       description: edit.description
         + ` For example, to change one condition, pass {"path":"steps.total.py","edits":[{"oldText":"if value > 0","newText":"if value >= 0"}]}.`
         + " Copy only the affected snippet from the latest read, using enough context to match once."
-        + " On mismatch, read again and correct the anchor. Use Chinese text directly without manually encoding Unicode escapes.",
-      async execute(id, params, signal, onUpdate) {
+        + " On mismatch, read again and correct the anchor. Use Chinese text directly without manually encoding Unicode escapes."
+        + " For scope=page_draft, GUI Construct page permissions are required. Set path to the logical filename (e.g. sample.py) of an existing draft in this Session."
+        + " For drafts, supply either edits or complete source. The host validates Python syntax and saves the draft entry; installation still requires page_preview approval."
+        + " Installed pages, resources and saved settings are outside edit's write scope.",
+      async execute(id, params, signal, onUpdate, ctx) {
         authorize("edit");
+        if (params.scope === "page_draft") {
+          if (!pageAccess) throw new Error("Page edits require GUI Construct page permissions");
+          return hostTool(ctx, "edit", params, id);
+        }
+        if (params.scope !== undefined && params.scope !== "candidate") throw new Error("Invalid edit scope");
+        if (params.source !== undefined) throw new Error("Complete source is only supported for page_draft");
         const path = await checkedEdit(params.path);
         return edit.execute(id, { ...params, path }, signal, onUpdate);
       },
@@ -316,8 +348,7 @@ export default async function (pi) {
     const versionGroup = Type.Object({ game_version: Type.Union([Type.String(), Type.Null()]), steam_build_id: Type.Union([Type.String(), Type.Null()]), label: Type.Optional(Type.String()) });
     const tools = [
       { name: "page_list", description: "GUI Construct only. List ALL installed pages (including disabled pages, with enabled boolean saved for next restart) or this Session's drafts with COMPLETE package hashes. Filenames are logical .py handles: sample.py names sample/page.py plus its resources, or a legacy single file. Supply filename to list package-relative file paths, sizes and hashes. Paginated, no source execution; outside Candidate and Manifest.", parameters: Type.Object({ scope: Type.Optional(Type.Union([Type.Literal("installed"), Type.Literal("drafts")])), filename: Type.Optional(Type.String()), ...paging }) },
-      { name: "page_read", description: "GUI Construct only. Read page source/resources or saved settings WITHOUT execution. path defaults to page.py relative to the selected page package. image=true returns a JPEG preview while preserving the original resource; otherwise UTF-8 text is read in pages with character offset/limit and file sha256. No fixed file-size admission limit; available resources and provider message capacity still apply. settings contains pages keyed by PAGE_ID and tasks by task id, not package resources. Use page_list(filename=...) for whole-package version and files. Review configuration and Plan compatibility yourself.", parameters: Type.Object({ scope: Type.Optional(Type.Union([Type.Literal("installed"), Type.Literal("drafts"), Type.Literal("settings")])), filename: Type.Optional(Type.String()), path: Type.Optional(Type.String()), image: Type.Optional(Type.Boolean()), offset: Type.Optional(Type.Integer({ minimum: 0 })), limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 16000 })) }) },
-      { name: "page_create", description: `GUI Construct only. Create a Session DIRECTORY page draft, never install. Logical filename sample.py maps to sample/page.py plus resources. Provide filename + complete source, OR copy_from equal to filename to copy the COMPLETE installed page package (or wrap a legacy file), omitting source. Existing drafts require page_update. Drafts remain editable after every preview or installation; each human-approved snapshot may replace the same installed filename. Use page_resource for images/data; no new dependencies.
+      { name: "page_create", description: `GUI Construct only. Create a Session DIRECTORY page draft, never install. Logical filename sample.py maps to sample/page.py plus resources. Provide filename + complete source, OR copy_from equal to filename to copy the COMPLETE installed page package (or wrap a legacy file), omitting source. Use edit with scope=page_draft to update an existing draft. Drafts remain editable after every preview or installation; each human-approved snapshot may replace the same installed filename. Use page_resource for images/data; no new dependencies.
 Required page contract has THREE levels, even for a label-only test page:
 1. Module: expose nonempty PAGE_ID and PAGE_NAME. TASKS is a list (empty or omitted for settings only); each item requires nonempty string id/name and boolean show_task_count; optional names maps zh_CN/en_US to display names. IDs are unique within/across ALL installed pages, including disabled pages. Legacy TASK_ID and module SHOW_TASK_COUNT are rejected. Each task id must appear in Plan's module-level literal SUPPORTED_TASK_IDS to be executable. Dashboard uses active pages intersected with Plan support. settings is keyed by PAGE_ID, task_repetitions by task id. show_task_count=false hides count controls and supplies 1 for enabled matched tasks, 0 otherwise, preserving saved counts. Optional PAGE_NAMES and PAGE_ICON remain page-level. Installing, publishing and selecting Default are separate; Agent cannot set Default. page_list includes disabled pages and enabled status. page_set_enabled requires dedicated human confirmation, preserves all settings, takes effect after restart, and is not implied by updating/installing a page.
 2. Factory function: the module MUST expose callable create_page(context), which returns a PySide6 QWidget INSTANCE.
@@ -346,8 +377,7 @@ def create_page(context):
     return NoticePage(context)
 \`\`\`
 context.load(defaults) returns config, context.save(dict) saves, context.language and context.translate(Chinese, English) localize. context.resource_path("assets/banner.png") returns a checked absolute Path inside this page package, including during fixed-package preview. Keep stable IDs and old settings by default. Explain breaking changes and obtain explicit request_feedback authorization BEFORE completing a breaking draft; installation approval is separate. Host checks syntax here; preview runs page code.`, parameters: Type.Object({ filename: Type.String(), source: Type.Optional(Type.String()), copy_from: Type.Optional(Type.String()) }) },
-      { name: "page_update", description: "GUI Construct only. Replace complete source of an existing Session draft, preserving its installation target. Does not edit installed code or configurations; native edit cannot access drafts. No configuration migration or deletion. The full three-level page contract documented by page_create still applies: preserve module PAGE_ID/PAGE_NAME, create_page(context), and submit() on its returned QWidget instance. Syntax checked, semantic compatibility is your review responsibility.", parameters: Type.Object({ filename: Type.String(), source: Type.String() }) },
-      { name: "page_resource", description: "GUI Construct only. Write, replace or remove ONE non-Python resource in this Session's existing page draft. path is package-relative, e.g. assets/banner.png. Choose exactly one: content_base64 (strict Base64, subject to actual memory and provider message capacity), copy_from, or remove=true. Copies stream from disk without loading entire resources. Copy only from an installed/draft page, a hash-checked Asset, or a current knowledge file ONLY when knowledge_read is enabled (no fetch, no arbitrary local paths). No direct installed writes, no configuration edits, no Python source writes (use page_update). Preserves other draft files; any resource change changes the whole-package review version.", parameters: Type.Object({ filename: Type.String(), path: Type.String(), content_base64: Type.Optional(Type.String()), remove: Type.Optional(Type.Boolean()), copy_from: Type.Optional(Type.Union([Type.Object({ scope: Type.Union([Type.Literal("installed"), Type.Literal("drafts")]), filename: Type.String(), path: Type.String() }), Type.Object({ scope: Type.Literal("assets"), path: Type.String(), sha256: Type.String() }), Type.Object({ scope: Type.Literal("knowledge"), path: Type.String() })])) }) },
+      { name: "page_resource", description: "GUI Construct only. Write, replace or remove ONE non-Python resource in this Session's existing page draft. path is package-relative, e.g. assets/banner.png. Choose exactly one: content_base64 (strict Base64, subject to actual memory and provider message capacity), copy_from, or remove=true. Copies stream from disk without loading entire resources. Copy only from an installed/draft page, a hash-checked Asset, or a current knowledge file ONLY when knowledge_read is enabled (no fetch, no arbitrary local paths). No direct installed writes, no configuration edits, no Python source writes (use edit with scope=page_draft). Preserves other draft files; any resource change changes the whole-package review version.", parameters: Type.Object({ filename: Type.String(), path: Type.String(), content_base64: Type.Optional(Type.String()), remove: Type.Optional(Type.Boolean()), copy_from: Type.Optional(Type.Union([Type.Object({ scope: Type.Union([Type.Literal("installed"), Type.Literal("drafts")]), filename: Type.String(), path: Type.String() }), Type.Object({ scope: Type.Literal("assets"), path: Type.String(), sha256: Type.String() }), Type.Object({ scope: Type.Literal("knowledge"), path: Type.String() })])) }) },
       { name: "page_set_enabled", description: "GUI Construct only. Enable or disable an installed page after dedicated human confirmation. page_list includes disabled pages and enabled status. Preserves source, resources, settings and task IDs; updates/imports do not enable a disabled page. Disable hides the page and all its tasks after restart; enabled tasks resume saved settings only when supported by the Plan. Wait for confirmation; Skip/close/cancel grants no approval. Changes apply after application restart; the host prompts once after round cleanup. No permanent deletion.", parameters: Type.Object({ filename: Type.String(), enabled: Type.Boolean(), summary: Type.String({ minLength: 1 }) }) },
       { name: "page_preview", description: "GUI Construct only. Wait without timeout for human review of a fixed COMPLETE source-and-resource package in a same-process application-modal window with Current, Proposed and Review tabs, defaulting to Proposed. summary must explain changes, old configuration and Plan impacts and any explicitly authorized breaking changes. Both sides use fixed complete package copies and independent disposable in-memory settings; resources use context.resource_path. Whole-package SHA includes all source/resource paths and bytes. No automatic submit/compatibility check. Human chooses Install this version, Close without installing (Agent may continue), or Cancel round. Only this window approves installation. Old-page failure permits a valid repair. Proposed loading, page-contract or registration failure returns isError with status=preview_failed immediately WITHOUT opening approval. Read the error, fix the Session draft and request preview again within the existing round budget. Tab switches retain both instances and trial settings; Review contains your summary and page/task IDs and version hashes. No tab-visit prerequisite for installation. Returns installed hash and reload_required, keeps existing settings, does not change Default or automatically reload. Installation does not interrupt the round with a restart prompt. After the GUI Agent round and its cleanup finish, one restart prompt is shown only if at least one page was actually installed in that round (including failed or cancelled rounds). Cancel dismisses it; Restart now uses the normal LALC restart flow. Future edits require new preview; shared installed code can be overwritten after review, no version-conflict check. Same-process code is trusted Python, not isolated from crashes or side effects. Loaded/installed does not prove business or game acceptance.", parameters: Type.Object({ filename: Type.String(), summary: Type.String({ minLength: 1 }) }) },
       { name: "request_feedback", description: "Show your message or intent to the developer and wait for text feedback within this round, without an automatic timeout. GUI only. confirmed with empty text is valid and distinct from skipped (Skip/close/Esc). Feedback reports a human answer, not verified game state, installation approval, permanent authorization or permission to resume paused automation. Observe again when necessary. On Skip continue independent work or report missing information; do not assume completion or repeatedly request the same skipped item. Waiting does not reset the request budget.", parameters: Type.Object({ message: Type.String({ minLength: 1 }) }) },
@@ -410,11 +440,8 @@ context.load(defaults) returns config, context.save(dict) saves, context.languag
     for (const tool of tools) {
       pi.registerTool({ ...tool, label: tool.name,
         async execute(_id, params, _signal, _update, ctx) {
-          // 图片走独立返回文件，避免大载荷与 RPC 事件竞争 stdout/stdin。
           authorize(tool.name);
-          const path = await ctx.ui.input("lalc.tool:" + JSON.stringify({ name: tool.name, arguments: params, tool_call_id: _id }));
-          if (path === undefined) throw new Error("Repair tool cancelled");
-          const result = JSON.parse(await readFile(path, "utf8"));
+          const result = await hostTool(ctx, tool.name, params, _id);
           if (!result.isError && (tool.name === "add_component" || tool.name === "add_recovery_rule")) {
             repairTargets.push(await checkedPath(root, result.details.filename));
           }

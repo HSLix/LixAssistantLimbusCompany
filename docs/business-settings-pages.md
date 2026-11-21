@@ -76,9 +76,9 @@ pixmap = QPixmap(str(context.resource_path("assets/banner.png")))
 
 整包快照覆盖源码及资源字节，图片的增删改也会改变页面版本。安装替换整个页面包，不合并旧资源；从旧单文件转成同名目录时只在明确替换后移除旧文件。旧页面与新目录同时声明相同 PAGE_ID／任务 id 时，仍按现有规则拒绝全部冲突注册。
 
-Agent 的 GUI Construct 页面工具现已接通整包：`filename="sample.py"` 是逻辑名称，实际草稿为 `sample/page.py`。`page_create(copy_from="sample.py")` 复制已安装整包，旧单文件自动包装；`page_update` 只更新入口源码并保留资源。旧 Session 的单文件草稿仍可读取／修改，新增资源或正式安装时转换为目录，不批量迁移。
+Agent 的 GUI Construct 页面工具现已接通整包：`filename="sample.py"` 是逻辑名称，实际草稿为 `sample/page.py`。`page_create(copy_from="sample.py")` 复制已安装整包，旧单文件自动包装；GUI Construct 中用 `edit(scope="page_draft", path="sample.py", edits=[{oldText, newText}])` 局部更新草稿入口，完整替换使用 `source`。宿主验证语法并原子保存，保留包内资源。旧 Session 的单文件草稿仍可读取／修改，新增资源或正式安装时转换为目录，不批量迁移。
 
-`page_list(filename="sample.py")` 分页列出页内文件、大小和哈希；`page_read(path="assets/banner.png", image=true)` 返回 JPEG 预览并保留原始资源，默认流式分页读取 UTF-8 文本。资源没有固定大小或像素准入上限；复制流式处理，内存解析和图片解码按当前可用资源检查。Base64 写入仍受模型服务消息容量及实际内存约束。
+`page_list(filename="sample.py")` 分页列出页内文件、大小和哈希；`read(scope="page_draft", filename="sample.py")` 读取草稿入口，使用 `page_installed` 读取已安装页面。可指定包内 `path`，带 `image=true` 时返回 JPEG 预览。文本按字符分页；`read(scope="page_settings")` 读取保存的配置。这些范围要求 GUI Construct 页面权限。受控远程 MCP 继续使用 `page_read` 和 `page_update`。资源没有固定大小或像素准入上限；复制流式处理，内存解析和图片解码按当前可用资源检查。Base64 写入仍受模型服务消息容量及实际内存约束。
 
 `page_resource` 只修改当前 Session 草稿中的一个非 Python 资源：严格 Base64 写入、从页面／Asset／知识库明确文件复制，或显式移除该草稿资源，三者选一。不允许任意本地文件路径、正式页写入、配置修改或借资源接口改 Python。知识库复制只取当前文件，不自动 fetch；Asset 复制需验证所声明的图片内容哈希。
 

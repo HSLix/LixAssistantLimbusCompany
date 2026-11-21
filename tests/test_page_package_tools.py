@@ -37,6 +37,30 @@ def test_directory_create_resource_update_remove_and_reopen(drafts):
     assert set(restored.snapshot("sample.py")["package"].files) == {"page.py"}
 
 
+def test_page_scoped_edit_matches_original_and_saves_only_valid_source(drafts):
+    """批量替换保留原始换行，匹配或语法有误时保留原草稿。"""
+    drafts.create("sample.py", SOURCE)
+    target = drafts.path("sample.py")
+    original = "\ufeff" + SOURCE.replace("\n", "\r\n")
+    target.write_bytes(original.encode())
+    tools = drafts.session.host.conversation.tools
+    args = {"scope": "page_draft", "path": "sample.py"}
+    for edits in (
+        [{"oldText": '"Sample"', "newText": '"Updated"'}, {"oldText": "absent", "newText": ""}],
+        [{"oldText": 'PAGE_NAME = "Sample"', "newText": ""}, {"oldText": '"Sample"', "newText": ""}],
+        [{"oldText": '"field"', "newText": '"new"'}],
+        [{"oldText": '"Sample"', "newText": "("}],
+    ):
+        assert read_json(tools.call("edit", {**args, "edits": edits}))["isError"]
+        assert target.read_bytes() == original.encode()
+    edits = [{"oldText": "return Page(context)", "newText": "return Page(context)  # 草稿"},
+             {"oldText": '"Sample"', "newText": '"Updated"'}]
+    result = read_json(tools.call("edit", {**args, "edits": edits}))
+    assert not result.get("isError")
+    assert target.read_bytes() == original.replace('"Sample"', '"Updated"').replace(
+        "return Page(context)", "return Page(context)  # 草稿").encode()
+
+
 def test_old_single_file_session_still_updates_after_target_converts_to_package(drafts):
     drafts.root.mkdir()
     legacy = drafts.root / "sample.py"
@@ -138,7 +162,7 @@ def test_image_resource_read_and_preview_install_exact_package(gui, drafts):
     result = read_json(tools.call("page_resource", {"filename": "sample.py", "path": "assets/banner.png",
                           "content_base64": base64.b64encode(original).decode()}))
     assert not result.get("isError")
-    result = read_json(tools.call("page_read", {"scope": "drafts", "filename": "sample.py", "path": "assets/banner.png", "image": True}))
+    result = read_json(tools.call("read", {"scope": "page_draft", "filename": "sample.py", "path": "assets/banner.png", "image": True}))
     assert not result.get("isError")
     block = next(block for block in result["content"] if block["type"] == "image")
     assert block["mimeType"] == "image/jpeg"

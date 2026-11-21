@@ -61,6 +61,11 @@ def test_persistent_drafts_readonly_source_settings_and_permissions(drafts):
     assert drafts.list()["items"][0]["filename"] == "sample.py"
     first = drafts.read(filename="sample.py", limit=10)
     assert first["source"] + drafts.read(filename="sample.py", offset=10)["source"] == code
+    tools = drafts.session.host.conversation.tools
+    result = read_json(tools.call("read", {"scope": "page_installed", "filename": "sample.py",
+                                         "offset": 10, "limit": 12}))
+    assert result["details"]["source"] == code[10:22]
+    assert result["details"]["next_offset"] == 22
     assert json.loads(drafts.read("settings")["source"])["pages"]["sample.page"] == {"field": "old"}
     drafts.create("sample.py", copy_from="sample.py")
     drafts.update("sample.py", SOURCE)

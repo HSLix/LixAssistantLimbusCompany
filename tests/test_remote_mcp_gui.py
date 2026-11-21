@@ -89,6 +89,11 @@ def test_remote_page_preview_installs_only_the_locally_approved_snapshot(gui):
     try:
         created = perform(remote, token, "page_create", {"filename": "sample.py", "source": SOURCE})
         assert not created["result"].get("isError")
+        source = SOURCE.replace('"Sample"', '"Remote update"')
+        updated = perform(remote, token, "page_update", {"filename": "sample.py", "source": source})
+        assert not updated["result"].get("isError")
+        read = remote.invoke("page_read", {"scope": "drafts", "filename": "sample.py"}, token)
+        assert read["details"]["source"] == source
         identity = str(uuid.uuid4())
         remote.invoke("page_preview", {"filename": "sample.py", "summary": "Review the new page"}, token, identity)
         pump(app, lambda: bool(window.remote_mcp_page.dialogs))
@@ -97,6 +102,6 @@ def test_remote_page_preview_installs_only_the_locally_approved_snapshot(gui):
         dialog.install()
         op = wait_operation(remote, identity)
         assert op["result"]["details"]["status"] == "installed"
-        assert (remote.service.data_root / "pages/sample/page.py").read_text() == SOURCE
+        assert (remote.service.data_root / "pages/sample/page.py").read_text() == source
     finally:
         remote.close()

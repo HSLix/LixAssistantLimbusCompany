@@ -30,6 +30,31 @@ def write_source(path, source):
             temporary.unlink(missing_ok=True)
 
 
+def apply_source_edits(source, edits):
+    """在同一份原文定位全部片段，拒绝缺失、歧义及重叠。"""
+    if not isinstance(edits, list) or not edits:
+        raise ValueError("edits 须包含至少一个替换片段。")
+    replacements = []
+    for edit in edits:
+        if not isinstance(edit, dict) or set(edit) != {"oldText", "newText"}:
+            raise ValueError("每个片段须提供 oldText 和 newText。")
+        old, new = edit["oldText"], edit["newText"]
+        if not isinstance(old, str) or not old or not isinstance(new, str):
+            raise ValueError("oldText 须为非空字符串，newText 须为字符串。")
+        start = source.find(old)
+        if start < 0 or source.find(old, start + 1) >= 0:
+            raise ValueError("原文片段未唯一匹配，请用 read 重新读取草稿。")
+        replacements.append((start, start + len(old), new))
+    parts, previous_end = [], 0
+    for start, end, new in sorted(replacements):
+        if start < previous_end:
+            raise ValueError("替换片段不能重叠。")
+        parts.extend((source[previous_end:start], new))
+        previous_end = end
+    parts.append(source[previous_end:])
+    return "".join(parts)
+
+
 class MemorySettings:
     """预览专用配置；两侧各自复制，不持有正式文件写入路径。"""
 
@@ -147,7 +172,7 @@ class PageDrafts:
         """完整源码或复制正式页创建草稿；正式页只在人工批准后覆盖。"""
         target = self.package_path(filename)
         if target.exists():
-            raise ValueError("草稿已存在，请使用 page_update。")
+            raise ValueError("草稿已存在，请使用页面编辑工具。")
         if copy_from is not None:
             if source is not None or filename != copy_from:
                 raise ValueError("复制正式页须沿用原文件名，且不能同时提供 source。")
@@ -161,16 +186,22 @@ class PageDrafts:
     @staticmethod
     def source_bytes(source):
         """只检查完整源码语法，不执行或判断业务兼容。"""
-        if not isinstance(source, str) or not source.strip():
+        if not isinstance(source, str) or not source.removeprefix("\ufeff").strip():
             raise ValueError("必须提供完整 Python 页面源码。")
         require_memory(len(source) * 48)
-        compile(source, "<page-draft>", "exec")
+        compile(source.removeprefix("\ufeff"), "<page-draft>", "exec")
         return source.encode("utf-8")
 
-    def update(self, filename, source):
+    def update(self, filename, source=None, *, edits=None):
+        """检查整份新源码的语法后原子保存，已安装版本和包内资源不参与写入。"""
+        if (source is None) == (edits is None):
+            raise ValueError("须且只能提供完整 source 或局部 edits。")
         target = self.path(filename)
         if not target.is_file():
             raise ValueError("草稿不存在。")
+        if edits is not None:
+            original = FileContent.from_path(target).decode()
+            source = apply_source_edits(original, edits)
         write_source(target, self.source_bytes(source))
         return self.read("drafts", filename)
 
@@ -181,10 +212,10 @@ class PageDrafts:
                 "package": package}
 
     def write_resource(self, filename, path, content=None, *, remove=False):
-        """只修改当前草稿资源；源码用 page_update，正式页与配置不可写。"""
+        """只修改当前草稿资源，入口源码由编辑工具处理。"""
         _relative(path)
         if Path(path).suffix.lower() in {".py", ".pyc", ".pyo"}:
-            raise ValueError("Python 源码只能通过 page_update 修改。")
+            raise ValueError("Python 源码须通过页面编辑工具修改。")
         if type(remove) is not bool or remove and content is not None:
             raise ValueError("移除资源不能同时提供内容。")
         if not remove and not isinstance(content, (bytes, FileContent)):
