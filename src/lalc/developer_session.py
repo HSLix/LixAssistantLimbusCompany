@@ -122,9 +122,11 @@ class DeveloperSession:
         self.host.session = self
 
     @classmethod
-    def create(cls, service, manifest_id, *, mode="Repair", entry="cli"):
+    def create(cls, service, manifest_id, *, mode="Repair", entry="cli", parent_run_id=None):
         """从明确版本或 Construct 空白准备完整目录后提交，失败不暴露半成品。"""
         allowed_tools(mode, entry)
+        if parent_run_id is not None and (entry != "runtime" or type(parent_run_id) is not int or parent_run_id < 1):
+            raise ValueError("Session 的父 Run 无效。")
         if (mode == "Repair" or manifest_id is not None) and (not isinstance(manifest_id, str) or not manifest_id.strip()):
             raise ValueError("Repair Session 必须明确指定已发布 Manifest。")
         session = cls(service, str(uuid.uuid4()), entry=entry)
@@ -141,8 +143,10 @@ class DeveloperSession:
                 raise ValueError(json.dumps([error.as_dict() for error in errors], ensure_ascii=False))
             atomic_write_json(prepared / ".candidate-baseline.json", {"manifest_id": manifest_id, "files": {
                 name: base64.b64encode(value).decode() for name, value in candidate_files(candidate).items()}})
-            atomic_write_json(prepared / "session.json", {
-                "version": 1, "session_id": session.identity, "mode": mode, "source_manifest_id": manifest_id})
+            metadata = {"version": 1, "session_id": session.identity, "mode": mode, "source_manifest_id": manifest_id}
+            if parent_run_id is not None:
+                metadata["parent_run_id"] = parent_run_id
+            atomic_write_json(prepared / "session.json", metadata)
             log = prepared / "log"
             log.mkdir()
             atomic_write_json(log / "log-format.json", FORMAT)
@@ -171,6 +175,10 @@ class DeveloperSession:
             raise ValueError("Session 标题必须是非空单行文字。")
         self.mode = metadata["mode"]
         self.source_manifest_id = source
+        self.parent_run_id = metadata.get("parent_run_id")
+        if "parent_run_id" in metadata and (
+                self.mode != "Repair" or type(self.parent_run_id) is not int or self.parent_run_id < 1):
+            raise ValueError("Session 的父 Run 无效。")
         if json.loads((self.path / "log/log-format.json").read_text(encoding="utf-8")) != FORMAT:
             raise ValueError("不支持该 Session 日志格式。")
         if any(path.is_symlink() for path in (self.path / "log").rglob("*")):
@@ -260,6 +268,13 @@ class DeveloperSession:
                     with events_path.open("ab") as stream:
                         stream.write(b"\n")
         events = list(read_events(events_path, expand=load_history)) if events_path.exists() else []
+        for row in events:
+            event = row["event"]
+            if event.get("type") == "trial_started" and type(event.get("run_id")) is int:
+                conversation.tools.trial_run_ids.add(event["run_id"])
+            elif (self.parent_run_id is None and event.get("type") == "game_version_observed"
+                  and event.get("source") == "runtime:Repair"):
+                conversation.tools.legacy_runtime = True
         log.event_sequence = len(events)
         if load_history:
             conversation.history = restored_history(events)

@@ -134,11 +134,14 @@ def execute(ctx, *, value: int) -> str:
     base = _publish(tmp_path, manager, step_source=broken)
     assert manager.set_default(base).ok
     runtime_settings(tmp_path)
+    save_options(tmp_path, other_run_logs_enabled=False)
     seen = []
     async def round(self, message, args, *, request_limit, **kwargs):
         self.log.group += 1
         self.tools.requested_manifest_id = None
         self.tools.cancelled.clear()
+        assert self.session.parent_run_id == kwargs["parent_run_id"]
+        assert self.tools.list_runs()["details"]["run_ids"] == [self.session.parent_run_id]
         seen.append((self.session.identity, request_limit, self.tools.read_run_state()["details"]))
         if len(seen) == 2:
             (self.host.candidate / json.loads((self.host.candidate / "manifest.json").read_text(encoding="utf-8"))["components"]["steps.break"]["source_path"]).write_text(NEW_STEP, encoding="utf-8")

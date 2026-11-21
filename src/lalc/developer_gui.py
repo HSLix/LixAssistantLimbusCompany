@@ -760,6 +760,7 @@ class SettingsPage(QWidget):
         self.global_controls = {}
         option_labels = ({"manifest_reference_enabled": tr('Allow querying published Manifests'),
                           "history_enabled": tr('Allow searching Agent history'),
+                          "other_run_logs_enabled": tr('Allow viewing logs from other runs'),
                           "knowledge_enabled": tr('Allow querying external knowledge')} if side == "developer" else {
             "automatic_repair_default": tr('Automatically use the repaired version after normal completion'),
             "runtime_feedback_enabled": tr('Allow requesting human feedback'),

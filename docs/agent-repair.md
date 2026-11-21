@@ -1,5 +1,7 @@
 # Agent Repair — Developer Candidate 开发与修复
 
+2026-11-21：Developer GUI → Agent Settings 的「允许查看其他 Run 的日志」默认开启，下一轮生效。所有内置 Session 始终能读取自己发起的试运行，Runtime Repair Session 也始终能读取触发自身的父 Run。只有 GUI 和 Runtime Repair 入口会在开关开启时获得其他本机 Run 的访问。列表和跨 Run 搜索只返回可见项，按 ID 读取、统计及截图沿用同一范围。旧日志按可确认的归属处理。远程 MCP 授权、人工 Logs 页和历史 Agent 对话检索有各自的设置。详见[影响审查](agent-run-visibility-impact-review.md)。
+
 2026-11-19：开启“允许查询已发布 Manifest”时，可用 `search_manifest_source` 按版本 ID 搜索登记的 Python 源码，包括 Recovery Rule。关键词按字面子串匹配，忽略大小写。结果包含成员逻辑名和行号，可用 `read_manifest_source` 读取上下文。分页与权限见 [Stage 5 规格](stage-5-agent-workbench.md)。
 
 2026-11-17：Session 聊天页右上角保留固定来源 Manifest，将重复的 Construct／Repair 标识替换为当前 Session 最近一次成功发布的 Manifest ID（包括 Agent 工具发布与会话内手动 Publish）。无发布记录显示“暂无 publish manifest”；发布失败保留上次 ID，重新打开 Session 从历史发布记录恢复，补载旧聊天不回退显示。发布与 Default 选择仍相互独立。

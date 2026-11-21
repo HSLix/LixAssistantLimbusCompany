@@ -261,8 +261,12 @@ One model request and response within an Agent conversation round, consuming req
 _Avoid_: Agent conversation round, Trusted Action call, Workflow Step
 
 **Runtime Agent Session**:
-The existing Repair Session used from a runtime entry with program-organized fault context and execution feedback, rather than a separate Session implementation. Its recovery rounds share one request budget; after the Run ends the same saved conversation can continue through the Developer GUI without reviving the former Run or its state.
+The existing Repair Session created to address a failed entry in its Parent Run. Its recovery rounds share one request budget; after the Run ends the same saved conversation can continue through the Developer GUI without reviving the former Run or its state.
 _Avoid_: Recursive Agent session, parallel runtime session store
+
+**Parent Run**:
+The top-level execution whose failed entry led to the creation of a Runtime Agent Session. Its diagnostic logs belong to that Session's repair context.
+_Avoid_: Developer Trial, Run that merely used the same Manifest
 
 **Request Step Recheck**:
 The historical Step-only name for a Runtime Recheck request. Stage 6 uses Recheck for the currently failed Plan, Workflow or Step entry rather than introducing a separate Step execution mechanism.

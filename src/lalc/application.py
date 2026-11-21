@@ -210,7 +210,7 @@ class ApplicationService:
 
     def start(
         self, logical_name: str | None, inputs: dict[str, Any], *, manifest_id: str | None = None,
-        _developer_trial: bool = False,
+        _developer_trial: bool = False, _trial_session_id: str | None = None,
         use_saved_config: bool = True, task_repetitions: dict[str, int] | None = None,
         settings: dict[str, Any] | None = None,
     ) -> int:
@@ -255,6 +255,8 @@ class ApplicationService:
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
             entry["developer_trial"] = _developer_trial
+            if _developer_trial and _trial_session_id is not None:
+                entry["trial_session_id"] = _trial_session_id
             if remote_trial:
                 entry["remote_operation_id"] = remote.operation_id
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs, run_state, use_saved_config)
@@ -279,12 +281,12 @@ class ApplicationService:
         self, *, manifest_id: str | None = None,
         task_repetitions: dict[str, int] | None = None,
         settings: dict[str, Any] | None = None, _developer_trial: bool = False,
-        use_saved_config: bool = True,
+        use_saved_config: bool = True, _trial_session_id: str | None = None,
     ) -> int:
         """只启动已发布 Manifest 的唯一 Python Plan，冻结两份输入快照。"""
         return self.start(None, {}, task_repetitions=task_repetitions, settings=settings,
                           use_saved_config=use_saved_config,
-                          manifest_id=manifest_id, _developer_trial=_developer_trial)
+                          manifest_id=manifest_id, _developer_trial=_developer_trial, _trial_session_id=_trial_session_id)
 
     def connect(self) -> dict[str, Any]:
         """检查唯一游戏窗口并留下截图与文字连接日志，不创建 Run。"""
@@ -857,9 +859,9 @@ class ApplicationService:
         from .developer_session import DeveloperSession
         from .agent_prompts import RUNTIME_REPAIR_REQUEST
         from .agent_settings import load_settings, FIELDS
-        context = {"run_id": self._state["run_id"], **context}
+        context = {**context, "run_id": self._state["run_id"]}
         if context["recovery_id"] != self._runtime_session_key:
-            session = DeveloperSession.create(self, context["manifest_id"], entry="runtime")
+            session = DeveloperSession.create(self, context["manifest_id"], entry="runtime", parent_run_id=context["run_id"])
             session.host.secrets = self.agent_secrets
             self._runtime_chat = session.conversation()
             self._runtime_session_key = context["recovery_id"]

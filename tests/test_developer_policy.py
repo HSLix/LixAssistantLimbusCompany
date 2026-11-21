@@ -37,9 +37,71 @@ def test_publish_trial_uses_saved_version_and_retained_logs(tmp_path, monkeypatc
         assert listing['runs'][0]['logical_name'] == 'steps.total'
         page = tools.read_run_log(first["run_id"], limit=1)["details"]
         assert page["events"][0]["event"] == "run_started" and page["next_sequence"] == 2
+        assert page["events"][0]["trial_session_id"] == tools.log.identity
         with pytest.raises(StartError):
             host.service.start("steps.total", {"values": []})
     assert host.manager.default_manifest_id() == original.manifest_id
+
+
+def test_run_visibility_filters_before_paging_and_blocks_direct_reads(tmp_path):
+    """会话可见集合同时约束试运行、父 Run、搜索与各类证据读取。"""
+    from lalc.agent_settings import save_options
+    from lalc.developer_session import DeveloperSession
+
+    host, saved = host_for(tmp_path)
+    session = DeveloperSession.create(host.service, saved.manifest_id, entry="runtime", parent_run_id=2)
+    other = DeveloperSession.create(host.service, saved.manifest_id, entry="gui")
+    traces = host.service.data_root / "traces"
+    traces.mkdir()
+    for run_id in range(1, 8):
+        record = {"event": "run_started", "run_id": run_id, "sequence": 1, "developer_trial": run_id in {4, 5, 6, 7}}
+        if run_id in {5, 7}:
+            record["trial_session_id"] = other.identity
+        if run_id == 4:
+            record["trial_session_id"] = session.identity
+        (traces / f"{run_id}.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    session.conversation().log.record({"type": "trial_started", "run_id": 6})
+    all_ids = list(range(7, 0, -1))
+    assert session.host.conversation.tools.list_runs()["details"]["run_ids"] == all_ids
+    assert other.conversation().tools.list_runs()["details"]["run_ids"] == all_ids
+    assert DeveloperSession(host.service, session.identity).conversation().tools.list_runs()["details"]["run_ids"] == [6, 4, 2]
+
+    save_options(host.service.data_root, other_run_logs_enabled=False)
+    for entry in ("runtime", "gui", "cli"):
+        tools = DeveloperSession(host.service, session.identity, entry=entry).conversation().tools
+        first = tools.list_runs(limit=2)["details"]
+        assert first["run_ids"] == [6, 4] and first["next_offset"] == 2
+        assert tools.list_runs(offset=2)["details"]["run_ids"] == [2]
+        page = tools.search_run_logs("run_started", all_runs=True, limit=2)["details"]
+        assert [item["run_id"] for item in page["matches"]] == [6, 4]
+        assert page["next"] == {"start_run_id": 2, "start_sequence": 1}
+        assert tools.read_run_log(2)["details"]["events"][0]["run_id"] == 2
+        for arguments in ({}, {"evidence_id": "7/1"}, {"render_sequence": 1}):
+            with pytest.raises(ValueError, match="没有访问权限"):
+                tools.read_run_log(7, **arguments)
+        with pytest.raises(ValueError, match="没有访问权限"):
+            tools.search_run_logs("run_started", run_id=7)
+    assert other.conversation().tools.list_runs()["details"]["run_ids"] == [7, 5]
+
+
+def test_legacy_runtime_parent_uses_host_trace(tmp_path):
+    """旧 Runtime Session 通过宿主介入事件恢复父 Run 归属。"""
+    from lalc.agent_settings import save_options
+    from lalc.developer_session import DeveloperSession
+
+    host, saved = host_for(tmp_path)
+    session = DeveloperSession.create(host.service, saved.manifest_id, entry="runtime")
+    session.conversation().log.record({"type": "game_version_observed", "source": "runtime:Repair"})
+    traces = host.service.data_root / "traces"
+    traces.mkdir()
+    for run_id in (1, 2):
+        records = [{"event": "run_started", "run_id": run_id, "sequence": 1, "developer_trial": False}]
+        if run_id == 1:
+            records.append({"event": "agent_invoked", "session_id": session.identity, "sequence": 2})
+        (traces / f"{run_id}.jsonl").write_text("".join(json.dumps(row) + "\n" for row in records), encoding="utf-8")
+    save_options(host.service.data_root, other_run_logs_enabled=False)
+    tools = DeveloperSession(host.service, session.identity, entry="gui").conversation().tools
+    assert tools.list_runs()["details"]["run_ids"] == [1]
 
 
 def test_rejected_start_has_no_run_and_failure_keeps_trace(tmp_path, monkeypatch):
@@ -133,7 +195,9 @@ def test_log_evidence_is_bound_to_run_and_missing_is_explicit(tmp_path):
     root = host.service.data_root
     trace = root / "traces" / "1.jsonl"
     trace.parent.mkdir(exist_ok=True)
-    trace.write_text(json.dumps({"sequence": 1, "evidence_id": "1/2"}) + "\n", encoding="utf-8")
+    trace.write_text(json.dumps({"sequence": 1, "event": "run_started", "run_id": 1,
+                                "developer_trial": True, "trial_session_id": tools.log.identity,
+                                "evidence_id": "1/2"}) + "\n", encoding="utf-8")
     image = root / "evidence" / "1" / "2.png"
     image.parent.mkdir(parents=True)
     Image.new("RGB", (4, 4)).save(image)

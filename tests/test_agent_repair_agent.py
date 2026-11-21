@@ -922,7 +922,7 @@ def test_two_invalid_final_answers_retry_automatically_and_preserve_business_rep
 
 
 def test_live_raw_output_is_forwarded_without_preflight_or_history_storage(conversation):
-    """真实 pi 的 thinking / 工具参数 / 文字在 message_end 前通知，日志只留完整消息。"""
+    """真实 pi 的思考和文字实时通知，完整工具参数随正式调用记录。"""
     chat, options, state = conversation
     options.provider = 'deepseek'
     options.model = 'deepseek-flash'
@@ -937,16 +937,18 @@ def test_live_raw_output_is_forwarded_without_preflight_or_history_storage(conve
     live = [row['event'] for row in events if row['event']['type'] == 'raw_output']
     assert live
     parts = [part for event in live for part in event['content']]
-    assert any(part.get('name') == 'read' for part in parts)
-    assert any('steps.total.py' in json.dumps(part) for part in parts)
+    assert all(part['type'] != 'toolCall' for part in parts)
     assert any(part.get('thinking') == 'Inspect [REDACTED]' for part in parts)
     assert any('finished' in part.get('text', '') for part in parts)
     first_stream = next(i for i, row in enumerate(events) if row['event']['type'] == 'raw_output')
     first_end = next(i for i, row in enumerate(events) if row['event']['type'] == 'message_end'
-                     and row['event'].get('message', {}).get('role') == 'assistant')
+                     and any(part['type'] == 'text' and 'finished' in part.get('text', '')
+                             for part in row['event']['message'].get('content', [])))
     assert first_stream < first_end
     assert 'raw-stream-secret' not in json.dumps(events)
     saved = list(read_events(chat.log.root / 'events.jsonl'))
+    assert any(row['event']['type'] == 'tool_execution_start'
+               and row['event'].get('args') == {'path': 'steps.total.py'} for row in saved)
     assert not any(row['event']['type'] in {'raw_output', 'message_update', 'model_check_started'} for row in saved)
     assert not (chat.log.root / 'round-1/events.jsonl').exists()
     assert (chat.log.root / 'round-1/request-1.json').exists()

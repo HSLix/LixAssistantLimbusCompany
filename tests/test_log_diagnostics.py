@@ -16,6 +16,14 @@ from lalc.agent_settings import save_options, settings_document
 from lalc.run_logs import display_json, image_path, query_trace, run_log_counts, run_summary
 from lalc.run_log_sharing import export_log, import_log
 from test_agent_repair import host_for
+
+
+@pytest.fixture
+def gui_run_tools(tmp_path):
+    """以允许读取本机日志的工作台入口验证合成证据。"""
+    from lalc.developer_session import DeveloperSession
+    host, saved = host_for(tmp_path)
+    return DeveloperSession.create(host.service, saved.manifest_id, entry="gui").conversation().tools
 from test_workflow_observability import make_service, finish
 
 
@@ -46,9 +54,9 @@ def test_filtered_paging_cross_run_search_and_incomplete_records(tmp_path):
     assert run_summary(tmp_path, 2)['status'] == 'unknown'
 
 
-def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path):
-    host, _ = host_for(tmp_path)
-    tools, root = host.conversation.tools, host.service.data_root
+def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path, gui_run_tools):
+    tools = gui_run_tools
+    root = tools.library.data_root
     write_trace(root, 2, [dict(sequence=1, event='component_log', level='info', message='hit')])
     write_trace(root, 1, [dict(sequence=1, event='component_log', level='info', message='hit', evidence_id='1/2')])
     path = root / 'evidence/1/2.avif'
@@ -71,13 +79,12 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path):
         tools.search_run_logs('hit', run_id=1, all_runs=True)
 
 
-def test_list_runs_summarizes_large_terminal_result(tmp_path):
-    host, _ = host_for(tmp_path)
-    tools = host.conversation.tools
+def test_list_runs_summarizes_large_terminal_result(gui_run_tools):
+    tools = gui_run_tools
     result = {"status": "interrupted", "items": [{"result": "failure"}] * 10_000,
               "all_tasks_succeeded": False, "failure_code": "branch_limit", "failure_message": "故障" * 2_000,
               "output": {"raw": "omitted"}}
-    write_trace(host.service.data_root, 1, [
+    write_trace(tools.library.data_root, 1, [
         {"sequence": 1, "event": "run_started"},
         {"sequence": 2, "event": "run_finished", "result": result},
     ])
@@ -91,9 +98,9 @@ def test_list_runs_summarizes_large_terminal_result(tmp_path):
 
 
 @pytest.mark.parametrize('extension', ['avif', 'png'])
-def test_tool_renders_exact_action_on_shared_evidence(tmp_path, extension):
-    host, _ = host_for(tmp_path)
-    tools, root = host.conversation.tools, host.service.data_root
+def test_tool_renders_exact_action_on_shared_evidence(gui_run_tools, extension):
+    tools = gui_run_tools
+    root = tools.library.data_root
     common = {'event': 'trusted_action_returned', 'debug_image': {'evidence_id': '1/2'}}
     write_trace(root, 1, [
         dict(common, sequence=1, logical_name='observe.match_asset',
@@ -217,10 +224,10 @@ def test_local_time_is_a_snapshot_and_never_changes_system_prompt(monkeypatch):
 
 
 
-def test_read_run_log_counts_whole_run_independent_of_filters_and_paging(tmp_path):
+def test_read_run_log_counts_whole_run_independent_of_filters_and_paging(gui_run_tools):
     """分页、筛选及正文中的等级字样均不改变整份快照的显式等级统计。"""
-    host, _ = host_for(tmp_path)
-    tools, root = host.conversation.tools, host.service.data_root
+    tools = gui_run_tools
+    root = tools.library.data_root
     records = [
         dict(sequence=1, event="component_log", level="warning", message="first"),
         dict(sequence=2, event="component_log", level="info", message="warning error"),

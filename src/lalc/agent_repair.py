@@ -157,7 +157,7 @@ class RepairLog:
         return {digest: self.image_ids[digest] for digest in digests}
 
     def stream(self, value):
-        """累计 pi 的内容块增量后脱敏，仅通知界面，不逐片写入历史。"""
+        """累计界面实时显示的文字与思考块，工具参数由完整调用事件提供。"""
         if not self.on_event:
             return
         event = value.get("assistantMessageEvent", {})
@@ -171,16 +171,6 @@ class RepairLog:
                 part[block] += event.get("delta", "")
             elif phase == "end":
                 part[block] = event.get("content", part[block])
-        elif block == "toolcall":
-            part = self.raw_content.setdefault(index, {"type": "toolCall", "name": "", "partialArgs": ""})
-            if phase == "start":
-                part["name"] = event.get("toolName", "")
-            elif phase == "delta":
-                part["partialArgs"] += event.get("delta", "")
-            elif phase == "end":
-                tool = event.get("toolCall", {})
-                part.update(name=tool.get("name", part["name"]),
-                            partialArgs=json.dumps(tool.get("arguments", {}), ensure_ascii=False))
         else:
             return
         self.on_event(self.clean({"round": self.group, "event": {
@@ -327,6 +317,8 @@ class RepairConversation:
                              identity=session.identity if session else None)
         self.history = []
         self.tools = RepairTools(host.service.data_root, self.log, platform=host.service.window_platform, host=host, allowed=self.allowed)
+        self.tools.read_other_runs = entry in {"gui", "runtime"} and options["other_run_logs_enabled"]
+        self.tools.parent_run_id = session.parent_run_id if session else None
 
     def append_user(self, message):
         """Session 的主动输入先记入持久事件，恢复不依赖轮末快照。"""
@@ -356,6 +348,7 @@ class RepairConversation:
                                          knowledge_enabled=options["knowledge_enabled"],
                                          manifest_reference_enabled=options["manifest_reference_enabled"])
             self.tools.allowed = frozenset(self.allowed)
+            self.tools.read_other_runs = self.entry in {"gui", "runtime"} and options["other_run_logs_enabled"]
             references = list(dict.fromkeys(manifest_references))
             for identity in references:
                 ManifestReference(self.host.manager).read(identity)
