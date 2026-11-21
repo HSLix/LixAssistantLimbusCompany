@@ -198,6 +198,7 @@ def test_transport_error_preserves_cause_and_request_without_retry(conversation,
 
 @pytest.mark.parametrize("code,failures,outcome", [
     ("ENOTFOUND", 1, "completed"),
+    ("ECONNRESET", 1, "completed"),
     ("UND_ERR_CONNECT_TIMEOUT", 2, "connection_timeout"),
     ("ECONNREFUSED", 1, "connection_refused"),
     ("EAI_AGAIN", 2, "user_cancelled"),

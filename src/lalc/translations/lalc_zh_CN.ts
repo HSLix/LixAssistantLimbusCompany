@@ -2180,6 +2180,10 @@ Original pixel region: {2}</source>
       <translation>连接超时</translation>
     </message>
     <message>
+      <source>Model service connection reset</source>
+      <translation>模型服务连接被重置</translation>
+    </message>
+    <message>
       <source>Could not resolve model service address</source>
       <translation>无法解析模型服务地址</translation>
     </message>
