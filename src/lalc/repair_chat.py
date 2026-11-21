@@ -381,8 +381,19 @@ class RepairChat(QTextBrowser):
                          f'style="color:#172b4d"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
         for number in activity_at.get(len(self.entries), []):
             parts.append(self.activity_html(number))
+        viewport = self.viewport()
+        updates_enabled = viewport.updatesEnabled()
+        viewport.setUpdatesEnabled(False)
+        try:
+            self._replace_chat_html("".join(parts), position, follow)
+        finally:
+            self._rendering = False
+            viewport.setUpdatesEnabled(updates_enabled)
+
+    def _replace_chat_html(self, html, position, follow):
+        """文档、附件和滚动位置全部就绪后再允许视口重绘。"""
         self.attachment_positions.clear()
-        self.setHtml("".join(parts))
+        self.setHtml(html)
         blank = QImage(1, 1, QImage.Format.Format_ARGB32)
         blank.fill(Qt.GlobalColor.transparent)
         for key in self.attachment_trays:
@@ -400,8 +411,8 @@ class RepairChat(QTextBrowser):
             block = block.next()
         # 后续延迟排版继续由 rangeChanged 沿用贴底状态。
         self.document().documentLayout().documentSize()
+        bar = self.verticalScrollBar()
         bar.setValue(bar.maximum() if self._following else position)
         if not follow:
             self._following = bar.value() >= bar.maximum() - 2
         self.position_attachments()
-        self._rendering = False

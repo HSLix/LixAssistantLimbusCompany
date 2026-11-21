@@ -107,7 +107,7 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
     chat, options, state = conversation
     candidate = chat.host.candidate
     manifest = (candidate / "manifest.json").read_text(encoding="utf-8")
-    (candidate / "temporary.py").write_text("# before", encoding="utf-8")
+    (candidate / "temporary.py").write_text("# before\n# keep this line\n# last", encoding="utf-8")
     (candidate / "outside-link.py").symlink_to(candidate.parent / "outside.py")
     # 候选符号链接在进入模型前拒绝，不依赖文件选择。
     with pytest.raises(ValueError):
@@ -118,7 +118,10 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
         tool("edit", {"path": "manifest.json", "oldText": manifest, "newText": "{invalid json"}),
         tool("edit", {"path": "plans.default.py", "oldText": "return None", "newText": 'ctx.log("plan edited")\n    return None'}),
         tool("edit", {"path": "steps.unchanged.py", "oldText": 'return "unchanged"', "newText": 'return "changed"'}),
-        tool("edit", {"path": "temporary.py", "oldText": "# before", "newText": "# after"}),
+        tool("edit", {"path": "temporary.py", "edits": [
+            {"oldText": "# before", "newText": "# after"},
+            {"oldText": "# last", "newText": "# 最后一行"},
+        ]}),
         tool("edit", {"path": "new.py", "oldText": "", "newText": "created"}),
         tool("validate_and_publish", {}), answer("need another round")])
     result = asyncio.run(chat.run("edit multiple existing files", options))
@@ -128,7 +131,7 @@ def test_multifile_edit_manifest_and_plan_enforced(conversation):
     assert 'ctx.log("plan edited")' in (candidate / "plans.default.py").read_text(encoding="utf-8")
     assert not (candidate / "new.py").exists()
     assert 'return "changed"' in (candidate / "steps.unchanged.py").read_text(encoding="utf-8")
-    assert (candidate / "temporary.py").read_text(encoding="utf-8") == "# after"
+    assert (candidate / "temporary.py").read_text(encoding="utf-8") == "# after\n# keep this line\n# 最后一行"
     assert any(message.get("role") == "toolResult" and message.get("isError") for message in chat.history)
     script(state, [tool("edit", {"path": "manifest.json", "oldText": "{invalid json", "newText": manifest}), answer("repaired")])
     result = asyncio.run(chat.run("fix the invalid manifest", options))
