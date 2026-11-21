@@ -21,7 +21,7 @@ def test_snapshot_and_notifications_never_copy_historical_trace(tmp_path):
         service._emit("component_log" if i < 350 else "target_window_checked",
                       {"message": str(i)})
     assert len(notifications) == 10350
-    assert len(service._live_logs) == 300
+    assert len(service._live_logs) == 100
     saved = [json.loads(line) for line in service._trace_path.read_text(encoding="utf-8").splitlines()]
     assert saved == service.state["trace"]
 
@@ -38,10 +38,10 @@ def test_snapshot_and_notifications_never_copy_historical_trace(tmp_path):
         service._changed_locked()
     state = service.ui_snapshot()
     assert "trace" not in service.status and "trace" not in state
-    assert [r["sequence"] for r in state["log_records"]] == list(range(51, 351))
+    assert [r["sequence"] for r in state["log_records"]] == list(range(251, 351))
     assert state["logs_trimmed"] and state["last_sequence"] == 10350
     state["log_records"][0]["message"] = "caller-only"
-    assert service.ui_snapshot()["log_records"][0]["message"] == "50"
+    assert service.ui_snapshot()["log_records"][0]["message"] == "250"
     assert service.ui_snapshot(1, 10350)["log_records"] == []
     service._emit("component_log", {"message": "next"})
     assert [r["sequence"] for r in service.ui_snapshot(1, 10350)["log_records"]] == [10351]

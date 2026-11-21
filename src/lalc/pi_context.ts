@@ -7,11 +7,18 @@ const digest = (data: string) => createHash("sha256").update(Buffer.from(data, "
 const textOf = (message) => typeof message?.content === "string" ? message.content
   : (message?.content ?? []).filter(part => part.type === "text").map(part => part.text).join("\n");
 
+/** 模型只接收工具的 content，结构化 details 留给宿主和原始日志。 */
+function modelContextMessage(message) {
+  if (message?.role !== "toolResult" && message?.role !== "tool") return message;
+  const { details, ...visible } = message;
+  return visible;
+}
+
 /** 图片采用固定额度估算，中文文本补偿 pi 的 chars/4 估算。 */
 export function contextTokens(message): number {
   const content = Array.isArray(message.content) ? message.content
     : typeof message.content === "string" ? [{ type: "text", text: message.content }] : [];
-  const withoutImages = { ...message, role: message.role === "custom" ? "user" : message.role === "tool" ? "toolResult" : message.role, content: content.filter(part => part.type !== "image") };
+  const withoutImages = { ...modelContextMessage(message), role: message.role === "custom" ? "user" : message.role === "tool" ? "toolResult" : message.role, content: content.filter(part => part.type !== "image") };
   const text = JSON.stringify(withoutImages);
   const chinese = (text.match(/[\u3000-\u9fff]/g) ?? []).length;
   return estimateTokens(withoutImages) + chinese + Math.ceil(((message.reasoning_content ?? "").length + JSON.stringify(message.tool_calls ?? []).length) / 4) +
@@ -38,7 +45,7 @@ export function imageWindow(entries, imageIds, sessionId, limit, currentIds = ne
   }
   const kept = new Set(images.filter(item => currentIds.has(item.entry.id)).slice(-limit));
   // 张数满足后仍检查字节预算，优先移出较早图片，最新单图超限明确失败。
-  const messageBytes = entries.reduce((n, e) => n + Buffer.byteLength(JSON.stringify(e.message ?? {}), "utf8"), 0);
+  const messageBytes = entries.reduce((n, e) => n + Buffer.byteLength(JSON.stringify(modelContextMessage(e.message) ?? {}), "utf8"), 0);
   let keptBytes = messageBytes - images.filter(item => !kept.has(item)).reduce((n, item) => n + item.part.data.length, 0);
   for (const item of [...kept]) {
     if (keptBytes < 39 * 1024 * 1024) break;
@@ -173,7 +180,7 @@ export async function installContext(pi, emit, accounting) {
     }
     const selected = entries.slice(0, cut).flatMap(entry => entry.messages).filter(m => m.role !== "system");
     const ids = imageIds;
-    const stripped = selected.map(message => ({ ...message, content: Array.isArray(message.content)
+    const stripped = selected.map(message => ({ ...modelContextMessage(message), content: Array.isArray(message.content)
       ? message.content.map(part => part.type === "image" ? { type: "text", text:
         `[图片证据 session_id=${bootstrap.session_id}, image_id=${ids[digest(part.data)] ?? "未知"}]` } : part)
       : message.content }));

@@ -7,8 +7,8 @@
       <translation>请选择分享对象。</translation>
     </message>
     <message>
-      <source>Showing the latest 300 entries. See Logs for earlier entries.</source>
-      <translation>仅显示最近 300 条日志，更早记录请到 Logs 日志页查看。</translation>
+      <source>Showing the latest {0} entries. See Logs for earlier entries.</source>
+      <translation>仅显示最近 {0} 条日志，更早记录请到 Logs 日志页查看。</translation>
     </message>
     <message>
         <source>Global shortcut: Ctrl Alt P</source>

@@ -767,33 +767,33 @@ def test_trial_caps_logs_and_preserves_surviving_scroll_anchor(gui):
     def records(start, end):
         return [{"sequence": i, "event": "component_log", "message": f"entry-{i:04d}"}
                 for i in range(start, end)]
-    dialog.render({"paused": False, "log_records": records(1, 301)})
+    dialog.render({"paused": False, "log_records": records(1, 101)})
     app.processEvents()
     document = dialog.logs.document()
     bar = dialog.logs.verticalScrollBar()
     frames = document.rootFrame().childFrames()
-    bar.setValue(round(document.documentLayout().frameBoundingRect(frames[150]).top()) + 8)
-    dialog.render({"paused": False, "log_records": records(301, 302)})
+    bar.setValue(round(document.documentLayout().frameBoundingRect(frames[50]).top()) + 8)
+    dialog.render({"paused": False, "log_records": records(101, 102)})
     frames = document.rootFrame().childFrames()
-    assert len(frames) == len(dialog.log_records) == 300
-    assert min(dialog.log_records) == 2 and max(dialog.log_records) == 301
-    expected = document.documentLayout().frameBoundingRect(frames[149]).top() + 8
+    assert len(frames) == len(dialog.log_records) == 100
+    assert min(dialog.log_records) == 2 and max(dialog.log_records) == 101
+    expected = document.documentLayout().frameBoundingRect(frames[49]).top() + 8
     assert abs(bar.value() - expected) <= 2
     assert dialog.history_notice.isVisible()
     assert "entry-0001" not in dialog.logs.toPlainText()
     dialog.show_log_details(QUrl("1"))
     assert dialog.findChild(ErrorDialog) is None
-    dialog.show_log_details(QUrl("301"))
+    dialog.show_log_details(QUrl("101"))
     details = dialog.findChild(ErrorDialog)
-    assert json.loads(details.details.toPlainText())["message"] == "entry-0301"
+    assert json.loads(details.details.toPlainText())["message"] == "entry-0101"
     details.close()
-    dialog.render({"paused": False, "log_records": records(302, 602)})
+    dialog.render({"paused": False, "log_records": records(102, 202)})
     assert bar.value() == 0  # 阅读项已被移出近期窗口。
     bar.setValue(bar.maximum())
-    dialog.render({"paused": False, "log_records": records(602, 603)})
+    dialog.render({"paused": False, "log_records": records(202, 203)})
     assert bar.value() == bar.maximum()
     text = dialog.logs.toPlainText()
-    dialog.render({"paused": False, "log_records": records(602, 603)})
+    dialog.render({"paused": False, "log_records": records(202, 203)})
     assert dialog.logs.toPlainText() == text
     dialog.deleteLater()
 
@@ -828,6 +828,37 @@ def test_trial_keeps_following_after_log_limit_and_layout(gui, logs_trimmed, has
         {"sequence": LIVE_LOG_LIMIT + 5, "event": "component_log", "message": "回看时新增"}]})
     app.processEvents()
     assert 0 < bar.value() < bar.maximum()
+    dialog.deleteLater()
+
+
+def test_trial_follows_delayed_viewport_changes_and_resumes_at_bottom(gui):
+    """日志满额后，延迟缩小视口会继续贴底，回看时保留滚动位置。"""
+    from PySide6.QtCore import QTimer
+    from lalc.developer_gui import TrialDialog
+    app, window = gui
+    dialog = TrialDialog(window.service, window)
+    dialog.show()
+    app.processEvents()
+    records = [{"sequence": i, "event": "component_log", "message": f"entry-{i}"}
+               for i in range(1, 102)]
+    dialog.render({"paused": False, "log_records": records})
+    app.processEvents()
+    bar = dialog.logs.verticalScrollBar()
+    previous_maximum = bar.maximum()
+    QTimer.singleShot(0, lambda: dialog.resize(dialog.width(), dialog.height() - 80))
+    app.processEvents()
+    assert bar.maximum() > previous_maximum
+    assert bar.value() == bar.maximum()
+
+    reading_position = bar.maximum() // 2
+    bar.setValue(reading_position)
+    dialog.resize(dialog.width(), dialog.height() + 80)
+    app.processEvents()
+    assert bar.value() == reading_position
+    bar.setValue(bar.maximum())
+    dialog.resize(dialog.width(), dialog.height() - 80)
+    app.processEvents()
+    assert bar.value() == bar.maximum()
     dialog.deleteLater()
 
 

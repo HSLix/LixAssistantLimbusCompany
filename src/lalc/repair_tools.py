@@ -19,7 +19,7 @@ from .runtime import UserInterruption
 
 
 from .agent_policy import BASE_TOOLS
-from .manifest_reference import ManifestReference
+from .manifest_reference import DEFAULT_MANIFEST_LIST_LIMIT, ManifestReference
 from .knowledge import KnowledgeLibrary
 
 REPAIR_TOOLS = list(BASE_TOOLS)
@@ -272,7 +272,7 @@ class RepairTools:
         finally:
             request.close()
 
-    def list_manifests(self, offset=0, limit=50):
+    def list_manifests(self, offset=0, limit=DEFAULT_MANIFEST_LIST_LIMIT):
         return self.text(ManifestReference(self.host.manager).list(offset, limit))
 
     def list_game_versions(self, **arguments):

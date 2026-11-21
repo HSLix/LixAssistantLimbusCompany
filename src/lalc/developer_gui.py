@@ -231,7 +231,7 @@ class TrialDialog(QDialog):
         self.setWindowFlag(Qt.WindowType.WindowCloseButtonHint, False)
         self.resize(760, 480)
         layout = QVBoxLayout(self)
-        self.history_notice = QLabel(tr("Showing the latest 300 entries. See Logs for earlier entries."))
+        self.history_notice = QLabel(tr("Showing the latest {0} entries. See Logs for earlier entries.").format(LIVE_LOG_LIMIT))
         self.history_notice.setWordWrap(True)
         self.history_notice.hide()
         layout.addWidget(self.history_notice)
@@ -239,6 +239,11 @@ class TrialDialog(QDialog):
         self.logs.setOpenLinks(False)
         self.logs.setOpenExternalLinks(False)
         self.logs.anchorClicked.connect(self.show_log_details)
+        self._following_logs = True
+        self._rendering_logs = False
+        bar = self.logs.verticalScrollBar()
+        bar.valueChanged.connect(self._log_scroll_changed)
+        bar.rangeChanged.connect(self._log_scroll_range_changed)
         self.log_records = {}
         layout.addWidget(self.logs)
         controls = QHBoxLayout()
@@ -252,50 +257,62 @@ class TrialDialog(QDialog):
         layout.addWidget(self.pause_notice)
         self._pause_notice_shown = False
 
+    def _log_scroll_changed(self, value):
+        if not self._rendering_logs:
+            self._following_logs = value >= self.logs.verticalScrollBar().maximum() - 4
+
+    def _log_scroll_range_changed(self, minimum, maximum):
+        """视口或延迟排版改变滚动范围时，继续沿用贴底状态。"""
+        if self._following_logs and not self._rendering_logs:
+            self.logs.verticalScrollBar().setValue(maximum)
+
     def render(self, state):
-        bar = self.logs.verticalScrollBar()
-        following = bar.value() >= bar.maximum() - 4
-        for record in state.get("log_records", state.get("trace", ())):
-            if record["sequence"] <= self.sequence:
-                continue
-            self.sequence = record["sequence"]
-            entry = _run_log_entry(record)
-            if entry is not None:
-                self.append_log(record, *entry)
-        if state.get("logs_trimmed"):
-            self.history_notice.show()
-        self.trim_logs()
-        info = state.get("pause_info")
-        if info:
-            instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
-            if not info.get("restart_step", True):
-                instruction = tr('Resuming continues Workflow observation and scheduling.')
-            instruction = info.get("resume_description", instruction)
-            self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
-            if not self._pause_notice_shown:
-                self._pause_notice_shown = True
-                self.parentWidget().showNormal()
-                self.parentWidget().raise_()
-                self.parentWidget().activateWindow()
-        else:
-            self._pause_notice_shown = False
-            self.pause_notice.clear()
-        self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
-        self.pause.setEnabled(not state.get("resume_pending", False))
-        # 首次显示历史提示会缩小日志视口，须在布局更新后恢复本轮刷新前的贴底选择。
-        self.layout().activate()
-        if following:
-            bar.setValue(bar.maximum())
+        """批量更新日志和控件，避免文档重排改写用户的滚动选择。"""
+        self._rendering_logs = True
+        try:
+            for record in state.get("log_records", state.get("trace", ())):
+                if record["sequence"] <= self.sequence:
+                    continue
+                self.sequence = record["sequence"]
+                entry = _run_log_entry(record)
+                if entry is not None:
+                    self.append_log(record, *entry)
+            if state.get("logs_trimmed"):
+                self.history_notice.show()
+            self.trim_logs()
+            info = state.get("pause_info")
+            if info:
+                instruction = tr("Resuming checks the current Step's condition.") if info["has_condition"] else tr('Resuming restarts the current Step.')
+                if not info.get("restart_step", True):
+                    instruction = tr('Resuming continues Workflow observation and scheduling.')
+                instruction = info.get("resume_description", instruction)
+                self.pause_notice.setText(f"{info['reason']}\n{info['description']}\n{instruction}")
+                if not self._pause_notice_shown:
+                    self._pause_notice_shown = True
+                    self.parentWidget().showNormal()
+                    self.parentWidget().raise_()
+                    self.parentWidget().activateWindow()
+            else:
+                self._pause_notice_shown = False
+                self.pause_notice.clear()
+            self.pause.setText(tr('Resume') if state["paused"] else tr('Pause'))
+            self.pause.setEnabled(not state.get("resume_pending", False))
+            self.layout().activate()
+            if self._following_logs:
+                bar = self.logs.verticalScrollBar()
+                bar.setValue(bar.maximum())
+        finally:
+            self._rendering_logs = False
 
     def append_log(self, record, level, message):
         """以可选中文本显示等级色块；用户回看时不强制滚到底部。"""
         sequence = record["sequence"]
         self.log_records[sequence] = record
         bar = self.logs.verticalScrollBar()
-        following = bar.value() >= bar.maximum() - 4
         position = bar.value()
         self.logs.append(self.log_html(record, level, message))
-        bar.setValue(bar.maximum() if following else position)
+        if not self._following_logs:
+            bar.setValue(position)
 
     @staticmethod
     def log_html(record, level, message):
@@ -317,7 +334,6 @@ class TrialDialog(QDialog):
         if len(self.log_records) <= LIVE_LOG_LIMIT:
             return
         bar = self.logs.verticalScrollBar()
-        following = bar.value() >= bar.maximum() - 4
         anchor, offset = None, 0
         document = self.logs.document()
         layout = document.documentLayout()
@@ -331,9 +347,9 @@ class TrialDialog(QDialog):
                                   for record in self.log_records.values()))
         self.history_notice.show()
         document.documentLayout().documentSize()
-        if following:
-            bar.setValue(bar.maximum())
-        elif anchor in self.log_records:
+        if self._following_logs:
+            return
+        if anchor in self.log_records:
             index = list(self.log_records).index(anchor)
             frames = document.rootFrame().childFrames()
             bar.setValue(round(document.documentLayout().frameBoundingRect(frames[index]).top() + offset))
