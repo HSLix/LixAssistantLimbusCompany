@@ -2178,8 +2178,10 @@ class RepairPage(QWidget):
             status = tr('Agent is responding…')
         elif kind in {"lalc_connection_retry", "lalc_connection_restored"}:
             if kind == "lalc_connection_retry":
-                reason = (tr('Connection timed out') if value['failure_code'] == 'connection_timeout'
-                          else tr('Could not resolve model service address'))
+                reason = {
+                    'connection_timeout': tr('Connection timed out'),
+                    'connection_reset': tr('Model service connection reset'),
+                }.get(value['failure_code'], tr('Could not resolve model service address'))
                 status = tr('{0}. Connection retry {1}/{2} (1 second between attempts).').format(reason, value['retry'], value['retry_limit'])
             else:
                 status = tr('Model service connection restored after {0} retry attempt(s).').format(value['retry'])

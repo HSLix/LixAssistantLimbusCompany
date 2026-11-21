@@ -39,6 +39,7 @@ function connectionFailure(error) {
     case "UND_ERR_CONNECT_TIMEOUT": return "connection_timeout";
     case "EAI_AGAIN": return "dns_temporary";
     case "ENOTFOUND": return "dns_not_found";
+    case "ECONNRESET": return "connection_reset";
     case "ECONNREFUSED": return "connection_refused";
   }
   if (error?.name === "TimeoutError") return "connection_timeout";
@@ -68,7 +69,7 @@ export function diagnosticFetch(fetcher, report, requestNumber, retryLimit, sign
         const details = { requests: requestNumber(), url, phase: "connect",
           elapsed_ms: Date.now() - started, error: cause, failure_code: code };
         if (abort?.aborted || init?.signal?.aborted || retry >= retryLimit
-            || !code || !["connection_timeout", "dns_temporary", "dns_not_found"].includes(code)) {
+            || !code || !["connection_timeout", "dns_temporary", "dns_not_found", "connection_reset"].includes(code)) {
           report("lalc_transport_error", { ...details, retries_used: retry, retry_limit: retryLimit });
           throw error;
         }

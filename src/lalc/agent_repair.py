@@ -231,7 +231,8 @@ def model_error(message, stage, requests, request_limit, transport=None):
     else:
         code = (transport or {}).get("failure_code") or "provider_error"
         summary = {"connection_timeout": "连接模型服务超时。", "dns_temporary": "模型服务域名暂时无法解析。",
-                   "dns_not_found": "模型服务域名未解析。", "connection_refused": "模型服务拒绝连接。"}.get(code)
+                   "dns_not_found": "模型服务域名未解析。", "connection_refused": "模型服务拒绝连接。",
+                   "connection_reset": "模型服务连接被重置。"}.get(code)
         if not summary:
             summary = original or f"模型请求未正常结束（stopReason={stop or '未提供'}），服务未返回具体错误说明。"
     parts = message.get("content", [])

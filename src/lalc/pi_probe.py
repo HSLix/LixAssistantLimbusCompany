@@ -166,6 +166,8 @@ def _models(base_url: str, key: str) -> list[dict]:
             code, message = "dns_temporary", "模型服务域名暂时无法解析"
         elif isinstance(cause, socket.gaierror) and cause.errno in {socket.EAI_NONAME, getattr(socket, "EAI_NODATA", None)}:
             code, message = "dns_not_found", "模型服务域名未解析"
+        elif isinstance(cause, ConnectionResetError):
+            code, message = "connection_reset", "模型服务连接被重置"
         elif isinstance(cause, ConnectionRefusedError):
             code, message = "connection_refused", "模型服务拒绝连接"
         else:
@@ -308,7 +310,9 @@ async def session_models(args, key, record):
             models = await asyncio.to_thread(_pi_models, args, key)
         except AgentDiagnosticError as error:
             code = error.evidence.get("failure_code")
-            if retry == CONNECTION_RETRY_LIMIT or code not in {"connection_timeout", "dns_temporary", "dns_not_found"}:
+            if retry == CONNECTION_RETRY_LIMIT or code not in {
+                "connection_timeout", "dns_temporary", "dns_not_found", "connection_reset"
+            }:
                 if retry:
                     error.evidence.update(retries_used=retry, retry_limit=CONNECTION_RETRY_LIMIT)
                 raise

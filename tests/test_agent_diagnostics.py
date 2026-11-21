@@ -77,6 +77,7 @@ def test_http_details_keep_body_cause_and_redact_before_logging(tmp_path, monkey
 
 @pytest.mark.parametrize("reason,code", [
     (URLError(ConnectionRefusedError()), "connection_refused"),
+    (URLError(ConnectionResetError()), "connection_reset"),
     (URLError(TimeoutError()), "connection_timeout"),
     (TimeoutError(), "connection_timeout"),
     (URLError(socket.gaierror(socket.EAI_NONAME, "not found")), "dns_not_found"),
@@ -95,8 +96,14 @@ def test_unreachable_errors_keep_nonempty_reason(monkeypatch, reason, code):
     assert details["url"] == "http://host/v1/models"
 
 
-@pytest.mark.parametrize("outcome", ["restored", "exhausted", "refused", "cancelled"])
-def test_session_model_list_connection_retries(monkeypatch, outcome):
+@pytest.mark.parametrize("outcome,code", [
+    ("restored", "dns_not_found"),
+    ("restored", "connection_reset"),
+    ("exhausted", "dns_not_found"),
+    ("refused", "connection_refused"),
+    ("cancelled", "dns_not_found"),
+])
+def test_session_model_list_connection_retries(monkeypatch, outcome, code):
     from lalc.agent_diagnostics import AgentDiagnosticError
     import lalc.pi_probe as probe
 
@@ -105,7 +112,6 @@ def test_session_model_list_connection_retries(monkeypatch, outcome):
         calls.append(None)
         if outcome == "restored" and len(calls) == 2:
             return [{"id": "test"}]
-        code = "connection_refused" if outcome == "refused" else "dns_not_found"
         raise AgentDiagnosticError("failed", "service_check", failure_code=code)
     async def wait(seconds):
         waits.append(seconds)
