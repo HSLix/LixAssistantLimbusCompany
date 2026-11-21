@@ -14,7 +14,7 @@ AI_REPAIR_MESSAGES = {
     "agent_invoked": "AI intervened and is attempting a repair",
     "agent_recheck_started": "AI intervention ended. Retrying execution",
 }
-LIVE_LOG_LIMIT = 300
+LIVE_LOG_LIMIT = 100
 LIVE_STATE_EVENTS = {
     "run_started", "run_paused", "paused_by_user", "run_resumed", "input_resumed",
     "input_resume_requested", "input_resume_rejected", "run_cancel_requested",

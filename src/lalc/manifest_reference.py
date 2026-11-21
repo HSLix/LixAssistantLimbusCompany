@@ -8,6 +8,8 @@ from datetime import datetime
 
 from .manifest import OPTIONAL_FIELDS, SAVED_TOP_LEVEL_FIELDS, SCHEMA_VERSION, SECTIONS
 
+DEFAULT_MANIFEST_LIST_LIMIT = 5
+
 
 class ManifestReference:
     """按 Manifest 成员定位源码；每次访问验证真实路径、身份和内容哈希。"""
@@ -51,7 +53,7 @@ class ManifestReference:
                     raise ValueError("Manifest 成员登记无效。")
         return value
 
-    def list(self, offset=0, limit=50):
+    def list(self, offset=0, limit=DEFAULT_MANIFEST_LIST_LIMIT):
         self._bounds(offset, limit)
         if self.manager.manifests_dir.is_symlink():
             raise ValueError("Manifest 目录不允许符号链接。")

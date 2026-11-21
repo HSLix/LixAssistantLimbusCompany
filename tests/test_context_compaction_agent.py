@@ -67,14 +67,20 @@ def test_tool_loop_can_compact_without_losing_tool_pair(conversation, tmp_path, 
         return answer()
     state['respond'] = respond
     # 单条工具结果可越过压缩线，必须在下一请求前处理。
-    payload = chat.tools.text({'large': 'tool-result ' * 30000})
+    payload = chat.tools.text({'large': '工具正文标记' + '材料' * 30000})
     if with_image:
         path = make_images(tmp_path, ('PNG',))[0]
         payload['content'].append({'type': 'image', 'mimeType': 'image/png', 'data': base64.b64encode(path.read_bytes()).decode()})
     chat.tools.asset_tree = lambda **_: payload
     result = asyncio.run(chat.run('读取并总结', options))
     assert result['status'] == 'completed', result
-    assert any(e['type'] == 'lalc_compaction' and e['phase'] == 'completed' for e in records(chat))
+    events = records(chat)
+    compaction = next(e for e in events if e['type'] == 'lalc_compaction' and e['phase'] == 'completed')
+    assert compaction['before'] < 120000
+    summaries = [body for body in state['calls'] if not body.get('tools')]
+    assert sum(json.dumps(body, ensure_ascii=False).count('工具正文标记') for body in summaries) == 1
+    raw = next(e['result'] for e in events if e['type'] == 'repair_tool' and e['name'] == 'asset_tree')
+    assert raw['details'] == payload['details']
     assert any(e['type'] == 'extension_ui_request' and e.get('title', '').startswith('lalc.image_ids:')
                for e in records(chat)) == with_image
     for body in state['calls']:

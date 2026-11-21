@@ -252,6 +252,10 @@ def test_dynamic_controls_chat_and_notifications_keep_original_details(owner, ap
     dialog.render(state)
     assert dialog.pause.text() == ("恢复" if language == "zh_CN" else "Resume")
     assert dialog.stop.text() == ("停止" if language == "zh_CN" else "Stop")
+    assert dialog.history_notice.text() == (
+        "仅显示最近 100 条日志，更早记录请到 Logs 日志页查看。" if language == "zh_CN"
+        else "Showing the latest 100 entries. See Logs for earlier entries."
+    )
     dialog.done(0)
     developer.notifications.notify(tr("Execution completed"), "原始结果 raw")
     card = developer.notifications.cards[0]
