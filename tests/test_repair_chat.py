@@ -212,16 +212,23 @@ def test_tool_error_is_one_updated_diagnostic_with_both_event_sources(gui, host_
 
 
 def test_native_read_edit_and_validation_keep_completion_rows(gui):
-    app, window = gui
+    _, window = gui
     page = window.repair_page
+    chat = page.chat
+    chat.add_message("你", "请局部修改文件", 1)
+    viewport = chat.viewport()
+    during_update = []
+    chat.document().contentsChanged.connect(lambda: during_update.append(viewport.updatesEnabled()))
     for name in ("read", "edit"):
         emit(page, "tool_execution_start", identity=name, name=name)
+        assert viewport.updatesEnabled() and "请局部修改文件" in chat.toPlainText()
         emit(page, "tool_execution_end", identity=name, name=name, result={}, isError=False)
     emit(page, "validation", identity="validation-1", name="validate", ok=True, errors=[])
     emit(page, "tool_execution_end", identity="validation-1", name="validate", result={}, isError=False)
-    assert len(page.chat.entries) == 3
-    assert [entry["name"] for entry in page.chat.entries] == ["read", "edit", "validate"]
-    assert all(entry["status"] == "成功" for entry in page.chat.entries)
+    assert during_update and not any(during_update)
+    assert viewport.updatesEnabled()
+    assert [entry["name"] for entry in chat.entries[1:]] == ["read", "edit", "validate"]
+    assert all(entry["status"] == "成功" for entry in chat.entries[1:])
 
 
 def test_history_scroll_position_is_kept_and_bottom_can_follow(gui):

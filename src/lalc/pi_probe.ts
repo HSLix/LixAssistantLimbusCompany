@@ -300,7 +300,10 @@ export default async function (pi) {
     });
     pi.registerTool({
       ...edit,
-      description: edit.description + " Chinese text can be used directly in oldText/newText; do not manually encode Unicode escapes. Copy oldText from the latest read, using a short unique code anchor. On mismatch, read again and correct the anchor before retrying.",
+      description: edit.description
+        + ` For example, to change one condition, pass {"path":"steps.total.py","edits":[{"oldText":"if value > 0","newText":"if value >= 0"}]}.`
+        + " Copy only the affected snippet from the latest read, using enough context to match once."
+        + " On mismatch, read again and correct the anchor. Use Chinese text directly without manually encoding Unicode escapes.",
       async execute(id, params, signal, onUpdate) {
         authorize("edit");
         const path = await checkedEdit(params.path);
