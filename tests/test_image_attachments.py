@@ -57,7 +57,7 @@ def test_gui_accumulates_selection_displays_cards_and_clears_all(gui, monkeypatc
     page = window.repair_page
     page.attach_image()
     page.attach_image()
-    assert page.images == paths * 2
+    assert [item['path'] for item in page.images] == paths * 2
     assert [item['path'] for item in page.attachment_tray.items] == paths * 2
     assert not page.attachment_tray.isHidden()
     page.clear_image()

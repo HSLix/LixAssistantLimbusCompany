@@ -1,4 +1,4 @@
-"""覆盖工作区打开、分轮富文本、工具合并/详情、滚动与主动 Diff 弹窗。
+"""覆盖工作区打开、轮次时间、消息操作、工具合并/详情、滚动与主动 Diff 弹窗。
 
 在项目根目录运行：
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_repair_chat.py
@@ -9,6 +9,54 @@ import shutil
 import pytest
 
 from test_developer_gui import gui, wait_jobs
+
+
+def test_message_actions_are_visible_below_body_and_copy_original_markdown(gui):
+    from datetime import datetime
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from lalc.i18n import tr
+    from lalc.repair_chat import RepairChat
+
+    app, _ = gui
+    chat = RepairChat()
+    chat.resize(560, 420)
+    chat.show()
+    stamp = '2026-11-22T06:32:07+00:00'
+    chat.set_round_time(1, stamp)
+    chat.set_round_time(1, '2026-11-22T06:39:59+00:00')
+    chat.set_round_time(2, 'unknown')
+    reply = '**Answer**\n\n```python\nprint(1)\n```'
+    chat.add_message('你', 'Question', 1)
+    chat.add_message('Agent', reply, 1)
+    chat.add_message('系统', 'Notice', 2)
+    app.processEvents()
+
+    assert set(chat.round_times) == {1}
+    clock = datetime.fromisoformat(stamp).astimezone()
+    time_label = chat.document().find(f'{clock:%H:%M:%S}')
+    assert time_label.charFormat().toolTip() == clock.strftime('%Y-%m-%d %H:%M:%S %Z')
+    user, agent = chat.message_actions.values()
+    assert user.copy.isVisible() and user.edit.isVisible() and agent.copy.isVisible()
+    assert agent.edit is None
+    for actions, first_line, last_line in ((user, 'Question', 'Question'), (agent, 'Answer', 'print(1)')):
+        start = chat.document().find(first_line)
+        start.setPosition(start.selectionStart())
+        assert actions.x() == chat.cursorRect(start).x()
+        assert actions.y() > chat.cursorRect(chat.document().find(last_line)).bottom()
+    QTest.mouseClick(agent.copy, Qt.MouseButton.LeftButton)
+    assert app.clipboard().text() == reply
+    assert agent.copy.toolTip() == tr('Copied successfully')
+    assert agent.copy_timer.isActive()
+    chat.set_edit_enabled(False)
+    assert not user.edit.isEnabled() and user.copy.isEnabled()
+    QTest.mouseClick(user.copy, Qt.MouseButton.LeftButton)
+    assert app.clipboard().text() == 'Question'
+    agent.reset_copy()
+    assert agent.copy.toolTip() == tr('Copy message')
+    chat.clear()
+    assert not chat.message_actions and not chat.round_times and not agent.isVisible()
+    chat.close()
 
 
 def test_tool_summary_and_live_working_clock(gui, monkeypatch):
