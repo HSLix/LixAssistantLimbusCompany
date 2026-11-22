@@ -14,4 +14,4 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest --run-agent-tests -q -s tes
 
 每项验证都创建新的 `.generated/external-search-validation/run-*/`，打印 `RETAINED=...`，不会自动删除既有结果；不要使用清空该目录的前置命令。首次检索实验的脚本和结果另保存在 `initial-probe/`。这些大文件目录被 Git 忽略，不代表长期备份或跨机器可用。
 
-`reusable_pi_extension.ts` 是小型协议原型，仅验证每轮状态切换、权限和中断边界；它没有接入生产的全部工具、图片、日志或页面工作流。失败版本和修正前的实验结果也保留，最终可采信的运行目录见[验证报告](../../docs/external-code-search-validation.md)。
+`reusable_pi_extension.ts` 是小型协议原型，仅验证每轮状态切换、权限和中断边界；它没有接入生产的全部工具、图片、日志或页面工作流。失败版本和修正前的实验结果也保留，最终可采信的运行目录见 Git 历史中的验证报告 `7e4b309:docs/external-code-search-validation.md`。

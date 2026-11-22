@@ -27,13 +27,11 @@ def app():
     return QApplication.instance() or QApplication([])
 
 
-def test_documented_minimal_page_loads_and_submits_empty_config(tmp_path, app):
-    """文档中的标签页示例完整可加载，无 Task 也提供实例 submit。"""
-    document = Path(__file__).resolve().parents[1] / "docs/business-settings-pages.md"
-    source = document.read_text(encoding="utf-8").split("```python\n", 1)[1].split("```", 1)[0]
+def test_minimal_page_loads_and_submits_empty_config(tmp_path, app):
+    """最小标签页可以加载，无 Task 也提供实例 submit。"""
     directory = tmp_path / "pages"
     directory.mkdir()
-    (directory / "notice.py").write_text(source, encoding="utf-8")
+    shutil.copyfile(EXAMPLE / "notice.py", directory / "notice.py")
     store = UserSettings(tmp_path)
     pages, errors = discover_pages(directory, store)
     assert not errors and len(pages) == 1
