@@ -1,6 +1,6 @@
 """Agent Repair 的分轮对话呈现；界面合并工具状态，原始事件不丢弃。"""
 
-from datetime import datetime
+from datetime import date, datetime
 from html import escape
 import json
 import time
@@ -418,6 +418,7 @@ class RepairChat(QTextBrowser):
         position = bar.value()
         self._following = self._following and follow
         parts, previous_round = [], None
+        today = date.today()
         # 每轮折叠区跟随该轮用户消息，续聊仍保留旧轮次内容。
         activity_indices = {}
         for index, entry in enumerate(self.entries):
@@ -439,7 +440,8 @@ class RepairChat(QTextBrowser):
                     stamp = self.round_times[number].astimezone()
                     tooltip = escape(stamp.strftime('%Y-%m-%d %H:%M:%S %Z'))
                     color = '#a7b6c8' if isDarkTheme() else '#68788b'
-                    time_label = f'&nbsp;&nbsp;<span style="color:{color}" title="{tooltip}">{stamp:%H:%M:%S}</span>'
+                    shown_time = stamp.strftime('%H:%M:%S' if stamp.date() == today else '%Y-%m-%d %H:%M:%S')
+                    time_label = f'&nbsp;&nbsp;<span style="color:{color}" title="{tooltip}">{shown_time}</span>'
                     heading = heading.removesuffix('</p>') + time_label + '</p>'
                 parts.append(heading)
                 previous_round = number
