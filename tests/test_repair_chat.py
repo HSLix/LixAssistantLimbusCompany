@@ -12,7 +12,7 @@ from test_developer_gui import gui, wait_jobs
 
 
 def test_message_actions_are_visible_below_body_and_copy_original_markdown(gui):
-    from datetime import datetime
+    from datetime import datetime, timedelta, timezone
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest
     from lalc.i18n import tr
@@ -22,20 +22,24 @@ def test_message_actions_are_visible_below_body_and_copy_original_markdown(gui):
     chat = RepairChat()
     chat.resize(560, 420)
     chat.show()
-    stamp = '2026-11-22T06:32:07+00:00'
-    chat.set_round_time(1, stamp)
-    chat.set_round_time(1, '2026-11-22T06:39:59+00:00')
-    chat.set_round_time(2, 'unknown')
+    clock = datetime.now().replace(hour=12, minute=32, second=7, microsecond=0)
+    yesterday = clock - timedelta(days=1)
+    chat.set_round_time(1, clock.astimezone(timezone.utc).isoformat())
+    chat.set_round_time(1, yesterday.astimezone(timezone.utc).isoformat())
+    chat.set_round_time(2, yesterday.astimezone(timezone.utc).isoformat())
+    chat.set_round_time(3, 'unknown')
     reply = '**Answer**\n\n```python\nprint(1)\n```'
     chat.add_message('你', 'Question', 1)
     chat.add_message('Agent', reply, 1)
     chat.add_message('系统', 'Notice', 2)
+    chat.add_message('系统', 'Older notice', 3)
     app.processEvents()
 
-    assert set(chat.round_times) == {1}
-    clock = datetime.fromisoformat(stamp).astimezone()
+    assert set(chat.round_times) == {1, 2}
     time_label = chat.document().find(f'{clock:%H:%M:%S}')
-    assert time_label.charFormat().toolTip() == clock.strftime('%Y-%m-%d %H:%M:%S %Z')
+    assert time_label.charFormat().toolTip() == clock.astimezone().strftime('%Y-%m-%d %H:%M:%S %Z')
+    assert f'{clock:%Y-%m-%d %H:%M:%S}' not in chat.toPlainText()
+    assert f'{yesterday:%Y-%m-%d %H:%M:%S}' in chat.toPlainText()
     user, agent = chat.message_actions.values()
     assert user.copy.isVisible() and user.edit.isVisible() and agent.copy.isVisible()
     assert agent.edit is None
