@@ -1,12 +1,14 @@
 """Agent Repair 的分轮对话呈现；界面合并工具状态，原始事件不丢弃。"""
 
+from datetime import datetime
 from html import escape
 import json
 import time
 
-from PySide6.QtCore import Signal, QTimer, Qt, QUrl
+from PySide6.QtCore import QEvent, QSize, Signal, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QTextDocument, QTextCursor, QImage
-from PySide6.QtWidgets import QApplication, QTextBrowser
+from PySide6.QtWidgets import QApplication, QHBoxLayout, QTextBrowser, QWidget
+from qfluentwidgets import FluentIcon, Theme, TransparentToolButton, isDarkTheme, setCustomStyleSheet
 
 from .i18n import tr
 from .agent_prompts import user_message_text, chat_title
@@ -59,10 +61,55 @@ def working_duration(seconds):
     return tr('{0}h {1}m').format(hours, minutes)
 
 
+class MessageActions(QWidget):
+    """在富文本正文下方提供可聚焦的原生按钮，复制反馈独立于聊天重绘。"""
+
+    def __init__(self, entry, edit, parent):
+        super().__init__(parent)
+        self.entry = entry
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(6)
+        self.copy = self.add_button(FluentIcon.COPY, tr('Copy message'))
+        self.copy.clicked.connect(self.copy_message)
+        self.copy_timer = QTimer(self)
+        self.copy_timer.setSingleShot(True)
+        self.copy_timer.timeout.connect(self.reset_copy)
+        self.edit = None
+        if entry['role'] == '你':
+            self.edit = self.add_button(FluentIcon.EDIT, tr('Edit message'))
+            self.edit.clicked.connect(lambda: edit.emit(entry))
+        self.setFixedSize(self.sizeHint())
+
+    def add_button(self, icon, label):
+        button = TransparentToolButton(icon.icon(Theme.LIGHT), self)
+        button.setFixedSize(26, 26)
+        button.setIconSize(QSize(14, 14))
+        button.setAccessibleName(label)
+        button.setToolTip(label)
+        button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        style = ('TransparentToolButton:hover { background: #d4e0ee; } '
+                 'TransparentToolButton:focus { border: 1px solid #46698e; }')
+        setCustomStyleSheet(button, style, style)
+        self.layout().addWidget(button)
+        return button
+
+    def copy_message(self):
+        QApplication.clipboard().setText(self.entry['text'])
+        self.copy.setIcon(FluentIcon.ACCEPT.icon(Theme.LIGHT))
+        self.copy.setToolTip(tr('Copied successfully'))
+        self.copy_timer.start(1200)
+
+    def reset_copy(self):
+        self.copy.setIcon(FluentIcon.COPY.icon(Theme.LIGHT))
+        self.copy.setToolTip(tr('Copy message'))
+
+
 class RepairChat(QTextBrowser):
     """用原生富文本区呈现角色与 Markdown，按调用 ID 合并可展开工具记录。"""
 
     olderRequested = Signal()
+    editRequested = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -73,6 +120,10 @@ class RepairChat(QTextBrowser):
         self.entries = []
         self.attachment_trays = {}
         self.attachment_positions = {}
+        self.message_actions = {}
+        self.action_positions = {}
+        self.edit_enabled = True
+        self.round_times = {}
         self.tools = {}
         self.activities = {}
         self.activity_round = 0
@@ -86,7 +137,7 @@ class RepairChat(QTextBrowser):
         self.verticalScrollBar().sliderReleased.connect(self._slider_released)
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
         self.verticalScrollBar().rangeChanged.connect(self._scroll_range_changed)
-        self.verticalScrollBar().valueChanged.connect(self.position_attachments)
+        self.verticalScrollBar().valueChanged.connect(self.position_inline_widgets)
 
     def _slider_released(self):
         """松手后按最终位置恢复跟随，并合并刷新拖动期间积累的内容。"""
@@ -119,11 +170,14 @@ class RepairChat(QTextBrowser):
     def clear(self):
         self.stop_work()
         self._render_pending = False
-        for tray in self.attachment_trays.values():
-            tray.hide()
-            tray.deleteLater()
+        for widget in (*self.attachment_trays.values(), *self.message_actions.values()):
+            widget.hide()
+            widget.deleteLater()
         self.attachment_trays.clear()
         self.attachment_positions.clear()
+        self.message_actions.clear()
+        self.action_positions.clear()
+        self.round_times.clear()
         self.entries.clear()
         self.tools.clear()
         self.activities.clear()
@@ -203,13 +257,43 @@ class RepairChat(QTextBrowser):
         self.entries.append({"role": role, "text": text, "round": round_number, 'attachments': list(attachments)})
         self.render()
 
-    def position_attachments(self, *_):
-        """原生托盘随富文本占位移动，保留嵌套滚动与键盘操作。"""
-        for key, position in self.attachment_positions.items():
-            cursor = QTextCursor(self.document())
-            cursor.setPosition(position)
-            rect = self.cursorRect(cursor)
-            self.attachment_trays[key].move(rect.x(), rect.y())
+    def set_round_time(self, number, value):
+        """保留最早取得的有效轮次时间，渲染时转换到本机时区。"""
+        if not number or number in self.round_times or not isinstance(value, str):
+            return
+        try:
+            stamp = datetime.fromisoformat(value)
+            stamp.astimezone()
+        except (ValueError, OverflowError, OSError):
+            return
+        self.round_times[number] = stamp
+        self.render()
+
+    def set_edit_enabled(self, enabled):
+        if self.edit_enabled != enabled:
+            self.edit_enabled = enabled
+            for actions in self.message_actions.values():
+                if actions.edit is not None:
+                    actions.edit.setEnabled(enabled)
+
+    def position_inline_widgets(self, *_):
+        """托盘和操作按钮跟随各自的富文本占位，保持原生滚动与焦点。"""
+        for positions, widgets in ((self.attachment_positions, self.attachment_trays),
+                                   (self.action_positions, self.message_actions)):
+            for key, position in positions.items():
+                cursor = QTextCursor(self.document())
+                cursor.setPosition(position)
+                rect = self.cursorRect(cursor)
+                widgets[key].move(rect.topLeft())
+
+    def eventFilter(self, watched, event):
+        if (isinstance(watched, TransparentToolButton) and event.type() == QEvent.Type.FocusIn
+                and event.reason() in (Qt.FocusReason.TabFocusReason, Qt.FocusReason.BacktabFocusReason)):
+            top = watched.parentWidget().y() + watched.y()
+            bottom = top + watched.height()
+            bar = self.verticalScrollBar()
+            bar.setValue(bar.value() + min(0, top) + max(0, bottom - self.viewport().height()))
+        return super().eventFilter(watched, event)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -350,7 +434,14 @@ class RepairChat(QTextBrowser):
                 parts.append(self.activity_html(number))
             number, role = entry["round"], entry["role"]
             if number and number != previous_round:
-                parts.append(tr('<hr><p><b>Round {0}</b></p>').format(number))
+                heading = tr('<hr><p><b>Round {0}</b></p>').format(number)
+                if number in self.round_times:
+                    stamp = self.round_times[number].astimezone()
+                    tooltip = escape(stamp.strftime('%Y-%m-%d %H:%M:%S %Z'))
+                    color = '#a7b6c8' if isDarkTheme() else '#68788b'
+                    time_label = f'&nbsp;&nbsp;<span style="color:{color}" title="{tooltip}">{stamp:%H:%M:%S}</span>'
+                    heading = heading.removesuffix('</p>') + time_label + '</p>'
+                parts.append(heading)
                 previous_round = number
             if role == "工具":
                 continue
@@ -364,9 +455,9 @@ class RepairChat(QTextBrowser):
                 body = document.toHtml().split("<body", 1)[1].split(">", 1)[1].rsplit("</body>", 1)[0]
             else:
                 body = "<p>" + escape(entry["text"]).replace("\n", "<br>") + "</p>"
+            key = id(entry)
             if entry.get('attachments'):
                 from .chat_attachments import AttachmentTray
-                key = id(entry)
                 if key not in self.attachment_trays:
                     tray = AttachmentTray(self.viewport())
                     tray.set_items(entry['attachments'])
@@ -377,6 +468,18 @@ class RepairChat(QTextBrowser):
                 tray.reflow()
                 body = (f'<p><img src="attachment-tray:{key}" width="{tray.width()}" '
                         f'height="{tray.height()}" /></p>' + body)
+            if role in {'你', 'Agent'}:
+                if key not in self.message_actions:
+                    actions = MessageActions(entry, self.editRequested, self.viewport())
+                    actions.copy.installEventFilter(self)
+                    if actions.edit is not None:
+                        actions.edit.installEventFilter(self)
+                        actions.edit.setEnabled(self.edit_enabled)
+                    self.message_actions[key] = actions
+                    actions.show()
+                actions = self.message_actions[key]
+                body += (f'<p><img src="message-actions:{key}" width="{actions.width()}" '
+                         f'height="{actions.height()}" /></p>')
             parts.append(f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" '
                          f'style="color:#172b4d"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
         for number in activity_at.get(len(self.entries), []):
@@ -391,13 +494,21 @@ class RepairChat(QTextBrowser):
             viewport.setUpdatesEnabled(updates_enabled)
 
     def _replace_chat_html(self, html, position, follow):
-        """文档、附件和滚动位置全部就绪后再允许视口重绘。"""
+        """定位附件与操作按钮，再恢复阅读位置和视口重绘。"""
         self.attachment_positions.clear()
+        self.action_positions.clear()
         self.setHtml(html)
         blank = QImage(1, 1, QImage.Format.Format_ARGB32)
         blank.fill(Qt.GlobalColor.transparent)
-        for key in self.attachment_trays:
-            self.document().addResource(QTextDocument.ResourceType.ImageResource, QUrl(f'attachment-tray:{key}'), blank)
+        placeholders = {}
+        for prefix, widgets, positions in (
+            ('attachment-tray', self.attachment_trays, self.attachment_positions),
+            ('message-actions', self.message_actions, self.action_positions),
+        ):
+            for key in widgets:
+                name = f'{prefix}:{key}'
+                placeholders[name] = (positions, key)
+                self.document().addResource(QTextDocument.ResourceType.ImageResource, QUrl(name), blank)
         block = self.document().begin()
         while block.isValid():
             iterator = block.begin()
@@ -405,8 +516,9 @@ class RepairChat(QTextBrowser):
                 fragment = iterator.fragment()
                 if fragment.charFormat().isImageFormat():
                     name = fragment.charFormat().toImageFormat().name()
-                    if name.startswith('attachment-tray:'):
-                        self.attachment_positions[int(name.split(':')[1])] = fragment.position()
+                    if name in placeholders:
+                        positions, key = placeholders[name]
+                        positions[key] = fragment.position()
                 iterator += 1
             block = block.next()
         # 后续延迟排版继续由 rangeChanged 沿用贴底状态。
@@ -415,4 +527,4 @@ class RepairChat(QTextBrowser):
         bar.setValue(bar.maximum() if self._following else position)
         if not follow:
             self._following = bar.value() >= bar.maximum() - 2
-        self.position_attachments()
+        self.position_inline_widgets()

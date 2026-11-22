@@ -56,16 +56,17 @@ def test_remove_selected_attachment_preserves_files_full_ids_and_busy_boundary(g
     first = make_image(tmp_path / 'one.png')
     second = make_image(tmp_path / 'two.png')
     identities = ['12345678-0000-4000-8000-000000000001', '12345678-0000-4000-8000-000000000002']
-    page.images, page.manifest_references = [first, second], list(identities)
+    images = draft_attachments([first, second], [])
+    page.images, page.manifest_references = list(images), list(identities)
     page.update_attachment_notice()
     monkeypatch.setattr(page, 'is_busy', lambda: False)
     page.remove_attachment(1)
-    assert page.images == [first] and second.exists()
+    assert page.images == images[:1] and second.exists()
     page.remove_attachment(1)
     assert page.manifest_references == [identities[1]]
     monkeypatch.setattr(page, 'is_busy', lambda: True)
     page.remove_attachment(0)
-    assert page.images == [first] and first.exists()
+    assert page.images == images[:1] and first.exists()
 
 
 def test_history_metadata_does_not_expand_prompt_and_rejects_unsafe_images(gui, tmp_path):
@@ -157,20 +158,26 @@ def iter_cursor(chat):
 
 
 def test_submit_snapshot_and_restored_attachments_survive_source_removal(gui, tmp_path, monkeypatch):
+    from datetime import datetime
     from lalc.agent_repair import RepairConversation, image_attachments
     app, window = gui
     page = window.repair_page
     path = make_image(tmp_path / 'original.png')
     identity = window.host.manager.default_manifest_id()
     observed = []
+    live_times = []
     original_add = page.chat.add_message
     def add(role, text, number=0, **kwargs):
         if role == '你':
             observed.append(kwargs.get('attachments', []))
         return original_add(role, text, number, **kwargs)
     monkeypatch.setattr(page.chat, 'add_message', add)
+    window.operation_event.connect(lambda row: live_times.append(row['time'])
+                                   if row['event']['type'] == 'round_opened' else None)
     async def run(self, message, *args, images=(), manifest_references=(), **kwargs):
         self.log.group += 1
+        self.log.on_event = kwargs['on_event']
+        self.log.record({'type': 'round_opened'})
         folder = self.log.path / f'round-{self.log.group}'
         folder.mkdir(exist_ok=True)
         _, records = image_attachments(images, folder)
@@ -179,12 +186,13 @@ def test_submit_snapshot_and_restored_attachments_survive_source_removal(gui, tm
             'attachments': records, 'manifest_references': list(manifest_references)})
         return {'reason': 'answered', 'requests': 0, 'answer': {'message': 'ready'}}
     monkeypatch.setattr(RepairConversation, 'run', run)
-    page.images, page.manifest_references = [path], [identity]
+    page.images, page.manifest_references = draft_attachments([path], []), [identity]
     page.update_attachment_notice()
     page.message.setPlainText('use these attachments')
     page.send()
     wait_jobs(app, window)
     assert observed[0][0]['path'] == path
+    assert page.chat.round_times[1] == datetime.fromisoformat(live_times[0])
     assert page.images == [] and page.manifest_references == []
     path.unlink()
     page.reload_history()
@@ -201,8 +209,63 @@ def test_submit_snapshot_and_restored_attachments_survive_source_removal(gui, tm
                 if page.history.item(i).data(Qt.ItemDataRole.UserRole) == session_id)
     page.open_session(item)
     wait_jobs(app, window)
-    restored = [entry for entry in page.chat.entries if entry['role'] == '你'][-1]['attachments']
+    entry = next(entry for entry in page.chat.entries if entry['role'] == '你')
+    restored = entry['attachments']
     assert restored[1]['name'] == identity and not thumbnail(restored[0]).isNull()
+    assert page.chat.round_times[1] == datetime.fromisoformat(live_times[0])
+    page.chat.message_actions[id(entry)].edit.click()
+    assert page.message.toPlainText() == 'use these attachments'
+    assert page.message.textCursor().atEnd()
+    assert page.images == restored[:1] and page.images[0] is not restored[0]
+    assert page.manifest_references == [identity]
+    page.message.insertPlainText(' again')
+    page.send()
+    wait_jobs(app, window)
+    assert page.chat.entries[0]['round'] == 2
+    page.load_older_history()
+    wait_jobs(app, window)
+    messages = [entry['text'] for entry in page.chat.entries if entry['role'] == '你']
+    assert messages == ['use these attachments', 'use these attachments again']
+    assert page.chat.round_times[1] == datetime.fromisoformat(live_times[0])
+
+
+def test_edit_confirmation_protects_draft_and_revalidates_reused_image(gui, tmp_path, monkeypatch):
+    import pytest
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QMessageBox
+
+    app, window = gui
+    page = window.repair_page
+    root = tmp_path / 'log'
+    root.mkdir()
+    folder = root / 'round-1'
+    folder.mkdir()
+    image = make_image(folder / 'input-1.png')
+    store = LogStore(root)
+    store.initialize()
+    store.write_json(folder / 'input.json', {'attachments': [{'filename': image.name}]})
+    page.chat.add_message('你', 'History', 1, attachments=history_attachments(root, 1))
+    edit = next(iter(page.chat.message_actions.values())).edit
+    page.message.setPlainText('Unsaved draft')
+    QTimer.singleShot(0, lambda: app.activeModalWidget().button(QMessageBox.StandardButton.Cancel).click())
+    edit.click()
+    assert page.message.toPlainText() == 'Unsaved draft' and not page.images
+    def replace_draft():
+        dialog = app.activeModalWidget()
+        next(button for button in dialog.buttons()
+             if dialog.buttonRole(button) == QMessageBox.ButtonRole.AcceptRole).click()
+
+    QTimer.singleShot(0, replace_draft)
+    edit.click()
+    assert page.message.toPlainText() == 'History' and len(page.images) == 1
+
+    image.unlink()
+    image.symlink_to(make_image(tmp_path / 'outside.png'))
+    monkeypatch.setattr(window, '_interact', lambda operation: operation())
+    with pytest.raises(ValueError, match=r'input-1\.png'):
+        page.send()
+    assert page.message.toPlainText() == 'History' and len(page.images) == 1
+    assert not window.jobs
 
 
 def test_keyboard_removal_and_dark_cards_keep_their_labels_readable(gui, tmp_path):

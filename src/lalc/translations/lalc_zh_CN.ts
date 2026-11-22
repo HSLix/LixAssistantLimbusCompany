@@ -2036,6 +2036,11 @@ Original pixel region: {2}</source>
 <message><source>Thinking and tools</source><translation>思考与工具</translation></message>
 <message><source>Open Skills directory</source><translation>打开 Skills 文件夹</translation></message>
 <message><source>Copied successfully</source><translation>复制成功</translation></message>
+    <message><source>Copy message</source><translation>复制消息</translation></message>
+    <message><source>Edit message</source><translation>编辑消息</translation></message>
+    <message><source>Replace the current draft and its attachments?</source><translation>要替换当前草稿及其附件吗？</translation></message>
+    <message><source>Replace draft</source><translation>替换草稿</translation></message>
+    <message><source>Image unavailable: {0}</source><translation>图片不可用：{0}</translation></message>
 <message><source>Skills</source><translation>Skills</translation></message>
 <message><source>Choose Replace all conflicts or Skip all conflicts for Assets / Skills.</source><translation>请为冲突的 Asset／Skill 选择全部覆盖或全部跳过。</translation></message>
 <message><source>Allow querying published Manifests</source><translation>允许查询已发布 Manifest</translation></message>
