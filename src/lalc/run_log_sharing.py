@@ -42,10 +42,15 @@ def list_logs(root):
     """枚举本机与隔离导入日志，按原始开始时间排序。"""
     result = []
     for path in (root / 'traces').glob('*.jsonl'):
-        if path.stem.isdecimal() and int(path.stem) > 0 and not path.is_symlink():
+        if re.fullmatch(r'[1-9][0-9]*', path.stem) and not path.is_symlink():
             identity = int(path.stem)
+            try:
+                started_at = start_time(root, identity)
+            except (FileNotFoundError, ValueError):
+                # 另一窗口可能刚提交清理，重新枚举时不保留已消失的行。
+                continue
             result.append(dict(key=identity, root=root, run_id=identity, imported=False,
-                               started_at=start_time(root, identity)))
+                               started_at=started_at))
     imported = root / 'imported-run-logs'
     real_directory(imported)
     for folder in imported.glob('*'):

@@ -8,7 +8,7 @@ import time
 import uuid
 from collections import deque
 from copy import deepcopy
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -176,7 +176,7 @@ class ApplicationService:
                 raise StartError("runtime_not_authorized", "Runtime repair belongs to the active Run worker.")
             if self._activity or self._state["phase"] == "running" and not runtime:
                 raise StartError("activity_busy", f"当前活动尚未结束：{self._activity or '运行'}")
-            if not runtime and (name == "Agent" or name.startswith("Capture")) and not (remote and remote.game_lock):
+            if not runtime and (name in {"Agent", "Data cleanup"} or name.startswith("Capture")) and not (remote and remote.game_lock):
                 lock = ProcessLock("game")
                 try:
                     lock.acquire()
@@ -216,7 +216,7 @@ class ApplicationService:
     ) -> int:
         """同步校验启动请求，再在单一后台线程执行已捕获的 Manifest。"""
 
-        with self._condition:
+        with self._condition, ExitStack() as locks:
             if self._fatal:
                 raise StartError("application_failed", "Application cannot continue after a fatal error.")
             remote = getattr(self, "_remote_mcp", None)
@@ -228,6 +228,10 @@ class ApplicationService:
                 raise StartError("run_already_active", "Another Run is already active.")
             if _developer_trial and (not (self._activity == "Agent" or remote_trial) or manifest_id is None):
                 raise StartError("trial_not_authorized", "Developer trial requires Agent activity and an explicit Manifest ID.")
+            try:
+                locks.enter_context(self.manifest_manager.store_lock())
+            except OSError as error:
+                raise StartError("activity_busy", "Manifest 存储正在使用，请稍后再启动。") from error
             manifest = self._loaded_manifest(manifest_id)
             if logical_name is None:
                 plans = [name for name, item in manifest.components.items() if item.role == "automation_plan"]
@@ -1041,8 +1045,9 @@ class ApplicationService:
                 last_run_id = value["last_run_id"]
             else:
                 last_run_id = 0
-            traces = self.data_root / "traces"
-            existing_ids = [int(item.stem) for item in traces.glob("*.jsonl") if item.stem.isdecimal()]
+            existing_ids = [int(item.stem)
+                            for folder, pattern in (("traces", "*.jsonl"), ("run-usage", "*.json"))
+                            for item in (self.data_root / folder).glob(pattern) if item.stem.isdecimal()]
             run_id = max([last_run_id, *existing_ids], default=0) + 1
             if run_id < 1:
                 raise ValueError("Run ID must be positive")

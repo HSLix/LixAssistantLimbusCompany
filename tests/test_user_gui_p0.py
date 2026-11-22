@@ -13,14 +13,14 @@ from test_user_pages import app, owner
 
 
 def test_invalid_other_provider_does_not_block_selection_or_reading(tmp_path):
-    save_settings(tmp_path, {"model": "local"})
-    save_settings(tmp_path, {"provider": "deepseek", "base_url": "invalid"})
+    save_settings(tmp_path, {"provider": "llama.cpp", "model": "local"}, side="user")
+    save_settings(tmp_path, {"provider": "deepseek", "base_url": "invalid"}, side="developer")
     save_selection(tmp_path, "user", "llama.cpp", enabled=False)
     assert not settings_document(tmp_path)["user_enabled"]
     assert load_settings(tmp_path, side="user")["model"] == "local"
-    assert load_settings(tmp_path, for_use=False)["base_url"] == "invalid"
-    with pytest.raises(ValueError):
-        load_settings(tmp_path)
+    assert load_settings(tmp_path, side="developer", for_use=False)["base_url"] == "invalid"
+    with pytest.raises(ValueError, match="base-url"):
+        load_settings(tmp_path, side="developer")
 
 
 @pytest.mark.parametrize("provider,address,model,key,enabled,ready", [
@@ -101,6 +101,10 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_p
     import lalc.agent_settings as settings
     monkeypatch.setattr(settings.sys, "platform", "darwin")
     page = api_key_page
+    provider = "llama.cpp"
+    save_selection(owner.service.data_root, page.side, provider)
+    page.reload()
+    assert page.provider.currentData() == provider
     assert page.key is None
     dialog, buttons = key_dialog(page)
     assert not buttons.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
@@ -117,14 +121,14 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_p
     buttons.accepted.emit()
     app.processEvents()
     assert page.key is None
-    assert owner.host.secrets["llama.cpp"] == "saved-key"
+    assert owner.host.secrets == {provider: "saved-key"}
     assert page.secret_state.text() == "API Key：已设置"
     assert "saved-key" not in (owner.service.data_root / "agent-settings.json").read_text(encoding="utf-8")
     dialog, buttons = key_dialog(page)
     assert page.key.text() == ""
     buttons.rejected.emit()
     app.processEvents()
-    assert owner.host.secrets["llama.cpp"] == "saved-key"
+    assert owner.host.secrets == {provider: "saved-key"}
     page.clear_button.click()
     assert not owner.host.secrets
     assert page.secret_state.text() == "API Key：未设置"

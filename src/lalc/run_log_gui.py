@@ -361,7 +361,13 @@ class RunLogPage(QWidget):
         self.source_mode = key
         self.refresh_runs()
 
-    def refresh_runs(self, *_):
+    def open_log(self, key):
+        """从数据盘点定位选定的本机运行或导入副本。"""
+        self.source_filter.setCurrentItem('all')
+        self.source_mode = 'all'
+        self.refresh_runs(preferred=key)
+
+    def refresh_runs(self, *_, preferred=None):
         """按来源过滤并按原始运行时间排序，导入身份独立于本机编号。"""
         source = self.source_mode
         self.listing_serial = getattr(self, 'listing_serial', 0) + 1
@@ -374,7 +380,19 @@ class RunLogPage(QWidget):
             self.entries = {}
             self.runs.clear()
             self.append_runs()
-            if self.runs.count() and self.runs.currentRow() < 0:
+            target = next((entry for entry in self.run_entries if entry['key'] == preferred), None)
+            if target is not None:
+                item = next((self.runs.item(row) for row in range(self.runs.count())
+                             if self.runs.item(row).data(Qt.ItemDataRole.UserRole) == preferred), None)
+                if item is not None:
+                    self.runs.setCurrentItem(item)
+                else:
+                    self.runs.setCurrentRow(-1)
+                    self.entries[preferred] = target
+                    item = QListWidgetItem()
+                    item.setData(Qt.ItemDataRole.UserRole, preferred)
+                self.select_run(item)
+            elif self.runs.count() and self.runs.currentRow() < 0:
                 self.runs.setCurrentRow(0)
                 self.select_run(self.runs.item(0))
             elif not self.runs.count():

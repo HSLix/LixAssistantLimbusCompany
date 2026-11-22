@@ -93,36 +93,37 @@ def import_workflow(manager, source_root, source_manifest_id, *, manifest_id, ma
     prepared, fingerprint = _prepare(manager, source_root, source_manifest_id)
     if fingerprint != manifest_sha256:
         raise ValueError("Manifest 内容已变化，请重新检查并确认。")
-    _directory(manager.data_root)
-    for directory in (manager.manifests_dir, manager.components_dir):
-        _directory(directory).mkdir(parents=True, exist_ok=True)
-    target = manager.manifests_dir / f"{manifest_id}.json"
-    if _occupied(manager, manifest_id):
-        raise FileExistsError("Manifest UUID 已被占用，请重新检查。")
-    for source in prepared.sources.values():
-        component = manager.components_dir / f"{source.component_id.removeprefix('sha256:')}.py"
-        if component.is_symlink() or component.exists() and not component.is_file():
-            raise ValueError("本地 Component 必须是普通文件。")
-        name = f"components/{component.name}"
-        transfer_file(0, len(source.content), name)
-        manager._store_component(source)
-        transfer_file(len(source.content), len(source.content), name, finished=True)
-    assert isinstance(prepared.manifest, dict)
-    manifest = {**prepared.manifest, "manifest_id": manifest_id}
-    temporary = None
-    try:
-        content = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
-        name = f"manifests/{manifest_id}.json"
-        transfer_file(0, len(content), name)
-        with work_file(dir=manager.manifests_dir, prefix=".import-", delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(content)
-            stream.flush()
-            os.fsync(stream.fileno())
-        # 排他创建也保护检查之后发生的占用；失败保留已存储的共享哈希源码。
-        os.link(temporary, target)
-        transfer_file(len(content), len(content), name, finished=True)
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return {"source_manifest_id": source_manifest_id, "manifest_id": manifest_id}
+    with manager.store_lock():
+        _directory(manager.data_root)
+        for directory in (manager.manifests_dir, manager.components_dir):
+            _directory(directory).mkdir(parents=True, exist_ok=True)
+        target = manager.manifests_dir / f"{manifest_id}.json"
+        if _occupied(manager, manifest_id):
+            raise FileExistsError("Manifest UUID 已被占用，请重新检查。")
+        for source in prepared.sources.values():
+            component = manager.components_dir / f"{source.component_id.removeprefix('sha256:')}.py"
+            if component.is_symlink() or component.exists() and not component.is_file():
+                raise ValueError("本地 Component 必须是普通文件。")
+            name = f"components/{component.name}"
+            transfer_file(0, len(source.content), name)
+            manager._store_component(source)
+            transfer_file(len(source.content), len(source.content), name, finished=True)
+        assert isinstance(prepared.manifest, dict)
+        manifest = {**prepared.manifest, "manifest_id": manifest_id}
+        temporary = None
+        try:
+            content = json.dumps(manifest, ensure_ascii=False, indent=2).encode("utf-8")
+            name = f"manifests/{manifest_id}.json"
+            transfer_file(0, len(content), name)
+            with work_file(dir=manager.manifests_dir, prefix=".import-", delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(content)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # 排他创建也保护检查之后发生的占用；失败保留已存储的共享哈希源码。
+            os.link(temporary, target)
+            transfer_file(len(content), len(content), name, finished=True)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+        return {"source_manifest_id": source_manifest_id, "manifest_id": manifest_id}

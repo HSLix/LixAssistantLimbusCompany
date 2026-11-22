@@ -647,6 +647,9 @@ class UserWindow(MainWindow):
         scroll.setStyleSheet("QScrollArea {border: none; background: transparent;} QWidget#general-settings-content {background: transparent;}")
         scroll.setObjectName("general-settings")
         self.general_settings = scroll
+        from .data_maintenance_gui import DataMaintenancePage
+        self.data_maintenance = DataMaintenancePage(self)
+        self.addSubInterface(self.data_maintenance, FluentIcon.DELETE, tr('Data & Cleanup'))
         self.addSubInterface(scroll, FluentIcon.SETTING, tr('General Settings'))
         self.navigationInterface.addSeparator()
         self.navigationInterface.addItemHeader(tr('WORKFLOW SETTINGS'))
@@ -974,6 +977,8 @@ class UserWindow(MainWindow):
         if not hasattr(self, "start_button"):
             return
         busy = state["phase"] == "running" or bool(state.get("activity")) or bool(state.get("remote_control")) or self.closing
+        if hasattr(self, "data_maintenance"):
+            self.data_maintenance.render_actions(busy or bool(self.jobs))
         for button in getattr(self, "sharing_buttons", []):
             button.setEnabled(not busy and not self.jobs)
         if self.current_manifest_id != state["default_manifest_id"] or not hasattr(self, "_tasks_initialized"):
