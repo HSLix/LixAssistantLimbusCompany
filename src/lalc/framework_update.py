@@ -2,9 +2,11 @@
 
 from dataclasses import dataclass
 import hashlib
+from html.parser import HTMLParser
 from http.client import HTTPException
 from importlib.metadata import PackageNotFoundError, version as distribution_version
 import json
+import logging
 import os
 from pathlib import Path, PureWindowsPath
 import re
@@ -14,6 +16,7 @@ import subprocess
 import sys
 import tomllib
 from urllib.parse import urlencode, urlsplit
+from urllib.error import HTTPError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
@@ -22,6 +25,7 @@ from .work_files import create_work_directory
 
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
+LATEST_RELEASE_URL = f"{REPOSITORY_URL}/releases/latest"
 CDK_SECRET = "lalc-mirrorchyan-cdk"
 VERSION_PATTERN = r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 REQUIRED_FILES = ("LALC.exe", "LALC-console.exe", "build-info.json", "install-update.ps1",
@@ -58,6 +62,40 @@ class ReleaseStatus:
     announcement: str | None
     github: Package | None
     mirror: tuple[int, int, int] | None
+    announcement_html: bool = False
+    github_version: tuple[int, int, int] | None = None
+
+
+class _ReleaseBody(HTMLParser):
+    """从 GitHub Release 页面截取正文，保留其中嵌套的 HTML。"""
+
+    def __init__(self, page):
+        super().__init__()
+        self.page = page
+        self.offsets = [0, *(line.end() for line in re.finditer("\n", page))]
+        self.start = self.end = None
+        self.depth = 0
+        self.feed(page)
+
+    def handle_starttag(self, tag, attrs):
+        if tag != "div":
+            return
+        if self.depth:
+            self.depth += 1
+        elif self.start is None and ("data-test-selector", "body-content") in attrs:
+            line, column = self.getpos()
+            self.start = self.offsets[line - 1] + column + len(self.get_starttag_text())
+            self.depth = 1
+
+    def handle_endtag(self, tag):
+        if tag == "div" and self.depth:
+            self.depth -= 1
+            if self.depth == 0:
+                line, column = self.getpos()
+                self.end = self.offsets[line - 1] + column
+
+    def body(self):
+        return self.page[self.start:self.end].strip() if self.end is not None else None
 
 
 def version_number(value):
@@ -133,7 +171,21 @@ def _github(variant):
             if isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
                 package = Package(version, f"{REPOSITORY_URL}/releases/download/{tag}/{name}", digest[7:])
                 break
-    return (announcement if isinstance(announcement, str) else ""), package
+    return (announcement if isinstance(announcement, str) else ""), package, version
+
+
+def _github_page():
+    """API 不可用时从同一最新 Release 的公开网页读取正文与版本。"""
+    request = Request(LATEST_RELEASE_URL, headers={"User-Agent": "LALC", "Accept": "text/html"})
+    with urlopen(request, timeout=8) as response:
+        destination = urlsplit(response.geturl())
+        tag_prefix = f"/{REPOSITORY}/releases/tag/"
+        if destination.netloc != "github.com" or not destination.path.startswith(tag_prefix):
+            raise ValueError("Unexpected GitHub release page")
+        content = response.read(2 * 1024 * 1024 + 1)
+    if len(content) > 2 * 1024 * 1024:
+        raise ValueError("Release page is too large")
+    return _ReleaseBody(content.decode("utf-8")).body(), version_number(destination.path.removeprefix(tag_prefix))
 
 
 def _mirror(config, cdk=""):
@@ -151,15 +203,25 @@ def _mirror(config, cdk=""):
 
 def check_releases(variant, mirror):
     """单个服务不可用时仍返回另一方的结果。"""
+    announcement_html = False
     try:
-        announcement, github = _github(variant)
-    except (OSError, ValueError, TypeError, AttributeError, HTTPException):
-        announcement, github = None, None
+        announcement, github, github_version = _github(variant)
+    except (OSError, ValueError, TypeError, AttributeError, HTTPException) as error:
+        logger = logging.getLogger(__name__)
+        logger.warning("GitHub release API request failed (%s)",
+                       f"HTTP {error.code}" if isinstance(error, HTTPError) else type(error).__name__)
+        announcement, github, github_version = None, None, None
+        try:
+            announcement, github_version = _github_page()
+            announcement_html = announcement is not None
+        except (OSError, ValueError, HTTPException) as fallback_error:
+            logger.warning("GitHub release page request failed (%s)", type(fallback_error).__name__)
     try:
         mirror_version = version_number(_mirror(mirror).get("version_name"))
     except (OSError, ValueError, TypeError, HTTPException):
         mirror_version = None
-    return ReleaseStatus(announcement, github, mirror_version if mirror_version and mirror_version[0] >= 6 else None)
+    return ReleaseStatus(announcement, github, mirror_version if mirror_version and mirror_version[0] >= 6 else None,
+                         announcement_html, github_version)
 
 
 def _extract(archive, destination, cancelled=lambda: False):

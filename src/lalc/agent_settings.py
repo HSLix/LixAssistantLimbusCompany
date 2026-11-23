@@ -19,7 +19,7 @@ from .runtime import atomic_write_json
 FIELDS = ("provider", "base_url", "model", "max_requests", "secret_name", "output_limit",
           "thinking", "reasoning_effort")
 DEFAULTS = {"provider": "deepseek", "base_url": "https://api.deepseek.com", "model": "deepseek-flash",
-            "max_requests": 50, "secret_name": None, "output_limit": "server_default",
+            "max_requests": 100, "secret_name": None, "output_limit": "server_default",
             "thinking": True, "reasoning_effort": "high"}
 PROVIDERS = {"llama.cpp", "deepseek"}
 SETTINGS_LOCK = threading.RLock()

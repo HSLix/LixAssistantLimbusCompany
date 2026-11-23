@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+from urllib.error import HTTPError
 import zipfile
 
 import pytest
@@ -19,13 +20,33 @@ from lalc import framework_update as update
 
 def test_old_release_is_an_announcement_but_not_a_package(monkeypatch):
     monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v5.0.0", "body": "legacy news"})
-    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None)
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None, github_version=(5, 0, 0))
 
 
 def test_bad_download_metadata_does_not_hide_release_body(monkeypatch):
     monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v6.0.1", "body": "## Latest GitHub notes", "assets": [
         None, {"name": "LALC-6.0.1-windows-x64-with-agent.zip", "digest": 8}]})
-    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("## Latest GitHub notes", None, None)
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("## Latest GitHub notes", None, None,
+                                                                          github_version=(6, 0, 1))
+
+
+def test_api_rate_limit_reads_only_latest_release_body(monkeypatch, caplog):
+    expected = '<h2>Release changes</h2>\n<div><p>Nested notes</p></div>\n<p>More changes</p>'
+
+    class ReleasePage(io.BytesIO):
+        def geturl(self):
+            return f"{update.REPOSITORY_URL}/releases/tag/v5.0.0"
+
+    def open_release(request, *, timeout):
+        if request.full_url.startswith("https://api.github.com/"):
+            raise HTTPError(request.full_url, 403, "rate limit exceeded", None, None)
+        assert request.full_url == update.LATEST_RELEASE_URL
+        return ReleasePage(f'<div>GitHub navigation</div>\n<div data-test-selector="body-content">\n{expected}\n</div><div>Assets</div>'.encode())
+
+    monkeypatch.setattr(update, "urlopen", open_release)
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus(expected, None, None, announcement_html=True,
+                                                                          github_version=(5, 0, 0))
+    assert "HTTP 403" in caplog.text
 
 
 def test_release_channels_are_independent_and_use_exact_package(monkeypatch):

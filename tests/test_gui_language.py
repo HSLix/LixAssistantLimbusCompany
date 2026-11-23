@@ -103,7 +103,7 @@ def test_fresh_process_uses_saved_language_for_both_windows_and_pages(tmp_path, 
     script = '''
 import json, sys
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 app = QApplication([])
 if sys.platform == 'darwin':
     from qframelesswindow.mac import MacFramelessWindowBase
@@ -117,7 +117,8 @@ owner = GuiCoordinator(ApplicationService(Path(sys.argv[1])), ApplicationLifecyc
 developer = owner.open_window(True)
 user = owner.open_window()
 print(json.dumps([current_language(), user.start_button.text(), developer.repair_page.new_button.text(),
-                  [page.context.language for page in user.business_pages], owner.service.game_language]))
+                  [page.context.language for page in user.business_pages], owner.service.game_language,
+                  user.findChild(QLabel, 'software-disclaimer').text()]))
 user.close()
 developer.close()
 '''
@@ -125,9 +126,11 @@ developer.close()
                             env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}, capture_output=True,
                             text=True, timeout=20, check=True)
     values = json.loads(result.stdout.splitlines()[-1])
-    assert values == [language, "开始运行" if language == "zh_CN" else "Start Plan",
-                      "新建聊天" if language == "zh_CN" else "New Chat",
-                      [language] * 3, "en"]
+    assert values[:-1] == [language, "开始运行" if language == "zh_CN" else "Start Plan",
+                           "新建聊天" if language == "zh_CN" else "New Chat",
+                           [language] * 3, "en"]
+    assert ("免费开源软件" in values[-1]) == (language == "zh_CN")
+    assert ("free and open-source software" in values[-1]) == (language == "en_US")
 
 
 def test_save_failure_restores_language_control(owner, monkeypatch):

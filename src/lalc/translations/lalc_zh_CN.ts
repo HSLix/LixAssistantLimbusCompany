@@ -3,6 +3,34 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Latest published version: {0}. A verified download is unavailable.</source>
+      <translation>最新发布版本为 {0}，暂无法取得通过校验的下载信息。</translation>
+    </message>
+    <message>
+      <source>The installed version is newer than the latest published version ({0}).</source>
+      <translation>当前安装版本高于最新发布版本（{0}）。</translation>
+    </message>
+    <message>
+      <source>LALC is free and open-source software for learning and discussion. If you paid for LALC, please request a refund.</source>
+      <translation>LALC 是一款免费开源软件，仅供学习交流使用。如果你在任何渠道付费购买了 LALC，请为自身权益申请退款。</translation>
+    </message>
+    <message>
+      <source>The app icon was sourced online and is excluded from the AGPL license. If it infringes your rights, please contact the author to have it removed.</source>
+      <translation>软件图标素材来源于网络，未纳入 AGPL 许可范围。如有侵权，请联系作者删除。</translation>
+    </message>
+    <message>
+      <source>Project repository: {0}</source>
+      <translation>项目地址：{0}</translation>
+    </message>
+    <message>
+      <source>Loading the GitHub release announcement…</source>
+      <translation>正在加载 GitHub 发布公告…</translation>
+    </message>
+    <message>
+      <source>Could not load the GitHub release announcement.</source>
+      <translation>无法加载 GitHub 发布公告，可重试检查更新或打开原文。</translation>
+    </message>
+    <message>
       <source>View latest GitHub Release</source>
       <translation>查看 GitHub 最新发行版</translation>
     </message>
