@@ -55,7 +55,7 @@ def test_takeover_or_activity_wait_never_moves_cursor(monkeypatch, waiting):
     try:
         if waiting:
             window.foreground = False
-            def interrupt_wait(*args):
+            def interrupt_wait(*args, **kwargs):
                 assert cursor["moves"] == window.captures == 0
                 window.backend.monitor.record("鼠标", False)
                 inputs.check_ownership()

@@ -11,7 +11,7 @@ import pytest
 
 from lalc import control, run_logs
 from lalc.control import InputSession
-from lalc.focused import FocusedAutomationSession
+from lalc.focused import FocusedAutomationSession, WindowsWindowPlatform
 from lalc.runtime import RunGate, UserInterruption
 from lalc.windows_input import WindowsInputBackend
 from test_input_control import FakeWindow, service_for, finished, paused
@@ -61,6 +61,59 @@ def test_other_activity_restarts_ten_seconds_and_logs_visible_info(session):
     assert len(logs) == 2
     assert logs[-1]["duration_seconds"] == 24
     assert logs[-1]["outcome"] == "idle"
+
+
+@pytest.mark.parametrize("end", ["foreground", "cancel", "replaced"])
+def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(session, monkeypatch, end):
+    """复用正式聚焦重试，覆盖拒绝置前、途中输入和取消。"""
+    env = session
+    env.window.foreground = False
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
+    requests, activity = [], []
+    window_info = env.window.window_info
+
+    def info(hwnd):
+        state = window_info(hwnd)
+        if end == "replaced" and len(requests) >= 11:
+            state["process_id"] += 1
+        return state
+
+    def attempt(hwnd):
+        requests.append(env.clock.now)
+        if len(requests) == 12 and end == "foreground":
+            env.window.foreground = True
+        return False
+
+    def tick():
+        if not activity and requests and env.clock.now >= requests[0] + 0.2:
+            activity.append(env.clock.now)
+            env.inputs.monitor.record("键盘", False, takeover=False, other_application=True)
+        elif len(activity) == 1 and env.clock.now >= activity[0] + 8:
+            activity.append(env.clock.now)
+            env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+        if end == "cancel" and len(requests) == 11:
+            env.inputs.gate.stop()
+
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 42 if env.window.foreground else 99,
+        IsWindow=lambda hwnd: True,
+        IsIconic=lambda hwnd: False,
+        SetForegroundWindow=attempt,
+    )
+    env.clock.on_sleep = tick
+    monkeypatch.setattr(env.window, "window_info", info)
+    monkeypatch.setattr(env.window, "focus", platform.focus)
+    if end == "foreground":
+        env.inputs.check()
+        assert env.window.foreground
+    else:
+        with pytest.raises(UserInterruption) as caught:
+            env.inputs.check()
+        assert caught.value.reason == ("cancel" if end == "cancel" else "pause")
+    assert len(requests) == (12 if end == "foreground" else 11)
+    assert requests[1] >= activity[-1] + 10
+    assert env.inputs.paused is (end == "replaced")
 
 
 def test_foreground_takeover_wait_keeps_resetting_with_mouse_and_keyboard(session):
@@ -219,9 +272,9 @@ def test_first_start_listens_before_immediate_focus_and_manual_resume_skips_idle
     def listen():
         order.append("listen")
         return create()
-    def activate(hwnd):
+    def activate(hwnd, **kwargs):
         order.append("focus")
-        focus(hwnd)
+        focus(hwnd, **kwargs)
     monkeypatch.setattr(window, "create_input_backend", listen)
     monkeypatch.setattr(window, "focus", activate)
     window.backend.pause_on_next_input()
@@ -256,7 +309,8 @@ def test_minimized_game_waits_before_restore(session, monkeypatch):
     minimized = [True]
     def info(hwnd):
         return {**original_info(hwnd), "minimized": minimized[0]}
-    def focus(hwnd):
+    def focus(hwnd, *, checkpoint, max_attempts):
+        checkpoint()
         assert env.clock.now == 110
         minimized[0] = False
         original_focus(hwnd)
@@ -310,12 +364,12 @@ def test_global_hotkey_works_while_first_focus_is_pending(tmp_path, monkeypatch)
     window.backend.takeovers = 0
     waiting = threading.Event()
     focus = window.focus
-    def first_focus(hwnd):
+    def first_focus(hwnd, **kwargs):
         if not waiting.is_set():
             window.backend.monitor.record("键盘", False, takeover=False, pause=True)
             waiting.set()
             window.checkpoint()
-        focus(hwnd)
+        focus(hwnd, **kwargs)
     monkeypatch.setattr(window, "focus", first_focus)
     service.start("tasks.control", {})
     assert waiting.wait(2)

@@ -34,7 +34,7 @@ class FocusedAutomationSession:
         self.before_focus: Callable[[int], None] | None = None
         self.before_capture: Callable[[], bool] | None = None
 
-    def connect(self, *, checkpoint: Callable[[], None] | None = None) -> dict[str, Any]:
+    def connect(self, *, checkpoint: Callable[[], None] | None = None, focus=None) -> dict[str, Any]:
         """唯一匹配后恢复并尝试置前，随后核验真实前台状态。"""
 
         matches = self.platform.find_windows()
@@ -43,10 +43,11 @@ class FocusedAutomationSession:
         hwnd = matches[0]
         if self.before_focus is not None:
             self.before_focus(hwnd)
+        activate = self.platform.focus if focus is None else focus
         if checkpoint is None:
-            self.platform.focus(hwnd)
+            activate(hwnd)
         else:
-            self.platform.focus(hwnd, checkpoint=checkpoint)
+            activate(hwnd, checkpoint=checkpoint)
         info = self.platform.window_info(hwnd)
         self._require_window(info)
         self.hwnd = hwnd
@@ -441,8 +442,9 @@ class WindowsWindowPlatform:
         """以固定可执行文件及其目录启动游戏，不经过 shell。"""
         return subprocess.Popen([str(executable)], cwd=str(executable.parent))
 
-    def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None) -> None:
-        """每隔一秒请求置前，最多十次；等待实际激活期间仍响应取消和接管。"""
+    def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None,
+              max_attempts: int | None = 10) -> None:
+        """每隔一秒请求置前；运行会话可在检查点管理持续等待。"""
 
         attempts = 0
         next_attempt = time.monotonic()
@@ -458,9 +460,9 @@ class WindowsWindowPlatform:
             if not self.user32.IsWindow(hwnd):
                 raise WindowError(f"Target Window disappeared while waiting for foreground: target_hwnd={hwnd}.")
             if time.monotonic() >= next_attempt:
-                if attempts == 10:
+                if max_attempts is not None and attempts == max_attempts:
                     raise WindowError(
-                        f"Cannot focus Target Window after 10 attempts at 1-second intervals: "
+                        f"Cannot focus Target Window after {max_attempts} attempts at 1-second intervals: "
                         f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, "
                         f"last_set_foreground_result={last_result}."
                     )

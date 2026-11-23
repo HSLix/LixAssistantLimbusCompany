@@ -67,7 +67,6 @@ class InputSession:
         self.focus_checkpoint: Callable[[], None] | None = None
         window.before_capture = self.park_cursor
         window.before_check = self.ensure_foreground
-        window.before_focus = self.before_focus
         self.monitor.target_hwnd = window.hwnd
         try:
             self.process = window.platform.open_game_process(window.process_id)
@@ -115,19 +114,29 @@ class InputSession:
             raise UserInterruption(reason, reason=intent) from original
         raise UserInterruption(reason, reason=intent)
 
-    def before_focus(self, hwnd: int) -> None:
-        """重启绑定也在真正还原、聚焦前遵守用户活动等待。"""
+    def focus_window(self, hwnd: int, *, process_id: int, after_takeover: bool = False,
+                     checkpoint: Callable[[], None] | None = None) -> None:
+        """每次置前尝试都经过同一个可取消的空闲检查。"""
         self.monitor.target_hwnd = hwnd
-        if not self.resume_focus:
-            self.wait_for_activity(hwnd)
-        self.resume_focus = False
+        immediate_since = None
+
+        def check():
+            nonlocal immediate_since
+            immediate_since = self.wait_for_activity(
+                hwnd, process_id, after_takeover=after_takeover, immediate_since=immediate_since,
+            )
+            if checkpoint is not None:
+                checkpoint()
+
+        self.window.platform.focus(hwnd, checkpoint=check, max_attempts=None)
 
     def log_input_wait(self, message: str, **fields: Any) -> None:
         self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
                   "phase": "execute", "level": "info", "message": message, **fields})
 
-    def wait_for_activity(self, hwnd: int) -> None:
-        """其他应用连续空闲后才取焦点；等待日志复用用户可见 Info 记录。"""
+    def wait_for_activity(self, hwnd: int, process_id: int, *, after_takeover: bool = False,
+                          immediate_since: float | None = None) -> float | None:
+        """键鼠活动延后下次聚焦，显式恢复只豁免该次操作前的活动。"""
         started = time.monotonic()
         waiting = False
         outcome = "interrupted"
@@ -141,30 +150,44 @@ class InputSession:
                     paused_seconds += time.monotonic() - checkpoint_started
                 else:
                     self.check_ownership()
-                if self.resume_focus:
-                    outcome = "manual_resume"
-                    return
-                if hwnd == self.window.hwnd and self.process.exited():
+                if process_id == self.window.process_id and self.process.exited():
                     raise GameProcessExited()
                 info = self.window.platform.window_info(hwnd)
                 if not info["valid"]:
                     raise WindowError("Target Window disappeared while waiting for user activity.")
+                if info["process_id"] != process_id:
+                    raise WindowError("Target Window process changed.")
+                if not info["visible"] or info["width"] <= 0 or info["height"] <= 0:
+                    raise WindowError("Target Window is hidden or has an empty client area.")
                 foreground = info["foreground"] and not info["minimized"]
                 with self.monitor.lock:
-                    last = self.monitor.last_other_activity
-                if foreground or (time.monotonic() - last >= self.ACTIVITY_SECONDS
-                                  and not self.backend.any_pressed()):
-                    outcome = "foreground" if foreground else "idle"
-                    return
+                    activity = self.monitor.last_input
+                    last = activity if after_takeover else self.monitor.last_other_activity
+                if self.resume_focus:
+                    self.resume_focus = False
+                    immediate_since = activity
+                if immediate_since == activity:
+                    outcome = "manual_resume"
+                    return immediate_since
+                if foreground and not after_takeover:
+                    outcome = "foreground"
+                    return None
+                if time.monotonic() - last >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
+                    with self.monitor.lock:
+                        if last == (self.monitor.last_input if after_takeover else self.monitor.last_other_activity):
+                            outcome = "idle"
+                            return None
                 if not waiting:
                     waiting = True
-                    self.log_input_wait("等待其他应用连续空闲 10 秒后聚焦游戏。", idle_seconds=self.ACTIVITY_SECONDS)
+                    scope = "键鼠" if after_takeover else "其他应用"
+                    self.log_input_wait(f"等待{scope}连续空闲 {self.ACTIVITY_SECONDS:g} 秒后聚焦游戏。",
+                                        idle_seconds=self.ACTIVITY_SECONDS)
                 time.sleep(self.POLL_SECONDS)
         finally:
             if waiting:
                 duration = time.monotonic() - started
                 self.focus_wait_seconds += max(0.0, duration - paused_seconds)
-                reason = {"idle": "其他应用已空闲", "foreground": "游戏已在前台",
+                reason = {"idle": "键鼠已空闲", "foreground": "游戏已在前台",
                           "manual_resume": "用户手动恢复", "interrupted": "暂停、取消或窗口异常"}[outcome]
                 self.log_input_wait(f"游戏焦点等待结束，实际等待 {duration:.1f} 秒：{reason}。",
                                     duration_seconds=duration, outcome=outcome)
@@ -188,8 +211,7 @@ class InputSession:
             self.window.size = None
             if self.holding:
                 raise UserInterruption("输入途中游戏失焦，释放后重新执行当前 Step。", reason="focus")
-            self.before_focus(hwnd)
-            self.window.platform.focus(hwnd)
+            self.focus_window(hwnd, process_id=self.window.process_id)
             self.check_ownership()
             if had_image:
                 self.window.capture()
@@ -252,14 +274,13 @@ class InputSession:
             self.owned_generation = self.wait_quiet()
             self.paused = False
         self.check_ownership()
-        self.resume_focus = True
+        self.resume_focus = not automatic
         if self.process.exited():
             self.window.image = None
             self.window.size = None
             raise GameProcessExited()
         assert self.window.hwnd is not None
-        self.before_focus(self.window.hwnd)
-        self.window.platform.focus(self.window.hwnd)
+        self.focus_window(self.window.hwnd, process_id=self.window.process_id, after_takeover=automatic)
         self.window.capture()
         self.check_ownership()
         if self.backend.any_pressed():

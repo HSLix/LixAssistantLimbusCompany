@@ -157,7 +157,9 @@ def restart_game(data_root: Path, inputs) -> None:
                 if candidate.path.resolve() != executable:
                     raise ValueError("New game window does not match the saved Steam installation.")
                 log("发现新游戏窗口，正在置前并重新绑定。", hwnd=matches[0], process_id=candidate.pid)
-                window.connect(checkpoint=bind_checkpoint)
+                def focus(hwnd, *, checkpoint):
+                    inputs.focus_window(hwnd, process_id=candidate.pid, checkpoint=checkpoint)
+                window.connect(checkpoint=bind_checkpoint, focus=focus)
                 bind_checkpoint()
                 if window.process_id != candidate.pid or candidate.exited():
                     raise ValueError("New game process changed during binding.")
