@@ -279,7 +279,7 @@ def test_input_theme_caret_blinks_and_preserves_plain_text(gui):
 
 
 def test_composer_border_tracks_input_focus(gui):
-    from qfluentwidgets import Theme, qconfig, setTheme, themeColor
+    from qfluentwidgets import themeColor
 
     app, window = gui
     page = window.repair_page
@@ -290,19 +290,12 @@ def test_composer_border_tracks_input_focus(gui):
     app.processEvents()
     assert page.message.hasFocus()
     assert f'border: 1px solid {themeColor().name()}' in page.composer.styleSheet()
-    original_theme = qconfig.theme
-    try:
-        setTheme(Theme.DARK)
-        app.processEvents()
-        assert f'border: 1px solid {themeColor().name()}' in page.composer.styleSheet()
-        page.message.reset_caret()
-        rect = page.message.cursorRect()
-        pixel = page.message.viewport().grab().toImage().pixelColor(rect.x() + 1, rect.center().y())
-        assert pixel.rgba() == themeColor().rgba()
-        image = page.message.grab().toImage()
-        assert image.pixelColor(image.width() // 2, 0) == image.pixelColor(image.width() // 2, image.height() - 1)
-    finally:
-        setTheme(original_theme)
+    page.message.reset_caret()
+    rect = page.message.cursorRect()
+    pixel = page.message.viewport().grab().toImage().pixelColor(rect.x() + 1, rect.center().y())
+    assert pixel.rgba() == themeColor().rgba()
+    image = page.message.grab().toImage()
+    assert image.pixelColor(image.width() // 2, 0) == image.pixelColor(image.width() // 2, image.height() - 1)
     page.attach.setFocus()
     app.processEvents()
     assert 'border: 1px solid rgba(128,128,128,0.25)' in page.composer.styleSheet()
@@ -665,24 +658,24 @@ def test_context_settings_keep_inactive_mode_value(gui):
     assert saved['context_compaction_ratio'] == 30 and saved['context_compaction_tokens'] == 20000
 
 
-@pytest.mark.parametrize('dark', [False, True])
 @pytest.mark.parametrize('language', ['en_US', 'zh_CN'])
-def test_context_usage_fits_composer_toolbar_and_tracks_theme(gui, dark, language):
-    from qfluentwidgets import Theme, qconfig, setTheme
+def test_context_usage_fits_composer_toolbar_and_shows_level_colors(gui, language):
     from lalc.i18n import install_translations
 
     app, window = gui
     page = window.repair_page
-    previous_theme = qconfig.theme
     previous_language = getattr(app, '_lalc_language', 'en_US')
     try:
         install_translations(app, language)
-        setTheme(Theme.DARK if dark else Theme.LIGHT)
         window.show()
         window.switchTo(page)
         window.resize(760, 640)
-        for usage in ({'tokens': 168000, 'limit': 400000},
-                      {'tokens': 440000, 'limit': 400000}, None):
+        for usage, color in (
+            ({'tokens': 168000, 'limit': 400000}, '#ff237b4b'),
+            ({'tokens': 240000, 'limit': 400000}, '#ff906400'),
+            ({'tokens': 440000, 'limit': 400000}, '#ffc42b2b'),
+            (None, '#ff606060'),
+        ):
             page.show_context_usage(usage)
             QTest.qWait(20)
             assert page.context_usage.parentWidget() is page.composer
@@ -691,10 +684,6 @@ def test_context_usage_fits_composer_toolbar_and_tracks_theme(gui, dark, languag
             assert page.context_usage.geometry().right() < page.more_button.geometry().left()
             assert page.context_usage.geometry().bottom() <= page.composer.height()
             assert page.context_label.width() >= page.context_label.sizeHint().width()
-            expected = ('#b8b8b8' if dark else '#606060') if usage is None else (
-                ('#70d69b' if dark else '#237b4b') if usage['tokens'] < 200000 else
-                ('#ff9393' if dark else '#c42b2b'))
-            assert '#ff' + expected[1:] in page.context_label.styleSheet()
+            assert color in page.context_label.styleSheet()
     finally:
         install_translations(app, previous_language)
-        setTheme(previous_theme)

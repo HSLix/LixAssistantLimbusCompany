@@ -268,11 +268,9 @@ def test_edit_confirmation_protects_draft_and_revalidates_reused_image(gui, tmp_
     assert not window.jobs
 
 
-def test_keyboard_removal_and_dark_cards_keep_their_labels_readable(gui, tmp_path):
-    from qfluentwidgets import Theme, qconfig, setTheme
+def test_keyboard_removal_and_attachment_card_labels(gui, tmp_path):
     from lalc.i18n import tr
     app, _ = gui
-    previous = qconfig.theme
     tray = AttachmentTray(removable=True)
     tray.resize(400, 72)
     identity = 'ea3c6c01-0000-4000-8000-000000000001'
@@ -290,10 +288,6 @@ def test_keyboard_removal_and_dark_cards_keep_their_labels_readable(gui, tmp_pat
     assert not manifest.remove.isHidden()
     manifest.remove.click()
     assert removed == [1]
-    try:
-        setTheme(Theme.DARK)
-        assert '#303030' in manifest.button.styleSheet()
-    finally:
-        setTheme(previous)
-        tray.close()
-        tray.deleteLater()
+    assert '#fafafa' in manifest.button.styleSheet()
+    tray.close()
+    tray.deleteLater()

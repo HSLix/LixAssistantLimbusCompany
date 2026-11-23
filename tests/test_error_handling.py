@@ -133,20 +133,16 @@ def test_gui_interaction_logs_error_and_dialog_copies_original_traceback(tmp_pat
 def test_error_dialog_prompts_copy_and_uses_red_button(fatal):
     from PySide6.QtGui import QPalette
     from PySide6.QtWidgets import QApplication, QLabel, QPushButton
-    from qfluentwidgets import Theme, qconfig, setTheme
     from lalc.gui import ErrorDialog
 
     app = QApplication.instance() or QApplication([])
-    original_theme = qconfig.get(qconfig.themeMode)
     dialog = ErrorDialog('错误摘要', '完整详情', fatal=fatal)
     try:
         dialog.show()
         assert any('不用截图' in label.text() for label in dialog.findChildren(QLabel))
         copy = next(button for button in dialog.findChildren(QPushButton) if button.text() == '复制错误详情')
-        for theme, color in [(Theme.LIGHT, '#c42b1c'), (Theme.DARK, '#ff99a4')]:
-            setTheme(theme)
-            app.processEvents()
-            assert copy.palette().color(QPalette.ColorRole.ButtonText).name() == color
+        app.processEvents()
+        assert copy.palette().color(QPalette.ColorRole.ButtonText).name() == '#c42b1c'
         copy.click()
         assert copy.text() == '复制成功'
         assert dialog.copy_timer.isActive()
@@ -155,7 +151,6 @@ def test_error_dialog_prompts_copy_and_uses_red_button(fatal):
         assert '错误摘要' in app.clipboard().text() and '完整详情' in app.clipboard().text()
     finally:
         dialog.close()
-        setTheme(original_theme)
         app.processEvents()
 
 

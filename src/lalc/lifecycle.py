@@ -87,9 +87,10 @@ class ApplicationLifecycle:
             from PySide6.QtWidgets import QApplication
 
             app = QApplication.instance() or QApplication([])
-            from .gui import ErrorDialog
+            from .gui import ErrorDialog, use_light_theme
 
             from .i18n import tr
+            use_light_theme(app)
             ErrorDialog(tr("A fatal error occurred. The application cannot continue.\n"
                            "You can copy the original error information and report it to the developer."),
                         details, fatal=True).exec()

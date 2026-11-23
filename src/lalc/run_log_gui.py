@@ -10,7 +10,7 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable,
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
-from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, isDarkTheme
+from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget
 
 from .work_files import WorkDirectory
 from .file_content import FileContent, image_preview
@@ -21,13 +21,12 @@ from .run_log_sharing import list_logs, export_log, import_log
 
 
 def log_colors(level: str) -> tuple[str, str]:
-    """运行窗口和历史日志共用等级色块，保持深浅主题文字可读。"""
-    dark = isDarkTheme()
+    """运行窗口和历史日志共用等级色块。"""
     return {
-        "info": ("#17334a", "#d5eaff") if dark else ("#eaf4ff", "#163b60"),
-        "warning": ("#493919", "#ffe3a1") if dark else ("#fff4d6", "#604600"),
-        "error": ("#4b2529", "#ffd8dd") if dark else ("#fde9eb", "#861b2b"),
-        "debug": ("#303030", "#dedede") if dark else ("#f0f0f0", "#404040"),
+        "info": ("#eaf4ff", "#163b60"),
+        "warning": ("#fff4d6", "#604600"),
+        "error": ("#fde9eb", "#861b2b"),
+        "debug": ("#f0f0f0", "#404040"),
     }[level]
 
 

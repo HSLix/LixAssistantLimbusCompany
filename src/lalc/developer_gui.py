@@ -22,7 +22,7 @@ from qfluentwidgets import (
     PlainTextEdit as QPlainTextEdit, SpinBox as QSpinBox, ComboBox as QComboBox,
     CheckBox as QCheckBox, ListWidget as QListWidget, SegmentedWidget,
     TransparentToolButton, PrimaryToolButton, FluentIcon, RoundMenu, Action, TextBrowser,
-    CaptionLabel, IconWidget, CustomStyleSheet, setStyleSheet as setFluentStyleSheet, themeColor, qconfig,
+    CaptionLabel, IconWidget, CustomStyleSheet, themeColor, qconfig,
 )
 
 from .run_logs import LIVE_LOG_LIMIT, ai_repair_message
@@ -222,9 +222,7 @@ class TrialDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setObjectName("running-dialog")
-        setFluentStyleSheet(self, CustomStyleSheet(self).setCustomStyleSheet(
-            'QDialog#running-dialog { background-color: #f3f3f3; }',
-            'QDialog#running-dialog { background-color: #202020; }'))
+        self.setStyleSheet('QDialog#running-dialog { background-color: #f3f3f3; }')
         self.setWindowTitle(tr('Agent trial'))
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
@@ -1275,7 +1273,6 @@ class RepairPage(QWidget):
         self.message = ChatInput()
         self.message.focusChanged.connect(self.update_composer_focus)
         qconfig.themeColorChanged.connect(self.update_composer_focus)
-        qconfig.themeChanged.connect(self.update_composer_focus)
         self.update_composer_focus()
         self.message.setPlaceholderText(tr('Message the Agent…'))
         self.message.sendRequested.connect(self.send)
@@ -1516,14 +1513,13 @@ class RepairPage(QWidget):
         if (type(tokens) not in (int, float) or type(limit) not in (int, float)
                 or not math.isfinite(tokens) or not math.isfinite(limit) or tokens < 0 or limit <= 0):
             self.context_label.setText(tr('Context —'))
-            self.context_label.setTextColor('#606060', '#b8b8b8')
+            self.context_label.setTextColor('#606060')
             self.context_label.setToolTip(tr('Context: unknown'))
             self.context_usage.setToolTip(tr('Context: unknown'))
             return
         percent = tokens / limit * 100
-        light, dark = (('#237b4b', '#70d69b') if percent < 50 else
-                       ('#906400', '#f2c661') if percent < 80 else ('#c42b2b', '#ff9393'))
-        self.context_label.setTextColor(light, dark)
+        color = '#237b4b' if percent < 50 else '#906400' if percent < 80 else '#c42b2b'
+        self.context_label.setTextColor(color)
         self.context_label.setText(tr('Context: {0}%').format(int(percent)))
         details = tr('Estimated {0} / {1} tokens; 100% triggers compaction.').format(int(tokens), int(limit))
         self.context_label.setToolTip(details)

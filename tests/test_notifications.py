@@ -105,28 +105,22 @@ def test_details_remain_plain_and_use_existing_dialog(windows, monkeypatch):
     opened[0].close()
 
 
-def test_count_limit_long_text_and_opaque_dark_panel(windows):
-    from qfluentwidgets import Theme, qconfig, setTheme
+def test_count_limit_long_text_and_opaque_panel(windows):
     app, _, user, _ = windows
     notices = user.notifications
-    previous_theme = qconfig.theme
-    try:
-        setTheme(Theme.DARK)
-        for i in range(100):
-            notices.notify(f'{i} ' + '很长的通知' * 40)
-        user.resize(760, 550)
-        app.processEvents()
-        assert notices.cards[0].badge.text() == '99+'
-        assert notices.cards[0].title_label.height() <= notices.cards[0].title_label.maximumHeight()
-        assert notices.width() <= user.width() - 40
-        assert notices._normalBackgroundColor().alpha() == 255
-        assert notices._hoverBackgroundColor() == notices._normalBackgroundColor()
-        assert not notices.scroll.widget().autoFillBackground()
-        assert not notices.scroll.viewport().autoFillBackground()
-        notices.cards[0].close_button.click()
-        assert notices.cards[0].badge.text() == '99'
-    finally:
-        setTheme(previous_theme)
+    for i in range(100):
+        notices.notify(f'{i} ' + '很长的通知' * 40)
+    user.resize(760, 550)
+    app.processEvents()
+    assert notices.cards[0].badge.text() == '99+'
+    assert notices.cards[0].title_label.height() <= notices.cards[0].title_label.maximumHeight()
+    assert notices.width() <= user.width() - 40
+    assert notices._normalBackgroundColor().getRgb() == (255, 255, 255, 255)
+    assert notices._hoverBackgroundColor() == notices._normalBackgroundColor()
+    assert not notices.scroll.widget().autoFillBackground()
+    assert not notices.scroll.viewport().autoFillBackground()
+    notices.cards[0].close_button.click()
+    assert notices.cards[0].badge.text() == '99'
 
 
 @pytest.mark.parametrize('result, expected', [

@@ -6,7 +6,7 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 from qfluentwidgets import (BodyLabel, CardWidget, FluentIcon, PushButton, SimpleCardWidget,
-                            TransparentToolButton, isDarkTheme, setCustomStyleSheet)
+                            TransparentToolButton, setCustomStyleSheet)
 
 from .errors import result_diagnostics
 from .i18n import tr
@@ -103,7 +103,7 @@ class NotificationList(SimpleCardWidget):
         self.messages.setContentsMargins(0, 0, 0, 0)
         self.messages.setSpacing(6)
         self.scroll.setWidget(content)
-        # QScrollArea 默认给内容填充原生底色，深色浮层会因此变白。
+        # 滚动内容沿用浮层底色，避免出现原生底色的边界。
         content.setAutoFillBackground(False)
         self.scroll.viewport().setAutoFillBackground(False)
         layout.addWidget(self.scroll)
@@ -112,7 +112,7 @@ class NotificationList(SimpleCardWidget):
 
     def _normalBackgroundColor(self):
         # 覆盖页面的浮层必须不透明，不能透出下方的文字和控件。
-        return QColor('#2d2d2d' if isDarkTheme() else '#ffffff')
+        return QColor('#ffffff')
 
     def notify(self, message: str, details: str = '', *, kind='information', summary='') -> None:
         """新结果置顶；展开阅读时先隐藏新增卡片，避免改变阅读位置。"""
