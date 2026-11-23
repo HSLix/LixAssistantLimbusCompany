@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 import sys
@@ -29,14 +30,54 @@ def test_packaged_beta_has_a_display_version_but_no_stable_update_version(tmp_pa
 
 def test_old_release_is_an_announcement_but_not_a_package(monkeypatch):
     monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v5.0.0", "body": "legacy news"})
-    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None, github_version=(5, 0, 0))
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None,
+                                                                          github_version=(5, 0, 0), resources_checked=True)
 
 
 def test_bad_download_metadata_does_not_hide_release_body(monkeypatch):
     monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v6.0.1", "body": "## Latest GitHub notes", "assets": [
         None, {"name": "LALC-6.0.1-windows-x64-with-agent.zip", "digest": 8}]})
     assert update.check_releases("with-agent", {}) == update.ReleaseStatus("## Latest GitHub notes", None, None,
-                                                                          github_version=(6, 0, 1))
+                                                                          github_version=(6, 0, 1), resources_checked=True)
+
+
+def test_resource_appended_to_current_release_is_independent_of_framework(monkeypatch):
+    def asset(name, date, **fields):
+        return {"name": name, "digest": "sha256:" + "3" * 64, "state": "uploaded",
+                "size": 42, "created_at": date, **fields}
+
+    date = "2026-11-23T14:30:00Z"
+    name = "lalc-sharing-20261122-143000-000.zip"
+    release = {"tag_name": "v6.0.0", "assets": [
+        asset(name, date),
+        asset("default-resources.zip", "2026-11-22T14:30:00Z"),
+        asset("irrelevant.zip", "2026-11-24T14:30:00Z"),
+        asset("LALC-6.0.0-windows-x64-with-agent.zip", "2026-11-22T14:30:00Z"),
+    ]}
+    monkeypatch.setattr(update, "_json", lambda _: release)
+    status = update.check_releases("with-agent", {})
+    assert status.github.version == (6, 0, 0)
+    assert status.resource == update.ResourceRelease(name, f"{update.REPOSITORY_URL}/releases/download/v6.0.0/{name}",
+                                                    "3" * 64, 42, datetime.fromisoformat(date))
+    release["prerelease"] = True
+    status = update.check_releases("with-agent", {})
+    assert status.github is None and status.resource is None
+
+
+def test_resource_download_verifies_size_and_digest(tmp_path, monkeypatch):
+    class Response(io.BytesIO):
+        def geturl(self):
+            return "https://example.test/package"
+
+    payload = b"resource archive"
+    monkeypatch.setattr(update, "urlopen", lambda *args, **kwargs: Response(payload))
+    resource = update.ResourceRelease("default-resources.zip", "https://example.test/package",
+                                      hashlib.sha256(payload).hexdigest(), len(payload), datetime.now(timezone.utc))
+    update.download_resource(resource, tmp_path / resource.name)
+    assert (tmp_path / resource.name).read_bytes() == payload
+    bad = update.ResourceRelease(resource.name, resource.url, "0" * 64, resource.size, resource.uploaded)
+    with pytest.raises(ValueError, match="checksum"):
+        update.download_resource(bad, tmp_path / "invalid.zip")
 
 
 def test_api_rate_limit_reads_only_latest_release_body(monkeypatch, caplog):

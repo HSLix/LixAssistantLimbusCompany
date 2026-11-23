@@ -1,5 +1,6 @@
 """General Settings 分享向导；分类审查、资源冲突及统一人工提交。"""
 
+from contextlib import ExitStack
 from pathlib import Path
 import json
 from datetime import datetime
@@ -75,7 +76,8 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
     worker = SharingWorker(operation)
     worker.allow_unknown_space = allow_unknown_space or getattr(parent, "allow_unknown_space", False)
     heading = {"Export sharing package": tr("Export sharing package"),
-               "Import sharing package": tr("Import sharing package")}.get(title, tr("Processing sharing files"))
+               "Import sharing package": tr("Import sharing package"),
+               "Downloading resource package…": tr("Downloading resource package…")}.get(title, tr("Processing sharing files"))
     phases = {"Preparing export files": tr("Preparing export files"), "Writing ZIP": tr("Writing ZIP"),
               "Extracting files": tr("Extracting files"), "Installing files": tr("Installing files"),
               "Finishing…": tr("Finishing…"), "Skipped": tr("Skipped")}
@@ -924,21 +926,35 @@ class ImportDialog(QDialog):
         self.assets.blockSignals(False)
 
 
-def open_sharing(window, *, exporting):
+def open_sharing(window, *, exporting, resource=None):
     """活动互斥覆盖选择、Review 和提交；退出任意路径释放锁及暂存资料。"""
     if window.jobs or window.closing:
         raise ValueError(tr("An operation has not finished."))
-    with sharing_activity(window.service):
+    with sharing_activity(window.service), ExitStack() as cleanup:
         if exporting:
             ExportDialog(window).exec()
-        else:
+            return
+        if resource is None:
             filename, _ = QFileDialog.getOpenFileName(window, tr("Choose shared package"), "", "ZIP (*.zip)")
-            if filename:
-                try:
-                    package = sharing_task(window, lambda: SharingPackage(filename, window.service.data_root), title="Import sharing package")
-                except InterruptedError:
-                    return
-                try:
-                    ImportDialog(window, package).exec()
-                finally:
-                    package.close()
+            if not filename:
+                return
+        root = window.service.data_root
+        try:
+            if resource is not None:
+                from .default_resources import RESOURCE_KINDS
+                from .framework_update import download_resource
+                from .work_files import WorkDirectory
+                work = root / "work"
+                work.mkdir(parents=True, exist_ok=True)
+                filename = Path(cleanup.enter_context(WorkDirectory(dir=work, prefix="resource-update-"))) / resource.name
+                sharing_task(window, lambda: download_resource(resource, filename), title="Downloading resource package…")
+            package = sharing_task(window, lambda: SharingPackage(filename, root), title="Import sharing package")
+        except InterruptedError:
+            return
+        cleanup.callback(package.close)
+        if resource is not None and any(obj["kind"] not in RESOURCE_KINDS for obj in package.objects):
+            raise ValueError(tr("The official resource package contains unsupported items."))
+        ImportDialog(window, package).exec()
+        if resource is not None:
+            from .default_resources import record_viewed_resource
+            record_viewed_resource(root, resource)

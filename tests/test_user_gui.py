@@ -122,6 +122,26 @@ def test_framework_compares_release_version_without_an_installable_package(windo
     assert not user.update_button.isEnabled()
 
 
+def test_current_framework_and_unseen_resource_are_independent(windows):
+    from datetime import datetime
+    from lalc.default_resources import record_viewed_resource
+    from lalc.framework_update import ReleaseStatus, ResourceRelease
+    from lalc.i18n import tr
+
+    _, _, user, _ = windows
+    resource = ResourceRelease("default-resources.zip", "https://example.test/resource", "a" * 64, 10,
+                               datetime.fromisoformat("2026-11-23T14:30:00Z"))
+    user.framework_build = {"version": "6.0.0"}
+    status = ReleaseStatus("News", None, None, github_version=(6, 0, 0), resource=resource, resources_checked=True)
+    user.show_framework_releases(status)
+    assert user.framework_status.text() == tr("The framework is up to date.")
+    assert not user.update_button.isEnabled()
+    assert user.resource_button.isEnabled() and user.resource_button.text() == tr("Download and preview")
+    record_viewed_resource(user.service.data_root, resource)
+    user.show_framework_releases(status)
+    assert user.resource_button.text() == tr("Preview again")
+
+
 def test_developer_tools_are_last_in_user_settings(windows):
     _, _, user, _ = windows
     layout = user.general_settings.widget().layout()

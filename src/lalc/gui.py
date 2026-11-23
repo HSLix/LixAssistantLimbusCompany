@@ -576,12 +576,15 @@ class UserWindow(MainWindow):
         self.check_update_button.clicked.connect(self.check_framework_releases)
         self.update_button = QPushButton(tr('Update'))
         self.update_button.setEnabled(False)
+        self.update_button.hide()
         self.update_button.clicked.connect(lambda: self._interact(self.update_framework))
-        resource_notice = QLabel(tr('To update workflows and other resources, download the corresponding sharing package and import it in General Settings.'))
-        resource_notice.setWordWrap(True)
-        for title, widgets in ((tr('Announcements'), (self.announcement, view_release)), (tr('Disclaimer'), (disclaimer,)),
-                               (tr('Version & Update'), (self.framework_version, self.framework_status, self.check_update_button,
-                                                         self.update_button, resource_notice))):
+        self.resource_status = QLabel()
+        self.resource_status.setTextFormat(Qt.TextFormat.PlainText)
+        self.resource_status.setWordWrap(True)
+        self.resource_button = QPushButton(tr('Download and preview'))
+        self.resource_button.clicked.connect(lambda: self._interact(self.open_resource_update))
+        self.render_resource_update()
+        for title, widgets in ((tr('Announcements'), (self.announcement, view_release)), (tr('Disclaimer'), (disclaimer,))):
             card = CardWidget()
             content = QVBoxLayout(card)
             content.setContentsMargins(20, 20, 20, 20)
@@ -589,6 +592,33 @@ class UserWindow(MainWindow):
             for widget in widgets:
                 content.addWidget(widget)
             information.addWidget(card)
+        updates = CardWidget()
+        updates.setObjectName('version-updates')
+        update_layout = QVBoxLayout(updates)
+        update_layout.setContentsMargins(20, 20, 20, 20)
+        header = QHBoxLayout()
+        header.addWidget(SubtitleLabel(tr('Version & Update')))
+        header.addStretch()
+        header.addWidget(self.check_update_button)
+        update_layout.addLayout(header)
+        for icon, title, labels, button in (
+            (FluentIcon.APPLICATION, tr('Framework'), (self.framework_version, self.framework_status), self.update_button),
+            (FluentIcon.FOLDER, tr('Official resource package'), (self.resource_status,), self.resource_button),
+        ):
+            update_layout.addSpacing(6)
+            row = QHBoxLayout()
+            symbol = IconWidget(icon)
+            symbol.setFixedSize(18, 18)
+            row.addWidget(symbol, alignment=Qt.AlignmentFlag.AlignTop)
+            details = QVBoxLayout()
+            details.addWidget(StrongBodyLabel(title))
+            for label in labels:
+                label.setWordWrap(True)
+                details.addWidget(label)
+            row.addLayout(details, 1)
+            row.addWidget(button, alignment=Qt.AlignmentFlag.AlignVCenter)
+            update_layout.addLayout(row)
+        information.addWidget(updates)
         information.addStretch()
         dash.addLayout(information, 1)
         self.navigationInterface.addItemHeader(tr('GENERAL'))
@@ -626,7 +656,7 @@ class UserWindow(MainWindow):
         tools_layout = QVBoxLayout(tools)
         tools_layout.setContentsMargins(16, 16, 16, 16)
         tools_layout.addWidget(SubtitleLabel(tr('Developer Tools')))
-        purpose = QLabel(tr('For observation, Candidate development and trials after publication.'))
+        purpose = QLabel(tr('Develop or repair workflows and start conversations with the built-in Agent.'))
         purpose.setWordWrap(True)
         tools_layout.addWidget(purpose)
         developer = QPushButton(tr('Open Developer GUI'))
@@ -817,6 +847,8 @@ class UserWindow(MainWindow):
         self.check_update_button.setEnabled(False)
         self.update_button.setEnabled(False)
         self.framework_status.setText(tr('Checking for updates…'))
+        self.resource_button.setEnabled(False)
+        self.resource_status.setText(tr('Checking for updates…'))
         self.announcement.setPlaceholderText(tr('Loading the GitHub release announcement…'))
         variant, mirror = self.framework_variant, self.framework_build.get('mirror', {})
 
@@ -832,6 +864,7 @@ class UserWindow(MainWindow):
     def show_framework_releases(self, result):
         from .framework_update import version_number
         self.release_status = result
+        self.render_resource_update()
         if result.announcement is None:
             self.announcement.setPlaceholderText(tr('Could not load the GitHub release announcement.'))
         else:
@@ -846,6 +879,7 @@ class UserWindow(MainWindow):
         installable = github_package or (mirror if self.mirror_cdk_saved else None)
         self.framework_target = installable if installable and current and installable > current else None
         self.update_button.setEnabled(bool(self.framework_target) and self.can_install_update)
+        self.update_button.setVisible(self.update_button.isEnabled())
         self.update_button.setText(tr('Update to {0}').format('.'.join(map(str, self.framework_target)))
                                    if self.framework_target else tr('Update'))
         if '-beta.' in self.framework_build['version']:
@@ -863,6 +897,36 @@ class UserWindow(MainWindow):
             self.framework_status.setText(tr('The framework is up to date.'))
         else:
             self.framework_status.setText(tr('Could not check for a framework update.'))
+
+    def render_resource_update(self):
+        """独立显示正式资源包；已查看的附件不再提示有更新。"""
+        from .default_resources import viewed_resource_packages
+        result = self.release_status
+        resource = result.resource if result is not None else None
+        self.resource_button.setVisible(resource is not None)
+        if resource is None:
+            if result is None:
+                message = tr('Official resource updates have not been checked.')
+            elif result.resources_checked:
+                message = tr('No official resource package is available.')
+            else:
+                message = tr('Could not check for an official resource update.')
+            self.resource_status.setText(message)
+            return
+        date = resource.uploaded.astimezone().strftime('%Y-%m-%d %H:%M')
+        viewed = resource.sha256 in viewed_resource_packages(self.service.data_root)
+        self.resource_status.setText(tr('Latest resource package: {0}\nAlready viewed.').format(date) if viewed
+                                     else tr('Latest resource package: {0}\nA new package is available to import.').format(date))
+        self.resource_button.setText(tr('Preview again') if viewed else tr('Download and preview'))
+        self.resource_button.setEnabled(True)
+
+    def open_resource_update(self):
+        """下载校验后走普通分享导入，关闭预览不写入任何资源。"""
+        from .sharing_gui import open_sharing
+        if self.release_status is not None and self.release_status.resource is not None:
+            open_sharing(self, exporting=False, resource=self.release_status.resource)
+            self.render_resource_update()
+            self.refresh_manifest_card()
 
     def update_framework(self):
         """点击更新后才下载，文件就绪后单独确认重启。"""

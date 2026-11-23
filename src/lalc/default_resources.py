@@ -1,16 +1,35 @@
 """打包已发布默认资源，并在空白用户目录中显式安装。"""
 
+import json
 from pathlib import Path
 import sys
 
 from .agent_skills import DEFAULT_SKILL_NAMES
 from .manifest import ManifestManager
 from .process_lock import ProcessLock
+from .runtime import atomic_write_json
 from .sharing import SharingPackage, build_export, catalog, import_selected, inspect_objects, save_package
 from .user_pages import UserSettings
 
 DEFAULT_RESOURCE_NAME = "default-resources.zip"
 RESOURCE_KINDS = {"workflow", "assets", "pages", "skills"}
+
+
+def viewed_resource_packages(root):
+    """读取本机已打开导入预览的官方包摘要。"""
+    try:
+        value = json.loads((root / "viewed-resource-packages.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def record_viewed_resource(root, resource):
+    """同一份内容即使重新上传，也只提示一次。由分享活动互斥保护。"""
+    viewed = viewed_resource_packages(root)
+    if resource.sha256 not in viewed:
+        viewed[resource.sha256] = resource.uploaded.isoformat()
+        atomic_write_json(root / "viewed-resource-packages.json", viewed)
 
 
 def bundled_default_resources():

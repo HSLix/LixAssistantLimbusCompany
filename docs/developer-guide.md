@@ -6,7 +6,7 @@
 
 - **`build-only`** 将构建结果留在当次运行的 Artifacts。
 - **`beta`** 从所选分支构建，使用 Actions 运行编号生成标签，例如 `v6.0.0-beta.12`。工作流将两个 Windows ZIP 和 `SHA256SUMS` 上传到 GitHub Pre-release。测试者从 Releases 手动下载，应用内框架更新仅支持正式版。
-- **`stable`** 从 `master` 正式发布。除两个 Windows ZIP 和 `SHA256SUMS` 外，还上传供 5.x 迁移的 `lalc.zip`。Windows EXE、ZIP 和发布标签都从同一个项目版本号生成。
+- **`stable`** 从 `master` 正式发布。提交审核过的 `packaging/default-resources.zip` 后再发版，缺少此文件时正式构建会失败。发布页附上两个 Windows ZIP、供 5.x 迁移的 `lalc.zip`、同一份独立的 `default-resources.zip` 和 `SHA256SUMS`。
 
 发布完成后，检查 Windows 构建记录和 Release。两种发布都会从上一个正式版开始汇总贡献记录。
 
@@ -19,3 +19,7 @@
 在存有正式资源的 Windows 机器上运行 `uv run --locked --all-extras python scripts/build_windows.py`。本地构建会从 `%LOCALAPPDATA%\LALC` 选取最新已发布 Workflow、全部 Assets、已安装扩展页面和 Skills，缺少的内置 Skill 使用程序随附版本。默认包排除 Agent 对话历史和页面配置。
 
 用 `--default-resources 路径` 可指定另一数据目录或一份确认可随框架发布的分享 ZIP。GitHub Actions 可以从 `packaging/default-resources.zip` 取得已核对的默认包。Actions 执行机没有维护者 Windows 上的本地资源。
+
+## 单独更新官方资源包
+
+需要先修工作流时，在 **通用设置 → 分享 → 导出** 选择要发布的工作流、素材、页面和 Skills，保留 `lalc-sharing-<时间戳>.zip` 文件名。核对内容后，把 ZIP 追加到 GitHub 上最新的正式框架 Release。首页按 GitHub 附件上传时间查找最新资源包，玩家可在应用内下载并预览。用于公开更新的包只包含上述资源类型，页面配置和 Agent 历史请留在本机。

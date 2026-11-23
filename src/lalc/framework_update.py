@@ -1,6 +1,7 @@
 """查询框架版本，下载经过校验的完整程序包并交给 Windows 更新进程。"""
 
 from dataclasses import dataclass
+from datetime import datetime
 import hashlib
 from html.parser import HTMLParser
 from http.client import HTTPException
@@ -21,6 +22,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 import zipfile
 
 from .agent_settings import dpapi, save_secret, secret_path
+from .file_content import checkpoint, require_disk
 from .work_files import create_work_directory
 
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
@@ -56,6 +58,17 @@ class Package:
 
 
 @dataclass(frozen=True)
+class ResourceRelease:
+    """正式发行页中的独立资源包附件。"""
+
+    name: str
+    url: str
+    sha256: str
+    size: int
+    uploaded: datetime
+
+
+@dataclass(frozen=True)
 class ReleaseStatus:
     """公告和两个渠道的版本可独立取得。"""
 
@@ -64,6 +77,8 @@ class ReleaseStatus:
     mirror: tuple[int, int, int] | None
     announcement_html: bool = False
     github_version: tuple[int, int, int] | None = None
+    resource: ResourceRelease | None = None
+    resources_checked: bool = False
 
 
 class _ReleaseBody(HTMLParser):
@@ -162,17 +177,36 @@ def _github(variant):
     tag = data.get("tag_name")
     version = version_number(tag)
     package = None
+    resources = []
     assets = data.get("assets")
+    if data.get("draft") or data.get("prerelease"):
+        return None, None, None, None
     if version and version[0] >= 6 and isinstance(assets, list):
         name = f"LALC-{'.'.join(map(str, version))}-windows-x64-{variant}.zip"
         for asset in assets:
-            if not isinstance(asset, dict) or asset.get("name") != name:
+            if not isinstance(asset, dict):
                 continue
             digest = asset.get("digest")
-            if isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
-                package = Package(version, f"{REPOSITORY_URL}/releases/download/{tag}/{name}", digest[7:])
-                break
-    return (announcement if isinstance(announcement, str) else ""), package, version
+            if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                continue
+            asset_name = asset.get("name")
+            url = f"{REPOSITORY_URL}/releases/download/{tag}/{asset_name}"
+            if asset_name == name:
+                package = Package(version, url, digest[7:])
+            elif isinstance(asset_name, str) and re.fullmatch(
+                r"(?:default-resources|lalc-sharing-[0-9]{8}-[0-9]{6}-[0-9]{3})\.zip", asset_name
+            ):
+                size = asset.get("size")
+                if asset.get("state") != "uploaded" or type(size) is not int or size < 1:
+                    continue
+                try:
+                    uploaded = datetime.fromisoformat(asset["created_at"])
+                except (KeyError, ValueError, TypeError):
+                    continue
+                if uploaded.tzinfo is not None:
+                    resources.append(ResourceRelease(asset_name, url, digest[7:], size, uploaded))
+    resource = max(resources, key=lambda item: (item.uploaded, item.name), default=None)
+    return (announcement if isinstance(announcement, str) else ""), package, version, resource
 
 
 def _github_page():
@@ -205,8 +239,10 @@ def _mirror(config, cdk=""):
 def check_releases(variant, mirror):
     """单个服务不可用时仍返回另一方的结果。"""
     announcement_html = False
+    resource, resources_checked = None, False
     try:
-        announcement, github, github_version = _github(variant)
+        announcement, github, github_version, resource = _github(variant)
+        resources_checked = True
     except (OSError, ValueError, TypeError, AttributeError, HTTPException) as error:
         logger = logging.getLogger(__name__)
         logger.warning("GitHub release API request failed (%s)",
@@ -222,7 +258,7 @@ def check_releases(variant, mirror):
     except (OSError, ValueError, TypeError, HTTPException):
         mirror_version = None
     return ReleaseStatus(announcement, github, mirror_version if mirror_version and mirror_version[0] >= 6 else None,
-                         announcement_html, github_version)
+                         announcement_html, github_version, resource, resources_checked)
 
 
 def _extract(archive, destination, cancelled=lambda: False):
@@ -249,21 +285,39 @@ def _extract(archive, destination, cancelled=lambda: False):
             bundle.extract(entry, destination)
 
 
+def _download_verified(package, archive, cancelled, *, size=None):
+    """将 HTTPS 正式附件流式写入工作目录并验证摘要。"""
+    digest = hashlib.sha256()
+    done = 0
+    request = Request(package.url, headers={"User-Agent": "LALC"})
+    with urlopen(request, timeout=30) as response, archive.open("xb") as output:
+        if urlsplit(response.geturl()).scheme != "https":
+            raise ValueError("Download requires HTTPS")
+        while chunk := response.read(1024 * 1024):
+            if cancelled():
+                raise InterruptedError
+            done += len(chunk)
+            if size is not None:
+                if done > size:
+                    raise ValueError("Update download size mismatch")
+                checkpoint(done, size, archive.name)
+            output.write(chunk)
+            digest.update(chunk)
+    if (size is not None and done != size) or digest.hexdigest() != package.sha256:
+        raise ValueError("Update checksum mismatch")
+
+
+def download_resource(package, archive):
+    """预留资源 ZIP 所需空间，复用分享进度的取消检查。"""
+    require_disk([(archive.parent, package.size)])
+    checkpoint(0, package.size, archive.name)
+    _download_verified(package, archive, lambda: False, size=package.size)
+
+
 def _prepare(package, workspace, variant, cancelled):
     archive = workspace / "download.zip"
     try:
-        digest = hashlib.sha256()
-        request = Request(package.url, headers={"User-Agent": "LALC"})
-        with urlopen(request, timeout=30) as response, archive.open("xb") as output:
-            if urlsplit(response.geturl()).scheme != "https":
-                raise ValueError("Download requires HTTPS")
-            while chunk := response.read(1024 * 1024):
-                if cancelled():
-                    raise InterruptedError
-                output.write(chunk)
-                digest.update(chunk)
-        if digest.hexdigest() != package.sha256:
-            raise ValueError("Update checksum mismatch")
+        _download_verified(package, archive, cancelled)
         _extract(archive, workspace, cancelled)
         payload = workspace / "LALC"
         if not all((payload / name).is_file() for name in REQUIRED_FILES):

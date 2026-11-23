@@ -165,6 +165,8 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
                 if prefix == "lalc":
                     bundle.write(ROOT / "packaging/update_to.bat", "lalc/update_to.bat")
             outputs.append(output)
+        if default_resources is not None and beta_number is None:
+            outputs.append(base / DEFAULT_RESOURCE_NAME)
         checksums = "".join(f"{digest(path)}  {path.name}\n" for path in outputs)
         for path in outputs:
             path.replace(destination / path.name)
