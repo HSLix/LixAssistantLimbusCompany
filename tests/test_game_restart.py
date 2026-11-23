@@ -336,6 +336,8 @@ def execute(ctx, *, value: int) -> str:
     if failure == "detection_error":
         checks = []
         def exited():
+            if not env.platform.processes[7].dead:
+                return False
             checks.append(1)
             if len(checks) == 1:
                 return True

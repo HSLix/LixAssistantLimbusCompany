@@ -32,7 +32,6 @@ class FocusedAutomationSession:
         self.focus_revision = 0
         self.captured_at: str | None = None
         self.before_check: Callable[[], None] | None = None
-        self.before_focus: Callable[[int], None] | None = None
         self.before_capture: Callable[[], bool] | None = None
 
     def connect(self, *, checkpoint: Callable[[], None] | None = None, focus=None) -> dict[str, Any]:
@@ -42,8 +41,6 @@ class FocusedAutomationSession:
         if len(matches) != 1:
             raise WindowError(f"Expected one Limbus Company window, found {len(matches)}.")
         hwnd = matches[0]
-        if self.before_focus is not None:
-            self.before_focus(hwnd)
         activate = self.platform.focus if focus is None else focus
         if checkpoint is None:
             activate(hwnd)
@@ -104,7 +101,7 @@ class FocusedAutomationSession:
         self.image = None
         self.size = None
         self.check()
-        hooks = self.before_check, self.before_focus, self.before_capture
+        hooks = self.before_check, self.before_capture
         inputs = None
         try:
             inputs = InputSession(self, self.platform.create_input_backend(), RunGate(), self.emit)
@@ -116,7 +113,7 @@ class FocusedAutomationSession:
                 if inputs is not None:
                     inputs.close()
             finally:
-                self.before_check, self.before_focus, self.before_capture = hooks
+                self.before_check, self.before_capture = hooks
 
     def _capture(self, auto_park_cursor: bool) -> dict[str, int]:
         """取得客户区原始图像；焦点变化或鼠标重新进入时从头重试。"""

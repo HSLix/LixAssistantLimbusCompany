@@ -18,7 +18,7 @@ class PhysicalInputMonitor:
     def __init__(self) -> None:
         self.lock = threading.Lock()
         self.generation = 0
-        self.last_input = time.monotonic()
+        self.started_at = self.last_input = time.monotonic()
         self.kind = ""
         self.target_hwnd: int | None = None
         self.pause_requested = False
@@ -51,10 +51,9 @@ class InputSession:
     KEYS = {"esc": 0x1B, "p": 0x50, "enter": 0x0D}
 
     def __init__(self, window: FocusedAutomationSession, backend: Any, gate: RunGate,
-                 emit: Callable[[str, dict[str, Any]], None]) -> None:
+                 emit: Callable[[str, dict[str, Any]], None], *, process_id: int | None = None) -> None:
         self.window, self.backend, self.gate, self.emit = window, backend, gate, emit
         self.monitor = backend.monitor
-        self.owned_generation = self.monitor.snapshot()[0]
         self.cursor_interrupted_at: float | None = None
         self.paused = False
         self.failed = False
@@ -62,14 +61,15 @@ class InputSession:
         self.focus_wait_seconds = 0.0
         self.resume_focus = False
         self.focus_checkpoint: Callable[[], None] | None = None
-        window.before_capture = self.park_cursor
-        window.before_check = self.ensure_foreground
-        self.monitor.target_hwnd = window.hwnd
         try:
-            self.process = window.platform.open_game_process(window.process_id)
+            self.owned_generation = self.monitor.snapshot()[0]
+            self.process = window.platform.open_game_process(window.process_id if process_id is None else process_id)
         except BaseException:
             backend.close()
             raise
+        window.before_capture = self.park_cursor
+        window.before_check = self.ensure_foreground
+        self.monitor.target_hwnd = window.hwnd
 
     def check_ownership(self) -> None:
         """无窗口过渡期仍检查输入所有权、暂停、取消和释放失败。"""
@@ -114,10 +114,10 @@ class InputSession:
         raise UserInterruption(reason, reason=intent)
 
     def focus_window(self, hwnd: int, *, process_id: int, after_takeover: bool = False,
-                     checkpoint: Callable[[], None] | None = None) -> None:
+                     checkpoint: Callable[[], None] | None = None,
+                     immediate_since: float | None = None) -> None:
         """每次置前尝试都经过同一个可取消的空闲检查。"""
         self.monitor.target_hwnd = hwnd
-        immediate_since = None
         activity_at_check = None
         requested = False
 
@@ -172,7 +172,7 @@ class InputSession:
                     paused_seconds += time.monotonic() - checkpoint_started
                 else:
                     self.check_ownership()
-                if process_id == self.window.process_id and self.process.exited():
+                if process_id == self.process.pid and self.process.exited():
                     raise GameProcessExited()
                 info = self.window.platform.window_info(hwnd)
                 if not info["valid"]:
