@@ -16,7 +16,7 @@
 
 ### 在 Windows 随包打入默认资源
 
-在存有正式资源的 Windows 机器上运行 `uv run --locked --all-extras python scripts/build_windows.py`。本地构建会从 `%LOCALAPPDATA%\LALC` 选取最新已发布 Workflow、全部 Assets、已安装扩展页面和 Skills，缺少的内置 Skill 使用程序随附版本。默认包排除 Agent 对话历史和页面配置。
+在存有正式资源的 Windows 机器上运行 `uv run --locked --all-extras python scripts/build_windows.py`。本地构建会从 `%LOCALAPPDATA%\LALC` 选取最新已发布 Workflow、全部 Assets、已安装扩展页面和 Skills，缺少的内置 Skill 使用程序随附版本。默认包还会自动导出镜牢页面已保存的饰品配置和主题包配置。首次安装时一并导入，已有用户可在分享导入预览中勾选镜牢默认配置，导入会保留镜牢页面内的其他字段。Agent 对话历史和其他页面配置留在本机。
 
 用 `--default-resources 路径` 可指定另一数据目录或一份确认可随框架发布的分享 ZIP。GitHub Actions 可以从 `packaging/default-resources.zip` 取得已核对的默认包。Actions 执行机没有维护者 Windows 上的本地资源。
 

@@ -8,7 +8,9 @@ from .agent_skills import DEFAULT_SKILL_NAMES
 from .manifest import ManifestManager
 from .process_lock import ProcessLock
 from .runtime import atomic_write_json
-from .sharing import SharingPackage, build_export, catalog, import_selected, inspect_objects, save_package
+from .sharing import (MIRROR_DEFAULT_FIELDS, MIRROR_SETTINGS_ID, PAGE_DEFAULTS_FILE, SharingPackage,
+                      build_export, catalog, import_selected, inspect_objects, json_bytes,
+                      page_settings_config, save_package)
 from .user_pages import UserSettings
 
 DEFAULT_RESOURCE_NAME = "default-resources.zip"
@@ -38,7 +40,7 @@ def bundled_default_resources():
 
 
 def export_default_resources(source, destination):
-    """选最新已发布 Workflow、所有 Assets 和页面，以及所有应用 Skill。"""
+    """导出正式资源及已保存的镜牢饰品与主题包默认配置。"""
     manager = ManifestManager(source)
     with ProcessLock("game"):
         available = catalog(manager, include_private=False)
@@ -46,15 +48,29 @@ def export_default_resources(source, destination):
                      "skills": sorted(set(DEFAULT_SKILL_NAMES) | set(available["skills"]))}
         if missing := [kind for kind, entries in selection.items() if not entries]:
             raise ValueError(f"默认资源目录缺少可导出的内容：{', '.join(missing)}")
-        save_package(build_export(manager, selection, builtin_skills=True), destination)
+        objects = build_export(manager, selection, builtin_skills=True)
+        mirror = UserSettings(manager.data_root).value["pages"].get(MIRROR_SETTINGS_ID, {})
+        defaults = {key: value for key, value in mirror.items() if key in MIRROR_DEFAULT_FIELDS}
+        if defaults:
+            files = {PAGE_DEFAULTS_FILE: json_bytes(defaults)}
+            page_settings_config(MIRROR_SETTINGS_ID, files)
+            objects.append({"kind": "page_settings", "id": MIRROR_SETTINGS_ID, "files": files})
+            selection["page_settings"] = [MIRROR_SETTINGS_ID]
+        save_package(objects, destination)
     return {kind: len(entries) for kind, entries in selection.items()}
 
 
 def check_default_package(package):
-    """要求恰好一个 Workflow，并拒绝默认包携带历史或页面配置。"""
+    """接受旧默认包及可选的镜牢饰品与主题包默认配置。"""
     kinds = [obj["kind"] for obj in package.objects]
-    if set(kinds) != RESOURCE_KINDS or kinds.count("workflow") != 1:
+    if set(kinds) - {"page_settings"} != RESOURCE_KINDS or kinds.count("workflow") != 1:
         raise ValueError("默认资源包需要一个 Workflow、Assets、页面及 Skills。")
+    for obj in package.objects:
+        if obj["kind"] == "page_settings":
+            files = package.files(obj)
+            if set(files) != {PAGE_DEFAULTS_FILE}:
+                raise ValueError("默认资源包只允许镜牢的饰品与主题包配置。")
+            page_settings_config(obj["id"], files)
 
 
 def is_empty_for_default_resources(root):

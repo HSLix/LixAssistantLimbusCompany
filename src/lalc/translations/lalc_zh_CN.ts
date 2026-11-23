@@ -2598,7 +2598,7 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Page Settings shares saved values only. Unsaved edits, task counts and page availability are excluded.</source><translation>页面配置仅分享已保存的业务值，不包含未保存的修改、任务次数／开关或页面启停状态。</translation></message>
     <message><source>Page settings may contain private information. The matching page may not be installed; configuration compatibility is not verified.</source><translation>页面配置可能包含私人信息。对应页面可能尚未安装；配置字段兼容性未经验证。</translation></message>
     <message><source>Current settings:</source><translation>当前配置：</translation></message>
-    <message><source>Imported settings (whole page replacement):</source><translation>导入配置（整页替换）：</translation></message>
+    <message><source>Settings after import:</source><translation>导入后的配置：</translation></message>
     <message><source>Choose Replace or Skip for each selected conflict (Assets / Skills / Page Settings).</source><translation>请为选中的冲突项选择替换或跳过（Asset／Skill／页面配置）。</translation></message>
     <message><source>Page settings were imported. Reload the application before running.</source><translation>页面配置已导入，请重载应用后再运行。</translation></message>
     <message><source>All roles</source><translation>全部角色</translation></message>
