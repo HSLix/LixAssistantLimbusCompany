@@ -108,7 +108,8 @@ def installed_build():
     if getattr(sys, "frozen", False):
         try:
             build = json.loads((Path(sys.executable).parent / "build-info.json").read_text(encoding="utf-8"))
-            if version_number(build["version"]):
+            version = build["version"]
+            if isinstance(version, str) and re.fullmatch(rf"{VERSION_PATTERN}(?:-beta\.[1-9][0-9]*)?", version):
                 return build
         except (OSError, ValueError, KeyError, TypeError):
             pass

@@ -89,7 +89,7 @@ def check_codesearch(archive: Path, models: Path) -> None:
 
 
 def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None,
-             default_resources: Path | None = None) -> list[Path]:
+             default_resources: Path | None = None, beta_number: int | None = None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts",
@@ -126,6 +126,8 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
             finally:
                 package.close()
             info = {**info, "default_resources_sha256": digest(resource_zip)}
+        if beta_number is not None:
+            info = {**info, "version": f"{info['version']}-beta.{beta_number}"}
         (base / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         with_pi = stage / "with-agent" / "LALC"
         shutil.copytree(base, with_pi)
@@ -149,9 +151,12 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
 
         if file_manifest(base) != file_manifest(with_pi, exclude_pi=True):
             raise ValueError("Two packages have different application files")
-        names = [f"LALC-{info['version']}-windows-x64-without-agent", f"LALC-{info['version']}-windows-x64-with-agent"]
+        archives = [(f"LALC-{info['version']}-windows-x64-without-agent", base, "LALC"),
+                    (f"LALC-{info['version']}-windows-x64-with-agent", with_pi, "LALC")]
+        if beta_number is None:
+            archives.append(("lalc", with_pi, "lalc"))
         outputs = []
-        for name, source, prefix in zip([*names, "lalc"], (base, with_pi, with_pi), ("LALC", "LALC", "lalc")):
+        for name, source, prefix in archives:
             output = stage / f"{name}.zip"
             with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
                 for path in sorted(source.rglob("*")):
@@ -173,7 +178,10 @@ def main(argv=None) -> int:
     parser.add_argument("--codesearch-zip", type=Path, default=CODESEARCH_ARCHIVE)
     parser.add_argument("--models", type=Path, default=MODEL_ROOT)
     parser.add_argument("--default-resources", type=Path, help="默认资源来源，可指定 LALC 数据目录或分享 ZIP。")
+    parser.add_argument("--beta", type=int, metavar="NUMBER", help="构建指定编号的 Beta 双包。")
     args = parser.parse_args(argv)
+    if args.beta is not None and args.beta < 1:
+        parser.error("--beta 需要正整数编号。")
     if sys.platform != "win32" or platform.machine().lower() not in {"amd64", "x86_64"}:
         parser.error("请在 Windows x64 构建，macOS 不能交叉生成该成品。")
     archive = args.pi_zip.resolve(strict=True)
@@ -209,7 +217,7 @@ def main(argv=None) -> int:
             "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}, "codesearch": {"version": CODESEARCH_VERSION,
             "archive_sha256": CODESEARCH_SHA256, "model_revision": MODEL_REVISION, "model_files": MODEL_FILES}}
     for path in assemble(work / "dist/LALC", archive, ROOT / "dist", info,
-                         codesearch_archive=args.codesearch_zip, models=args.models, default_resources=source):
+                         codesearch_archive=args.codesearch_zip, models=args.models, default_resources=source, beta_number=args.beta):
         print(path)
     return 0
 

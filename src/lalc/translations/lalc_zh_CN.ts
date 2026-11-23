@@ -11,6 +11,10 @@
       <translation>当前安装版本高于最新发布版本（{0}）。</translation>
     </message>
     <message>
+      <source>Download Beta builds manually from GitHub Releases.</source>
+      <translation>Beta 版请从 GitHub Releases 手动下载更新。</translation>
+    </message>
+    <message>
       <source>LALC is free and open-source software for learning and discussion. If you paid for LALC, please request a refund.</source>
       <translation>LALC 是一款免费开源软件，仅供学习交流使用。如果你在任何渠道付费购买了 LALC，请为自身权益申请退款。</translation>
     </message>
@@ -41,6 +45,14 @@
     <message>
       <source>GitHub repository</source>
       <translation>GitHub 仓库</translation>
+    </message>
+    <message>
+      <source>Easter egg</source>
+      <translation>彩蛋</translation>
+    </message>
+    <message>
+      <source>Call out “LALC” and something interesting might happen.</source>
+      <translation>呼唤「LALC」，或许会有有趣的事情发生。</translation>
     </message>
     <message>
       <source>Support the author</source>

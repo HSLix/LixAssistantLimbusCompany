@@ -149,6 +149,31 @@ def test_legacy_avatar_and_external_navigation(windows, monkeypatch):
     assert opened[-1] == "https://discord.gg/bVzCuBU4bC"
 
 
+def test_easter_egg_opens_a_titleless_dialog_with_a_close_button(windows):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QSignalSpy, QTest
+    from qfluentwidgets import MessageBoxBase, StrongBodyLabel
+    from lalc.i18n import tr
+
+    _, _, user, _ = windows
+    nav = user.navigationInterface
+    entry = nav.widget("easter-egg")
+    assert nav.panel.bottomLayout.itemAt(0).widget() is entry
+    assert entry.toolTip() == tr("Easter egg")
+    entry.clicked.emit(True)
+    dialog = user.findChild(MessageBoxBase)
+    assert dialog.isVisible() and not dialog.windowTitle()
+    quote, hint = (dialog.viewLayout.itemAt(index).widget() for index in range(2))
+    assert quote.text().endswith("——改编自《神秘复苏》（Adapted from Mysterious Revival）")
+    assert isinstance(hint, StrongBodyLabel) and hint.alignment() == Qt.AlignmentFlag.AlignCenter
+    assert "LALC" in hint.text()
+    assert dialog.cancelButton.isHidden() and dialog.yesButton.text() == tr("Close")
+    finished = QSignalSpy(dialog.finished)
+    dialog.yesButton.click()
+    QTest.qWait(250)
+    assert finished.count() == 1
+
+
 def test_default_resources_prompt_only_imports_on_confirmation(windows, tmp_path, monkeypatch):
     from contextlib import nullcontext
     from PySide6.QtWidgets import QMessageBox

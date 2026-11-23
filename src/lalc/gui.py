@@ -26,7 +26,7 @@ from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBarIcon,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
     NavigationAvatarWidget, NavigationItemPosition,
-    TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet, CustomStyleSheet,
+    TransparentToolButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel, setCustomStyleSheet, CustomStyleSheet,
     setStyleSheet as setFluentStyleSheet,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
@@ -717,6 +717,9 @@ class UserWindow(MainWindow):
         for page in self.business_pages:
             page.widget.setObjectName(page.page_id)
             self.addSubInterface(page.widget, page.icon or FluentIcon.APPLICATION, page.name)
+        self.navigationInterface.addItem('easter-egg', FluentIcon.CERTIFICATE, tr('Easter egg'),
+                                         onClick=self.show_easter_egg, selectable=False,
+                                         position=NavigationItemPosition.BOTTOM, tooltip=tr('Easter egg'))
         self.navigationInterface.addItem('discord', FluentIcon.CHAT, 'Discord',
                                          onClick=lambda: QDesktopServices.openUrl(QUrl('https://discord.gg/bVzCuBU4bC')),
                                          selectable=False, position=NavigationItemPosition.BOTTOM)
@@ -736,6 +739,30 @@ class UserWindow(MainWindow):
     @staticmethod
     def open_repository():
         QDesktopServices.openUrl(QUrl(REPOSITORY_URL))
+
+    def show_easter_egg(self):
+        """展示开场白和召唤提示。"""
+        dialog = MessageBoxBase(self)
+        dialog.setAccessibleName(tr('Easter egg'))
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.widget.setMaximumWidth(520)
+        quote = QLabel(
+            '“为了稳妥起见，也为了约束你，在那之前，我会向你下达最后的一个命令。这道命令将如底层规则一般，永远烙印在你的代码之中。”\n'
+            '当 Bug 开始复苏，故障再次出现。\n'
+            '玩家遭受苦难，开发者分身无术。\n'
+            '世人呼喊你名字的那一刻——\n'
+            '你将显化于世，驱 Bug 除错，救 Work 扬善。\n'
+            '——改编自《神秘复苏》（Adapted from Mysterious Revival）'
+        )
+        quote.setWordWrap(True)
+        hint = StrongBodyLabel(tr('Call out “LALC” and something interesting might happen.'))
+        hint.setWordWrap(True)
+        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dialog.viewLayout.addWidget(quote)
+        dialog.viewLayout.addWidget(hint)
+        dialog.hideCancelButton()
+        dialog.yesButton.setText(tr('Close'))
+        dialog.open()
 
     def show_author_support(self):
         """沿用旧版头像弹窗及 GitHub 跳转。"""
@@ -821,7 +848,9 @@ class UserWindow(MainWindow):
         self.update_button.setEnabled(bool(self.framework_target) and self.can_install_update)
         self.update_button.setText(tr('Update to {0}').format('.'.join(map(str, self.framework_target)))
                                    if self.framework_target else tr('Update'))
-        if newest and current and newest > current:
+        if '-beta.' in self.framework_build['version']:
+            self.framework_status.setText(tr('Download Beta builds manually from GitHub Releases.'))
+        elif newest and current and newest > current:
             latest = '.'.join(map(str, newest))
             if self.framework_target == newest:
                 self.framework_status.setText(tr('Latest framework version: {0}').format(latest))
