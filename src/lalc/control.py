@@ -140,6 +140,7 @@ class InputSession:
 
         def still_idle():
             return (not self.gate.stopped and not self.gate.paused and not self.monitor.pause_requested
+                    and (immediate_since is not None or self.session_idle_for(self.ACTIVITY_SECONDS))
                     and self.monitor.snapshot()[1] == activity_at_check)
 
         def fallback(foreground):
@@ -156,6 +157,12 @@ class InputSession:
     def log_input_wait(self, message: str, **fields: Any) -> None:
         self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
                   "phase": "execute", "level": "info", "message": message, **fields})
+
+    def session_idle_for(self, duration: float) -> bool:
+        """钩子计时到期后，再确认当前桌面会话没有更近的输入。"""
+        read_idle = getattr(self.backend, "session_idle_seconds", None)
+        idle = read_idle() if read_idle is not None else None
+        return idle is None or idle >= duration
 
     def wait_for_activity(self, hwnd: int, process_id: int, *, after_takeover: bool = False,
                           immediate_since: float | None = None,
@@ -196,7 +203,8 @@ class InputSession:
                     outcome = "foreground"
                     return None, activity
                 idle_since = activity if focus_lost_at is None else max(activity, focus_lost_at)
-                if time.monotonic() - idle_since >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
+                if (time.monotonic() - idle_since >= self.ACTIVITY_SECONDS and not self.backend.any_pressed()
+                        and self.session_idle_for(self.ACTIVITY_SECONDS)):
                     if self.monitor.snapshot()[1] == activity:
                         outcome = "idle"
                         return None, activity
@@ -324,7 +332,8 @@ class InputSession:
             if self.gate.paused:
                 self._interrupt("自动化已暂停。", "pause")
             idle_since = last if since is None else max(last, since)
-            if time.monotonic() - idle_since >= duration and not self.backend.any_pressed():
+            if (time.monotonic() - idle_since >= duration and not self.backend.any_pressed()
+                    and (seconds is None or self.session_idle_for(duration))):
                 # 查询实际按住状态期间也可能有键鼠输入。
                 if self.monitor.snapshot()[:2] == (generation, last):
                     break
