@@ -63,6 +63,29 @@ def test_other_activity_restarts_ten_seconds_and_logs_visible_info(session):
     assert logs[-1]["outcome"] == "idle"
 
 
+def test_each_focus_loss_gets_a_fresh_idle_window_after_confirmation(session):
+    """两次失焦分别等待，后续输入仍能延长各自的等待。"""
+    env = session
+    env.clock.now = 120
+    env.window.foreground = False
+    env.inputs.check()
+    assert env.clock.now == 130
+    assert env.window.focus_calls == 2
+
+    env.clock.now = 131
+    env.window.foreground = False
+
+    def activity():
+        assert env.window.focus_calls == 2
+        if env.clock.now == 139:
+            env.inputs.monitor.record("鼠标", False, takeover=False)
+
+    env.clock.on_sleep = activity
+    env.inputs.check()
+    assert env.clock.now == 149
+    assert env.window.focus_calls == 3
+
+
 @pytest.mark.parametrize("end", ["foreground", "cancel", "replaced"])
 def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(session, monkeypatch, end):
     """复用正式聚焦重试，覆盖拒绝置前、途中输入和取消。"""

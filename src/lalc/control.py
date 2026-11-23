@@ -115,7 +115,7 @@ class InputSession:
 
     def focus_window(self, hwnd: int, *, process_id: int, after_takeover: bool = False,
                      checkpoint: Callable[[], None] | None = None,
-                     immediate_since: float | None = None) -> None:
+                     immediate_since: float | None = None, focus_lost_at: float | None = None) -> None:
         """每次置前尝试都经过同一个可取消的空闲检查。"""
         self.monitor.target_hwnd = hwnd
         activity_at_check = None
@@ -125,6 +125,7 @@ class InputSession:
             nonlocal immediate_since, activity_at_check
             immediate_since, activity_at_check = self.wait_for_activity(
                 hwnd, process_id, after_takeover=after_takeover, immediate_since=immediate_since,
+                focus_lost_at=focus_lost_at,
             )
             if checkpoint is not None:
                 checkpoint()
@@ -157,7 +158,8 @@ class InputSession:
                   "phase": "execute", "level": "info", "message": message, **fields})
 
     def wait_for_activity(self, hwnd: int, process_id: int, *, after_takeover: bool = False,
-                          immediate_since: float | None = None) -> tuple[float | None, float]:
+                          immediate_since: float | None = None,
+                          focus_lost_at: float | None = None) -> tuple[float | None, float]:
         """键鼠活动延后下次聚焦，显式恢复只豁免该次操作前的活动。"""
         started = time.monotonic()
         waiting = False
@@ -193,7 +195,8 @@ class InputSession:
                 if foreground and not after_takeover:
                     outcome = "foreground"
                     return None, activity
-                if time.monotonic() - activity >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
+                idle_since = activity if focus_lost_at is None else max(activity, focus_lost_at)
+                if time.monotonic() - idle_since >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
                     if self.monitor.snapshot()[1] == activity:
                         outcome = "idle"
                         return None, activity
@@ -230,7 +233,8 @@ class InputSession:
             self.window.size = None
             if self.holding:
                 raise UserInterruption("输入途中游戏失焦，释放后重新执行当前 Step。", reason="focus")
-            self.focus_window(hwnd, process_id=self.window.process_id)
+            # 每次失焦单独计时，上一次已经等满的空闲期不能用于新一轮置前。
+            self.focus_window(hwnd, process_id=self.window.process_id, focus_lost_at=time.monotonic())
             self.check_ownership()
             if had_image:
                 self.window.capture()
