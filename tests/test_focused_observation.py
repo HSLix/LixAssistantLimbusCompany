@@ -69,7 +69,9 @@ class FakeWindowPlatform:
     def find_windows(self) -> list[int]:
         return self.windows
 
-    def focus(self, hwnd: int) -> None:
+    def focus(self, hwnd: int, *, checkpoint=None, max_attempts=10) -> None:
+        if checkpoint is not None:
+            checkpoint()
         self.focus_calls += 1
         self.foreground = True
         self.minimized = False
@@ -308,10 +310,10 @@ def test_cancelled_run_does_not_cancel_later_developer_observation(tmp_path, mon
         platform = FakeWindowPlatform()
         focus = platform.focus
 
-        def checked_focus(hwnd):
+        def checked_focus(hwnd, **kwargs):
             if checkpoint is not None:
                 checkpoint()
-            focus(hwnd)
+            focus(hwnd, **kwargs)
 
         def resize(hwnd, width, height):
             if checkpoint is not None:

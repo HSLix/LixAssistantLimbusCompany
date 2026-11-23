@@ -52,10 +52,8 @@ class RestartWindow(FakeWindow):
         info.update(valid=hwnd in self.find_windows(), process_id=self.windows.get(hwnd, 0))
         return info
 
-    def focus(self, hwnd, *, checkpoint=None):
-        if checkpoint:
-            checkpoint()
-        super().focus(hwnd)
+    def focus(self, hwnd, **kwargs):
+        super().focus(hwnd, **kwargs)
 
     def request_close(self, hwnd, pid):
         assert self.windows[hwnd] == pid
@@ -181,7 +179,7 @@ def test_restart_failure_is_terminal_and_logged(environment, problem, monkeypatc
         env.platform.creates_window = False
         env.platform.launch_exit_code = 1
     elif problem == "focus_timeout":
-        def focus(hwnd, *, checkpoint=None):
+        def focus(hwnd, *, checkpoint=None, max_attempts=10):
             while True:
                 checkpoint()
         monkeypatch.setattr(env.platform, "focus", focus)
