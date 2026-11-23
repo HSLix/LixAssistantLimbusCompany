@@ -137,6 +137,10 @@ def test_cancellation_stops_plan_and_skips_later_item(tmp_path: Path, monkeypatc
     assert state["result"]["reason"] == "user_cancelled"
     assert len(state["result"]["items"]) == 1
     assert state["result"]["items"][0]["failure_code"] == "user_cancelled"
+    summary = state["trace"][-1]
+    assert summary["level"] == "debug"
+    assert summary["message"].count("plans.default · 1次") == 2
+    assert summary["message"].count("steps.double · 1次") == 2
     records = service.ledger_records()
     assert len([record for record in records if record["workflow_kind"] == "task"]) == 1
 

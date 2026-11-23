@@ -153,7 +153,8 @@ def test_recovery_failures_propagate_original_traceback(tmp_path: Path, phase: s
     assert "direct cause" in diagnostic
     assert 'raise OSError("native failure")' in diagnostic
     persisted = [json.loads(line) for line in (tmp_path / "traces" / "1.jsonl").read_text(encoding="utf-8").splitlines()]
-    assert persisted[-1]["result"]["items"][0]["traceback"] == diagnostic
+    assert persisted[-2]["event"] == "run_finished"
+    assert persisted[-2]["result"]["items"][0]["traceback"] == diagnostic
 
 
 def _finish(service: ApplicationService, run_id: int) -> dict[str, Any]:
@@ -295,6 +296,7 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
     if success:
         assert state["result"]["output"] == ["task-old", "step-old:7", "sub-old"]
         assert "safe_task_termination" not in events
+        assert state["trace"][-1]["message"].count("one · 2次") == 2
     else:
         assert state["result"]["failure_code"] == ("recovery_rule_ambiguous" if len(rules) > 1 and all("return True" in rule for rule in rules.values()) else "execution_failed")
         assert events.count("safe_task_termination") == 1
@@ -302,15 +304,23 @@ def test_rule_paths_keep_workflow_frame_and_stop_safely(
     assert json.loads((tmp_path / "runs" / "1.json").read_text(encoding="utf-8"))["working_manifest_id"] == manifest_id
 
 
-def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path: Path) -> None:
+def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path: Path, monkeypatch) -> None:
+    from threading import Event
+    import time
+    from lalc.run_logs import read_page, run_manifest_ids, run_summary, snapshot
+
     manager = ManifestManager(tmp_path)
     rules = {"blocking": _rule("return False")}
-    base = _publish(tmp_path, manager, step_source=STEP.replace("{nonce}", tmp_path.name), rules=rules)
+    condition = '\ndef condition(ctx, *, value: int) -> bool:\n    return {}\n'
+    base = _publish(tmp_path, manager, step_source=NEW_STEP + condition.format(False), rules=rules)
     revised_task = TASK.replace('"task-old"', '"task-new"')
     revised_sub = SUB.replace('"sub-old"', '"sub-new"')
-    replacement = _publish(tmp_path, manager, step_source=NEW_STEP, task_source=revised_task, sub_source=revised_sub, rules=rules)
+    replacement = _publish(tmp_path, manager, step_source=NEW_STEP + condition.format(True),
+                           task_source=revised_task, sub_source=revised_sub, rules=rules)
     assert manager.set_default(base).ok
     service = ApplicationService(tmp_path, manifest_manager=manager, recovery_choice=lambda *_: replacement)
+    ticks = iter(range(0, 12_000_000, 1_000_000))
+    monkeypatch.setattr(time, "monotonic_ns", lambda: next(ticks))
 
     state = _finish(service, service.start("tasks.run", {"value": 4}))
 
@@ -327,6 +337,18 @@ def test_whole_manifest_switch_changes_later_calls_but_not_entered_task(tmp_path
     sub = next(event for event in state["trace"] if event["event"] == "component_started" and event["logical_name"] == "flows.next")
     assert sub["manifest_id"] == replacement
     assert [event["manifest_id"] for event in state["trace"] if event["event"] == "working_manifest_selected"] == [replacement]
+    run_id = state["run_id"]
+    boundary = snapshot(tmp_path, run_id)
+    summary = state["trace"][-1]
+    assert (summary["event"], summary["level"]) == ("component_timing_summary", "debug")
+    assert summary["message"].count("steps.break · 2次 · 总耗时 0秒002毫秒 · 平均耗时 0秒001毫秒") == 2
+    detections = [event["phase"] for event in state["trace"] if event["event"] == "recovery_rule_started"]
+    assert detections == ["detect", "detect"]
+    assert summary["message"].count("blocking · 2次") == 2
+    assert summary["message"].count("tasks.run · 1次 · 总耗时 0秒011毫秒") == 2
+    assert read_page(tmp_path, run_id, boundary, levels=("debug",))["rows"][0]["record"] == summary
+    assert run_summary(tmp_path, run_id)["status"] == "success"
+    assert run_manifest_ids(tmp_path, run_id, boundary, cancelled=Event()) == (base, replacement)
 
 
 def test_failed_selected_step_remains_history_then_prior_manifest_can_succeed(tmp_path: Path) -> None:

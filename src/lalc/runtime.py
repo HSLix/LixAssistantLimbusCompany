@@ -198,6 +198,7 @@ class WorkflowExecutor:
         repair: Callable[[dict[str, Any]], str | None] | None = None,
     ) -> None:
         self.task_results: list[dict[str, Any]] = []
+        self.component_timings: dict[str, tuple[int, int]] = {}
         self.task_finished = task_finished
         self.manifest = manifest
         self.gate = gate
@@ -660,10 +661,21 @@ class WorkflowExecutor:
         call_id = self._allocate_call_id()
         fields = {"call_id": call_id, "logical_name": name, "component_id": rule.component_id, "manifest_id": self.manifest.manifest_id, "phase": phase}
         fields.update(role="recovery_rule", parent_call_id=self._frames[-1].call_id if self._frames else None)
-        return self._invoke(
-            lambda: getattr(rule.module, phase)(self.context), fields,
-            phase=phase, event="recovery_rule",
-        )
+        with self._time_dispatch(name):
+            return self._invoke(
+                lambda: getattr(rule.module, phase)(self.context), fields,
+                phase=phase, event="recovery_rule",
+            )
+
+    @contextmanager
+    def _time_dispatch(self, logical_name: str):
+        """按逻辑名累计实际进入的调度次数和单调时钟纳秒，覆盖异常退出。"""
+        started = time.monotonic_ns()
+        try:
+            yield
+        finally:
+            count, total = self.component_timings.get(logical_name, (0, 0))
+            self.component_timings[logical_name] = count + 1, total + time.monotonic_ns() - started
 
     def _terminate_anomaly(self, reason: str, logical_name: str) -> None:
         self.emit("execution_anomaly", {"logical_name": logical_name, "reason": reason})
@@ -834,10 +846,6 @@ class WorkflowExecutor:
             "role": component.role,
             "inputs": _json_copy(inputs),
         }
-        condition = getattr(component.module, "condition", None) if component.role == "step" else None
-        if condition is not None and not skip_condition:
-            self._run_condition(component, condition, identity, inputs)
-
         def invoke() -> Any:
             result = component.module.execute(self.context, **_json_copy(inputs))
             if component.role == "step" and self._check_input is not None:
@@ -853,13 +861,17 @@ class WorkflowExecutor:
                 component.module.execute, globalns=component.module.execute.__globals__
             )["return"])
 
-        if agent_recheck:
-            self.gate.checkpoint()
-            self.emit("agent_recheck_started", {
-                "logical_name": logical_name, "manifest_id": self.manifest.manifest_id,
-                "recovery_id": self._recovery_key, "call_id": call_id,
-            })
-        return self._invoke(invoke, identity, phase="execute", event="component")
+        with self._time_dispatch(logical_name):
+            condition = getattr(component.module, "condition", None) if component.role == "step" else None
+            if condition is not None and not skip_condition:
+                self._run_condition(component, condition, identity, inputs)
+            if agent_recheck:
+                self.gate.checkpoint()
+                self.emit("agent_recheck_started", {
+                    "logical_name": logical_name, "manifest_id": self.manifest.manifest_id,
+                    "recovery_id": self._recovery_key, "call_id": call_id,
+                })
+            return self._invoke(invoke, identity, phase="execute", event="component")
 
     def _run_condition(
         self, component: LoadedComponent, condition: Callable[..., Any],
