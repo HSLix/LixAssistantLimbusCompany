@@ -455,7 +455,7 @@ def test_user_activity_wait_does_not_consume_restart_timeout(environment, monkey
     env.inputs.ACTIVITY_SECONDS = 10
     def start():
         env.platform.foreground = False
-        env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+        env.inputs.monitor.record("鼠标", False, takeover=False)
     env.platform.on_start = start
     restart_game(env.root, env.inputs)
     assert env.platform.launches == 1
@@ -473,7 +473,7 @@ def test_pause_during_focus_activity_wait_resumes_without_relaunch(environment, 
     original_emit = env.inputs.emit
     def emit(event, fields):
         original_emit(event, fields)
-        if event == "component_log" and fields.get("message", "").startswith("等待其他应用"):
+        if event == "component_log" and fields.get("message", "").startswith("等待键鼠连续空闲"):
             env.inputs.monitor.record("键盘", False, takeover=False, pause=True)
         if event == "paused_by_user":
             waiting.set()

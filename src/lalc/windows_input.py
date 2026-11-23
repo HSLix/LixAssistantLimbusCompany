@@ -263,8 +263,7 @@ class WindowsInputBackend:
             hit = self.user32.WindowFromPoint(event.pt)
             inside = (self.user32.GetAncestor(hit, 2) == hwnd
                       and rect.left <= point.x < rect.right and rect.top <= point.y < rect.bottom)
-        self.monitor.record("鼠标", False, takeover=foreground and inside,
-                            other_application=not foreground)
+        self.monitor.record("鼠标", False, takeover=foreground and inside)
 
     def _keyboard_event(self, message: int, event: KBDLLHOOKSTRUCT) -> None:
         """物理按键按前台判定；Ctrl Alt P 不依赖游戏焦点且只暂停。"""
@@ -280,8 +279,7 @@ class WindowsInputBackend:
                   and bool(self._physical_keys & {0x12, 0xA4, 0xA5}))
         foreground = bool(self.monitor.target_hwnd and
                           self.user32.GetForegroundWindow() == self.monitor.target_hwnd)
-        self.monitor.record("键盘", False, takeover=down and foreground and not hotkey,
-                            other_application=not foreground, pause=hotkey)
+        self.monitor.record("键盘", False, takeover=down and foreground and not hotkey, pause=hotkey)
 
     def any_pressed(self) -> bool:
         """避免用户仍按住按键、修饰键或鼠标时恢复自动化。"""
