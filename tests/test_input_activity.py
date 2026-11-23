@@ -323,6 +323,55 @@ def test_first_start_listens_before_immediate_focus_and_manual_resume_skips_idle
     assert order == ["listen", "focus", "focus"]
 
 
+@pytest.mark.parametrize("stop", [False, True])
+def test_plan_startup_waits_on_activity_and_retries_focus_beyond_ten_attempts(tmp_path, monkeypatch, stop):
+    """启动置前失败也可等待与取消，确认前台前不执行 Plan。"""
+    service, window = service_for(tmp_path)
+    clock = Clock()
+    monkeypatch.setattr(control.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(control.time, "sleep", clock.sleep)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 10)
+    window.foreground = False
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = lambda: getattr(window, "checkpoint", lambda: None)()
+    attempts, activity = [], []
+
+    def attempt(hwnd):
+        attempts.append(clock.now)
+        if len(attempts) == 12:
+            window.foreground = True
+        return False
+
+    def tick():
+        if attempts and not activity:
+            activity.append(clock.now)
+            window.backend.monitor.record("鼠标", False, takeover=False)
+        if stop and activity and clock.now >= activity[0] + 2:
+            service.stop()
+
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 42 if window.foreground else 99, IsWindow=lambda hwnd: True,
+        IsIconic=lambda hwnd: False, SetForegroundWindow=attempt,
+    )
+    clock.on_sleep = tick
+    monkeypatch.setattr(window, "focus", platform.focus)
+    monkeypatch.setattr(window, "try_attached_focus",
+                        lambda hwnd, pid, foreground, still_idle: attempt(hwnd), raising=False)
+    service.start_plan(use_saved_config=False)
+    state = finished(service)
+    if stop:
+        assert state["result"]["failure_code"] == "user_cancelled"
+        assert len(attempts) == 1
+        assert not any(row["event"] == "component_started" for row in state["trace"])
+    else:
+        assert state["result"]["status"] == "completed"
+        assert len(attempts) == 12 and attempts[1] >= activity[0] + 10
+        connected = next(row for row in state["trace"] if row["event"] == "target_window_connected")
+        started = next(row for row in state["trace"] if row["event"] == "component_started")
+        assert connected["sequence"] < started["sequence"]
+    assert window.backend.closed
+
+
 def test_wait_log_is_readable_in_default_info_view(session, tmp_path):
     import json
     env = session
@@ -403,7 +452,7 @@ def test_global_hotkey_works_while_first_focus_is_pending(tmp_path, monkeypatch)
         if not waiting.is_set():
             window.backend.monitor.record("键盘", False, takeover=False, pause=True)
             waiting.set()
-            window.checkpoint()
+            kwargs["checkpoint"]()
         focus(hwnd, **kwargs)
     monkeypatch.setattr(window, "focus", first_focus)
     service.start("tasks.control", {})

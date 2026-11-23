@@ -24,6 +24,7 @@ from .manifest import LoadedManifest, ManifestManager, ValidationError
 from .page_resources import PageJsonResources
 from .runtime import (
     InputValidationError,
+    GameProcessExited,
     RunGate,
     UserInterruption,
     TraceWriteError,
@@ -518,40 +519,55 @@ class ApplicationService:
             self._input_session.execute(operation, arguments)
 
     def _start_session(self) -> None:
-        """先监听再首次立即聚焦；明确开始运行豁免十秒活动等待。"""
+        """首次聚焦前安装监听，启动后新增的键鼠活动进入统一等待。"""
 
         assert self._gate is not None
         self._gate.checkpoint()
         self._focused_session = FocusedAutomationSession(self._window_platform(), self._emit)
         platform = self._focused_session.platform
         backend = platform.create_input_backend()
-        self._focused_session.before_focus = lambda hwnd: setattr(backend.monitor, "target_hwnd", hwnd)
-        previous_checkpoint = getattr(platform, "checkpoint", None)
+        backend_pending = True
 
-        startup_generation = 0
+        def activate(hwnd):
+            nonlocal backend_pending
+            info = platform.window_info(hwnd)
+            if not info["valid"]:
+                raise WindowError("Target Window is unavailable before startup.")
+            process_id = info["process_id"]
+            backend_pending = False
+            inputs = self._input_session = InputSession(self._focused_session, backend, self._gate, self._emit,
+                                                        process_id=process_id)
 
-        def startup_checkpoint():
-            nonlocal startup_generation
-            # 首次聚焦尚无 InputSession，仍在运行线程处理全局暂停。
-            backend.monitor.snapshot()
-            if backend.monitor.pause_requested:
-                with backend.monitor.lock:
-                    backend.monitor.pause_requested = False
-                self.pause()
-                self._gate.checkpoint()
-                startup_generation = backend.monitor.snapshot()[0]
-            self._gate.checkpoint()
+            def startup_checkpoint():
+                while True:
+                    with inputs.monitor.lock:
+                        hotkey = inputs.monitor.pause_requested
+                        inputs.monitor.pause_requested = False
+                    if hotkey:
+                        self.pause()
+                    self._gate.checkpoint()
+                    if not inputs.monitor.pause_requested:
+                        # Plan 尚未操作游戏，可吸收接管代次并继续等待物理空闲。
+                        inputs.owned_generation = inputs.monitor.snapshot()[0]
+                        return
 
-        platform.checkpoint = startup_checkpoint
+            inputs.focus_checkpoint = startup_checkpoint
+            try:
+                inputs.focus_window(hwnd, process_id=process_id, after_takeover=True,
+                                    immediate_since=inputs.monitor.started_at)
+            except GameProcessExited as error:
+                raise WindowError("Target Window process exited during startup.") from error
+            finally:
+                inputs.focus_checkpoint = None
+
         try:
-            self._focused_session.connect()
-            self._input_session = InputSession(self._focused_session, backend, self._gate, self._emit)
-            self._input_session.owned_generation = startup_generation
-        except BaseException:
-            backend.close()
-            raise
+            info = self._focused_session.connect(focus=activate)
         finally:
-            platform.checkpoint = previous_checkpoint
+            if backend_pending:
+                backend.close()
+        assert self._input_session is not None
+        if info["process_id"] != self._input_session.process.pid:
+            raise WindowError("Target Window process changed during startup.")
 
     def _ensure_input_session(self) -> None:
         """每个 Run 开始时建立输入监测，生命周期由 worker 统一清理。"""
