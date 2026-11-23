@@ -3,6 +3,74 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Update to {0}</source>
+      <translation>更新至 {0}</translation>
+    </message>
+    <message>
+      <source>No release announcement available.</source>
+      <translation>暂无发布公告。</translation>
+    </message>
+    <message>
+      <source>LALC is free and open source under AGPL-3.0. Use it responsibly and follow the game’s rules. LALC is unaffiliated with Project Moon.</source>
+      <translation>LALC 是采用 AGPL-3.0 许可证的免费开源软件。请合理使用并遵守游戏规则。LALC 与 Project Moon 无关联。</translation>
+    </message>
+    <message>
+      <source>Installed framework version: {0}</source>
+      <translation>已安装的框架版本：{0}</translation>
+    </message>
+    <message>
+      <source>Check for updates</source>
+      <translation>检查更新</translation>
+    </message>
+    <message>
+      <source>MirrorChyan CDK</source>
+      <translation>Mirror酱 CDK</translation>
+    </message>
+    <message>
+      <source>Save MirrorChyan CDK</source>
+      <translation>保存 Mirror酱 CDK</translation>
+    </message>
+    <message>
+      <source>CDK saved. Save an empty field to remove it.</source>
+      <translation>已保存 CDK。留空并保存即可清除。</translation>
+    </message>
+    <message>
+      <source>Optional, for faster downloads</source>
+      <translation>可选，用于加速下载</translation>
+    </message>
+    <message>
+      <source>Checking for updates…</source>
+      <translation>正在检查更新…</translation>
+    </message>
+    <message>
+      <source>Latest framework version: {0}</source>
+      <translation>最新框架版本：{0}</translation>
+    </message>
+    <message>
+      <source>The framework is up to date.</source>
+      <translation>框架已是最新版本。</translation>
+    </message>
+    <message>
+      <source>Could not check for a framework update.</source>
+      <translation>暂时无法检查框架更新。</translation>
+    </message>
+    <message>
+      <source>Downloading and verifying the update…</source>
+      <translation>正在下载并校验更新…</translation>
+    </message>
+    <message>
+      <source>Restart and install update</source>
+      <translation>重启并安装更新</translation>
+    </message>
+    <message>
+      <source>The update has been verified and is ready to install.</source>
+      <translation>更新已校验，可以重启安装。</translation>
+    </message>
+    <message>
+      <source>Could not download or verify the update. Try checking for updates again.</source>
+      <translation>无法下载或校验更新。请重新检查更新后再试。</translation>
+    </message>
+    <message>
       <source>Please select objects to share.</source>
       <translation>请选择分享对象。</translation>
     </message>
@@ -132,11 +200,6 @@ You can copy the original error information and report it to the developer.</sou
       <location filename="../gui.py" line="469" />
       <source>Announcements</source>
       <translation>公告</translation>
-    </message>
-    <message>
-      <location filename="../gui.py" line="469" />
-      <source>Announcements are not connected yet</source>
-      <translation>公告尚未接入</translation>
     </message>
     <message>
       <location filename="../gui.py" line="525" />
@@ -1020,11 +1083,6 @@ Log: {1}</source>
       <translation>所选版本用于后续开发试运行。</translation>
     </message>
     <message>
-      <location filename="../gui.py" line="469" />
-      <source>The software disclaimer is not connected yet</source>
-      <translation>软件声明尚未接入</translation>
-    </message>
-    <message>
       <location filename="../repair_chat.py" line="76" />
       <source>Tool: {0} · {1}</source>
       <translation>工具：{0} · {1}</translation>
@@ -1075,11 +1133,6 @@ Log: {1}</source>
       <location filename="../gui.py" line="478" />
       <source>Version &amp; Update</source>
       <translation>版本与更新</translation>
-    </message>
-    <message>
-      <location filename="../gui.py" line="470" />
-      <source>Version information and updates are not connected yet</source>
-      <translation>版本信息与更新尚未接入</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="780" />

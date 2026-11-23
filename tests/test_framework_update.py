@@ -1,0 +1,172 @@
+"""覆盖发版记录、双渠道版本查询、校验和更新交接准备。
+
+项目根目录运行：uv run --frozen pytest -q tests/test_framework_update.py
+"""
+
+import hashlib
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import zipfile
+
+import pytest
+
+from lalc import framework_update as update
+
+
+def test_old_release_is_an_announcement_but_not_a_package(monkeypatch):
+    monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v5.0.0", "body": "legacy news"})
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None)
+
+
+def test_release_channels_are_independent_and_use_exact_package(monkeypatch):
+    def api(url):
+        if "mirrorchyan" in url:
+            assert "cdk=" not in url
+            return {"code": 0, "data": {"version_name": "v6.0.1"}}
+        return {"tag_name": "v6.0.2", "body": "news", "assets": [
+            {"name": "lalc.zip", "digest": "sha256:" + "1" * 64},
+            {"name": "LALC-6.0.2-windows-x64-without-agent.zip", "digest": "sha256:" + "2" * 64},
+        ]}
+
+    monkeypatch.setattr(update, "_json", api)
+    mirror = {"rid": "new-rid"}
+    result = update.check_releases("without-agent", mirror)
+    assert result.announcement == "news" and result.mirror == (6, 0, 1)
+    assert result.github.sha256 == "2" * 64 and result.github.version == (6, 0, 2)
+    assert update.check_releases("with-agent", mirror).github is None
+
+
+@pytest.mark.parametrize("name", ["LALC/../outside", "LALC/AUX.txt", "LALC/test:stream", "LALC/dir\\file", "other/file"])
+def test_reject_update_archive_paths(name, tmp_path):
+    archive = tmp_path / "bad.zip"
+    extract_to = tmp_path / "extracted"
+    extract_to.mkdir()
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr("LALC/valid.txt", "valid")
+        member = zipfile.ZipInfo("placeholder")
+        member.filename = name
+        bundle.writestr(member, "bad")
+    with pytest.raises(ValueError, match="Unsafe update archive"):
+        update._extract(archive, extract_to)
+    assert not list(extract_to.iterdir())
+
+
+def test_bad_mirror_package_falls_back_to_verified_github(tmp_path, monkeypatch):
+    published = io.BytesIO()
+    with zipfile.ZipFile(published, "w") as archive:
+        for name in (*update.REQUIRED_FILES, "agent/codesearch.exe"):
+            archive.writestr(f"LALC/{name}", json.dumps({"version": "6.0.1"}) if name == "build-info.json" else b"fixture")
+    payload = published.getvalue()
+    executable = tmp_path / "LALC.exe"
+    (tmp_path / "install-update.ps1").write_text("trusted installed script", encoding="utf-8")
+    monkeypatch.setattr(update.sys, "executable", str(executable))
+    monkeypatch.setattr(update, "_read_cdk", lambda _: "fake-secret")
+    mirror_url = "https://mirror.example/package"
+    monkeypatch.setattr(update, "_mirror", lambda *args: {
+        "version_name": "v6.0.1", "url": mirror_url, "update_type": "full", "sha256": "0" * 64})
+    attempts = []
+
+    class Response(io.BytesIO):
+        def geturl(self):
+            return attempts[-1]
+
+    def download(request, **kwargs):
+        attempts.append(request.full_url)
+        return Response(payload)
+
+    monkeypatch.setattr(update, "urlopen", download)
+    version = (6, 0, 1)
+    github = update.Package(version, "https://github.example/package", hashlib.sha256(payload).hexdigest())
+    status = update.ReleaseStatus("news", github, version)
+    root = tmp_path / "data"
+    workspace = update.prepare_update(root, status, version, "with-agent", {"rid": "LALC6"})
+    assert attempts == [mirror_url, github.url]
+    assert (workspace / "LALC/LALC.exe").is_file()
+    assert (workspace / "install-update.ps1").read_text() == "trusted installed script"
+    assert list((root / "work").iterdir()) == [workspace]
+    attempts.clear()
+    assert update.prepare_update(root, status, version, "with-agent", {"rid": "LALC6"}, lambda: bool(attempts)) is None
+    assert attempts == [mirror_url] and list((root / "work").iterdir()) == [workspace]
+
+
+def test_release_notes_count_direct_commits_and_coauthors(tmp_path):
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(tmp_path), *args], encoding="utf-8").strip()
+
+    git("init", "-q")
+    git("config", "user.name", "First Author")
+    git("config", "user.email", "first@example.com")
+    git("commit", "--allow-empty", "-qm", "previous release")
+    git("tag", "v6.0.0")
+    git("commit", "--allow-empty", "-qm", "direct fix", "-m", "Co-authored-by: Second Author <second@example.com>")
+    script = Path(__file__).parents[1] / "scripts/release_notes.py"
+    notes = subprocess.check_output([sys.executable, str(script), "v6.0.0", "HEAD"], cwd=tmp_path, encoding="utf-8")
+    assert "First Author (1)" in notes and "Second Author (1)" in notes
+    assert notes.count("direct fix") == 2 and "previous release" not in notes
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows directory and process behavior")
+@pytest.mark.parametrize("legacy, ready", [(True, True), (False, False)])
+def test_windows_installer_in_place_and_rollback(legacy, ready, tmp_path):
+    import ctypes
+
+    if not ctypes.windll.shell32.IsUserAnAdmin():
+        pytest.skip("Installer test needs an elevated Windows test runner")
+    powershell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass"]
+    target = tmp_path / "old installation"
+    payload = tmp_path / "staged package"
+    target.mkdir()
+    payload.mkdir()
+    old_exe = target / ("LixAssistantLimbusCompany.exe" if legacy else "LALC.exe")
+    old_exe.write_bytes(b"previous program")
+    if not legacy:
+        (target / "build-info.json").write_text("{}")
+    exe = payload / "LALC.exe"
+    for name in ("LALC-console.exe", "install-update.ps1"):
+        (payload / name).touch()
+    (payload / "build-info.json").write_text(json.dumps({"version": "6.0.1"}), encoding="utf-8")
+    (payload / "_internal").mkdir()
+    if ready:
+        helper = r'''
+$code = @'
+using System;
+using System.Threading;
+public class Program {
+    public static int Main(string[] args) {
+        foreach (var arg in args) {
+            if (arg.StartsWith("--update-ready=")) {
+                using (var ready = EventWaitHandle.OpenExisting(@"Local\LALC-update-" + arg.Substring(15))) {
+                    ready.Set();
+                    return 0;
+                }
+            }
+        }
+        return 1;
+    }
+}
+'@
+Add-Type -TypeDefinition $code -OutputAssembly $env:LALC_TEST_UPDATE_EXE -OutputType ConsoleApplication
+'''
+        compiler = tmp_path / "compile.ps1"
+        compiler.write_text(helper, encoding="utf-8")
+        subprocess.run([*powershell, "-File", str(compiler)], check=True,
+                       env={**os.environ, "LALC_TEST_UPDATE_EXE": str(exe)}, timeout=30)
+        assert exe.is_file()
+    else:
+        exe.write_bytes(b"invalid executable")
+    script = Path(__file__).parents[1] / "packaging/install-update.ps1"
+    result = subprocess.run([*powershell, "-File", str(script), "-Source", str(payload), "-Target", str(target),
+                             *(["-Legacy"] if legacy else [])], cwd=tmp_path, stdin=subprocess.DEVNULL,
+                            capture_output=True, text=True, timeout=65)
+    assert result.returncode == (0 if ready else 1), (result.stdout, result.stderr)
+    backups = list(tmp_path.glob(target.name + ".backup-*"))
+    if ready:
+        assert (target / "LALC.exe").read_bytes() == exe.read_bytes()
+        assert old_exe.read_bytes() == exe.read_bytes()
+        assert len(backups) == 1 and (backups[0] / old_exe.name).read_bytes() == b"previous program"
+    else:
+        assert old_exe.read_bytes() == b"previous program" and not backups

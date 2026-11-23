@@ -1,4 +1,4 @@
-"""在 Windows x64 本地构建同源双包；校验 OCR 资源，不收集用户数据或调用模型。"""
+"""构建同源 Windows 双包和旧版迁移包，校验打包资源。"""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def check_pi(archive: Path) -> None:
     with zipfile.ZipFile(archive) as bundle:
         for item in bundle.infolist():
             path = PurePosixPath(item.filename)
-            if (path.is_absolute() or ".." in path.parts or "\\" in item.filename or
+            if (item.orig_filename != item.filename or path.is_absolute() or ".." in path.parts or "\\" in item.filename or
                     ":" in item.filename or item.external_attr >> 16 & 0o170000 == 0o120000):
                 raise ValueError(f"Unsafe pi archive path: {item.filename}")
         metadata = json.loads(bundle.read("package.json"))
@@ -110,6 +110,7 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
         base = stage / "without-agent" / "LALC"
         shutil.copytree(application, base)
         (base / "Developer.cmd").write_bytes(b'@echo off\r\nstart "" "%~dp0LALC.exe" --developer\r\n')
+        shutil.copyfile(ROOT / "packaging/install-update.ps1", base / "install-update.ps1")
         (base / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         with_pi = stage / "with-agent" / "LALC"
         shutil.copytree(base, with_pi)
@@ -135,18 +136,20 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
             raise ValueError("Two packages have different application files")
         names = [f"LALC-{info['version']}-windows-x64-without-agent", f"LALC-{info['version']}-windows-x64-with-agent"]
         outputs = []
-        for name, source in zip(names, (base, with_pi)):
+        for name, source, prefix in zip([*names, "lalc"], (base, with_pi, with_pi), ("LALC", "LALC", "lalc")):
             output = stage / f"{name}.zip"
             with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
                 for path in sorted(source.rglob("*")):
                     if path.is_file():
-                        bundle.write(path, "LALC/" + path.relative_to(source).as_posix())
+                        bundle.write(path, prefix + "/" + path.relative_to(source).as_posix())
+                if prefix == "lalc":
+                    bundle.write(ROOT / "packaging/update_to.bat", "lalc/update_to.bat")
             outputs.append(output)
         checksums = "".join(f"{digest(path)}  {path.name}\n" for path in outputs)
         for path in outputs:
             path.replace(destination / path.name)
         (destination / "SHA256SUMS").write_text(checksums, encoding="utf-8")
-    return [destination / f"{name}.zip" for name in names]
+    return [destination / path.name for path in outputs]
 
 
 def main(argv=None) -> int:
@@ -161,8 +164,6 @@ def main(argv=None) -> int:
     check_pi(archive)
     check_codesearch(args.codesearch_zip, args.models)
     version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
-    if f"StringStruct('ProductVersion', '{version}.0')" not in (ROOT / "LALC.version").read_text(encoding="utf-8"):
-        raise ValueError("LALC.version and pyproject.toml versions differ")
     work = ROOT / ".generated/windows-build"
     env = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(work / "venv")}
     subprocess.run(["uv", "sync", "--locked", "--no-editable", "--no-default-groups", "--group", "build", "--all-extras"],
@@ -174,6 +175,8 @@ def main(argv=None) -> int:
          "import sys,json,importlib.metadata as m; print(json.dumps({'python':sys.version,'packages':"
          "{d.metadata['Name']:d.version for d in m.distributions()}}))"], cwd=ROOT, env=env, text=True, encoding="utf-8"))
     info = {"version": version, "source": source_snapshot(), "uv_lock_sha256": digest(ROOT / "uv.lock"),
+            "mirror": {"rid": os.environ.get("LALC_MIRROR_RID", ""), "os": os.environ.get("LALC_MIRROR_OS", ""),
+                       "arch": os.environ.get("LALC_MIRROR_ARCH", "")},
             "environment": installed,
             "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}, "codesearch": {"version": CODESEARCH_VERSION,
             "archive_sha256": CODESEARCH_SHA256, "model_revision": MODEL_REVISION, "model_files": MODEL_FILES}}

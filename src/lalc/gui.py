@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import asyncio
 import threading
@@ -414,6 +415,8 @@ class MainWindow(FluentWindow):
 class UserWindow(MainWindow):
     """用户只选择 Default 并运行其唯一 Plan；普通配置不占用游戏。"""
 
+    releases_checked = Signal(object)
+
     def __init__(self, service, lifecycle=None, *, host, coordinator):
         # 共用窗口清理/后台操作和脱敏错误处理，用户页面独立构建。
         FluentWindow.__init__(self)
@@ -528,19 +531,36 @@ class UserWindow(MainWindow):
         self.notifications = NotificationList(self)
         information = QVBoxLayout()
         information.setSpacing(12)
-        for title, message in ((tr('Announcements'), tr('Announcements are not connected yet')), (tr('Disclaimer'), tr('The software disclaimer is not connected yet')),
-                               (tr('Version & Update'), tr('Version information and updates are not connected yet'))):
+        from .framework_update import installed_build, installed_variant, REQUIRED_FILES
+        self.framework_build = installed_build()
+        self.framework_variant = installed_variant(Path(sys.executable).parent)
+        self.can_install_update = (sys.platform == 'win32' and getattr(sys, 'frozen', False)
+                                   and all((Path(sys.executable).parent / name).is_file() for name in REQUIRED_FILES))
+        self.release_status = None
+        self.update_workspace = None
+        self.releases_checked.connect(self.show_framework_releases)
+        self.announcement = QPlainTextEdit()
+        self.announcement.setReadOnly(True)
+        self.announcement.setPlaceholderText(tr('No release announcement available.'))
+        self.announcement.setMaximumHeight(240)
+        disclaimer = QLabel(tr('LALC is free and open source under AGPL-3.0. Use it responsibly and follow the game’s rules. LALC is unaffiliated with Project Moon.'))
+        disclaimer.setWordWrap(True)
+        self.framework_version = QLabel(tr('Installed framework version: {0}').format(self.framework_build['version'] or '—'))
+        self.framework_status = QLabel()
+        self.framework_status.setWordWrap(True)
+        self.check_update_button = QPushButton(tr('Check for updates'))
+        self.check_update_button.clicked.connect(self.check_framework_releases)
+        self.update_button = QPushButton(tr('Update'))
+        self.update_button.setEnabled(False)
+        self.update_button.clicked.connect(lambda: self._interact(self.update_framework))
+        for title, widgets in ((tr('Announcements'), (self.announcement,)), (tr('Disclaimer'), (disclaimer,)),
+                               (tr('Version & Update'), (self.framework_version, self.framework_status, self.check_update_button, self.update_button))):
             card = CardWidget()
             content = QVBoxLayout(card)
             content.setContentsMargins(20, 20, 20, 20)
             content.addWidget(SubtitleLabel(title))
-            label = QLabel(message)
-            label.setWordWrap(True)
-            content.addWidget(label)
-            if title == tr('Version & Update'):
-                self.update_button = QPushButton(tr('Update'))
-                self.update_button.setEnabled(False)
-                content.addWidget(self.update_button)
+            for widget in widgets:
+                content.addWidget(widget)
             information.addWidget(card)
         information.addStretch()
         dash.addLayout(information, 1)
@@ -603,6 +623,19 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
+        if sys.platform == 'win32':
+            from .framework_update import CDK_SECRET, secret_path
+            application_layout.addWidget(QLabel(tr('MirrorChyan CDK')))
+            self.mirror_cdk = QLineEdit()
+            self.mirror_cdk.setEchoMode(QLineEdit.EchoMode.Password)
+            self.mirror_cdk_saved = secret_path(service.data_root, CDK_SECRET).is_file()
+            self.show_mirror_cdk_state()
+            application_layout.addWidget(self.mirror_cdk)
+            save_cdk = QPushButton(tr('Save MirrorChyan CDK'))
+            save_cdk.clicked.connect(lambda: self._interact(self.save_mirror_cdk))
+            application_layout.addWidget(save_cdk)
+        else:
+            self.mirror_cdk_saved = False
         from .game_version import load_steam_root
         application_layout.addWidget(QLabel(tr('Steam client directory')))
         self.steam_directory = QLineEdit()
@@ -664,6 +697,105 @@ class UserWindow(MainWindow):
         self.manifest_timer.timeout.connect(self.refresh_manifest_card)
         self.manifest_timer.start()
         self.render_state(service.status)
+        if self.can_install_update:
+            QTimer.singleShot(0, self, self.check_framework_releases)
+
+    def show_mirror_cdk_state(self):
+        self.mirror_cdk.setPlaceholderText(tr('CDK saved. Save an empty field to remove it.') if self.mirror_cdk_saved
+                                           else tr('Optional, for faster downloads'))
+
+    def save_mirror_cdk(self):
+        """CDK 单独保存为当前 Windows 用户的加密凭证。"""
+        from .framework_update import set_mirror_cdk
+        value = self.mirror_cdk.text().strip()
+        set_mirror_cdk(self.service.data_root, value)
+        self.mirror_cdk_saved = bool(value)
+        self.mirror_cdk.clear()
+        self.show_mirror_cdk_state()
+        if self.release_status is not None and self.update_workspace is None and self.check_update_button.isEnabled():
+            self.show_framework_releases(self.release_status)
+
+    def check_framework_releases(self):
+        """版本查询与首页操作独立，窗口关闭后丢弃结果。"""
+        from .framework_update import check_releases
+        self.check_update_button.setEnabled(False)
+        self.update_button.setEnabled(False)
+        self.framework_status.setText(tr('Checking for updates…'))
+        variant, mirror = self.framework_variant, self.framework_build.get('mirror', {})
+
+        def query():
+            result = check_releases(variant, mirror)
+            try:
+                self.releases_checked.emit(result)
+            except RuntimeError:
+                pass  # 用户可能已关闭窗口。
+
+        threading.Thread(target=query, daemon=True).start()
+
+    def show_framework_releases(self, result):
+        from .framework_update import version_number
+        self.release_status = result
+        if result.announcement is not None:
+            self.announcement.setPlainText(result.announcement)
+        self.check_update_button.setEnabled(True)
+        github = result.github.version if result.github else None
+        mirror = result.mirror if self.framework_variant == 'with-agent' else None
+        newest = max(filter(None, (github, mirror)), default=None)
+        current = version_number(self.framework_build['version'])
+        installable = github or (mirror if self.mirror_cdk_saved else None)
+        self.framework_target = installable if installable and current and installable > current else None
+        self.update_button.setEnabled(bool(self.framework_target) and self.can_install_update)
+        self.update_button.setText(tr('Update to {0}').format('.'.join(map(str, self.framework_target)))
+                                   if self.framework_target else tr('Update'))
+        if newest and current and newest > current:
+            self.framework_status.setText(tr('Latest framework version: {0}').format('.'.join(map(str, newest))))
+        elif newest and current:
+            self.framework_status.setText(tr('The framework is up to date.'))
+        else:
+            self.framework_status.setText(tr('Could not check for a framework update.'))
+
+    def update_framework(self):
+        """点击更新后才下载，文件就绪后单独确认重启。"""
+        from .framework_update import hand_off_update, prepare_update
+        if self.update_workspace is not None:
+            workspace = self.update_workspace
+            self.coordinator.request_reload(lambda windows: hand_off_update(workspace, windows))
+            self.update_workspace = None
+            return
+        if not self.can_install_update or not self.framework_target or self.jobs:
+            return
+        self.update_button.setEnabled(False)
+        self.check_update_button.setEnabled(False)
+        self.framework_status.setText(tr('Downloading and verifying the update…'))
+
+        def prepare():
+            try:
+                workspace = prepare_update(self.service.data_root, self.release_status, self.framework_target,
+                                           self.framework_variant, self.framework_build.get('mirror', {}), lambda: self.closing)
+            except OSError:
+                return None
+            if self.closing and workspace:
+                shutil.rmtree(workspace, ignore_errors=True)
+                return None
+            return workspace
+
+        def ready(workspace):
+            self.update_workspace = workspace
+            if workspace:
+                self.update_button.setText(tr('Restart and install update'))
+                self.framework_status.setText(tr('The update has been verified and is ready to install.'))
+            else:
+                self.check_update_button.setEnabled(True)
+                self.framework_status.setText(tr('Could not download or verify the update. Try checking for updates again.'))
+            self.update_button.setEnabled(bool(workspace))
+
+        self.launch(prepare, ready)
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        if event.isAccepted() and self.update_workspace is not None:
+            shutil.rmtree(self.update_workspace, ignore_errors=True)
+            self.update_workspace = None
 
     def show_agent_settings(self):
         """从首页进入设置并定位到 Agent 卡片。"""
@@ -1108,7 +1240,7 @@ class GuiCoordinator:
         self.user._agent_ready = not document["user_enabled"] or complete
         self.user.render_state(self.service.status)
 
-    def request_reload(self):
+    def request_reload(self, restart=None):
         """先保存并封闭所有入口，最终清理成功后才允许启动新进程。"""
         def check_idle():
             state = self.service.status
@@ -1134,7 +1266,7 @@ class GuiCoordinator:
         for window in (self.user, self.developer):
             if window is not None:
                 window.setEnabled(False)
-        self.lifecycle.restart = lambda: self.restart_process(windows)
+        self.lifecycle.restart = lambda: (restart or self.restart_process)(windows)
         QApplication.instance().exit(0)
 
     @staticmethod
@@ -1177,12 +1309,12 @@ class GuiCoordinator:
         self.service.shutdown()
 
 
-def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, restore=()) -> int:
+def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, restore=(), ready=None) -> int:
     """归并重复 GUI 入口，在唯一事件循环内持有双窗口。"""
     from .sharing import cleanup_staging
     cleanup_staging()
     if lifecycle is None:
-        return run_application(lambda owner: run_gui(owner, developer=developer, restore=restore))
+        return run_application(lambda owner: run_gui(owner, developer=developer, restore=restore, ready=ready))
     from .gui_instance import GuiInstance
     app = QApplication.instance() or QApplication(sys.argv)
     instance = GuiInstance()
@@ -1222,6 +1354,8 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
     try:
         for name in restore or (("developer" if developer else "user"),):
             coordinator.open_window(name == "developer")
+        if ready is not None:
+            QTimer.singleShot(0, ready)
         return app.exec()
     finally:
         interrupt_timer.stop()

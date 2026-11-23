@@ -376,7 +376,8 @@ class ExportDialog(QDialog):
             selection = self.selection()
             if not any(selection.values()):
                 raise ValueError(tr("Please select objects to share."))
-            filename, _ = QFileDialog.getSaveFileName(self, tr("Save shared package"), "lalc-sharing.zip", "ZIP (*.zip)")
+            stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
+            filename, _ = QFileDialog.getSaveFileName(self, tr("Save shared package"), f"lalc-sharing-{stamp}.zip", "ZIP (*.zip)")
             if filename:
                 def save():
                     objects = build_export(self.manager, selection)

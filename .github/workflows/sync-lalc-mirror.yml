@@ -1,0 +1,72 @@
+name: Sync LALC to MirrorChyan
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Already published LALC tag (vX.Y.Z)
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      MIRRORCHYANUPLOADTOKEN:
+        required: false
+      LALC_LEGACY_MIRROR_UPLOAD_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lalc-mirror-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: ${{ github.ref == 'refs/heads/master' }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Verify the published tag
+        id: release
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          [[ $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          gh release view "$TAG" --json isDraft,isPrerelease,assets --jq \
+            '.isDraft == false and .isPrerelease == false and ([.assets[].name] | index("SHA256SUMS") != null)' | grep -qx true
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "with-agent=LALC-${TAG#v}-windows-x64-with-agent.zip" >> "$GITHUB_OUTPUT"
+      - uses: MirrorChyan/uploading-action@v1
+        if: ${{ vars.LALC_MIRROR_RID != '' }}
+        with:
+          filetype: latest-release
+          filename: ${{ steps.release.outputs.with-agent }}
+          tag: ${{ steps.release.outputs.tag }}
+          mirrorchyan_rid: ${{ vars.LALC_MIRROR_RID }}
+          os: ${{ vars.LALC_MIRROR_OS }}
+          arch: ${{ vars.LALC_MIRROR_ARCH }}
+          github_token: ${{ github.token }}
+          upload_token: ${{ secrets.MIRRORCHYANUPLOADTOKEN }}
+      - uses: MirrorChyan/release-note-action@v1
+        if: ${{ vars.LALC_MIRROR_RID != '' }}
+        with:
+          version_name: ${{ steps.release.outputs.tag }}
+          mirrorchyan_rid: ${{ vars.LALC_MIRROR_RID }}
+          github_token: ${{ github.token }}
+          upload_token: ${{ secrets.MIRRORCHYANUPLOADTOKEN }}
+      - uses: MirrorChyan/uploading-action@v1
+        if: ${{ vars.LALC_LEGACY_MIRROR_RID != '' }}
+        with:
+          filetype: latest-release
+          filename: lalc.zip
+          tag: ${{ steps.release.outputs.tag }}
+          mirrorchyan_rid: ${{ vars.LALC_LEGACY_MIRROR_RID }}
+          github_token: ${{ github.token }}
+          upload_token: ${{ secrets.LALC_LEGACY_MIRROR_UPLOAD_TOKEN || secrets.MIRRORCHYANUPLOADTOKEN }}

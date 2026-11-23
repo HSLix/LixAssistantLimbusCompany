@@ -1,4 +1,4 @@
-"""覆盖双 ZIP 内容、归档边界及成品草稿路径；不构建 Windows 或调用 pi。
+"""覆盖同源双包、旧版迁移包、归档边界及成品草稿路径。
 
 项目根目录运行：QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_windows_packaging.py
 """
@@ -75,6 +75,12 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
         assert outputs[0].name.endswith("without-agent.zip") and outputs[1].name.endswith("with-agent.zip")
         assert not any("user-settings" in name or "candidate" in name for name in bundled.namelist())
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
+        with zipfile.ZipFile(outputs[2]) as legacy:
+            assert outputs[2].name == "lalc.zip"
+            assert b"-Legacy" in legacy.read("lalc/update_to.bat")
+            assert "LALC/update_to.bat" not in bundled.namelist()
+            assert {name.removeprefix("lalc/"): legacy.read(name) for name in legacy.namelist() if name != "lalc/update_to.bat"} == {
+                name.removeprefix("LALC/"): bundled.read(name) for name in bundled.namelist()}
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
     assert all(build.digest(path) in sums for path in outputs)
     before = {path: build.digest(path) for path in outputs}
@@ -117,7 +123,9 @@ def test_tampered_pi_and_missing_frozen_resource_are_rejected(tmp_path, archive)
 def test_pi_archive_paths_are_checked_before_extraction(tmp_path, monkeypatch, name):
     path = tmp_path / "bad.zip"
     with zipfile.ZipFile(path, "w") as bundle:
-        bundle.writestr(name, b"bad")
+        member = zipfile.ZipInfo("placeholder")
+        member.filename = name
+        bundle.writestr(member, b"bad")
     monkeypatch.setattr(build, "PI_SHA256", build.digest(path))
     with pytest.raises(ValueError, match="Unsafe"):
         build.check_pi(path)

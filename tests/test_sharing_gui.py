@@ -62,7 +62,11 @@ def test_export_defaults_and_direct_save(window, source, tmp_path, monkeypatch):
         assert not selected["history"] and not selected["pages"]
         assert not hasattr(dialog, "review")
         path = tmp_path / "export.zip"
-        monkeypatch.setattr("lalc.sharing_gui.QFileDialog.getSaveFileName", lambda *args: (str(path), "ZIP"))
+        def choose_save(_, title, suggestion, filters):
+            import re
+            assert re.fullmatch(r"lalc-sharing-\d{8}-\d{6}-\d{3}\.zip", suggestion)
+            return str(path), "ZIP"
+        monkeypatch.setattr("lalc.sharing_gui.QFileDialog.getSaveFileName", choose_save)
         dialog.advance()
         if os.name != 'nt':
             sibling = tmp_path / "ordinary-file"
