@@ -69,7 +69,7 @@ class FakeWindowPlatform:
     def find_windows(self) -> list[int]:
         return self.windows
 
-    def focus(self, hwnd: int, *, checkpoint=None, max_attempts=10, on_first_attempt=None) -> None:
+    def focus(self, hwnd: int, *, checkpoint=None, max_attempts=10, on_first_attempt=None, fallback=None) -> None:
         if checkpoint is not None:
             checkpoint()
         self.focus_calls += 1
@@ -422,17 +422,17 @@ def test_focus_succeeds_on_retry_and_restores_minimized_window(monkeypatch, succ
 
 
 @pytest.mark.parametrize("minimized", [False, True])
-def test_managed_focus_uses_async_activation_and_confirms_foreground(monkeypatch, minimized):
-    """直接置前请求被拒绝时，模拟异步激活，等待真实前台返回。"""
+def test_managed_focus_restores_or_retries_attached_focus_a_second_apart(monkeypatch, minimized):
+    """异步恢复最小化窗口，或在直接请求后补试两次，并核验真实前台。"""
     now = [0.0]
     state = {"foreground": 42 if minimized else 10, "minimized": minimized}
-    requests, shows, reports = [], [], []
+    requests, shows, reports, retries = [], [], [], []
     platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
     platform.checkpoint = None
 
     def sleep(seconds):
         now[0] = round(now[0] + seconds, 6)
-        if shows:
+        if shows or len(retries) == 2:
             state.update(foreground=42, minimized=False)
 
     platform.user32 = SimpleNamespace(
@@ -444,11 +444,56 @@ def test_managed_focus_uses_async_activation_and_confirms_foreground(monkeypatch
     )
     monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
     monkeypatch.setattr(focused.time, "sleep", sleep)
-    platform.focus(42, max_attempts=None, on_first_attempt=lambda *fields: reports.append(fields))
-    assert shows == [(42, 9 if minimized else 5, 0 if minimized else 1)]
-    assert requests == [42] * (1 if minimized else 2)
+    platform.focus(42, max_attempts=None, on_first_attempt=lambda *fields: reports.append(fields),
+                   fallback=lambda hwnd: retries.append((hwnd, now[0])) or False)
+    assert shows == ([(42, 9, 0)] if minimized else [])
+    assert requests == [42]
+    assert retries == ([] if minimized else [(10, 1), (10, 2)])
     assert reports == [(42 if minimized else 10, False)]
     assert state == {"foreground": 42, "minimized": False}
+
+
+def test_attached_focus_releases_the_input_queue_on_native_error():
+    """原生置前出错也会释放已连接的输入队列。"""
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.window_info = lambda hwnd: {"valid": True, "process_id": 7}
+    platform.kernel32 = SimpleNamespace(GetCurrentThreadId=lambda: 5)
+    calls = []
+
+    def fail(hwnd):
+        raise OSError("focus failed")
+
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: 99,
+        GetWindowThreadProcessId=lambda hwnd, pid: 8,
+        PeekMessageW=lambda *args: None,
+        AttachThreadInput=lambda *args: calls.append(args) or True,
+        BringWindowToTop=lambda hwnd: calls.append(hwnd),
+        SetForegroundWindow=fail,
+    )
+    assert not platform.request_attached_focus(42, 6, 99)
+    assert not platform.request_attached_focus(42, 7, 98)
+    assert not calls
+    with pytest.raises(OSError, match="focus failed"):
+        platform.request_attached_focus(42, 7, 99)
+    assert calls == [(8, 5, True), 42, (8, 5, False)]
+
+
+@pytest.mark.parametrize("interrupt_at", [0.1, 3.0])
+def test_hung_attached_focus_worker_is_reaped_on_activity_or_timeout(monkeypatch, interrupt_at):
+    """键鼠重新活动或子进程超时都会清理卡住的置前尝试。"""
+    now = [0.0]
+    calls = []
+    with monkeypatch.context() as patch:
+        patch.setattr(focused.time, "monotonic", lambda: now[0])
+        patch.setattr(focused.time, "sleep", lambda seconds: now.__setitem__(0, round(now[0] + seconds, 6)))
+        patch.setattr(focused.subprocess, "CREATE_NO_WINDOW", 0, raising=False)
+        worker = SimpleNamespace(poll=lambda: None, kill=lambda: calls.append("kill"),
+                                 wait=lambda *, timeout: calls.append("wait"))
+        patch.setattr(focused.subprocess, "Popen", lambda *args, **kwargs: worker)
+        assert not WindowsWindowPlatform.try_attached_focus(42, 7, 99, lambda: now[0] < interrupt_at)
+    assert now[0] == min(interrupt_at, 2.0)
+    assert calls == ["kill", "wait"]
 
 
 @pytest.mark.parametrize("interrupt", ["cancel", "disappeared"])

@@ -179,7 +179,7 @@ def test_restart_failure_is_terminal_and_logged(environment, problem, monkeypatc
         env.platform.creates_window = False
         env.platform.launch_exit_code = 1
     elif problem == "focus_timeout":
-        def focus(hwnd, *, checkpoint=None, max_attempts=10, on_first_attempt=None):
+        def focus(hwnd, *, checkpoint=None, max_attempts=10, on_first_attempt=None, fallback=None):
             while True:
                 checkpoint()
         monkeypatch.setattr(env.platform, "focus", focus)

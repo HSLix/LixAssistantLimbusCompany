@@ -119,11 +119,12 @@ class InputSession:
         """每次置前尝试都经过同一个可取消的空闲检查。"""
         self.monitor.target_hwnd = hwnd
         immediate_since = None
+        activity_at_check = None
         requested = False
 
         def check():
-            nonlocal immediate_since
-            immediate_since = self.wait_for_activity(
+            nonlocal immediate_since, activity_at_check
+            immediate_since, activity_at_check = self.wait_for_activity(
                 hwnd, process_id, after_takeover=after_takeover, immediate_since=immediate_since,
             )
             if checkpoint is not None:
@@ -137,7 +138,18 @@ class InputSession:
             self.log_input_wait(message, outcome="focus_requested", target_hwnd=hwnd,
                                 foreground_hwnd=foreground, set_foreground_result=accepted)
 
-        self.window.platform.focus(hwnd, checkpoint=check, max_attempts=None, on_first_attempt=first_attempt)
+        def still_idle():
+            return (not self.gate.stopped and not self.gate.paused and not self.monitor.pause_requested
+                    and self.monitor.snapshot()[1] == activity_at_check)
+
+        def fallback(foreground):
+            accepted = self.window.platform.try_attached_focus(hwnd, process_id, foreground, still_idle)
+            self.log_input_wait("已尝试通过前台输入队列切回游戏。", outcome="focus_fallback",
+                                target_hwnd=hwnd, foreground_hwnd=foreground, set_foreground_result=accepted)
+            return accepted
+
+        self.window.platform.focus(hwnd, checkpoint=check, max_attempts=None, on_first_attempt=first_attempt,
+                                   fallback=fallback)
         if requested:
             self.log_input_wait("已确认游戏窗口回到前台。", outcome="focus_confirmed", target_hwnd=hwnd)
 
@@ -146,7 +158,7 @@ class InputSession:
                   "phase": "execute", "level": "info", "message": message, **fields})
 
     def wait_for_activity(self, hwnd: int, process_id: int, *, after_takeover: bool = False,
-                          immediate_since: float | None = None) -> float | None:
+                          immediate_since: float | None = None) -> tuple[float | None, float]:
         """键鼠活动延后下次聚焦，显式恢复只豁免该次操作前的活动。"""
         started = time.monotonic()
         waiting = False
@@ -179,15 +191,15 @@ class InputSession:
                     immediate_since = activity
                 if immediate_since == activity:
                     outcome = "manual_resume"
-                    return immediate_since
+                    return immediate_since, activity
                 if foreground and not after_takeover:
                     outcome = "foreground"
-                    return None
+                    return None, activity
                 if time.monotonic() - last >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
                     with self.monitor.lock:
                         if last == (self.monitor.last_input if after_takeover else self.monitor.last_other_activity):
                             outcome = "idle"
-                            return None
+                            return None, activity
                 if not waiting:
                     waiting = True
                     scope = "键鼠" if after_takeover else "其他应用"

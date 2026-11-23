@@ -323,6 +323,13 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if len(args) == 4 and args[0] == "--focus-worker" and sys.platform == "win32":
+        from .focused import WindowsWindowPlatform
+
+        hwnd, pid, foreground = map(int, args[1:])
+        if min(hwnd, pid, foreground) < 1:
+            return 1
+        return 0 if WindowsWindowPlatform().request_attached_focus(hwnd, pid, foreground) else 1
     if len(args) == 3 and args[0] == "--packaging-probe":
         from .packaging_probe import run_probe
 
