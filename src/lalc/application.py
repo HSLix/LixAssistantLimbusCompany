@@ -16,7 +16,7 @@ from typing import Any, Callable
 from .process_lock import ProcessLock
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
-from .run_logs import LIVE_LOG_LIMIT, ACTION_ENDS, is_live_log
+from .run_logs import ACTION_ENDS, COMPONENT_TIMING_SUMMARY, LIVE_LOG_LIMIT, component_timing_text, is_live_log
 from .control import InputSession
 from .ocr import ocr_service
 from .ledger import LedgerWriteError, WorkflowRunLedger, application_event_totals, workflow_health
@@ -927,6 +927,14 @@ class ApplicationService:
                               "status": "failure", "failure_code": "trace_write_failed",
                               "failure_message": str(error), **_exception_fields(error)}
                 result["previous_result"] = previous
+            else:
+                timings = self._active_executor.component_timings if self._active_executor is not None else {}
+                try:
+                    self._record_locked(COMPONENT_TIMING_SUMMARY, {
+                        "level": "debug", "message": component_timing_text(timings),
+                    })
+                except TraceWriteError:
+                    self.logger.exception("Component timing summary write failed")
             update = None
             normal = result.get("status") in {"success", "completed"} and not result.get("fatal")
             if (normal and self._run_options["automatic_repair_default"]

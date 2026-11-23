@@ -23,6 +23,20 @@ def write_logs(root, count=2000):
     return path, records
 
 
+def test_component_timing_rankings_sort_before_rounding_and_format_long_durations():
+    from lalc.run_logs import component_timing_text
+
+    text = component_timing_text({"steps.a": (1, 3_723_004_000_000), "steps.b": (3, 6_000_000_000_000),
+                                  "steps.c": (1, 999_600_000), "steps.d": (1, 1_000_100_000)})
+    average, total = text.split("按总耗时降序")
+    assert average.index("steps.a") < average.index("steps.b")
+    assert total.index("steps.b") < total.index("steps.a")
+    assert average.index("steps.d") < average.index("steps.c")
+    assert "steps.c · 1次 · 总耗时 1秒000毫秒 · 平均耗时 1秒000毫秒" in text
+    assert "总耗时 1时2分3秒004毫秒 · 平均耗时 1时2分3秒004毫秒" in text
+    assert "总耗时 1时40分0秒000毫秒 · 平均耗时 33分20秒000毫秒" in text
+
+
 def test_chunk_boundaries_and_reverse_forward_agree(tmp_path):
     path, records = write_logs(tmp_path)
     end = path.stat().st_size

@@ -10,6 +10,7 @@ from .file_content import FileContent, open_image, require_memory
 
 
 ACTION_ENDS = {"trusted_action_returned", "trusted_action_failed", "trusted_action_interrupted"}
+COMPONENT_TIMING_SUMMARY = "component_timing_summary"
 AI_REPAIR_MESSAGES = {
     "agent_invoked": "AI intervened and is attempting a repair",
     "agent_recheck_started": "AI intervention ended. Retrying execution",
@@ -36,6 +37,26 @@ def is_live_log(record: dict) -> bool:
     if event == "component_log":
         return record.get("level", "info").lower() in {"info", "warning", "error"}
     return event in LIVE_STATE_EVENTS
+
+
+def component_timing_text(timings: dict[str, tuple[int, int]]) -> str:
+    """用未舍入的耗时排序，正文同时展示调度次数、总耗时和平均耗时。"""
+    def duration(nanoseconds: float) -> str:
+        seconds, milliseconds = divmod(round(nanoseconds / 1_000_000), 1000)
+        minutes, seconds = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        prefix = f"{hours}时{minutes}分" if hours else f"{minutes}分" if minutes else ""
+        return f"{prefix}{seconds}秒{milliseconds:03d}毫秒"
+
+    rows = [(name, count, total, total / count) for name, (count, total) in timings.items()]
+    lines = ["组件运行耗时"]
+    for heading, index in (("按平均耗时降序", 3), ("按总耗时降序", 2)):
+        lines.extend(("", heading))
+        for name, count, total, average in sorted(rows, key=lambda row: (-row[index], row[0])):
+            lines.append(f"{name} · {count}次 · 总耗时 {duration(total)} · 平均耗时 {duration(average)}")
+        if not rows:
+            lines.append("无组件调度")
+    return "\n".join(lines)
 
 
 def trace_path(root: Path, run_id: int) -> Path:
@@ -220,7 +241,8 @@ def run_summary(root, run_id, *, check=lambda: None):
     """只读首尾事件，给列表提供终态摘要，完整结果留在 Trace。"""
     boundary = snapshot(root, run_id)
     first = next((r for r in trace_records(root, run_id, boundary=boundary, check=check) if r), {})
-    last = next((r for r in trace_records(root, run_id, boundary=boundary, reverse=True, check=check) if r), {})
+    last = next((r for r in trace_records(root, run_id, boundary=boundary, reverse=True, check=check)
+                 if r and r.get("event") != COMPONENT_TIMING_SUMMARY), {})
     start = first if first.get("event") == "run_started" else {}
     end = last if last.get("event") == "run_finished" else {}
     result = end.get("result")
@@ -261,6 +283,8 @@ def run_manifest_ids(root, run_id, boundary, *, cancelled):
     base = manifest_id(start, "base_manifest_id") if start and start.get("event") == "run_started" else None
     records = trace_records(root, run_id, boundary=boundary, reverse=True)
     end = next(records, None)
+    if end and end.get("event") == COMPONENT_TIMING_SUMMARY:
+        end = next(records, None)
     if not end or end.get("event") != "run_finished":
         return base, None
     final = manifest_id(end, "working_manifest_id")
@@ -335,7 +359,7 @@ def read_page(root: Path, run_id: int, boundary: tuple, *, start=0, end=None,
                 raise ValueError("Invalid record")
             event = record.get("event")
             repair_message = ai_repair_message(event, translate)
-            if event != "component_log" and event not in ACTION_ENDS and repair_message is None:
+            if event not in {"component_log", COMPONENT_TIMING_SUMMARY} and event not in ACTION_ENDS and repair_message is None:
                 continue
             if event in ACTION_ENDS and (not isinstance(record.get("logical_name"), str)
                                         or not isinstance(record.get("inputs", {}), dict)
