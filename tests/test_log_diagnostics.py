@@ -67,12 +67,31 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path, gui_run
     assert [p['matches'][0]['run_id'] for p in (page, next_page)] == [2, 1]
     assert next_page['next'] is None
     assert tools.read_run_log(1, evidence_id='1/2')['content'][-1]['mimeType'] == 'image/jpeg'
-    target = tmp_path / 'imported'
-    target.mkdir()
     export_log(root, 1, tmp_path / 'log.zip')
-    identity = import_log(target, tmp_path / 'log.zip')
-    imported = target / 'imported-run-logs' / identity
+    identity = import_log(root, tmp_path / 'log.zip')
+    imported = root / 'imported-run-logs' / identity
     assert image_path(imported, 1, {'evidence_id': '1/2'}).read_bytes() == path.read_bytes()
+    listing = tools.list_runs()['details']
+    assert listing['run_ids'] == [3, 2, 1]
+    imported_run, local_run = listing['runs'][:2]
+    assert imported_run['origin'] == 'imported' and imported_run['original_run_id'] == 1
+    assert local_run['origin'] == 'local' and 'original_run_id' not in local_run
+    result = tools.read_run_log(3, evidence_id='1/2')
+    assert result['details']['run_id'] == 3 and result['details']['original_run_id'] == 1
+    assert result['content'][-1]['mimeType'] == 'image/jpeg'
+    hit = tools.search_run_logs('hit', run_id=3)['details']['matches'][0]
+    assert hit['run_id'] == 3 and hit['record']['evidence_id'] == '1/2'
+    page = tools.search_run_logs('hit', all_runs=True, limit=1)['details']
+    assert page['matches'][0]['run_id'] == 3
+    assert page['next'] == dict(start_run_id=2, start_sequence=1)
+    resumed = tools.search_run_logs('hit', all_runs=True, **page['next'])['details']['matches']
+    assert [match['run_id'] for match in resumed] == [2, 1]
+    tools.read_other_runs = False
+    assert 3 not in tools.list_runs()['details']['run_ids']
+    with pytest.raises(ValueError, match='日志不可用'):
+        tools.read_run_log(3)
+    with pytest.raises(ValueError, match='日志不可用'):
+        tools.search_run_logs('hit', run_id=3)
     with pytest.raises(ValueError):
         tools.search_run_logs('hit')
     with pytest.raises(ValueError):

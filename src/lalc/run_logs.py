@@ -251,9 +251,36 @@ def run_summary(root, run_id, *, check=lambda: None):
             "result": summary if result else None, "failure_reason": failure}
 
 
+def run_manifest_ids(root, run_id, boundary, *, cancelled):
+    """从相同 Trace 快照读取基础版本，只在有可信结束记录时返回最终版本。"""
+    def manifest_id(record, key):
+        value = record.get(key)
+        return value if isinstance(value, str) and value else None
+
+    start = next(trace_records(root, run_id, boundary=boundary), None)
+    base = manifest_id(start, "base_manifest_id") if start and start.get("event") == "run_started" else None
+    records = trace_records(root, run_id, boundary=boundary, reverse=True)
+    end = next(records, None)
+    if not end or end.get("event") != "run_finished":
+        return base, None
+    final = manifest_id(end, "working_manifest_id")
+    if final is not None:
+        return base, final
+    # 历史日志未把最终版本写入结束事件，从最后一次实际切换向前确认。
+    for record in records:
+        if cancelled.is_set() or record is None:
+            break
+        event = record.get("event")
+        if event == "working_manifest_selected":
+            return base, manifest_id(record, "manifest_id")
+        if event == "run_started":
+            return base, base
+    return base, None
+
+
 def query_trace(root, run_ids, *, start_sequence=1, limit=100, levels=None, logical_name=None,
-                keyword="", check=lambda: None):
-    """组合条件按事件原文筛选，返回下一条匹配的位置，扫描内存不随文件增长。"""
+                keyword="", check=lambda: None, locations=None):
+    """按原始事件搜索；匹配与续读游标统一使用本机查询编号。"""
     if type(start_sequence) is not int or start_sequence < 1 or type(limit) is not int or not 1 <= limit <= 200:
         raise ValueError("start_sequence 必须为正整数，limit 必须为 1–200。")
     if levels is not None and (not isinstance(levels, list) or not levels or
@@ -265,7 +292,8 @@ def query_trace(root, run_ids, *, start_sequence=1, limit=100, levels=None, logi
         raise ValueError("keyword 必须为字符串。")
     matches, damaged = [], 0
     for index, run_id in enumerate(run_ids):
-        for record in trace_records(root, run_id, check=check):
+        trace_root, trace_id = (root, run_id) if locations is None else locations[run_id]
+        for record in trace_records(trace_root, trace_id, check=check):
             if record is None or type(record.get("sequence")) is not int:
                 damaged += 1
                 continue

@@ -16,7 +16,7 @@ from .work_files import WorkDirectory
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
-from .run_logs import image_metadata, read_page, snapshot
+from .run_logs import image_metadata, read_page, run_manifest_ids, snapshot
 from .run_log_sharing import list_logs, export_log, import_log
 
 
@@ -210,6 +210,7 @@ class RunLogPage(QWidget):
         super().__init__(parent)
         self.setObjectName("run-logs")
         self.root, self.run_id, self.boundary = root, None, None
+        self.trace_run_id = None
         self.read_root, self.selected_key, self.entries = root, None, {}
         self.run_entries = []
         self.cancelled = Event()
@@ -285,11 +286,30 @@ class RunLogPage(QWidget):
         self.run_title = BodyLabel()
         self.run_title.setTextFormat(Qt.TextFormat.PlainText)
         header.addWidget(self.run_title, 1)
+        self.details_toggle = PushButton(tr('Show details'))
+        self.details_toggle.setCheckable(True)
+        self.details_toggle.hide()
+        header.addWidget(self.details_toggle)
+        self.copy_details = PushButton(tr('Copy details'))
+        self.copy_details.clicked.connect(self.copy_run_details)
+        self.copy_details.hide()
+        header.addWidget(self.copy_details)
+        self.copy_run_id = PushButton(tr('Copy Run ID'))
+        self.copy_run_id.clicked.connect(lambda: QApplication.clipboard().setText(str(self.run_id)))
+        self.copy_run_id.hide()
+        header.addWidget(self.copy_run_id)
         self.export_button = PushButton(tr('Export'))
         self.export_button.setEnabled(False)
         self.export_button.clicked.connect(self.export_zip)
         header.addWidget(self.export_button)
         details.addLayout(header)
+        self.run_metadata = BodyLabel()
+        self.run_metadata.setTextFormat(Qt.TextFormat.PlainText)
+        self.run_metadata.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.run_metadata.setWordWrap(True)
+        self.run_metadata.hide()
+        self.details_toggle.toggled.connect(self.show_run_details)
+        details.addWidget(self.run_metadata)
         details.addWidget(self.view, 1)
         body.addWidget(detail_card, 1)
         layout.addLayout(body, 1)
@@ -397,8 +417,12 @@ class RunLogPage(QWidget):
             elif not self.runs.count():
                 self.invalidate()
                 self.model.replace([])
-                self.run_id = self.selected_key = self.boundary = None
+                self.run_id = self.trace_run_id = self.selected_key = self.boundary = None
                 self.run_title.clear()
+                self.details_toggle.setChecked(False)
+                self.details_toggle.hide()
+                self.copy_details.hide()
+                self.copy_run_id.hide()
                 self.export_button.setEnabled(False)
                 self.status.setText(tr('No run logs'))
         self.submit(lambda: list_logs(self.root), shown)
@@ -428,16 +452,34 @@ class RunLogPage(QWidget):
             start = self.runs.count()
             for entry in self.run_entries[start:start + 10]:
                 self.entries[entry['key']] = entry
-                title = tr('Log No.{0}').format(entry['run_id'])
-                stamp = log_time(entry['started_at'])
-                item = QListWidgetItem(title + '\n' + stamp
-                                       + (' · ' + tr('Imported') if entry['imported'] else ''))
+                item = QListWidgetItem(self.run_heading(entry) + '\n' + '\n'.join(self.run_metadata_lines(entry)))
                 item.setFont(self.run_title.font())
-                item.setSizeHint(QSize(230, 76))
+                item.setSizeHint(QSize(230, 86 if entry['imported'] else 76))
                 item.setData(Qt.ItemDataRole.UserRole, entry['key'])
                 self.runs.addItem(item)
                 if entry['key'] == self.selected_key:
                     self.runs.setCurrentItem(item)
+
+    @staticmethod
+    def run_heading(entry):
+        origin = tr('Imported') if entry['imported'] else tr('Local')
+        return tr('Run ID {0}').format(entry['run_id']) + ' · ' + origin
+
+    @staticmethod
+    def run_metadata_lines(entry):
+        lines = []
+        if entry['imported']:
+            lines.append(tr('Original Run ID {0}').format(entry['original_run_id']))
+        return [*lines, log_time(entry['started_at'])]
+
+    def show_run_details(self, expanded):
+        """切换当前日志的摘要详情，保留日志正文。"""
+        self.run_metadata.setVisible(expanded)
+        self.details_toggle.setText(tr('Hide details') if expanded else tr('Show details'))
+
+    def copy_run_details(self):
+        """复制日志标题和完整元数据，允许在折叠状态下复制。"""
+        QApplication.clipboard().setText(self.run_title.text() + '\n' + self.run_metadata.text())
 
     def import_zip(self):
         """选择后直接检查并导入，取消或失败不留下半成品。"""
@@ -446,10 +488,10 @@ class RunLogPage(QWidget):
         if not path:
             return
         try:
-            sharing_task(self, lambda: import_log(self.root, path))
+            key = sharing_task(self, lambda: import_log(self.root, path))
             self.source_filter.setCurrentItem('all')
             self.source_mode = 'all'
-            self.refresh_runs()
+            self.refresh_runs(preferred=key)
             QMessageBox.information(self, tr('Import log'), tr('Log imported successfully'))
         except InterruptedError:
             pass
@@ -462,13 +504,14 @@ class RunLogPage(QWidget):
         from .file_content import FileContent, checkpoint, require_disk, write_content
         if self.run_id is None:
             return
-        root, identity = self.read_root, self.run_id
+        root, identity = self.read_root, self.trace_run_id
+        local_id = self.run_id
         try:
             boundary = snapshot(root, identity)
             with WorkDirectory() as directory:
                 archive = Path(directory) / 'log.zip'
                 sharing_task(self, lambda: export_log(root, identity, archive, boundary))
-                destination, _ = QFileDialog.getSaveFileName(self, tr('Export log'), f'log-{identity}.zip', 'ZIP (*.zip)')
+                destination, _ = QFileDialog.getSaveFileName(self, tr('Export log'), f'log-{local_id}.zip', 'ZIP (*.zip)')
                 if destination:
                     def save():
                         target = Path(destination)
@@ -493,11 +536,18 @@ class RunLogPage(QWidget):
         """选择运行才检查文件；当前快照有追加时等待用户接受。"""
         key = item.data(Qt.ItemDataRole.UserRole)
         entry = self.entries[key]
-        identity = entry['run_id']
+        identity = entry.get('original_run_id', entry['run_id'])
         changed = key != self.selected_key
         self.read_root = root = entry['root']
-        self.run_title.setText(tr('Log No.{0}').format(identity) + '\n' + log_time(entry['started_at'])
-                               + (' · ' + tr('Imported') if entry['imported'] else ''))
+        self.run_title.setText(self.run_heading(entry))
+        metadata = self.run_metadata_lines(entry)
+        if changed:
+            self.run_metadata.setText('\n'.join(metadata))
+            self.details_toggle.setChecked(False)
+            self.copy_details.setEnabled(False)
+        self.details_toggle.show()
+        self.copy_details.show()
+        self.copy_run_id.setVisible(entry['imported'])
         self.export_button.setEnabled(True)
         self.debounce.stop()
         self.invalidate()
@@ -505,21 +555,29 @@ class RunLogPage(QWidget):
         if changed:
             self.boundary = None
             self.model.replace([])
-        self.run_id, self.selected_key = identity, key
+        self.run_id, self.trace_run_id, self.selected_key = entry['run_id'], identity, key
         self.loading = True
         cancelled = self.cancelled
         def check():
             boundary = snapshot(root, identity)
-            if old is None or boundary[:2] != old[:2] or boundary[2] < old[2] or (boundary != old and boundary[2] == old[2]):
-                return boundary, "reset"
             if boundary == old:
-                return boundary, "same"
+                return boundary, "same", None
+            manifests = run_manifest_ids(root, identity, boundary, cancelled=cancelled)
+            if old is None or boundary[:2] != old[:2] or boundary[2] <= old[2]:
+                return boundary, "reset", manifests
             result = read_page(root, identity, boundary, start=old[2], reverse=False,
                                levels=tuple(self.levels), limit=1, cancelled=cancelled)
-            return boundary, "new" if result["rows"] else "same"
+            return boundary, "new" if result["rows"] else "same", manifests
         def checked(value):
             self.loading = False
-            boundary, change = value
+            boundary, change, manifests = value
+            if manifests is not None:
+                base, final = manifests
+                manifest_lines = [tr('Based on Manifest: {0}').format(base)] if base else []
+                if final:
+                    manifest_lines.append(tr('Final Manifest: {0}').format(final))
+                self.run_metadata.setText('\n'.join([*metadata, *manifest_lines]))
+            self.copy_details.setEnabled(True)
             if change == "reset":
                 self.boundary = boundary
                 self.pending_boundary = None
@@ -580,7 +638,7 @@ class RunLogPage(QWidget):
     def load_reset(self, anchor=None):
         """加载最新或锚点附近的一批；较旧侧无匹配才寻找较新项。"""
         self.loading, self.older_done, self.newer_done = True, False, anchor is None
-        root, identity, boundary, options, cancelled = self.read_root, self.run_id, self.boundary, self.options(), self.cancelled
+        root, identity, boundary, options, cancelled = self.read_root, self.trace_run_id, self.boundary, self.options(), self.cancelled
         self.status.setText(tr("Loading logs…"))
         def load():
             result = read_page(root, identity, boundary, end=anchor[1] if anchor else None, cancelled=cancelled, **options)
@@ -618,7 +676,7 @@ class RunLogPage(QWidget):
         rows = self.model.rows
         options = self.options()
         options.update(end=rows[-1]["offset"]) if older else options.update(start=rows[0]["end"], reverse=False)
-        root, identity, boundary, cancelled = self.read_root, self.run_id, self.boundary, self.cancelled
+        root, identity, boundary, cancelled = self.read_root, self.trace_run_id, self.boundary, self.cancelled
         def shown(result):
             anchor = self.anchor()
             bottom = self.view.indexAt(self.view.viewport().rect().bottomLeft())

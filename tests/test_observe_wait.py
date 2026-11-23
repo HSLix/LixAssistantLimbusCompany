@@ -14,7 +14,7 @@ from lalc.control import InputSession
 from lalc.manifest import ManifestManager
 from lalc.runtime import ExecutionFailure, RunGate, WorkflowExecutor
 from runtime_support import add_plan
-from test_input_control import FakeWindow, finished, paused
+from test_input_control import FakeWindow, finished, wait_state
 
 
 def wait_candidate(tmp_path):
@@ -149,15 +149,14 @@ def test_workflow_wait_takeover_preserves_stack_and_can_cancel(tmp_path, monkeyp
         original_wait(session, duration, update)
 
     monkeypatch.setattr(InputSession, '_wait', wait)
-    monkeypatch.setattr(InputSession, 'QUIET_SECONDS', 0.001)
+    monkeypatch.setattr(InputSession, 'ACTIVITY_SECONDS', 60 if cancel else 0)
     service.start('tasks.wait', {}, manifest_id=published.loaded.manifest_id)
-    state = paused(service)
-    assert state['pause_info']['restart_step'] is False
     if cancel:
+        state = wait_state(service, lambda state: any(row.get('waiting_for') == 'takeover' for row in state['trace']))
+        assert not state['paused']
         service.stop()
-    else:
-        service.resume()
     state = finished(service)
+    assert not any(row['event'] == 'paused_by_user' for row in state['trace'])
     assert state['result']['status'] == ('failure' if cancel else 'success')
     if cancel:
         assert state['result']['failure_code'] == 'user_cancelled'

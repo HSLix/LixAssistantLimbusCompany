@@ -15,7 +15,7 @@ from lalc.control import InputSession
 from lalc.focused import FocusedAutomationSession, WindowError
 from lalc.runtime import RunGate, UserInterruption
 from lalc.windows_input import INPUT, WindowsInputBackend
-from test_input_control import FakeWindow, finished, paused, service_for
+from test_input_control import FakeWindow, finished, service_for
 
 
 def install_scroll_backend(monkeypatch, window):
@@ -148,10 +148,11 @@ def test_registered_action_runs_through_executor_with_trace(tmp_path, monkeypatc
     assert window.backend.closed
 
 
-def test_partial_scroll_reenters_step_after_manual_resume(tmp_path, monkeypatch):
+def test_partial_scroll_reenters_step_after_automatic_wait(tmp_path, monkeypatch):
     service, window = service_for(tmp_path)
     install_scroll_backend(monkeypatch, window)
     monkeypatch.setattr(InputSession, "_wait", lambda self, seconds: self.check())
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
     def take_over_once():
         window.backend.monitor.record("鼠标", False)
@@ -166,13 +167,10 @@ def test_partial_scroll_reenters_step_after_manual_resume(tmp_path, monkeypatch)
 
     monkeypatch.setattr(service.manifest_manager.default.components["steps.control"].module, "execute", execute)
     service.start("steps.control", {})
-    state = paused(service)
-    assert state["pause_info"]["logical_name"] == "steps.control"
-    assert window.backend.events.count(("wheel", 120)) == 1
-    service.resume()
     state = finished(service)
     assert state["result"]["status"] == "success", state["result"]
-    # 已发送的一格保留，手动恢复后按既有语义重入 Step，重新发送三格。
+    assert any(row.get("waiting_for") == "takeover" for row in state["trace"])
+    # 已发送的一格保留，恢复后按既有语义重入 Step，重新发送三格。
     assert window.backend.events.count(("wheel", 120)) == 4
     assert sum(event["event"] == "trusted_action_interrupted" and
                event["logical_name"] == "control.scroll" for event in state["trace"]) == 1

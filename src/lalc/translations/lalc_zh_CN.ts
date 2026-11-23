@@ -2149,6 +2149,10 @@ Original pixel region: {2}</source>
       <source>Log No.{0}</source>
       <translation>{0} 号日志</translation>
     </message>
+    <message><source>Run ID {0}</source><translation>Run ID {0}</translation></message>
+    <message><source>Original Run ID {0}</source><translation>原 Run ID {0}</translation></message>
+    <message><source>Copy Run ID</source><translation>复制 Run ID</translation></message>
+    <message><source>Final Manifest: {0}</source><translation>最终 Manifest：{0}</translation></message>
     <message>
       <source>Run records</source>
       <translation>运行记录</translation>

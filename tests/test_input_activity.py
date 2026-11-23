@@ -50,15 +50,46 @@ def test_other_activity_restarts_ten_seconds_and_logs_visible_info(session):
     def activity():
         if env.clock.now == 105:
             env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+        if env.clock.now == 114:
+            env.inputs.monitor.record("键盘", False, takeover=False, other_application=True)
     env.clock.on_sleep = activity
     env.inputs.check()
-    assert env.clock.now == 115
+    assert env.clock.now == 124
     assert env.window.focus_calls == 2
     assert env.events[-1]["event"] != "input_takeover"
     logs = [e for e in env.events if e["event"] == "component_log"]
     assert len(logs) == 2
-    assert logs[-1]["duration_seconds"] == 15
+    assert logs[-1]["duration_seconds"] == 24
     assert logs[-1]["outcome"] == "idle"
+
+
+def test_foreground_takeover_wait_keeps_resetting_with_mouse_and_keyboard(session):
+    env = session
+    env.inputs.monitor.record("鼠标", False)
+    with pytest.raises(UserInterruption, match="中断") as caught:
+        env.inputs.check()
+    assert caught.value.reason == "takeover"
+    def activity():
+        assert env.window.focus_calls == 1
+        if env.clock.now in range(109, 182, 9):
+            kind = "键盘" if (env.clock.now - 100) % 2 else "鼠标"
+            env.inputs.monitor.record(kind, False, takeover=kind == "键盘")
+        if env.clock.now == 190:
+            env.inputs.monitor.record("injected", True)
+    env.clock.on_sleep = activity
+    env.inputs.prepare_resume(automatic=True)
+    assert env.clock.now == 191
+    assert env.window.focus_calls == 2
+    assert not env.inputs.paused
+
+
+def test_explicit_pause_interrupts_takeover_wait(session):
+    env = session
+    env.clock.on_sleep = env.inputs.gate.pause
+    with pytest.raises(UserInterruption) as caught:
+        env.inputs.prepare_resume(automatic=True)
+    assert caught.value.reason == "pause"
+    assert env.window.focus_calls == 1
 
 
 def test_return_to_game_finishes_wait_early(session):
@@ -193,7 +224,7 @@ def test_first_start_listens_before_immediate_focus_and_manual_resume_skips_idle
         focus(hwnd)
     monkeypatch.setattr(window, "create_input_backend", listen)
     monkeypatch.setattr(window, "focus", activate)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     service.start("tasks.control", {})
     paused(service)
     assert order == ["listen", "focus"]
@@ -353,7 +384,7 @@ def test_mouse_over_another_window_does_not_take_over_foreground_game():
 def test_hotkey_during_manual_resume_keeps_run_paused(tmp_path, monkeypatch):
     service, window = service_for(tmp_path)
     monkeypatch.setattr(InputSession, "QUIET_SECONDS", 0)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     service.start("tasks.control", {})
     paused(service)
     original = window.backend.any_pressed

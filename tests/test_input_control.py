@@ -37,6 +37,13 @@ class FakeInput:
     def any_pressed(self) -> bool:
         return self.pressed
 
+    def pause_on_next_input(self):
+        """在下一次注入过程中模拟显式暂停热键。"""
+        def pause():
+            self.monitor.record("键盘", False, takeover=False, pause=True)
+            self.on_down = lambda: None
+        self.on_down = pause
+
     def client_point(self, hwnd, x, y):
         return x + 10, y + 20
 
@@ -201,21 +208,18 @@ def test_supported_keys_use_down_up_and_do_not_misclassify_injection(tmp_path, k
 
 
 @pytest.mark.parametrize("operation", ["drag", "click", "key_press"])
-def test_takeover_releases_once_then_reenters_same_step_manually(tmp_path, operation):
+def test_takeover_releases_once_then_reenters_same_step_automatically(tmp_path, operation):
     service, window = service_for(tmp_path)
     window.backend.takeovers = 1
     service.start("tasks.control", {"operation": operation})
-    state = paused(service)
-    assert state["pause_info"]["logical_name"] == "steps.control"
-    assert not state["pause_info"]["has_condition"]
-    assert not any(event["event"] == "verification_started" for event in state["trace"])
-    assert sum(event["event"] == "input_released" for event in state["trace"]) == 1
-    assert window.focus_calls == 1
+    state = finished(service)
+    release = next(event for event in state["trace"] if event["event"] == "input_released")
+    wait = next(event for event in state["trace"] if event.get("waiting_for") == "takeover")
+    assert release["sequence"] < wait["sequence"]
+    assert not any(event["event"] == "paused_by_user" for event in state["trace"])
     interrupted = next(event for event in state["trace"] if event["event"] == "step_interrupted")
     assert interrupted["outcome"] == "unknown"
     assert "UserInterruption" in interrupted["traceback"]
-    service.resume()
-    state = finished(service)
     assert state["result"]["output"] == "finished"
     assert window.focus_calls == 2
     assert sum(event["event"] == "input_released" for event in state["trace"]) == 2
@@ -224,15 +228,13 @@ def test_takeover_releases_once_then_reenters_same_step_manually(tmp_path, opera
     assert len(steps) == 2 and steps[0]["parent_call_id"] == steps[1]["parent_call_id"]
 
 
-def test_repeated_takeover_requires_separate_resume(tmp_path):
+def test_repeated_takeover_starts_new_automatic_waits(tmp_path):
     service, window = service_for(tmp_path)
     window.backend.takeovers = 2
     service.start("tasks.control", {})
-    paused(service)
-    service.resume()
-    paused(service, 2)
-    service.resume()
-    assert finished(service)["result"]["status"] == "success"
+    state = finished(service)
+    assert state["result"]["status"] == "success"
+    assert sum(event.get("automatic") is True for event in state["trace"]) == 2
 
 
 @pytest.mark.parametrize("problem", ["false", "error"])
@@ -250,12 +252,13 @@ def condition(ctx, *, operation: str = "key_press", key: str = "esc", x: int = 1
         return window.ready
 
     monkeypatch.setattr(service.manifest_manager.default.components["steps.control"].module, "condition", check)
-    window.backend.takeovers = 1
+    def take_over():
+        window.ready = False
+        window.backend.monitor.record("鼠标", False)
+        window.backend.on_down = lambda: None
+    window.backend.on_down = take_over
     service.start("tasks.control", {})
-    paused(service)
-    window.ready = False
-    service.resume()
-    state = paused(service, 2)
+    state = paused(service)
     assert len([e for e in window.backend.events if isinstance(e, tuple) and e[0] == "down"]) == 1
     rejected = next(event for event in state["trace"] if event["event"] == "input_resume_rejected")
     assert "Traceback" in rejected["traceback"]
@@ -296,16 +299,18 @@ def test_wait_observes_takeover_and_can_be_cancelled(tmp_path, monkeypatch):
         original_wait(self, duration, update)
 
     monkeypatch.setattr(InputSession, "_wait", wait)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 60)
     service.start("tasks.control", {"operation": "wait"})
     assert entered.wait(2)
-    paused(service)
+    state = wait_state(service, lambda state: any(row.get("waiting_for") == "takeover" for row in state["trace"]))
+    assert not state["paused"]
     service.stop()
     assert finished(service)["result"]["failure_code"] == "user_cancelled"
 
 
 def test_quiet_resume_waits_for_released_input_without_another_resume(tmp_path, monkeypatch):
     service, window = service_for(tmp_path)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     service.start("tasks.control", {})
     paused(service)
     window.backend.pressed = True
@@ -379,7 +384,7 @@ def test_cli_requires_explicit_manual_resume(tmp_path, monkeypatch, capsys):
     import lalc.__main__ as cli
 
     service, window = service_for(tmp_path)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     monkeypatch.setattr(cli, "default_data_root", lambda: tmp_path)
     monkeypatch.setattr(cli, "ApplicationService", lambda *args, **kwargs: service)
     requested = []
@@ -487,7 +492,7 @@ def test_key_release_failure_is_terminal_and_keeps_original_exception():
 
 def test_failed_resume_capture_remains_paused_with_original_traceback(tmp_path):
     service, window = service_for(tmp_path)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     service.start("tasks.control", {})
     paused(service)
     window.capture_error = True
@@ -500,7 +505,7 @@ def test_failed_resume_capture_remains_paused_with_original_traceback(tmp_path):
     assert finished(service)["result"]["status"] == "success"
 
 
-def test_takeover_between_steps_pauses_pending_observation_without_replaying_step(tmp_path, monkeypatch):
+def test_takeover_between_steps_waits_without_replaying_step(tmp_path, monkeypatch):
     from lalc import task_workflow
 
     service, window = service_for(tmp_path)
@@ -522,11 +527,9 @@ def test_takeover_between_steps_pauses_pending_observation_without_replaying_ste
 
     monkeypatch.setattr(service, "_emit", record)
     service.start("tasks.control", {})
-    state = paused(service)
-    assert state["pause_info"]["restart_step"] is False
-    service.resume()
     state = finished(service)
     assert state["result"]["output"] == "finished"
+    assert any(event.get("automatic") is True for event in state["trace"])
     assert sum(event["event"] == "component_started" and event.get("role") == "step"
                for event in state["trace"]) == 1
 
@@ -544,11 +547,16 @@ def test_takeover_during_first_observation_prevents_first_control(tmp_path, monk
         return capture(hwnd, width, height)
 
     monkeypatch.setattr(window, "capture", observe)
+    waits = []
+    emit = service._emit
+    def record(event, fields):
+        if fields.get("waiting_for") == "takeover" and "idle_seconds" in fields:
+            waits.append(window.backend.events.copy())
+        emit(event, fields)
+    monkeypatch.setattr(service, "_emit", record)
     service.start("tasks.control", {})
-    paused(service)
-    assert window.backend.events == []
-    service.resume()
     assert finished(service)["result"]["status"] == "success"
+    assert waits == [[]]
 
 
 @pytest.mark.parametrize("problem", ["focus", "takeover"])
@@ -583,12 +591,8 @@ def test_workflow_observation_interruption_waits_for_resume_without_cancelling(t
         service.start_plan(use_saved_config=False, )
     else:
         service.start("tasks.control", {})
-    if problem == "takeover":
-        state = paused(service)
-        assert state["pause_info"]["restart_step"] is False
-        assert state["result"] is None and not service._gate.stopped
-        service.resume()
     state = finished(service)
+    assert not any(event["event"] == "paused_by_user" for event in state["trace"])
     if plan:
         assert state["result"]["status"] == "completed"
         assert state["result"]["items"][0]["result"] == "success"
@@ -627,7 +631,7 @@ def test_application_shutdown_waits_for_input_release(tmp_path, monkeypatch):
 def test_pause_description_prefers_execute_docstring(tmp_path, execute_doc):
     """接管提示采用入口说明，并兼容旧模块说明。"""
     service, window = service_for(tmp_path, execute_doc=execute_doc)
-    window.backend.takeovers = 1
+    window.backend.pause_on_next_input()
     service.start("tasks.control", {"operation": "drag"})
     try:
         state = paused(service)

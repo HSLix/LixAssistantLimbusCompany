@@ -219,7 +219,8 @@ def test_interruption_after_launch_never_launches_twice(environment, intent):
         assert "取消" in env.events[-1]["message"]
     else:
         restart_game(env.root, env.inputs)
-        assert any(e["event"] == "paused_by_user" for e in env.events)
+        assert any(e["event"] == "paused_by_user" for e in env.events) == (intent == "pause")
+        assert any(e.get("waiting_for") == "takeover" for e in env.events) == (intent == "takeover")
         env.inputs.check()
     assert env.platform.launches == 1
 
@@ -387,7 +388,7 @@ def execute(ctx, *, value: int) -> list[str]:
     assert sum(e["event"] == "step_reinvocation_returned" for e in state["trace"]) == 1
 
 
-def test_user_takeover_requires_resume_before_crash_recovery(environment):
+def test_user_takeover_waits_for_idle_before_crash_recovery(environment):
     env = environment
     source = '''"""接管时发生进程退出。"""
 from lalc import step
@@ -405,11 +406,12 @@ def execute(ctx, *, value: int) -> str:
     env.platform.on_capture = takeover_and_crash
     service = ApplicationService(env.root, manifest_manager=manager, window_platform=env.platform)
     service.start("steps.break", {"value": 1}, manifest_id=identity)
-    state = service.wait_for(lambda state: state["pause_info"] is not None or state["phase"] == "finished")
-    assert state["paused"] and env.platform.launches == 0
-    service.resume()
-    result = service.wait_for(lambda state: state["phase"] == "finished")["result"]
-    assert result["status"] == "success"
+    state = service.wait_for(lambda state: state["phase"] == "finished")
+    assert not any(row["event"] == "paused_by_user" for row in state["trace"])
+    idle = next(row for row in state["trace"] if row.get("waiting_for") == "takeover" and row.get("outcome") == "idle")
+    restart = next(row for row in state["trace"] if row.get("logical_name") == "control.restart_game")
+    assert idle["sequence"] < restart["sequence"]
+    assert state["result"]["status"] == "success"
     assert env.platform.launches == 1
 
 

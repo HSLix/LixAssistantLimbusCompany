@@ -231,9 +231,9 @@ class DataMaintenance:
         """仅用日志首尾填表，截图目录的占用另行扫描。"""
         real_directory(self.root / "traces")
         rows, invalid = [], 0
-        for entry in list_logs(self.root, keys=keys, read_start=False):
+        for entry in list_logs(self.root, keys=keys, read_start=False, assign_missing=keys is None):
             try:
-                info = run_summary(entry["root"], entry["run_id"])
+                info = run_summary(entry["root"], entry.get("original_run_id", entry["run_id"]))
                 date = _datetime(info["started_at"]) if info["started_at"] else None
             except DATA_ERRORS:
                 invalid += 1

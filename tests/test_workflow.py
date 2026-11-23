@@ -303,7 +303,7 @@ def test_gui_start_error_exposes_original_traceback(tmp_path: Path, monkeypatch)
 
 
 @pytest.mark.parametrize("outcome", ["success", "failure", "cancel", "takeover"])
-def test_every_executed_trusted_action_records_inputs_result_and_elapsed(tmp_path: Path, outcome: str) -> None:
+def test_every_executed_trusted_action_records_inputs_result_and_elapsed(tmp_path: Path, monkeypatch, outcome: str) -> None:
     """统一分派器为成功、失败和用户中断记录参数、真实结果及单次耗时。"""
 
     body = {
@@ -319,9 +319,12 @@ def execute(ctx, *, team: str) -> dict[str, str]:
 '''
     manager = _publish(tmp_path, control_source=source)
     service = ApplicationService(tmp_path, manifest_manager=manager)
+    if outcome == "takeover":
+        from lalc.control import InputSession
+        monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 60)
     run_id = service.start("steps.run_team", {"team": "alpha"})
     if outcome == "takeover":
-        service.wait_for(lambda s: s["pause_info"] is not None)
+        service.wait_for(lambda s: any(row.get("waiting_for") == "takeover" for row in s["trace"]))
         service.stop()
     state = _finished(service, run_id)
     events = [json.loads(line) for line in (tmp_path / "traces" / f"{run_id}.jsonl").read_text(encoding="utf-8").splitlines()]

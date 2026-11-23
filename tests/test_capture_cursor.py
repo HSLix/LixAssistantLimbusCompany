@@ -13,7 +13,7 @@ from lalc.control import InputSession
 from lalc.focused import FocusedAutomationSession, WindowError
 from lalc.runtime import RunGate, UserInterruption
 from lalc.windows_input import INPUT, WindowsInputBackend
-from test_input_control import FakeWindow, finished, paused, service_for
+from test_input_control import FakeWindow, finished, service_for
 
 
 def cursor_window(monkeypatch, window):
@@ -73,6 +73,7 @@ def test_takeover_or_activity_wait_never_moves_cursor(monkeypatch, waiting):
 def test_takeover_during_parking_resumes_with_fresh_position(tmp_path, monkeypatch):
     from lalc import task_workflow
     service, window = service_for(tmp_path)
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
     cursor = cursor_window(monkeypatch, window)
     move = window.backend.park_cursor
 
@@ -87,12 +88,16 @@ def test_takeover_during_parking_resumes_with_fresh_position(tmp_path, monkeypat
     def execute(ctx, *, operation: str = "drag") -> dict[str, int | str]:
         return ctx.action("observe.capture_screen")
     monkeypatch.setattr(service.manifest_manager.default.components["tasks.control"].module, "execute", execute)
+    waiting = []
+    emit = service._emit
+    def record(event, fields):
+        if fields.get("waiting_for") == "takeover" and "idle_seconds" in fields:
+            waiting.append((cursor["moves"], window.captures, service._focused_session.image))
+        emit(event, fields)
+    monkeypatch.setattr(service, "_emit", record)
     service.start("tasks.control", {})
-    paused(service)
-    assert cursor["moves"] == 1 and window.captures == 0
-    assert service._focused_session.image is None
-    service.resume()
     state = finished(service)
+    assert waiting == [(1, 0, None)]
     assert state["result"]["status"] == "success", state["result"]
     assert cursor["moves"] == 2 and not cursor["inside"]
 

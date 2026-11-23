@@ -493,23 +493,60 @@ class RepairTools:
             return False
         return False
 
-    def visible_run_ids(self):
+    def imported_run_locations(self):
+        """只在 Session 有权读取其他 Run 时提供导入副本的位置。"""
+        if not self.read_other_runs:
+            return {}
+        from .run_log_sharing import imported_logs
+
+        return {entry["run_id"]: (entry["root"], entry["original_run_id"])
+                for entry in imported_logs(self.library.data_root, check=self.checkpoint)}
+
+    def visible_run_locations(self):
         """先按权限筛选，再交给列表分页或检索。"""
         from .run_logs import retained_runs
-        return [run_id for run_id in retained_runs(self.library.data_root) if self.can_read_run(run_id)]
+        root = self.library.data_root
+        locations = self.imported_run_locations()
+        locations.update((run_id, (root, run_id)) for run_id in retained_runs(root) if self.can_read_run(run_id))
+        return locations
+
+    def run_location(self, run_id):
+        """将用户可见的 Run ID 解析为经过权限检查的 Trace 位置。"""
+        from .run_logs import trace_path
+        root = self.library.data_root
+        if self.can_read_run(run_id):
+            try:
+                trace_path(root, run_id)
+            except (OSError, ValueError):
+                location = self.imported_run_locations().get(run_id)
+                if location is not None:
+                    return location
+            else:
+                return root, run_id
+        raise ValueError("Run 日志不可用：没有访问权限、记录不存在或已清理。")
+
+    def run_origin(self, root, trace_id):
+        if root == self.library.data_root:
+            return {"origin": "local"}
+        return {"origin": "imported", "original_run_id": trace_id}
 
     def list_runs(self, offset=0, limit=100):
-        """列出保留 Run 的首尾元数据；旧记录不能确认的字段明确未知。"""
+        """按本机 Run ID 列出可读日志。origin 区分本机与导入，导入项含 original_run_id。"""
         if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 200:
             raise ValueError("offset 必须非负，limit 必须为 1–200 的整数。")
         from .run_logs import run_summary
-        root = self.library.data_root
-        ids = self.visible_run_ids()
-        runs = [run_summary(root, identity, check=self.checkpoint) for identity in ids[offset:offset + limit]]
+        locations = self.visible_run_locations()
+        ids = sorted(locations, reverse=True)
+        runs = []
+        for identity in ids[offset:offset + limit]:
+            root, trace_id = locations[identity]
+            item = run_summary(root, trace_id, check=self.checkpoint)
+            runs.append({**item, **self.run_origin(root, trace_id), "run_id": identity})
         if self.host is not None:
             current = self.host.service.status
             for item in runs:
-                if item["run_id"] == current.get("run_id") and current.get("phase") == "running":
+                if (item["origin"] == "local" and item["run_id"] == current.get("run_id")
+                        and current.get("phase") == "running"):
                     item["status"] = "running"
         return self.text({"run_ids": ids[offset:offset + limit], "runs": runs,
                           "next_offset": offset + limit if offset + limit < len(ids) else None})
@@ -518,20 +555,15 @@ class RepairTools:
                      *, render_sequence=None):
         """读取 Trace；用 evidence_id 查看原图，或只传 run_id 和 render_sequence 查看指定匹配、OCR 或点击事件的标注图。
 
+        run_id 使用 list_runs 返回的本机查询编号，截图使用事件中原样返回的 evidence_id。
         先通过 search_run_logs 或本工具找到动作结束事件的 sequence，再传给 render_sequence。
         OCR 和匹配仅引用已保存的当前观察；点击保存或复用当前缓存帧。事件需有可读截图证据。
         """
         if type(run_id) is not int or run_id < 1:
             raise ValueError("run_id 必须为正整数。")
-        from .run_logs import ACTION_ENDS, image_metadata, image_path, query_trace, run_log_counts, trace_records, trace_path
+        from .run_logs import ACTION_ENDS, image_metadata, image_path, query_trace, run_log_counts, trace_records
         from .file_content import FileContent, image_preview
-        root = self.library.data_root
-        try:
-            if not self.can_read_run(run_id):
-                raise ValueError("Run outside scope")
-            trace_path(root, run_id)
-        except (ValueError, OSError):
-            raise ValueError("Run 日志不可用：没有访问权限、记录不存在或已清理。") from None
+        root, trace_id = self.run_location(run_id)
         if render_sequence is not None:
             if type(render_sequence) is not int or render_sequence < 1:
                 raise ValueError("render_sequence 必须为正整数。")
@@ -539,12 +571,13 @@ class RepairTools:
                     or type(start_sequence) is not int or start_sequence != 1 or type(limit) is not int or limit != 100):
                 raise ValueError("render_sequence 仅与 run_id 一起使用。")
             start_sequence, limit = render_sequence, 1
-        page = query_trace(root, [run_id], start_sequence=start_sequence, limit=limit,
+        page = query_trace(root, [trace_id], start_sequence=start_sequence, limit=limit,
                            levels=levels, logical_name=logical_name, check=self.checkpoint)
-        details = {"run_id": run_id, "events": [item["record"] for item in page["matches"]],
+        details = {"run_id": run_id, **self.run_origin(root, trace_id),
+                   "events": [item["record"] for item in page["matches"]],
                    "next_sequence": page["next"]["start_sequence"] if page["next"] else None,
                    "damaged_records": page["damaged_records"],
-                   "log_counts": run_log_counts(root, run_id, check=self.checkpoint)}
+                   "log_counts": run_log_counts(root, trace_id, check=self.checkpoint)}
         annotations = []
         if render_sequence is not None:
             from .image_annotations import action_annotations
@@ -568,12 +601,12 @@ class RepairTools:
                 return isinstance(value, list) and any(referenced(item) for item in value)
 
             prefix, separator, observation = str(evidence_id).partition("/")
-            if (prefix != str(run_id) or not separator or not observation.isdecimal()
-                    or not any(referenced(record) for record in trace_records(root, run_id, check=self.checkpoint) if record)):
+            if (prefix != str(trace_id) or not separator or not observation.isdecimal()
+                    or not any(referenced(record) for record in trace_records(root, trace_id, check=self.checkpoint) if record)):
                 raise ValueError("截图必须是该 Run 日志引用的 evidence_id。")
         else:
             return self.text(details)
-        path = image_path(root, run_id, {"evidence_id": evidence_id})
+        path = image_path(root, trace_id, {"evidence_id": evidence_id})
         if path is None or not path.is_file():
             raise ValueError("截图证据不可用：缺失、已清理或路径越界。")
         content = image_preview(FileContent.from_path(path), annotations=annotations)
@@ -586,7 +619,7 @@ class RepairTools:
 
     def search_run_logs(self, keyword, run_id=None, *, all_runs=False, start_run_id=None,
                         start_sequence=1, limit=100, levels=None, logical_name=None):
-        """显式选择单 Run 或所有保留 Run，按原文子串检索并返回可续读游标。"""
+        """按本机 Run ID 查询一个或全部可读日志；匹配和续读游标使用本机编号。"""
         from .run_logs import query_trace
         if not isinstance(keyword, str) or not keyword.strip() or type(all_runs) is not bool:
             raise ValueError("keyword 必须非空，all_runs 必须为布尔值。")
@@ -594,17 +627,18 @@ class RepairTools:
             raise ValueError("指定正整数 run_id，或显式 all_runs=true，不能同时选择。")
         if start_run_id is not None and (type(start_run_id) is not int or start_run_id < 1):
             raise ValueError("start_run_id 必须为正整数。")
-        if not all_runs and not self.can_read_run(run_id):
-            raise ValueError("Run 日志不可用：没有访问权限、记录不存在或已清理。")
-        ids = self.visible_run_ids() if all_runs else [run_id]
         if start_run_id is not None:
             if not all_runs and start_run_id != run_id:
                 raise ValueError("游标不属于选定 Run。")
+        locations = self.visible_run_locations() if all_runs else {run_id: self.run_location(run_id)}
+        ids = sorted(locations, reverse=True)
+        if start_run_id is not None:
             ids = [identity for identity in ids if identity <= start_run_id]
             if ids and ids[0] != start_run_id:
                 start_sequence = 1
         return self.text(query_trace(self.library.data_root, ids, start_sequence=start_sequence, limit=limit,
-                                    levels=levels, logical_name=logical_name, keyword=keyword, check=self.checkpoint))
+                                    levels=levels, logical_name=logical_name, keyword=keyword, check=self.checkpoint,
+                                    locations=locations))
 
     def add_recovery_rule(self, filename, logical_name, source):
         """创建 Recovery Rule 并登记，不赋予通用写入权限。"""

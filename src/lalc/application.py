@@ -576,9 +576,9 @@ class ApplicationService:
             return False
         return self._input_session.process.exited()
 
-    def _prepare_input_resume(self) -> None:
+    def _prepare_input_resume(self, automatic: bool) -> None:
         assert self._input_session is not None
-        self._input_session.prepare_resume()
+        self._input_session.prepare_resume(automatic=automatic)
 
     def ledger_records(self) -> list[dict[str, Any]]:
         """读取当前 Run 的持久化 Workflow 记录。"""
@@ -913,7 +913,8 @@ class ApplicationService:
 
         with self._condition:
             try:
-                self._record_locked("run_finished", {"result": deepcopy(result)})
+                self._record_locked("run_finished", {"result": deepcopy(result),
+                                                     "working_manifest_id": self._state["working_manifest_id"]})
             except TraceWriteError as error:
                 self.logger.exception("Final Trace write failed")
                 previous = result
@@ -1036,24 +1037,13 @@ class ApplicationService:
         return result.loaded
 
     def _allocate_run_id(self) -> int:
-        path = self.data_root / "run-sequence.json"
+        """为正式执行从共享编号序列预留一个 Run ID。"""
+        from .run_log_sharing import reserve_run_ids, run_id_lock
+
         try:
-            if path.exists():
-                value = json.loads(path.read_text(encoding="utf-8"))
-                if type(value) is not dict or set(value) != {"last_run_id"} or type(value["last_run_id"]) is not int:
-                    raise ValueError("run-sequence.json is invalid")
-                last_run_id = value["last_run_id"]
-            else:
-                last_run_id = 0
-            existing_ids = [int(item.stem)
-                            for folder, pattern in (("traces", "*.jsonl"), ("run-usage", "*.json"))
-                            for item in (self.data_root / folder).glob(pattern) if item.stem.isdecimal()]
-            run_id = max([last_run_id, *existing_ids], default=0) + 1
-            if run_id < 1:
-                raise ValueError("Run ID must be positive")
-            atomic_write_json(path, {"last_run_id": run_id})
-            return run_id
-        except (OSError, ValueError, json.JSONDecodeError) as error:
+            with run_id_lock(self.data_root):
+                return reserve_run_ids(self.data_root).start
+        except (OSError, ValueError) as error:
             raise StartError("run_id_allocation_failed", str(error)) from error
 
     def _changed_locked(self) -> None:

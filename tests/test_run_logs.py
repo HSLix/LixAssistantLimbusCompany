@@ -131,6 +131,21 @@ def test_selection_checks_for_updates_without_moving_view(log_page):
     assert page.view.verticalScrollBar().value() == 0
 
 
+def test_manifest_header_updates_when_run_finishes_without_a_visible_log_row(log_page):
+    _, page, path, until = log_page
+    start = {'event': 'run_started', 'base_manifest_id': 'base-version'}
+    path.write_text(json.dumps(start) + '\n' + path.read_text(encoding='utf-8'), encoding='utf-8')
+    page.boundary = None
+    page.select_run(page.runs.item(0))
+    until(lambda: 'Based on Manifest: base-version' in page.run_metadata.text() and not page.loading)
+    assert 'Final Manifest' not in page.run_metadata.text()
+    with path.open('a', encoding='utf-8') as stream:
+        stream.write(json.dumps({'event': 'run_finished', 'working_manifest_id': 'final-version'}) + '\n')
+    page.select_run(page.runs.item(0))
+    until(lambda: 'Final Manifest: final-version' in page.run_metadata.text() and not page.loading)
+    assert not page.new_logs.isVisible()
+
+
 def test_wheel_step_stays_small_with_tall_logs(log_page):
     """长日志改变行高后，普通滚轮仍按小像素步长滚动。"""
     from PySide6.QtCore import QPoint, QPointF, Qt

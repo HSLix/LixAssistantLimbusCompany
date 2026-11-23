@@ -1,4 +1,4 @@
-"""前台输入所有权、长动作释放和用户手动恢复。"""
+"""前台输入所有权、长动作释放和输入恢复。"""
 
 from __future__ import annotations
 
@@ -122,6 +122,10 @@ class InputSession:
             self.wait_for_activity(hwnd)
         self.resume_focus = False
 
+    def log_input_wait(self, message: str, **fields: Any) -> None:
+        self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
+                  "phase": "execute", "level": "info", "message": message, **fields})
+
     def wait_for_activity(self, hwnd: int) -> None:
         """其他应用连续空闲后才取焦点；等待日志复用用户可见 Info 记录。"""
         started = time.monotonic()
@@ -129,9 +133,6 @@ class InputSession:
         outcome = "interrupted"
         paused_seconds = 0.0
 
-        def log(message: str, **fields: Any) -> None:
-            self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
-                      "phase": "execute", "level": "info", "message": message, **fields})
         try:
             while True:
                 if self.focus_checkpoint is not None:
@@ -157,7 +158,7 @@ class InputSession:
                     return
                 if not waiting:
                     waiting = True
-                    log("等待其他应用连续空闲 10 秒后聚焦游戏。", idle_seconds=self.ACTIVITY_SECONDS)
+                    self.log_input_wait("等待其他应用连续空闲 10 秒后聚焦游戏。", idle_seconds=self.ACTIVITY_SECONDS)
                 time.sleep(self.POLL_SECONDS)
         finally:
             if waiting:
@@ -165,8 +166,8 @@ class InputSession:
                 self.focus_wait_seconds += max(0.0, duration - paused_seconds)
                 reason = {"idle": "其他应用已空闲", "foreground": "游戏已在前台",
                           "manual_resume": "用户手动恢复", "interrupted": "暂停、取消或窗口异常"}[outcome]
-                log(f"游戏焦点等待结束，实际等待 {duration:.1f} 秒：{reason}。",
-                    duration_seconds=duration, outcome=outcome)
+                self.log_input_wait(f"游戏焦点等待结束，实际等待 {duration:.1f} 秒：{reason}。",
+                                    duration_seconds=duration, outcome=outcome)
 
     def ensure_foreground(self) -> None:
         """失焦先让出控制；已开始的长动作必须先释放，再由 Step 边界重入。"""
@@ -231,13 +232,26 @@ class InputSession:
         })
         return False
 
-    def prepare_resume(self) -> None:
-        """明确恢复仅等待输入释放，不等待十秒；恢复后首次聚焦享有例外。"""
-        with self.monitor.lock:
-            self.monitor.pause_requested = False
-        generation = self.wait_quiet()
-        self.owned_generation = generation
+    def wait_after_takeover(self) -> None:
+        """动作释放后等待全局物理输入安静，即使游戏还在前台。"""
+        started = time.monotonic()
+        self.log_input_wait("用户接管后，等待键鼠连续空闲 10 秒再自动恢复。",
+                            waiting_for="takeover", idle_seconds=self.ACTIVITY_SECONDS)
+        self.owned_generation = self.wait_quiet(self.ACTIVITY_SECONDS)
         self.paused = False
+        self.log_input_wait("键鼠已连续空闲，开始恢复前检查。", waiting_for="takeover", outcome="idle",
+                            duration_seconds=time.monotonic() - started)
+
+    def prepare_resume(self, *, automatic=False) -> None:
+        """确认输入释放并刷新游戏画面；自动恢复须先满足完整空闲窗口。"""
+        if automatic:
+            self.wait_after_takeover()
+        else:
+            with self.monitor.lock:
+                self.monitor.pause_requested = False
+            self.owned_generation = self.wait_quiet()
+            self.paused = False
+        self.check_ownership()
         self.resume_focus = True
         if self.process.exited():
             self.window.image = None
@@ -251,18 +265,23 @@ class InputSession:
         if self.backend.any_pressed():
             raise WindowError("恢复检查期间仍有用户输入，请再次恢复。")
 
-    def wait_quiet(self) -> int:
+    def wait_quiet(self, seconds: float | None = None) -> int:
         """等待物理输入释放且安静，供普通恢复与重启过渡期共用。"""
+        duration = self.QUIET_SECONDS if seconds is None else seconds
         while True:
             if self.gate.stopped:
                 raise UserInterruption
             generation, last, _ = self.monitor.snapshot()
             if self.monitor.pause_requested:
                 self._interrupt("全局快捷键请求暂停。", "pause")
-            if time.monotonic() - last >= self.QUIET_SECONDS and not self.backend.any_pressed():
-                break
+            if self.gate.paused:
+                self._interrupt("自动化已暂停。", "pause")
+            if time.monotonic() - last >= duration and not self.backend.any_pressed():
+                # 查询实际按住状态期间也可能有键鼠输入。
+                if self.monitor.snapshot()[:2] == (generation, last):
+                    break
             time.sleep(self.POLL_SECONDS)
-        self.emit("input_quiet", {"quiet_seconds": self.QUIET_SECONDS})
+        self.emit("input_quiet", {"quiet_seconds": duration})
         return generation
 
     def _wait(self, duration: float, update: Callable[[float], None] | None = None) -> None:
@@ -333,7 +352,7 @@ class InputSession:
                 self._point(x, y)
                 position = self.window.platform.cursor_position(self.window.hwnd)
                 if abs(position["x"] - x) > 2 or abs(position["y"] - y) > 2:
-                    self._interrupt("滚轮目标处的鼠标位置已改变或未到达。", "physical_input")
+                    self._interrupt("滚轮目标处的鼠标位置已改变或未到达。", "cursor_position")
                 self.backend.wheel(120 if direction == "up" else -120)
                 self.check()
         finally:
