@@ -119,6 +119,7 @@ class InputSession:
         """每次置前尝试都经过同一个可取消的空闲检查。"""
         self.monitor.target_hwnd = hwnd
         immediate_since = None
+        requested = False
 
         def check():
             nonlocal immediate_since
@@ -128,7 +129,17 @@ class InputSession:
             if checkpoint is not None:
                 checkpoint()
 
-        self.window.platform.focus(hwnd, checkpoint=check, max_attempts=None)
+        def first_attempt(foreground, accepted):
+            nonlocal requested
+            requested = True
+            message = ("已请求游戏置前，等待 Windows 确认。" if accepted else
+                       "Windows 未能将游戏置前，仍在等待，也可手动切回游戏。")
+            self.log_input_wait(message, outcome="focus_requested", target_hwnd=hwnd,
+                                foreground_hwnd=foreground, set_foreground_result=accepted)
+
+        self.window.platform.focus(hwnd, checkpoint=check, max_attempts=None, on_first_attempt=first_attempt)
+        if requested:
+            self.log_input_wait("已确认游戏窗口回到前台。", outcome="focus_confirmed", target_hwnd=hwnd)
 
     def log_input_wait(self, message: str, **fields: Any) -> None:
         self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
@@ -187,7 +198,7 @@ class InputSession:
             if waiting:
                 duration = time.monotonic() - started
                 self.focus_wait_seconds += max(0.0, duration - paused_seconds)
-                reason = {"idle": "键鼠已空闲", "foreground": "游戏已在前台",
+                reason = {"idle": "键鼠已空闲，可以请求游戏置前", "foreground": "游戏已在前台",
                           "manual_resume": "用户手动恢复", "interrupted": "暂停、取消或窗口异常"}[outcome]
                 self.log_input_wait(f"游戏焦点等待结束，实际等待 {duration:.1f} 秒：{reason}。",
                                     duration_seconds=duration, outcome=outcome)
