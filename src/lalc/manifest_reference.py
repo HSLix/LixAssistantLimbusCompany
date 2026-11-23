@@ -1,7 +1,6 @@
 """已发布 Manifest 的纯数据参考；不导入 Python，不变更任何选择。"""
 
 import hashlib
-import json
 import re
 import uuid
 from datetime import datetime
@@ -23,7 +22,7 @@ class ManifestReference:
         current = root
         for part in relative.parts:
             current /= part
-            if current.is_symlink():
+            if current.is_symlink() or current.is_junction():
                 raise ValueError("参考内容不允许符号链接。")
         if not path.resolve().is_relative_to(root.resolve()) or not path.is_file():
             raise ValueError("参考内容不存在或路径越界。")
@@ -33,8 +32,9 @@ class ManifestReference:
         """只解析登记关系，不走会执行源码的 load / validate。"""
         if not isinstance(manifest_id, str) or str(uuid.UUID(manifest_id)) != manifest_id:
             raise ValueError("Manifest ID 必须是标准 UUID。")
-        value = json.loads(self._file(self.manager.manifests_dir / f"{manifest_id}.json"))
-        if (not isinstance(value, dict) or not SAVED_TOP_LEVEL_FIELDS <= set(value) <= SAVED_TOP_LEVEL_FIELDS | OPTIONAL_FIELDS
+        content = self._file(self.manager.manifests_dir / f"{manifest_id}.json")
+        value, errors = self.manager._parse_json(content.decode("utf-8"))
+        if (errors or not isinstance(value, dict) or not SAVED_TOP_LEVEL_FIELDS <= set(value) <= SAVED_TOP_LEVEL_FIELDS | OPTIONAL_FIELDS
                 or type(value.get("schema_version")) is not int or value["schema_version"] != SCHEMA_VERSION
                 or value.get("manifest_id") != manifest_id):
             raise ValueError("Manifest 结构或身份校验失败。")

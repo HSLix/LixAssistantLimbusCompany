@@ -73,9 +73,12 @@ def test_control_is_independent_persistent_and_private(remote):
     assert restarted.check()["last_used_at"] == second["workspace"]["last_used_at"]
 
 
-def test_construct_tools_are_equal_but_not_aliased(remote):
+def test_remote_construct_tools_include_remote_page_read_and_update(remote):
     from lalc.agent_policy import allowed_tools
-    assert set(MCP_TOOLS) == set(allowed_tools("Construct", "gui"))
+    gui_tools = set(allowed_tools("Construct", "gui"))
+    remote_tools = set(MCP_TOOLS)
+    assert remote_tools - gui_tools == {"page_read", "page_update"}
+    assert gui_tools <= remote_tools
     token = acquired(remote)
     with pytest.raises(ValueError):
         remote.invoke("recheck", {}, token)

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 from types import MappingProxyType
 
+from .process_lock import ProcessLock
 from .work_files import create_work_file
 from .actions import ACTION_ACCESS, TrustedAction, application_actions
 from .runtime import _exception_fields, atomic_write_json, sha256_bytes
@@ -144,42 +145,47 @@ class ManifestManager:
         self.actions = MappingProxyType(dict(application_actions() if actions is None else actions))
         self.default: LoadedManifest | None = None
 
+    def store_lock(self) -> ProcessLock:
+        """发布、导入、选择和清理共享正式版本库的排他权。"""
+        return ProcessLock("manifest-store:" + os.path.normcase(str(self.data_root.resolve())))
+
     def publish(self, candidate_path: Path, *, manifest_id: str | None = None) -> ManifestResult:
         """完整校验并发布开发者候选，但不改变 Default Manifest。"""
 
         candidate_path = Path(candidate_path)
         phase = "validate_manifest"
         try:
-            prepared = self._prepare(candidate_path, saved=False)
-            if prepared.errors:
-                # 静态错误必须阻止整个批次导入，避免部分顶层代码提前执行。
-                return ManifestResult(errors=tuple(prepared.errors))
+            with self.store_lock():
+                prepared = self._prepare(candidate_path, saved=False)
+                if prepared.errors:
+                    # 静态错误必须阻止整个批次导入，避免部分顶层代码提前执行。
+                    return ManifestResult(errors=tuple(prepared.errors))
 
-            if manifest_id is None:
-                manifest_id = str(uuid.uuid4())
-            elif str(uuid.UUID(manifest_id)) != manifest_id:
-                raise ValueError("Invalid publication identity")
-            assert prepared.manifest is not None
-            manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
-            manifest.update(AdditionalMessage=prepared.manifest.get("AdditionalMessage", ""),
-                            published_at=datetime.now(timezone.utc).isoformat())
-            manifest.update({name: prepared.manifest[name] for name in SECTIONS})
-            phase = "write_components"
-            self.components_dir.mkdir(parents=True, exist_ok=True)
-            self.manifests_dir.mkdir(parents=True, exist_ok=True)
-            for source in prepared.sources.values():
-                self._store_component(source)
-                source.path = (self.components_dir / f"{source.component_id.removeprefix(COMPONENT_ID_PREFIX)}.py").resolve()
-            phase = "load_components"
-            loaded, errors = self._load(manifest, prepared)
-            if errors:
-                return ManifestResult(errors=tuple(errors))
-            phase = "write_manifest"
-            manifest_path = self.manifests_dir / f"{manifest_id}.json"
-            if manifest_path.exists():
-                raise FileExistsError(manifest_path)
-            atomic_write_json(manifest_path, manifest)
-            return ManifestResult(loaded=loaded)
+                if manifest_id is None:
+                    manifest_id = str(uuid.uuid4())
+                elif str(uuid.UUID(manifest_id)) != manifest_id:
+                    raise ValueError("Invalid publication identity")
+                assert prepared.manifest is not None
+                manifest = {"schema_version": SCHEMA_VERSION, "manifest_id": manifest_id}
+                manifest.update(AdditionalMessage=prepared.manifest.get("AdditionalMessage", ""),
+                                published_at=datetime.now(timezone.utc).isoformat())
+                manifest.update({name: prepared.manifest[name] for name in SECTIONS})
+                phase = "write_components"
+                self.components_dir.mkdir(parents=True, exist_ok=True)
+                self.manifests_dir.mkdir(parents=True, exist_ok=True)
+                for source in prepared.sources.values():
+                    self._store_component(source)
+                    source.path = (self.components_dir / f"{source.component_id.removeprefix(COMPONENT_ID_PREFIX)}.py").resolve()
+                phase = "load_components"
+                loaded, errors = self._load(manifest, prepared)
+                if errors:
+                    return ManifestResult(errors=tuple(errors))
+                phase = "write_manifest"
+                manifest_path = self.manifests_dir / f"{manifest_id}.json"
+                if manifest_path.exists():
+                    raise FileExistsError(manifest_path)
+                atomic_write_json(manifest_path, manifest)
+                return ManifestResult(loaded=loaded)
         except Exception as error:
             self.logger.exception("Manifest update failed during %s", phase)
             return ManifestResult(
@@ -216,20 +222,19 @@ class ManifestManager:
     def set_default(self, manifest_id: str) -> ManifestResult:
         """完整加载一个既有 Manifest 后原子选择为 Default。"""
 
-        result = self.load(manifest_id)
-        if not result.ok:
-            return result
-        if self.default_manifest_id() == manifest_id:
-            self.default = result.loaded
-            return result
         try:
-            self.manifests_dir.mkdir(parents=True, exist_ok=True)
-            atomic_write_json(self.manifests_dir / "default.json", {"manifest_id": manifest_id})
+            with self.store_lock():
+                result = self.load(manifest_id)
+                if not result.ok:
+                    return result
+                if self.default_manifest_id() != manifest_id:
+                    self.manifests_dir.mkdir(parents=True, exist_ok=True)
+                    atomic_write_json(self.manifests_dir / "default.json", {"manifest_id": manifest_id})
+                self.default = result.loaded
+                return result
         except Exception as error:
             self.logger.exception("Manifest update failed during set_default")
             return ManifestResult(errors=(ValidationError("manifest_update_failed", str(error), cause=error),))
-        self.default = result.loaded
-        return result
 
     def load_default(self) -> ManifestResult:
         """按照 default.json 加载 Default Manifest，但不重写磁盘状态。"""
@@ -315,7 +320,7 @@ class ManifestManager:
                     **sections,
                 }
             )
-        return sorted(summaries, key=lambda item: item["saved_at"], reverse=True)
+        return sorted(summaries, key=lambda item: (item["saved_at"], str(item["manifest_id"])), reverse=True)
 
     def initialize_candidate(
         self, candidate_dir: Path, *, manifest_id: str | None = None, empty: bool = False
@@ -1078,6 +1083,11 @@ class ManifestManager:
             text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
             return None, [ValidationError("manifest_unreadable", str(error), cause=error)]
+        return self._parse_json(text)
+
+    @staticmethod
+    def _parse_json(text: str) -> tuple[Any | None, list[ValidationError]]:
+        """共用 Manifest 写入与纯读取边界的重复键检查。"""
         duplicates: list[str] = []
 
         def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:

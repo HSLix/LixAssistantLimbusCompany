@@ -110,7 +110,7 @@ def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, fr
 def test_fluent_navigation_keeps_fixed_routes_and_always_visible_task_scrollbar(windows):
     from PySide6.QtCore import Qt
     _, _, user, developer = windows
-    assert [user.pages.widget(i).objectName() for i in range(3)] == ["dashboard", "run-logs", "general-settings"]
+    assert [user.pages.widget(i).objectName() for i in range(4)] == ["dashboard", "run-logs", "data-maintenance", "general-settings"]
     user.switchTo(user.general_settings)
     assert user.pages.currentWidget() is user.general_settings
     assert not user.pages.isAnimationEnabled()
@@ -127,13 +127,14 @@ def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows)
     app, _, user, developer = windows
     panel = user.navigationInterface.panel
     widgets = [panel.topLayout.itemAt(i).widget() for i in range(panel.topLayout.count())][2:]
-    assert len(widgets) == 6
-    general, dashboard, logs, settings, separator, workflow = widgets
+    assert len(widgets) == 7
+    general, dashboard, logs, maintenance, settings, separator, workflow = widgets
     assert isinstance(general, NavigationItemHeader) and general.text() == "通用"
     assert isinstance(workflow, NavigationItemHeader) and workflow.text() == "业务设置"
     assert isinstance(separator, NavigationSeparator)
     assert dashboard._icon == FluentIcon.HOME and settings._icon == FluentIcon.SETTING
-    assert user.pages.count() == 3 and not user.business_pages
+    assert maintenance._icon == FluentIcon.DELETE
+    assert user.pages.count() == 4 and not user.business_pages
     assert not developer.navigationInterface.findChildren(NavigationItemHeader)
     assert panel.expandWidth == 220
     user.navigationInterface.expand(useAni=False)
@@ -152,6 +153,51 @@ def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows)
     assert panel.displayMode == NavigationDisplayMode.MENU
     assert all(header.height() > 0 for header in (general, workflow))
     assert separator.isVisible() and panel.expandWidth == 220
+
+
+def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
+    """日期筛选包含当天，只有确认后才删除并保存摘要。"""
+    from datetime import datetime
+    from PySide6.QtCore import QDate
+    from lalc.data_maintenance_gui import CleanupDialog
+    from test_data_maintenance import trace
+
+    app, _, user, _ = windows
+    root = user.service.data_root
+    path = trace(root, 7, 'manifest', [])
+    page = user.data_maintenance
+    user.switchTo(page)
+
+    def wait_until(test):
+        deadline = time.monotonic() + 3
+        while not test() and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        assert test(), page.note.text()
+
+    wait_until(lambda: page.table.rowCount() == 1)
+    page.open_details(0, 6)
+    wait_until(lambda: user.log_page.selected_key == 7)
+    assert user.pages.currentWidget() is user.log_page
+    user.switchTo(page)
+    wait_until(lambda: page.table.rowCount() == 1)
+    day = QDate(datetime.fromisoformat('2026-11-11T12:00:00+00:00').astimezone().date())
+    page.start.setDate(day.addDays(1))
+    assert page.table.rowCount() == 0
+    page.start.setDate(day)
+    page.end.setDate(day)
+    assert page.table.rowCount() == 1
+    page.select_all.click()
+    assert page.preview_button.isEnabled()
+    decisions = iter([False, True])
+    monkeypatch.setattr(CleanupDialog, 'exec', lambda self: next(decisions))
+    page.preview_button.click()
+    wait_until(lambda: not page.previewing)
+    assert path.exists()
+    page.preview_button.click()
+    wait_until(lambda: not path.exists() and not user.jobs and not page.loading)
+    assert page.table.rowCount() == 0
+    assert (root / 'run-usage/7.json').is_file()
 
 
 def test_native_owned_modal_keeps_other_fluent_window_editable(windows):

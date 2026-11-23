@@ -17,3 +17,6 @@ pi_resources/*
 .scratch/
 codesearch_resources/
 work/
+
+/CONTEXT.md
+/docs/adr/

@@ -2420,5 +2420,110 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Imported settings (whole page replacement):</source><translation>导入配置（整页替换）：</translation></message>
     <message><source>Choose Replace or Skip for each selected conflict (Assets / Skills / Page Settings).</source><translation>请为选中的冲突项选择替换或跳过（Asset／Skill／页面配置）。</translation></message>
     <message><source>Page settings were imported. Reload the application before running.</source><translation>页面配置已导入，请重载应用后再运行。</translation></message>
+    <message><source>All roles</source><translation>全部角色</translation></message>
+    <message><source>All sources</source><translation>所有来源</translation></message>
+    <message><source>All versions</source><translation>全部版本</translation></message>
+    <message><source>Any date</source><translation>不限</translation></message>
+    <message><source>Asset name</source><translation>素材逻辑名</translation></message>
+    <message><source>Asset names</source><translation>素材逻辑名</translation></message>
+    <message><source>Calls</source><translation>调用次数</translation></message>
+    <message><source>Calls are counted by source version from available local logs and usage summaries.</source><translation>按源码版本统计，覆盖可用的本机日志和使用摘要。</translation></message>
+    <message><source>Cancelled</source><translation>已取消</translation></message>
+    <message><source>Interrupted</source><translation>已中断</translation></message>
+    <message><source>Cleanup completed</source><translation>清理完成</translation></message>
+    <message><source>Cleanup completed with files remaining</source><translation>清理已提交，有残留文件</translation></message>
+    <message><source>Cleanup is unavailable during an activity.</source><translation>有活动进行中，暂不可清理。</translation></message>
+    <message><source>Cleanup status</source><translation>清理状态</translation></message>
+    <message><source>Clear dates</source><translation>清除日期</translation></message>
+    <message><source>Clear selection</source><translation>清除选择</translation></message>
+    <message><source>Completed</source><translation>完成</translation></message>
+    <message><source>Component</source><translation>组件</translation></message>
+    <message><source>Component source versions</source><translation>组件源码版本</translation></message>
+    <message><source>Components</source><translation>组件</translation></message>
+    <message><source>Data &amp; Cleanup</source><translation>数据与清理</translation></message>
+    <message><source>Data operation failed: {0}</source><translation>数据操作失败：{0}</translation></message>
+    <message><source>Date</source><translation>日期</translation></message>
+    <message><source>Default</source><translation>默认</translation></message>
+    <message><source>Default, latest and sources referenced by retained versions are kept.</source><translation>默认与最新版本、仍被保留版本引用的源码会保留。</translation></message>
+    <message><source>Delete permanently</source><translation>永久删除</translation></message>
+    <message><source>Deleted detailed logs and screenshots cannot be recovered.</source><translation>详细日志和截图删除后无法恢复。</translation></message>
+    <message><source>Deleted versions cannot be selected for runs or rollback.</source><translation>删除后无法选择这些版本运行或回退。</translation></message>
+    <message><source>Detailed log size</source><translation>详细日志占用</translation></message>
+    <message><source>Eligible for cleanup</source><translation>可清理</translation></message>
+    <message><source>End date</source><translation>截止日期</translation></message>
+    <message><source>Estimated space freed</source><translation>预计释放</translation></message>
+    <message><source>File date</source><translation>文件时间</translation></message>
+    <message><source>Image size</source><translation>图片占用</translation></message>
+    <message><source>Imported logs</source><translation>导入日志</translation></message>
+    <message><source>Items to delete</source><translation>待删条目</translation></message>
+    <message><source>Last match</source><translation>最近命中</translation></message>
+    <message><source>Last match is read from the Asset usage index.</source><translation>最近命中来自素材使用索引。</translation></message>
+    <message><source>Last used</source><translation>最近使用</translation></message>
+    <message><source>Latest</source><translation>最新</translation></message>
+    <message><source>Loading data…</source><translation>正在加载数据…</translation></message>
+    <message><source>Local logs</source><translation>本机日志</translation></message>
+    <message><source>Logical names</source><translation>逻辑名</translation></message>
+    <message><source>Next</source><translation>下一页</translation></message>
+    <message><source>Not recorded</source><translation>未记录</translation></message>
+    <message><source>Permanently delete {0} run logs?</source><translation>永久清理 {0} 条运行日志？</translation></message>
+    <message><source>Permanently delete {0} workflow versions?</source><translation>永久清理 {0} 份工作流版本？</translation></message>
+    <message><source>Plan</source><translation>计划</translation></message>
+    <message><source>Preview cleanup</source><translation>预览清理</translation></message>
+    <message><source>Previous</source><translation>上一页</translation></message>
+    <message><source>Protected</source><translation>受保护</translation></message>
+    <message><source>Protected versions</source><translation>受保护版本</translation></message>
+    <message><source>Published versions</source><translation>已发布版本</translation></message>
+    <message><source>Recovery Rule</source><translation>恢复规则</translation></message>
+    <message><source>Referenced Component versions</source><translation>被引用的组件版本</translation></message>
+    <message><source>Referenced by</source><translation>引用版本数</translation></message>
+    <message><source>Refresh</source><translation>刷新</translation></message>
+    <message><source>Release date</source><translation>发布日期</translation></message>
+    <message><source>Result</source><translation>结果</translation></message>
+    <message><source>Run #{0}</source><translation>Run #{0}</translation></message>
+    <message><source>Run #{0} · {1}</source><translation>Run #{0} · {1}</translation></message>
+    <message><source>Run count</source><translation>运行次数</translation></message>
+    <message><source>Run counts cover available local logs and usage summaries.</source><translation>运行次数覆盖可用的本机日志和使用摘要。</translation></message>
+    <message><source>Run logs</source><translation>运行日志</translation></message>
+    <message><source>Search Asset name</source><translation>搜索素材逻辑名</translation></message>
+    <message><source>Search Component name or version</source><translation>搜索组件逻辑名或版本</translation></message>
+    <message><source>Select filtered results</source><translation>全选筛选结果</translation></message>
+    <message><source>Show {0} Component sources to be deleted</source><translation>查看将删除的 {0} 份组件源码</translation></message>
+    <message><source>Showing {0}–{1}</source><translation>显示第 {0}–{1} 条</translation></message>
+    <message><source>Size</source><translation>大小</translation></message>
+    <message><source>Some isolated files remain at {0}</source><translation>部分隔离文件仍保存在 {0}</translation></message>
+    <message><source>Source</source><translation>来源</translation></message>
+    <message><source>Source version</source><translation>源码版本</translation></message>
+    <message><source>Start date</source><translation>起始日期</translation></message>
+    <message><source>Start time</source><translation>开始时间</translation></message>
+    <message><source>Step</source><translation>步骤</translation></message>
+    <message><source>Subworkflow</source><translation>子工作流</translation></message>
+    <message><source>Success</source><translation>成功</translation></message>
+    <message><source>Task Workflow</source><translation>任务工作流</translation></message>
+    <message><source>Template images</source><translation>模板图片</translation></message>
+    <message><source>The selected items were removed.</source><translation>已清理选择的条目。</translation></message>
+    <message><source>Unknown</source><translation>未知</translation></message>
+    <message><source>Unknown name</source><translation>未知逻辑名</translation></message>
+    <message><source>Unreferenced sources</source><translation>无引用源码</translation></message>
+    <message><source>Usage summaries, Workflow Ledger and Agent sessions are kept.</source><translation>使用摘要、Workflow Ledger 和 Agent 会话会保留。</translation></message>
+    <message><source>Version / release notes</source><translation>版本 / 发布说明</translation></message>
+    <message><source>Versions with recorded calls</source><translation>有调用记录的版本</translation></message>
+    <message><source>View log</source><translation>查看日志</translation></message>
+    <message><source>Workflow versions</source><translation>工作流版本</translation></message>
+    <message><source>to</source><translation>至</translation></message>
+    <message><source>{0} records could not be read. Statistics may be incomplete.</source><translation>有 {0} 条记录无法读取，统计可能不完整。</translation></message>
+    <message><source>{0} results</source><translation>{0} 条结果</translation></message>
+    <message><source>{0} results · {1} selected</source><translation>筛选出 {0} 条 · 已选 {1} 条</translation></message>
+    <message><source>{0} to {1} · Local dates</source><translation>{0} 至 {1} · 本地日期</translation></message>
+    <message><source>Cleaning up data</source><translation>正在清理数据</translation></message>
+    <message><source>An unreadable Manifest or Default pointer prevents safe cleanup.</source><translation>有工作流版本或默认指针无法读取，暂不能安全清理。</translation></message>
+    <message><source>A selected run log is unavailable or has no start date.</source><translation>所选运行日志存在无法读取或缺少开始日期的条目。</translation></message>
+    <message><source>A selected Manifest is unavailable or protected.</source><translation>所选工作流版本存在不可用或受保护的条目。</translation></message>
+    <message><source>Selected data changed. Preview cleanup again.</source><translation>所选数据已变化，请重新预览。</translation></message>
+    <message><source>{0} logs</source><translation>{0} 条</translation></message>
+    <message><source>{0} versions</source><translation>{0} 份</translation></message>
+    <message><source>{0} sources</source><translation>{0} 份</translation></message>
+    <message><source>{0} names</source><translation>{0} 个</translation></message>
+    <message><source>{0} images</source><translation>{0} 张</translation></message>
+    <message><source>Asset inventory</source><translation>素材</translation></message>
 </context>
 </TS>
