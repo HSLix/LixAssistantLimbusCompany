@@ -11,8 +11,7 @@ from qfluentwidgets import PushButton, TransparentToolButton, FluentIcon, BodyLa
 from .agent_log import LogStore
 from .i18n import tr
 
-BUTTON_LIGHT = 'PushButton { background-color: #fafafa; color: #202020; }'
-BUTTON_DARK = 'PushButton { background-color: #303030; color: #f0f0f0; }'
+BUTTON_STYLE = 'PushButton { background-color: #fafafa; color: #202020; }'
 
 
 def draft_attachments(images, references):
@@ -121,7 +120,7 @@ class AttachmentCard(QWidget):
         super().__init__(parent)
         self.item = item
         self.button = PushButton(self)
-        setCustomStyleSheet(self.button, BUTTON_LIGHT, BUTTON_DARK)
+        setCustomStyleSheet(self.button, BUTTON_STYLE, BUTTON_STYLE)
         name = item['name']
         self.display_name = name
         self.button.setAccessibleName(name)
@@ -218,7 +217,7 @@ class AttachmentTray(QWidget):
         layout.addWidget(self.toggle)
         self.more = PushButton(self.content)
         for button in (self.more, self.toggle):
-            setCustomStyleSheet(button, BUTTON_LIGHT, BUTTON_DARK)
+            setCustomStyleSheet(button, BUTTON_STYLE, BUTTON_STYLE)
         self.more.clicked.connect(self.toggle_expanded)
         self.hide()
 

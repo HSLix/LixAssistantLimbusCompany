@@ -394,16 +394,14 @@ def test_log_time_displays_seconds_without_inventing_missing_time(value, expecte
     assert log_time(value) == expected
 
 
-@pytest.mark.parametrize('dark', [False, True])
 @pytest.mark.parametrize('level', ['info', 'warning', 'error', 'debug'])
-def test_log_delegate_paints_shared_level_background(log_page, monkeypatch, dark, level):
-    """检查实际绘制的色块像素；两种主题的四个等级均复用运行窗口配色。"""
+def test_log_delegate_paints_shared_level_background(log_page, level):
+    """检查实际绘制的色块像素；四个等级均复用运行窗口配色。"""
     from PySide6.QtCore import QRect
     from PySide6.QtGui import QColor, QImage, QPainter
     from PySide6.QtWidgets import QStyleOptionViewItem
     import lalc.run_log_gui as gui
     app, page, path, until = log_page
-    monkeypatch.setattr(gui, 'isDarkTheme', lambda: dark)
     row = {**page.model.rows[0], 'level': level, 'image': None}
     page.model.replace([row])
     option = QStyleOptionViewItem()

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QStackedWidget
     QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QListWidget, QListWidgetItem,
     QScrollArea, QFileDialog, QMessageBox, QProgressBar, QApplication)
 from qfluentwidgets import (BodyLabel, TitleLabel, PushButton, PrimaryPushButton, PlainTextEdit,
-                            CheckBox, ComboBox, SegmentedWidget, StrongBodyLabel, themeColor, isDarkTheme)
+                            CheckBox, ComboBox, SegmentedWidget, StrongBodyLabel, themeColor)
 
 from .i18n import tr
 from .developer_gui import Operation
@@ -128,8 +128,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
                 super().closeEvent(event)
     dialog = ProgressDialog(parent)
     dialog.setObjectName("sharingProgressDialog")
-    background = "#202020" if isDarkTheme() else "#ffffff"
-    dialog.setStyleSheet(f"QDialog#sharingProgressDialog {{ background: {background}; }}")
+    dialog.setStyleSheet("QDialog#sharingProgressDialog { background: #ffffff; }")
     dialog.setWindowTitle(heading)
     dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
     dialog.resize(600, 360)

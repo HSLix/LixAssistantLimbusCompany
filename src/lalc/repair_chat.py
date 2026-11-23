@@ -8,7 +8,7 @@ import time
 from PySide6.QtCore import QEvent, QSize, Signal, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QTextDocument, QTextCursor, QImage
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QTextBrowser, QWidget
-from qfluentwidgets import FluentIcon, Theme, TransparentToolButton, isDarkTheme, setCustomStyleSheet
+from qfluentwidgets import FluentIcon, Theme, TransparentToolButton, setCustomStyleSheet
 
 from .i18n import tr
 from .agent_prompts import user_message_text, chat_title
@@ -439,7 +439,7 @@ class RepairChat(QTextBrowser):
                 if number in self.round_times:
                     stamp = self.round_times[number].astimezone()
                     tooltip = escape(stamp.strftime('%Y-%m-%d %H:%M:%S %Z'))
-                    color = '#a7b6c8' if isDarkTheme() else '#68788b'
+                    color = '#68788b'
                     shown_time = stamp.strftime('%H:%M:%S' if stamp.date() == today else '%Y-%m-%d %H:%M:%S')
                     time_label = f'&nbsp;&nbsp;<span style="color:{color}" title="{tooltip}">{shown_time}</span>'
                     heading = heading.removesuffix('</p>') + time_label + '</p>'

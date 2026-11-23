@@ -19,6 +19,35 @@ from lalc.lifecycle import ApplicationLifecycle
 from test_agent_repair import host_for
 
 
+@pytest.mark.parametrize('developer', [False, True])
+def test_gui_startup_selects_light_theme(monkeypatch, developer):
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QStyleHints
+    from qfluentwidgets import Theme, qconfig, setTheme
+
+    from lalc.gui import run_gui
+    from lalc.gui_instance import GuiInstance
+
+    requested_schemes = []
+    # offscreen 不支持切换原生外观，直接验证应用发出的请求。
+    monkeypatch.setattr(QStyleHints, 'setColorScheme', lambda _, scheme: requested_schemes.append(scheme))
+    monkeypatch.setattr('lalc.sharing.cleanup_staging', lambda: None)
+
+    def forward(_, requested_developer):
+        assert requested_developer is developer
+        assert requested_schemes == [Qt.ColorScheme.Light]
+        assert qconfig.theme is Theme.LIGHT
+        return True
+
+    monkeypatch.setattr(GuiInstance, 'forward', forward)
+    previous_theme = qconfig.get(qconfig.themeMode)
+    try:
+        setTheme(Theme.DARK)
+        assert run_gui(ApplicationLifecycle(), developer=developer) == 0
+    finally:
+        setTheme(previous_theme)
+
+
 @pytest.fixture
 def windows(tmp_path, monkeypatch):
     monkeypatch.setenv('QT_QPA_PLATFORM', 'offscreen')

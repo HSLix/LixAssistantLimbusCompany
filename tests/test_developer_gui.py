@@ -879,24 +879,17 @@ def test_trial_controls_use_light_status_without_full_trace(gui, monkeypatch):
     dialog.deleteLater()
 
 
-@pytest.mark.parametrize("dark", [False, True])
-def test_trial_history_notice_has_theme_background(gui, dark):
-    from qfluentwidgets import Theme, qconfig, setTheme
+def test_trial_history_notice_has_light_background(gui):
     from lalc.developer_gui import TrialDialog
     app, window = gui
-    previous = qconfig.theme
-    try:
-        setTheme(Theme.DARK if dark else Theme.LIGHT)
-        dialog = TrialDialog(window.service, window)
-        dialog.render({"paused": False, "log_records": [], "logs_trimmed": True})
-        dialog.show()
-        app.processEvents()
-        background = dialog.grab().toImage().pixelColor(2, 2)
-        assert background.value() < 80 if dark else background.value() > 200
-        assert not dialog.history_notice.isHidden()
-        dialog.deleteLater()
-    finally:
-        setTheme(previous)
+    dialog = TrialDialog(window.service, window)
+    dialog.render({"paused": False, "log_records": [], "logs_trimmed": True})
+    dialog.show()
+    app.processEvents()
+    background = dialog.grab().toImage().pixelColor(2, 2)
+    assert background.name() == '#f3f3f3'
+    assert not dialog.history_notice.isHidden()
+    dialog.deleteLater()
 
 
 @pytest.mark.parametrize("option", ["manifest_reference_enabled", "other_run_logs_enabled"])

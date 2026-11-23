@@ -26,8 +26,7 @@ from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBarIcon,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
     NavigationAvatarWidget, NavigationItemPosition,
-    TransparentToolButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel, setCustomStyleSheet, CustomStyleSheet,
-    setStyleSheet as setFluentStyleSheet,
+    TransparentToolButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel, setCustomStyleSheet, Theme, setTheme,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
@@ -126,7 +125,8 @@ class ErrorDialog(QDialog):
         copy_text = tr('Copy error details') if error else tr('Copy details')
         copy = QPushButton(copy_text)
         if error:
-            setCustomStyleSheet(copy, 'QPushButton { color: #c42b1c; }', 'QPushButton { color: #ff99a4; }')
+            style = 'QPushButton { color: #c42b1c; }'
+            setCustomStyleSheet(copy, style, style)
         self.copy_timer = QTimer(self)
         self.copy_timer.setSingleShot(True)
         self.copy_timer.setInterval(1500)
@@ -477,9 +477,8 @@ class UserWindow(MainWindow):
         left.addWidget(self.manifest_notes)
         self.latest_card = QFrame()
         self.latest_card.setObjectName('manifest-update')
-        setFluentStyleSheet(self.latest_card, CustomStyleSheet(self.latest_card).setCustomStyleSheet(
-            'QFrame#manifest-update { background-color: #f3f3f3; border-radius: 6px; }',
-            'QFrame#manifest-update { background-color: #333333; border-radius: 6px; }'))
+        self.latest_card.setStyleSheet(
+            'QFrame#manifest-update { background-color: #f3f3f3; border-radius: 6px; }')
         latest_layout = QHBoxLayout(self.latest_card)
         latest_layout.setContentsMargins(12, 8, 12, 8)
         latest_text = QVBoxLayout()
@@ -1490,6 +1489,12 @@ class GuiCoordinator:
         self.service.shutdown()
 
 
+def use_light_theme(app: QApplication) -> None:
+    """统一原生 Qt 控件和 Fluent 控件的浅色外观。"""
+    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
+    setTheme(Theme.LIGHT)
+
+
 def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, restore=(), ready=None) -> int:
     """归并重复 GUI 入口，在唯一事件循环内持有双窗口。"""
     from .sharing import cleanup_staging
@@ -1498,6 +1503,7 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
         return run_application(lambda owner: run_gui(owner, developer=developer, restore=restore, ready=ready))
     from .gui_instance import GuiInstance
     app = QApplication.instance() or QApplication(sys.argv)
+    use_light_theme(app)
     instance = GuiInstance()
     if instance.forward(developer):
         return 0
