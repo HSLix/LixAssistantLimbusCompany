@@ -15,7 +15,6 @@ pi_resources/*
 !pi_resources/check_version.py
 !pi_resources/check_version.cmd
 .scratch/
-codesearch_resources/
 work/
 
 /CONTEXT.md
