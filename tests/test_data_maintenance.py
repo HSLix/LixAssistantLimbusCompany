@@ -231,3 +231,30 @@ def test_usage_is_shared_between_pages_and_recomputed_after_trace_change(tmp_pat
     trace(tmp_path, 1, manifest, [("one", digest)] * 2)
     assert data.inventory("components")[0][0]["count"] == 2
     assert reads == [1, 1]
+
+
+def test_component_cleanup_counts_references_by_hash_and_rechecks_before_commit(tmp_path):
+    data = DataMaintenance(ApplicationService(tmp_path))
+    shared, orphan = source(tmp_path, "shared"), source(tmp_path, "orphan")
+    current = version(tmp_path, 10, new_name=shared)
+    trace(tmp_path, 1, current, [("old_name", shared), ("unused", orphan)])
+    rows, _ = data.inventory("components")
+    assert {(row["name"], row["references"]) for row in rows} == {
+        ("new_name", 1), ("old_name", 1), ("unused", 0),
+    }
+    with pytest.raises(ValueError, match="still referenced"):
+        data.preview("components", [shared])
+    plan = data.preview("components", [orphan])
+    assert plan.size > 0 and plan.rows[0]["key"] == orphan
+    added = version(tmp_path, 11, now_used=orphan)
+    with pytest.raises(ValueError, match="still referenced"):
+        data.execute(plan)
+    manifest = tmp_path / f"manifests/{added}.json"
+    manifest.write_text("invalid", encoding="utf-8")
+    with pytest.raises(ValueError, match="unreadable"):
+        data.execute(plan)
+    manifest.unlink()
+    assert data.execute(plan) is None
+    assert not (tmp_path / f"components/{orphan[7:]}.py").exists()
+    assert (tmp_path / f"components/{shared[7:]}.py").is_file()
+    assert (tmp_path / "traces/1.jsonl").is_file()

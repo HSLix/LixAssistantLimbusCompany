@@ -2525,6 +2525,21 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>{0} names</source><translation>{0} 个</translation></message>
     <message><source>{0} images</source><translation>{0} 张</translation></message>
     <message><source>Asset inventory</source><translation>素材</translation></message>
+    <message><source>All workflow versions will be checked for references again before deletion.</source><translation>删除前会重新检查全部工作流版本中的引用。</translation></message>
+    <message><source>A selected Component source is invalid or still referenced.</source><translation>所选组件源码无效，或仍被工作流版本引用。</translation></message>
+    <message><source>Component sources</source><translation>组件源码</translation></message>
+    <message><source>Deleted Component sources cannot be recovered.</source><translation>清理后无法恢复这些源码。</translation></message>
+    <message><source>Last match: newest first</source><translation>最近命中：从新到旧</translation></message>
+    <message><source>Last match: oldest first</source><translation>最近命中：从旧到新</translation></message>
+    <message><source>Last run</source><translation>最近运行</translation></message>
+    <message><source>Loading {0}…</source><translation>正在加载{0}…</translation></message>
+    <message><source>Permanently delete {0} unreferenced Component sources?</source><translation>永久清理 {0} 份无引用组件源码？</translation></message>
+    <message><source>Select logs older than 3 days</source><translation>选取超过 3 天的日志</translation></message>
+    <message><source>Select older versions by last run, or release date when there is no run history.</source><translation>快捷选择按最近运行日期计算。没有运行记录时，使用发布日期。</translation></message>
+    <message><source>Select unreferenced Components</source><translation>选取无引用组件</translation></message>
+    <message><source>Select versions older than 3 days</source><translation>选取超过 3 天的版本</translation></message>
+    <message><source>Showing {0} of {1} · Scroll down to load more</source><translation>已显示 {0} / {1} · 向下滚动加载更多</translation></message>
+    <message><source>The list will appear before detailed statistics finish.</source><translation>列表显示后，详细用量会继续在后台统计。</translation></message>
     <message><source>Calculating detailed log size…</source><translation>正在统计详细日志占用…</translation></message>
     <message><source>Calculating usage from local Run history…</source><translation>正在统计本机 Run 历史用量…</translation></message>
     <message><source>{0} (partial)</source><translation>{0}（部分）</translation></message>
