@@ -256,7 +256,7 @@ def settings_version(config):
     return digest(json_bytes(config)) if config is not None else None
 
 
-def catalog(manager):
+def catalog(manager, *, include_private=True):
     """枚举可显式选择的对象；不加载页面、Workflow 或可恢复 Session。"""
     root = manager.data_root
     assets = real_directory(root / "assets")
@@ -269,6 +269,12 @@ def catalog(manager):
                 names.add(path.parent.relative_to(assets).as_posix())
     pages = real_directory(root / "pages")
     handles = [path.name if path.parent == pages else path.parent.name + ".py" for path in page_entries(pages)]
+    result = {"workflow": [item["manifest_id"] for item in manager.list_manifests()],
+              "assets": sorted(names), "pages": sorted(handles),
+              "skills": sorted(path.name for path in real_directory(root / "skills").iterdir()
+                               if (path / "SKILL.md").exists()) if (root / "skills").exists() else []}
+    if not include_private:
+        return result
     histories = []
     for pattern in ("developer-sessions/*/log/events.jsonl", "developer-operations/*/*/events.jsonl",
                     "agent-interactions/*/*/events.jsonl"):
@@ -281,11 +287,7 @@ def catalog(manager):
             real_directory(path.parent)
             histories.append(path.parent.parent.relative_to(root).as_posix() if path.parent.name == "log"
                              else path.parent.relative_to(root).as_posix())
-    return {"workflow": [item["manifest_id"] for item in manager.list_manifests()],
-            "assets": sorted(names), "pages": sorted(handles), "history": histories,
-            "page_settings": sorted(UserSettings(root).value["pages"]),
-            "skills": sorted(path.name for path in real_directory(root / "skills").iterdir()
-                             if (path / "SKILL.md").exists()) if (root / "skills").exists() else []}
+    return {**result, "history": histories, "page_settings": sorted(UserSettings(root).value["pages"])}
 
 
 @contextmanager
@@ -369,7 +371,7 @@ def history_files(root, identity):
     return files
 
 
-def build_export(manager, selection):
+def build_export(manager, selection, *, builtin_skills=False):
     """冻结明确选择及必要文件；Workflow 不分析或附带 Assets，不做隐私扫描。"""
     objects = []
     for kind in KINDS:
@@ -385,6 +387,9 @@ def build_export(manager, selection):
                 validate_assets(files)
             elif kind == "skills":
                 files = skill_files(manager.data_root, identity)
+                if files is None and builtin_skills:
+                    from .agent_skills import DEFAULT_SKILLS
+                    files = skill_files(DEFAULT_SKILLS.parent, identity)
                 if files is None:
                     raise ValueError(f"Skill 不存在：{identity}")
             elif kind == "page_settings":

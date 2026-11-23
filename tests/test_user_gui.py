@@ -87,13 +87,56 @@ def test_framework_release_checks_require_two_user_actions_to_install(windows, t
     monkeypatch.setattr(user, "launch", lambda operation, done: done(operation()))
     monkeypatch.setattr(owner, "request_reload", lambda restart: restart(("user", "developer")))
 
-    user.show_framework_releases(update.ReleaseStatus("<b>Release notes</b>", package, None))
-    assert user.announcement.toPlainText() == "<b>Release notes</b>"
+    user.show_framework_releases(update.ReleaseStatus("## Release notes\n\n- New version", package, None))
+    assert "Release notes" in user.announcement.toPlainText() and "New version" in user.announcement.toPlainText()
     assert user.update_button.isEnabled() and not events
     user.update_button.click()
     assert events == ["download"] and user.update_workspace == workspace
     user.update_button.click()
     assert events == ["download", (workspace, ("user", "developer"))]
+
+
+def test_legacy_avatar_and_github_navigation(windows, monkeypatch):
+    from PySide6.QtGui import QDesktopServices
+    from qfluentwidgets import MessageBox, NavigationAvatarWidget
+    from lalc.framework_update import REPOSITORY_URL
+
+    _, _, user, _ = windows
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
+    avatar = user.navigationInterface.widget("author-avatar")
+    assert isinstance(avatar, NavigationAvatarWidget) and avatar.name == "陆爻齐-LuYaoQi"
+    user.navigationInterface.widget("github-repository").clicked.emit(True)
+    assert opened == [REPOSITORY_URL]
+    avatar.clicked.emit(True)
+    dialog = user.findChild(MessageBox)
+    assert dialog.isVisible()
+    dialog.yesButton.click()
+    assert opened == [REPOSITORY_URL, REPOSITORY_URL]
+
+
+def test_default_resources_prompt_only_imports_on_confirmation(windows, tmp_path, monkeypatch):
+    from contextlib import nullcontext
+    from PySide6.QtWidgets import QMessageBox
+    from lalc import default_resources, sharing, sharing_gui
+
+    _, _, user, _ = windows
+    path = tmp_path / "default-resources.zip"
+    path.touch()
+    calls = []
+    monkeypatch.setattr(default_resources, "bundled_default_resources", lambda: path)
+    monkeypatch.setattr(default_resources, "is_empty_for_default_resources", lambda _: True)
+    monkeypatch.setattr(default_resources, "import_default_resources", lambda manager, path: calls.append(path))
+    monkeypatch.setattr(sharing, "sharing_activity", lambda _: nullcontext())
+    monkeypatch.setattr(sharing_gui, "sharing_task", lambda _, operation, **kwargs: operation())
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: None)
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    user.prompt_default_resources()
+    assert not calls
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    user.prompt_default_resources()
+    assert calls == [path]
 
 
 @pytest.mark.parametrize("frozen", [False, True])

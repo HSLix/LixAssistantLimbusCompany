@@ -9,8 +9,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize
-from PySide6.QtGui import QColor, QIcon, QPainter
+from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QTextDocument
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -19,12 +19,13 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox, QScrollArea, QFileDialog,
-    QGraphicsOpacityEffect, QListWidgetItem, QSizePolicy, QFrame,
+    QGraphicsOpacityEffect, QListWidgetItem, QSizePolicy, QFrame, QTextBrowser,
 )
 
 from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBarIcon,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
+    NavigationAvatarWidget, NavigationItemPosition,
     TransparentToolButton, IconWidget, MessageBox, setCustomStyleSheet, CustomStyleSheet,
     setStyleSheet as setFluentStyleSheet,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
@@ -37,6 +38,18 @@ from .notifications import NotificationList
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
 from .lifecycle import ApplicationLifecycle, run_application
+from .framework_update import REPOSITORY_URL
+
+
+class ReleaseAnnouncement(QTextBrowser):
+    """展示 GitHub Markdown，仅由用户点击打开 HTTPS 链接。"""
+
+    def loadResource(self, resource_type, name):
+        return None
+
+    def show_release(self, content):
+        self.document().setMarkdown(content, QTextDocument.MarkdownFeature.MarkdownDialectGitHub |
+                                    QTextDocument.MarkdownFeature.MarkdownNoHTML)
 
 
 class StateBridge(QObject):
@@ -539,11 +552,19 @@ class UserWindow(MainWindow):
         self.release_status = None
         self.update_workspace = None
         self.releases_checked.connect(self.show_framework_releases)
-        self.announcement = QPlainTextEdit()
-        self.announcement.setReadOnly(True)
+        self.announcement = ReleaseAnnouncement()
+        self.announcement.setOpenLinks(False)
+        self.announcement.anchorClicked.connect(lambda url: QDesktopServices.openUrl(url) if url.scheme() == 'https' else None)
         self.announcement.setPlaceholderText(tr('No release announcement available.'))
         self.announcement.setMaximumHeight(240)
-        disclaimer = QLabel(tr('LALC is free and open source under AGPL-3.0. Use it responsibly and follow the game’s rules. LALC is unaffiliated with Project Moon.'))
+        view_release = QPushButton(tr('View latest GitHub Release'))
+        view_release.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f'{REPOSITORY_URL}/releases/latest')))
+        disclaimer = QLabel(
+            'LALC is a free open source software, if you paid for LALC from any channel, please refund for your rights.\n'
+            'LALC 是一款免费开源软件，仅供学习交流使用，如果你在任何渠道付费购买了 LALC，请为您自身权益退款。\n'
+            '软件图标素材来源网图，不属于 AGPL 协议开源的内容，如有侵权，请及时联系作者删除\n'
+            f'Project repository 项目地址：{REPOSITORY_URL}')
+        disclaimer.setTextFormat(Qt.TextFormat.PlainText)
         disclaimer.setWordWrap(True)
         self.framework_version = QLabel(tr('Installed framework version: {0}').format(self.framework_build['version'] or '—'))
         self.framework_status = QLabel()
@@ -553,8 +574,11 @@ class UserWindow(MainWindow):
         self.update_button = QPushButton(tr('Update'))
         self.update_button.setEnabled(False)
         self.update_button.clicked.connect(lambda: self._interact(self.update_framework))
-        for title, widgets in ((tr('Announcements'), (self.announcement,)), (tr('Disclaimer'), (disclaimer,)),
-                               (tr('Version & Update'), (self.framework_version, self.framework_status, self.check_update_button, self.update_button))):
+        resource_notice = QLabel(tr('To update workflows and other resources, download the corresponding sharing package and import it in General Settings.'))
+        resource_notice.setWordWrap(True)
+        for title, widgets in ((tr('Announcements'), (self.announcement, view_release)), (tr('Disclaimer'), (disclaimer,)),
+                               (tr('Version & Update'), (self.framework_version, self.framework_status, self.check_update_button,
+                                                         self.update_button, resource_notice))):
             card = CardWidget()
             content = QVBoxLayout(card)
             content.setContentsMargins(20, 20, 20, 20)
@@ -623,7 +647,7 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
-        if sys.platform == 'win32':
+        if sys.platform == 'win32' and (self.framework_build.get('mirror') or {}).get('rid'):
             from .framework_update import CDK_SECRET, secret_path
             application_layout.addWidget(QLabel(tr('MirrorChyan CDK')))
             self.mirror_cdk = QLineEdit()
@@ -689,6 +713,10 @@ class UserWindow(MainWindow):
         for page in self.business_pages:
             page.widget.setObjectName(page.page_id)
             self.addSubInterface(page.widget, page.icon or FluentIcon.APPLICATION, page.name)
+        self.navigationInterface.addItem('github-repository', FluentIcon.GITHUB, tr('GitHub repository'),
+                                         onClick=self.open_repository, selectable=False, position=NavigationItemPosition.BOTTOM)
+        self.navigationInterface.addWidget('author-avatar', NavigationAvatarWidget('陆爻齐-LuYaoQi', str(Path(__file__).with_name('MagicGirl.png'))),
+                                           onClick=self.show_author_support, position=NavigationItemPosition.BOTTOM, tooltip=tr('Support the author'))
         for error in self.page_errors:
             self.add_warning(error)
             self.notifications.notify(tr('External page failed to load'), self.clean_details(error))
@@ -697,8 +725,42 @@ class UserWindow(MainWindow):
         self.manifest_timer.timeout.connect(self.refresh_manifest_card)
         self.manifest_timer.start()
         self.render_state(service.status)
-        if self.can_install_update:
-            QTimer.singleShot(0, self, self.check_framework_releases)
+
+    @staticmethod
+    def open_repository():
+        QDesktopServices.openUrl(QUrl(REPOSITORY_URL))
+
+    def show_author_support(self):
+        """沿用旧版头像弹窗及 GitHub 跳转。"""
+        dialog = MessageBox(tr('Support the author'), tr('If this project has helped you, consider giving it a Star ⭐ on GitHub. Your support helps the author keep developing and maintaining it 🚀'), self)
+        dialog.yesButton.setText(tr('I’m coming'))
+        dialog.cancelButton.setText(tr('Next time'))
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.yesSignal.connect(self.open_repository)
+        dialog.setModal(False)
+        dialog.show()
+
+    def prompt_default_resources(self):
+        """首次打开空白 User GUI 时，由用户确认导入随包资源。"""
+        from .default_resources import bundled_default_resources, import_default_resources, is_empty_for_default_resources
+        from .sharing import sharing_activity
+        from .sharing_gui import sharing_task
+
+        path = bundled_default_resources()
+        if path is None or not path.is_file() or not is_empty_for_default_resources(self.service.data_root):
+            return
+        title = tr('Import default resources')
+        message = tr('No resources have been set up yet. Import the bundled Workflow, Assets, extension pages and Skills? Installed pages can run code when LALC is reloaded.')
+        if QMessageBox.question(self, title, message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                                QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with sharing_activity(self.service):
+                sharing_task(self, lambda: import_default_resources(self.host.manager, path), title="Import sharing package")
+        except InterruptedError:
+            return
+        self.refresh_manifest_card()
+        QMessageBox.information(self, title, tr('Default resources imported. Reload LALC to load the pages, then select the imported Workflow version.'))
 
     def show_mirror_cdk_state(self):
         self.mirror_cdk.setPlaceholderText(tr('CDK saved. Save an empty field to remove it.') if self.mirror_cdk_saved
@@ -736,7 +798,7 @@ class UserWindow(MainWindow):
         from .framework_update import version_number
         self.release_status = result
         if result.announcement is not None:
-            self.announcement.setPlainText(result.announcement)
+            self.announcement.show_release(result.announcement)
         self.check_update_button.setEnabled(True)
         github = result.github.version if result.github else None
         mirror = result.mirror if self.framework_variant == 'with-agent' else None
@@ -1181,7 +1243,7 @@ class UserWindow(MainWindow):
 class GuiCoordinator:
     """应用持有唯一服务和宿主；窗口可独立关闭或重新打开。"""
 
-    def __init__(self, service, lifecycle):
+    def __init__(self, service, lifecycle, *, initialize_user_window=False):
         from .i18n import install_translations, load_language, resolve_language
         app = QApplication.instance()
         icon_path = (Path(__file__).with_name("MagicAndWonder.ico") if getattr(sys, "frozen", False)
@@ -1194,6 +1256,8 @@ class GuiCoordinator:
         self.host = DeveloperHost(service, default_candidate_root(service.data_root))
         self.user = None
         self.developer = None
+        self.initialize_user_window = initialize_user_window
+        self.resource_prompted = False
         self.reloading = False
         self.bridge = StateBridge(service, self.render_state)
         self.warning_history = []
@@ -1211,6 +1275,11 @@ class GuiCoordinator:
             window = MainWindow(self.service, self.lifecycle, host=self.host, coordinator=self) if developer else UserWindow(
                 self.service, self.lifecycle, host=self.host, coordinator=self)
             setattr(self, name, window)
+            if not developer and self.initialize_user_window:
+                QTimer.singleShot(0, window, window.check_framework_releases)
+                if not self.resource_prompted:
+                    self.resource_prompted = True
+                    QTimer.singleShot(0, window, lambda: window._interact(window.prompt_default_resources))
         self.refresh_agent()
         window.render_state(self.service.ui_snapshot())
         window.showNormal()
@@ -1321,7 +1390,7 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
     if instance.forward(developer):
         return 0
     service = ApplicationService(default_data_root())
-    coordinator = GuiCoordinator(service, lifecycle)
+    coordinator = GuiCoordinator(service, lifecycle, initialize_user_window=True)
     bridge = coordinator.bridge
     def open_requested(developer=False):
         try:
@@ -1352,10 +1421,10 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
     interrupt_timer.timeout.connect(lifecycle.process_interrupt)
     interrupt_timer.start()
     try:
-        for name in restore or (("developer" if developer else "user"),):
-            coordinator.open_window(name == "developer")
         if ready is not None:
             QTimer.singleShot(0, ready)
+        for name in restore or (("developer" if developer else "user"),):
+            coordinator.open_window(name == "developer")
         return app.exec()
     finally:
         interrupt_timer.stop()

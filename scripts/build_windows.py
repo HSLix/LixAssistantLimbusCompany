@@ -88,7 +88,8 @@ def check_codesearch(archive: Path, models: Path) -> None:
             raise ValueError("MiniLM model hash mismatch: " + filename)
 
 
-def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None) -> list[Path]:
+def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None,
+             default_resources: Path | None = None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts",
@@ -111,6 +112,20 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
         shutil.copytree(application, base)
         (base / "Developer.cmd").write_bytes(b'@echo off\r\nstart "" "%~dp0LALC.exe" --developer\r\n')
         shutil.copyfile(ROOT / "packaging/install-update.ps1", base / "install-update.ps1")
+        if default_resources is not None:
+            from lalc.default_resources import DEFAULT_RESOURCE_NAME, check_default_package, export_default_resources
+            from lalc.sharing import SharingPackage
+            resource_zip = base / DEFAULT_RESOURCE_NAME
+            if default_resources.is_dir():
+                print("默认资源已导出：", export_default_resources(default_resources, resource_zip))
+            else:
+                shutil.copyfile(default_resources, resource_zip)
+            package = SharingPackage(resource_zip, stage)
+            try:
+                check_default_package(package)
+            finally:
+                package.close()
+            info = {**info, "default_resources_sha256": digest(resource_zip)}
         (base / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         with_pi = stage / "with-agent" / "LALC"
         shutil.copytree(base, with_pi)
@@ -157,12 +172,25 @@ def main(argv=None) -> int:
     parser.add_argument("--pi-zip", type=Path, default=ROOT / "pi_resources/pi-windows-x64.zip")
     parser.add_argument("--codesearch-zip", type=Path, default=CODESEARCH_ARCHIVE)
     parser.add_argument("--models", type=Path, default=MODEL_ROOT)
+    parser.add_argument("--default-resources", type=Path, help="默认资源来源，可指定 LALC 数据目录或分享 ZIP。")
     args = parser.parse_args(argv)
     if sys.platform != "win32" or platform.machine().lower() not in {"amd64", "x86_64"}:
         parser.error("请在 Windows x64 构建，macOS 不能交叉生成该成品。")
     archive = args.pi_zip.resolve(strict=True)
     check_pi(archive)
     check_codesearch(args.codesearch_zip, args.models)
+    from lalc.application import default_data_root
+    from lalc.default_resources import DEFAULT_RESOURCE_NAME
+    source = args.default_resources
+    if source is None:
+        local_data = default_data_root()
+        approved_zip = ROOT / "packaging" / DEFAULT_RESOURCE_NAME
+        if not os.environ.get("GITHUB_ACTIONS") and (local_data / "manifests").is_dir():
+            source = local_data
+        elif approved_zip.is_file():
+            source = approved_zip
+    if source is None:
+        print("未发现默认资源包或正式数据目录，此次只构建框架。")
     version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     work = ROOT / ".generated/windows-build"
     env = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(work / "venv")}
@@ -181,7 +209,7 @@ def main(argv=None) -> int:
             "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}, "codesearch": {"version": CODESEARCH_VERSION,
             "archive_sha256": CODESEARCH_SHA256, "model_revision": MODEL_REVISION, "model_files": MODEL_FILES}}
     for path in assemble(work / "dist/LALC", archive, ROOT / "dist", info,
-                         codesearch_archive=args.codesearch_zip, models=args.models):
+                         codesearch_archive=args.codesearch_zip, models=args.models, default_resources=source):
         print(path)
     return 0
 

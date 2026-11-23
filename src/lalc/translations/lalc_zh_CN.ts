@@ -3,16 +3,52 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>View latest GitHub Release</source>
+      <translation>查看 GitHub 最新发行版</translation>
+    </message>
+    <message>
+      <source>To update workflows and other resources, download the corresponding sharing package and import it in General Settings.</source>
+      <translation>工作流和其他资源需要另行下载对应的分享包，并在「通用设置 → 分享」中导入。</translation>
+    </message>
+    <message>
+      <source>GitHub repository</source>
+      <translation>GitHub 仓库</translation>
+    </message>
+    <message>
+      <source>Support the author</source>
+      <translation>支持作者🥰</translation>
+    </message>
+    <message>
+      <source>If this project has helped you, consider giving it a Star ⭐ on GitHub. Your support helps the author keep developing and maintaining it 🚀</source>
+      <translation>个人开发不易，如果这个项目帮助到了您，可以考虑请给该项目点个 Star⭐。您的支持就是作者开发和维护项目的动力🚀</translation>
+    </message>
+    <message>
+      <source>I’m coming</source>
+      <translation>来啦老弟</translation>
+    </message>
+    <message>
+      <source>Next time</source>
+      <translation>下次一定</translation>
+    </message>
+    <message>
+      <source>Import default resources</source>
+      <translation>导入默认资源</translation>
+    </message>
+    <message>
+      <source>No resources have been set up yet. Import the bundled Workflow, Assets, extension pages and Skills? Installed pages can run code when LALC is reloaded.</source>
+      <translation>检测到当前设置为空，是否导入默认资源包？它包含工作流、素材、扩展页面和 Skills。重新加载 LALC 后，已安装的页面可以运行代码。</translation>
+    </message>
+    <message>
+      <source>Default resources imported. Reload LALC to load the pages, then select the imported Workflow version.</source>
+      <translation>已导入默认资源。请重新加载 LALC 以载入页面，再在首页选中导入的工作流版本。</translation>
+    </message>
+    <message>
       <source>Update to {0}</source>
       <translation>更新至 {0}</translation>
     </message>
     <message>
       <source>No release announcement available.</source>
       <translation>暂无发布公告。</translation>
-    </message>
-    <message>
-      <source>LALC is free and open source under AGPL-3.0. Use it responsibly and follow the game’s rules. LALC is unaffiliated with Project Moon.</source>
-      <translation>LALC 是采用 AGPL-3.0 许可证的免费开源软件。请合理使用并遵守游戏规则。LALC 与 Project Moon 无关联。</translation>
     </message>
     <message>
       <source>Installed framework version: {0}</source>

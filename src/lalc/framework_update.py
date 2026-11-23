@@ -21,6 +21,7 @@ from .agent_settings import dpapi, save_secret, secret_path
 from .work_files import create_work_directory
 
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
+REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
 CDK_SECRET = "lalc-mirrorchyan-cdk"
 VERSION_PATTERN = r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 REQUIRED_FILES = ("LALC.exe", "LALC-console.exe", "build-info.json", "install-update.ps1",
@@ -103,7 +104,9 @@ def _read_cdk(root):
 
 
 def _json(url):
-    request = Request(url, headers={"User-Agent": "LALC", "Accept": "application/json"})
+    github = urlsplit(url).hostname == "api.github.com"
+    request = Request(url, headers={"User-Agent": "LALC", "Cache-Control": "no-cache",
+                                    "Accept": "application/vnd.github+json" if github else "application/json"})
     with urlopen(request, timeout=8) as response:
         content = response.read(2 * 1024 * 1024 + 1)
     if len(content) > 2 * 1024 * 1024:
@@ -120,12 +123,15 @@ def _github(variant):
     tag = data.get("tag_name")
     version = version_number(tag)
     package = None
-    if version and version[0] >= 6:
+    assets = data.get("assets")
+    if version and version[0] >= 6 and isinstance(assets, list):
         name = f"LALC-{'.'.join(map(str, version))}-windows-x64-{variant}.zip"
-        for asset in data.get("assets", []):
-            if asset.get("name") == name and re.fullmatch(r"sha256:[0-9a-f]{64}", asset.get("digest") or ""):
-                package = Package(version, f"https://github.com/{REPOSITORY}/releases/download/{tag}/{name}",
-                                  asset["digest"][7:])
+        for asset in assets:
+            if not isinstance(asset, dict) or asset.get("name") != name:
+                continue
+            digest = asset.get("digest")
+            if isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", digest):
+                package = Package(version, f"{REPOSITORY_URL}/releases/download/{tag}/{name}", digest[7:])
                 break
     return (announcement if isinstance(announcement, str) else ""), package
 
