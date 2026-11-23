@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QStackedWidget
 from qfluentwidgets import (BodyLabel, TitleLabel, PushButton, PrimaryPushButton, PlainTextEdit,
                             CheckBox, ComboBox, SegmentedWidget, StrongBodyLabel, themeColor)
 
-from .i18n import tr
+from .i18n import current_language, tr
 from .developer_gui import Operation
 from .developer_session import saved_session_title
 from .file_content import (file_operation, image_preview, content_bytes, ResourceUnknown,
@@ -23,9 +23,9 @@ from .file_content import (file_operation, image_preview, content_bytes, Resourc
 
 from .page_packages import PageSnapshot
 from .page_preview import PagePreviewDialog, PreviewRequest
-from .sharing import (KINDS, SharingPackage, asset_files, build_export, catalog, image_size,
+from .sharing import (KINDS, SharingPackage, asset_files, build_export, catalog, image_size, json_bytes,
     import_selected, inspect_objects, installed_page, page_selection_errors, save_package,
-    sharing_activity)
+    saved_settings_groups, sharing_activity)
 from .user_pages import check_page_registration
 
 
@@ -275,6 +275,91 @@ def selected_list(widget):
             if widget.item(index).checkState() == Qt.CheckState.Checked]
 
 
+class SettingsTree(QTreeWidget):
+    """页面父项联动配置分组，键盘和鼠标使用同一勾选状态。"""
+
+    def __init__(self):
+        super().__init__()
+        self.setHeaderHidden(True)
+        self.setAccessibleName(tr("Page Settings"))
+        self.leaves = {}
+
+    def add_page(self, identity, label, groups, selected):
+        parent = QTreeWidgetItem(self, [label])
+        if groups:
+            parent.setFlags(parent.flags() | Qt.ItemFlag.ItemIsAutoTristate)
+            parent.setCheckState(0, Qt.CheckState.Unchecked)
+        for key, group in (groups or {None: None}).items():
+            item = QTreeWidgetItem(parent, [group["names"][current_language()]]) if group else parent
+            item.setCheckState(0, Qt.CheckState.Checked if (identity, key) in selected else Qt.CheckState.Unchecked)
+            self.leaves[identity, key] = item
+        parent.setExpanded(True)
+
+    def selected(self):
+        return {key for key, item in self.leaves.items() if item.checkState(0) == Qt.CheckState.Checked}
+
+    def toggle_all(self, checked):
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        self.blockSignals(True)
+        for item in self.leaves.values():
+            item.setCheckState(0, state)
+        self.blockSignals(False)
+
+    def current_key(self):
+        focused = self.currentItem()
+        return next((key for key, item in self.leaves.items() if item == focused), None)
+
+
+def settings_preview(values, fields, *, current=None):
+    """优先显示配置条目和差异，素材逻辑名仅显示去掉公共前缀后的名称。"""
+    def display(value, path=None):
+        if path == ["preferences"] and isinstance(value, str):
+            return {"default": tr("Default"), "prefer": tr("Prioritize"), "avoid": tr("Avoid if possible"),
+                    "consume": tr("Consume first")}.get(value, value)
+        return json.dumps(value, ensure_ascii=False, indent=2) if isinstance(value, (dict, list)) else str(value)
+
+    lines = []
+    for field, path in fields.items():
+        value = values[field]
+        local = (current or {}).get(field)
+        if path is None or not isinstance(value, dict) or field in (current or {}) and not isinstance(local, dict):
+            if current is not None and field in current and json_bytes(local) != json_bytes(value):
+                lines.append(f"{field}\n{display(local)} → {display(value)}")
+            else:
+                lines.append(f"{field}\n{display(value)}")
+            continue
+        location = field
+        for part in path:
+            local = local if isinstance(local, dict) else {}
+            for key, entry in (value.items() if isinstance(value, dict) else ()):
+                if key == part:
+                    continue
+                if key in local and json_bytes(local[key]) != json_bytes(entry):
+                    lines.append(f"{location}.{key}\n{display(local[key])} → {display(entry)}")
+                else:
+                    lines.append(f"{location}.{key}\n{display(entry)}")
+            value = value.get(part, {}) if isinstance(value, dict) else {}
+            local = local.get(part)
+            location += "." + part
+        local = local if isinstance(local, dict) else {}
+        entries = []
+        for key, entry in (value.items() if isinstance(value, dict) else ()):
+            name = key.split("/", 2)[-1] if path == ["preferences"] else key
+            if current is None:
+                entries.append((0, f"{name}    {display(entry, path)}"))
+            elif key not in local:
+                entries.append((1, f"{name}    {display(entry, path)} · {tr('New')}"))
+            elif json_bytes(entry) == json_bytes(local[key]):
+                entries.append((2, f"{name}    {display(entry, path)} · {tr('Keeps local value')}"))
+            else:
+                entries.append((0, f"{name}    {display(local[key], path)} → {display(entry, path)}"))
+        if entries:
+            lines.extend(line for _, line in sorted(entries))
+        else:
+            lines.append(f"{field}\n{display(values[field])}")
+    return "\n\n".join(lines)
+
+
 class ExportDialog(QDialog):
     """选择对象后直接确认保存位置，再冻结实际文件并保存 ZIP。"""
 
@@ -293,6 +378,7 @@ class ExportDialog(QDialog):
         choices = QVBoxLayout(first)
         self.selectors = {}
         available = catalog(self.manager)
+        self.settings_available = saved_settings_groups(self.manager, available["page_settings"])
         manifests = {item["manifest_id"]: item for item in self.manager.list_manifests()}
         titles = {}
         self.select_tabs, panels = SegmentedWidget(), QStackedWidget()
@@ -301,7 +387,13 @@ class ExportDialog(QDialog):
         choices.addWidget(panels, 1)
         for kind in KINDS:
             tabs.addItem(kind, title(kind))
-            widget = asset_tree(available[kind]) if kind == "assets" else check_list(available[kind], False)
+            if kind == "page_settings":
+                widget = SettingsTree()
+                for identity in available[kind]:
+                    spec = self.settings_available.get(identity, {})
+                    widget.add_page(identity, spec.get("names", {}).get(current_language(), identity), spec.get("groups"), set())
+            else:
+                widget = asset_tree(available[kind]) if kind == "assets" else check_list(available[kind], False)
             if kind in {"workflow", "history"} and isinstance(widget, QListWidget):
                 for index in range(widget.count()):
                     item = widget.item(index)
@@ -329,7 +421,17 @@ class ExportDialog(QDialog):
                 button.clicked.connect(lambda _, widget=widget, checked=checked: self.set_export_selection(widget, checked))
                 buttons.addWidget(button)
             column.addLayout(buttons)
-            column.addWidget(widget, 1)
+            if kind == "page_settings":
+                row = QHBoxLayout()
+                row.addWidget(widget, 5)
+                self.settings_details = details()
+                row.addWidget(self.settings_details, 7)
+                column.addLayout(row, 1)
+                widget.currentItemChanged.connect(self.render_settings)
+                widget.setCurrentItem(next(iter(widget.leaves.values()), None))
+                self.render_settings()
+            else:
+                column.addWidget(widget, 1)
             panels.addWidget(panel)
             widget.itemChanged.connect(lambda *_: self.export_counts())
         tabs.currentItemChanged.connect(lambda key: panels.setCurrentIndex(KINDS.index(key)))
@@ -350,10 +452,20 @@ class ExportDialog(QDialog):
     def export_counts(self):
         selection = self.selection()
         for kind, widget in self.selectors.items():
-            count = sum(item.data(0, Qt.ItemDataRole.UserRole) is not None for item in tree_items(widget)) if kind == "assets" else widget.count()
-            self.select_tabs.setItemText(kind, title(kind) + f" ({len(selection[kind])}/{count})")
+            selected = len(selection[kind])
+            if kind == "page_settings":
+                selected, count = len(widget.selected()), len(widget.leaves)
+            elif kind == "assets":
+                count = sum(item.data(0, Qt.ItemDataRole.UserRole) is not None for item in tree_items(widget))
+            else:
+                count = widget.count()
+            self.select_tabs.setItemText(kind, title(kind) + f" ({selected}/{count})")
 
     def set_export_selection(self, widget, checked):
+        if isinstance(widget, SettingsTree):
+            widget.toggle_all(checked)
+            self.export_counts()
+            return
         widget.blockSignals(True)
         state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
         if isinstance(widget, QTreeWidget):
@@ -367,10 +479,25 @@ class ExportDialog(QDialog):
         self.export_counts()
 
     def selection(self):
-        result = {kind: selected_list(widget) for kind, widget in self.selectors.items() if kind != "assets"}
+        result = {kind: selected_list(widget) for kind, widget in self.selectors.items() if kind not in {"assets", "page_settings"}}
+        result["page_settings"] = sorted({identity for identity, _ in self.selectors["page_settings"].selected()})
         result["assets"] = [item.data(0, Qt.ItemDataRole.UserRole) for item in tree_items(self.selectors["assets"])
                             if item.data(0, Qt.ItemDataRole.UserRole) is not None and item.checkState(0) == Qt.CheckState.Checked]
         return result
+
+    def render_settings(self, *_):
+        key = self.selectors["page_settings"].current_key()
+        if key is None:
+            self.settings_details.setPlainText(tr("Select a settings group to see its saved values."))
+            return
+        identity, group = key
+        if group is None:
+            self.settings_details.setPlainText(tr("Entire page settings"))
+            return
+        spec = self.settings_available[identity]
+        selected = spec["groups"][group]
+        self.settings_details.setPlainText(selected["names"][current_language()] + "\n\n" +
+            tr("Saved settings to export") + "\n\n" + settings_preview(spec["settings"], selected["fields"]))
 
     def advance(self):
         try:
@@ -380,8 +507,15 @@ class ExportDialog(QDialog):
             stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")[:-3]
             filename, _ = QFileDialog.getSaveFileName(self, tr("Save shared package"), f"lalc-sharing-{stamp}.zip", "ZIP (*.zip)")
             if filename:
+                selected_groups = {}
+                tree = self.selectors["page_settings"]
+                chosen = tree.selected()
+                for identity, key in tree.leaves:
+                    if key is not None and (identity, key) in chosen:
+                        spec = self.settings_available[identity]
+                        selected_groups.setdefault(identity, {"names": spec["names"], "groups": {}})["groups"][key] = spec["groups"][key]
                 def save():
-                    objects = build_export(self.manager, selection)
+                    objects = build_export(self.manager, selection, settings_groups=selected_groups)
                     save_package(objects, filename)
                 sharing_task(self, save, title="Export sharing package")
                 self.accept()
@@ -509,18 +643,25 @@ class ImportDialog(QDialog):
         self.skills.currentRowChanged.connect(self.render_skill)
         settings = self.panel("page_settings")
         settings.addWidget(notice(tr("Page settings may contain private information. The matching page may not be installed; configuration compatibility is not verified.")))
-        self.page_settings = check_list([obj["id"] for obj in self.by_kind["page_settings"]], False)
-        settings.addWidget(self.page_settings, 1)
+        settings.addWidget(notice(tr("Select settings groups to import. Unselected groups keep their local values.")))
+        self.page_settings = SettingsTree()
+        split = QHBoxLayout()
+        split.addWidget(self.page_settings, 5)
+        side = QVBoxLayout()
         actions = QHBoxLayout()
+        self.settings_actions = QWidget()
+        self.settings_actions.setLayout(actions)
         for label, action in ((tr("Replace"), "replace"), (tr("Skip"), "skip")):
             button = PushButton(label)
             button.clicked.connect(lambda _, action=action: self.settings_action(action))
             actions.addWidget(button)
-        settings.addLayout(actions)
         self.settings_details = details()
-        settings.addWidget(self.settings_details, 2)
-        self.page_settings.itemChanged.connect(lambda item: self.choose(self.number("page_settings", item.data(Qt.ItemDataRole.UserRole)), item.checkState() == Qt.CheckState.Checked))
-        self.page_settings.currentRowChanged.connect(self.render_settings)
+        side.addWidget(self.settings_details, 1)
+        side.addWidget(self.settings_actions)
+        split.addLayout(side, 7)
+        settings.addLayout(split, 1)
+        self.page_settings.itemChanged.connect(self.choose_settings)
+        self.page_settings.currentItemChanged.connect(self.render_settings)
         self.error_box = notice("")
         layout.addWidget(self.error_box)
         self.trust = CheckBox(tr("I understand imported code and records are untrusted."))
@@ -547,8 +688,6 @@ class ImportDialog(QDialog):
             self.pages.setCurrentRow(0)
         if self.histories.count():
             self.histories.setCurrentRow(0)
-        if self.page_settings.count():
-            self.page_settings.setCurrentRow(0)
         self.result_data = None
 
     def done(self, result):
@@ -571,6 +710,10 @@ class ImportDialog(QDialog):
         return layout
 
     def set_kind_selected(self, kind, checked):
+        if kind == "page_settings":
+            self.page_settings.toggle_all(checked)
+            self.choose_settings()
+            return
         numbers = {obj["number"] for obj in self.by_kind[kind]}
         self.selected.update(numbers) if checked else self.selected.difference_update(numbers)
         self.sync_selection()
@@ -583,6 +726,11 @@ class ImportDialog(QDialog):
     def choose(self, number, checked):
         if number is not None:
             self.selected.add(number) if checked else self.selected.discard(number)
+        self.update_state()
+
+    def choose_settings(self, *_):
+        self.selected.difference_update(obj["number"] for obj in self.by_kind["page_settings"])
+        self.selected.update(number for number, _ in self.page_settings.selected())
         self.update_state()
 
     def visit(self, kind):
@@ -600,6 +748,19 @@ class ImportDialog(QDialog):
                     self.reviewed.pop(number, None)
                     self.asset_actions.pop(number, None)
             self.inspection_error = ""
+            selected = self.page_settings.selected()
+            focus = self.page_settings.current_key()
+            self.page_settings.blockSignals(True)
+            self.page_settings.clear()
+            self.page_settings.leaves.clear()
+            for obj in self.by_kind["page_settings"]:
+                number = obj["number"]
+                check = self.checks[number]
+                name = check.get("names", {}).get(current_language(), obj["id"])
+                self.page_settings.add_page(number, name, check.get("groups"), selected)
+            self.page_settings.setCurrentItem(self.page_settings.leaves.get(focus, next(iter(self.page_settings.leaves.values()), None)))
+            self.page_settings.blockSignals(False)
+            self.choose_settings()
         except Exception as error:
             self.inspection_error = self.window_host.clean_details(str(error))
         self.render_workflow()
@@ -675,17 +836,26 @@ class ImportDialog(QDialog):
         self.skill_details.setPlainText(self.object_text(self.by_kind["skills"][row]) if row >= 0 else tr("No contents in this category."))
 
     def settings_action(self, action):
-        row = self.page_settings.currentRow()
-        if row >= 0:
-            obj = self.by_kind["page_settings"][row]
-            if self.checks.get(obj["number"], {}).get("conflict"):
-                self.asset_actions[obj["number"]] = action
+        key = self.page_settings.current_key()
+        if key is not None and key[1] is None and self.checks[key[0]].get("conflict"):
+            self.asset_actions[key[0]] = action
         self.update_state()
 
     def render_settings(self, *_):
-        row = self.page_settings.currentRow()
-        obj = self.by_kind["page_settings"][row] if row >= 0 else None
-        self.settings_details.setPlainText(self.object_text(obj) if obj else tr("No contents in this category."))
+        key = self.page_settings.current_key()
+        self.settings_actions.setVisible(key is not None and key[1] is None and self.checks[key[0]].get("conflict", False))
+        if key is None:
+            self.settings_details.setPlainText(tr("Select a settings group to inspect the changes."))
+            return
+        number, group = key
+        if group is None:
+            obj = next(obj for obj in self.by_kind["page_settings"] if obj["number"] == number)
+            self.settings_details.setPlainText(self.object_text(obj))
+            return
+        change = self.checks[number]["groups"][group]
+        lines = [change["names"][current_language()], "", tr("Settings after import:"), "",
+                 settings_preview(change["config"], change["fields"], current=change["current"])]
+        self.settings_details.setPlainText("\n".join(lines))
 
     def asset_action(self, action):
         self.asset_actions.update({obj["number"]: action for obj in self.by_kind["assets"] if self.checks.get(obj["number"], {}).get("conflict")})
@@ -782,7 +952,11 @@ class ImportDialog(QDialog):
             return
         for kind in KINDS:
             self.tabs.setItemText(kind, title(kind) + (" 🔴" if self.by_kind[kind] and kind not in self.viewed else ""))
-            self.selection_counts[kind].setText(tr("{0}/{1} selected").format(sum(obj["number"] in self.selected for obj in self.by_kind[kind]), len(self.by_kind[kind])))
+            if kind == "page_settings":
+                count, total = len(self.page_settings.selected()), len(self.page_settings.leaves)
+            else:
+                count, total = sum(obj["number"] in self.selected for obj in self.by_kind[kind]), len(self.by_kind[kind])
+            self.selection_counts[kind].setText(tr("{0}/{1} selected").format(count, total))
         nonempty = {kind for kind in KINDS if self.by_kind[kind]}
         self.counter.setText(tr("{0}/{1} categories viewed").format(len(self.viewed & nonempty), len(nonempty)))
         errors = [self.inspection_error] if getattr(self, "inspection_error", "") else []
@@ -825,14 +999,26 @@ class ImportDialog(QDialog):
             name = name[:80] if isinstance(name, str) else obj["id"]
             self.pages.item(index).setText((name + " · " if name != obj["id"] else "") + obj["id"] + " — " + status)
         self.pages.blockSignals(False)
-        for kind, widget in (("skills", self.skills), ("page_settings", self.page_settings)):
-            widget.blockSignals(True)
-            for index, obj in enumerate(self.by_kind[kind]):
-                check = self.checks.get(obj["number"], {})
-                status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
-                action = self.asset_actions.get(obj["number"])
-                widget.item(index).setText(obj["id"] + " — " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
-            widget.blockSignals(False)
+        self.skills.blockSignals(True)
+        for index, obj in enumerate(self.by_kind["skills"]):
+            check = self.checks.get(obj["number"], {})
+            status = tr("Check failed") if check.get("errors") else tr("Conflict") if check.get("conflict") else tr("Same content") if check.get("same") else tr("New")
+            action = self.asset_actions.get(obj["number"])
+            self.skills.item(index).setText(obj["id"] + " — " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
+        self.skills.blockSignals(False)
+        self.page_settings.blockSignals(True)
+        for obj in self.by_kind["page_settings"]:
+            number = obj["number"]
+            check = self.checks.get(number, {})
+            for key, group in (check.get("groups") or {None: check}).items():
+                item = self.page_settings.leaves.get((number, key))
+                if item is None:
+                    continue
+                label = obj["id"] if key is None else group["names"][current_language()]
+                status = tr("Check failed") if group.get("errors") else tr("Same content") if group.get("same") else tr("Will overwrite") if group.get("conflict") and key is not None else tr("Conflict") if group.get("conflict") else tr("New")
+                action = self.asset_actions.get(number) if key is None else None
+                item.setText(0, label + " · " + status + (" · " + (tr("Replace") if action == "replace" else tr("Skip")) if action else ""))
+        self.page_settings.blockSignals(False)
         self.render_skill()
         self.render_settings()
         self.error_box.setText("\n".join(dict.fromkeys(errors)))
@@ -879,9 +1065,25 @@ class ImportDialog(QDialog):
             message = tr("Install these pages without Review? Runtime identity, loading and interface have not been verified; they may fail after reload.") + "\n\n" + "\n".join(unreviewed)
             if QMessageBox.question(self, tr("Unreviewed pages"), message, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No) != QMessageBox.StandardButton.Yes:
                 return
+        settings_groups, overwrites = {}, []
+        for number, key in sorted(self.page_settings.selected()):
+            if key is not None:
+                settings_groups.setdefault(number, set()).add(key)
+                group = self.checks[number]["groups"][key]
+                if group["conflict"]:
+                    overwrites.append(self.page_settings.leaves[number, key].parent().text(0) + " · " + group["names"][current_language()])
+        if overwrites:
+            confirmation = QMessageBox(QMessageBox.Icon.Question, tr("Confirm settings overwrites"), "",
+                                       QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, self)
+            confirmation.setTextFormat(Qt.TextFormat.PlainText)
+            confirmation.setText(tr("Imported values will overwrite local values in these groups:") + "\n\n" + "\n".join(overwrites))
+            confirmation.setDefaultButton(QMessageBox.StandardButton.No)
+            if confirmation.exec() != QMessageBox.StandardButton.Yes:
+                return
         try:
             self.result_data = sharing_task(self, lambda: import_selected(self.manager, self.package, self.checks, self.selected,
-                asset_actions=self.asset_actions, reviewed=self.reviewed, allow_unreviewed=bool(unreviewed)), title="Import sharing package")
+                asset_actions=self.asset_actions, reviewed=self.reviewed, allow_unreviewed=bool(unreviewed),
+                settings_groups=settings_groups, confirm_settings_overwrites=bool(overwrites)), title="Import sharing package")
             imported_settings = {item["id"] for item in self.result_data["completed"]
                                  if item["kind"] == "page_settings" and item.get("status") == "imported"}
             if imported_settings:
@@ -912,11 +1114,16 @@ class ImportDialog(QDialog):
             self.recheck()
 
     def sync_selection(self):
-        for kind, widget in (("pages", self.pages), ("history", self.histories), ("skills", self.skills), ("page_settings", self.page_settings)):
+        for kind, widget in (("pages", self.pages), ("history", self.histories), ("skills", self.skills)):
             widget.blockSignals(True)
             for index, obj in enumerate(self.by_kind[kind]):
                 widget.item(index).setCheckState(Qt.CheckState.Checked if obj["number"] in self.selected else Qt.CheckState.Unchecked)
             widget.blockSignals(False)
+        self.page_settings.blockSignals(True)
+        for (number, _), item in self.page_settings.leaves.items():
+            if number not in self.selected:
+                item.setCheckState(0, Qt.CheckState.Unchecked)
+        self.page_settings.blockSignals(False)
         self.assets.blockSignals(True)
         for item in tree_items(self.assets):
             identity = item.data(0, Qt.ItemDataRole.UserRole)

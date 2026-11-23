@@ -20,7 +20,7 @@ from .file_content import (FileContent, content_hash, content_bytes, copy_conten
     content_stream, require_memory, require_disk, available_memory, open_image, image_preview, ResourceUnknown, checkpoint, file_transfers, transfer_file)
 from .agent_log import FORMAT, LogStore
 from .assets import AssetLibrary, asset_name
-from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries,
+from .page_packages import (PageSnapshot, _relative, install_page_package, page_entries, page_entry,
                             page_filename, real_directory, snapshot_page)
 from .user_pages import UserSettings
 from .runtime import _strict_json
@@ -31,6 +31,8 @@ KINDS = ("workflow", "assets", "pages", "history", "skills", "page_settings")
 MIRROR_SETTINGS_ID = "mirror.settings"
 MIRROR_DEFAULT_FIELDS = {"shop_gifts", "theme_packs"}
 PAGE_DEFAULTS_FILE = "defaults.json"
+GROUPED_SETTINGS_FILE = "grouped-settings.json"
+OTHER_SETTINGS_GROUP = "__other__"
 
 
 def digest(content):
@@ -146,13 +148,16 @@ def asset_files(data_root, name):
     return files
 
 
-def page_declarations(package):
+def page_declarations(package, *, settings=False):
     """仅提取可证明的字面量声明；动态属性留为未验证，不为检查导入模块。"""
     source = content_bytes(package.files["page.py"])
     require_memory(len(source) * 12)
     tree = ast.parse(source)
     values = {}
-    for name in ("PAGE_ID", "PAGE_NAME", "TASKS"):
+    names = ("PAGE_ID", "PAGE_NAME", "TASKS")
+    if settings:
+        names += ("PAGE_NAMES", "PAGE_SETTINGS_GROUPS")
+    for name in names:
         nodes = []
         for node in tree.body:
             targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
@@ -164,11 +169,13 @@ def page_declarations(package):
             value = ast.literal_eval(nodes[0])
         except (ValueError, TypeError):
             continue
-        if len(nodes) != 1 or name != "TASKS" and (type(value) is not str or not value.strip()):
+        if len(nodes) != 1 or name in {"PAGE_ID", "PAGE_NAME"} and (type(value) is not str or not value.strip()):
             raise ValueError(f"页面声明无效：{name}")
         if name == "TASKS":
             from .user_pages import validate_tasks
             value = validate_tasks(value)
+        elif name == "PAGE_SETTINGS_GROUPS":
+            validate_settings_groups(value, allow_other=False)
         values[name] = value
     if values.get("PAGE_ID") in {"dashboard", "general-settings"}:
         raise ValueError("页面使用了宿主保留 ID。")
@@ -240,6 +247,120 @@ def replace_skill(root, identity, files, expected):
     finally:
         if not preserve:
             shutil.rmtree(work)
+
+
+def validate_settings_groups(groups, *, allow_other):
+    """校验分组名称、字段归属和以条目为单位的合并路径。"""
+    if type(groups) is not dict or not groups:
+        raise ValueError("页面配置分组必须为非空对象。")
+    fields = set()
+    for key, group in groups.items():
+        if (type(key) is not str or not key.strip() or (key == OTHER_SETTINGS_GROUP and not allow_other)
+                or type(group) is not dict or set(group) != {"names", "fields"}):
+            raise ValueError("页面配置分组声明无效。")
+        names, rules = group["names"], group["fields"]
+        if (type(names) is not dict or set(names) != {"zh_CN", "en_US"}
+                or any(type(name) is not str or not name.strip() for name in names.values())
+                or type(rules) is not dict or not rules or fields.intersection(rules)
+                or any(type(field) is not str for field in rules)):
+            raise ValueError("页面配置分组名称无效或字段重复。")
+        for path in rules.values():
+            if path is not None and (type(path) is not list or len(path) > 8
+                                     or any(type(part) is not str for part in path)):
+                raise ValueError("页面配置分组的条目合并路径无效。")
+        fields.update(rules)
+    return fields
+
+
+def saved_settings_groups(manager, identities):
+    """读取安装页的字面量声明，展示已保存字段。"""
+    if not identities:
+        return {}
+    saved = UserSettings(manager.data_root).value["pages"]
+    directory = real_directory(manager.data_root / "pages")
+    result, seen = {}, set()
+    for entry in page_entries(directory):
+        try:
+            declarations = page_declarations(PageSnapshot({"page.py": FileContent.from_path(page_entry(entry))}), settings=True)
+        except (OSError, SyntaxError, ValueError):
+            continue
+        identity = declarations.get("PAGE_ID")
+        if identity not in identities:
+            continue
+        if identity in seen:
+            result.pop(identity, None)
+            continue
+        seen.add(identity)
+        groups = declarations.get("PAGE_SETTINGS_GROUPS")
+        if not groups or not (values := saved[identity]):
+            continue
+        active = {}
+        for key, group in groups.items():
+            if rules := {field: path for field, path in group["fields"].items() if field in values}:
+                active[key] = {**group, "fields": rules}
+        other = values.keys() - {field for group in active.values() for field in group["fields"]}
+        if other:
+            active[OTHER_SETTINGS_GROUP] = {"names": {"zh_CN": "其他配置", "en_US": "Other settings"},
+                                            "fields": dict.fromkeys(sorted(other))}
+        declared_names = declarations.get("PAGE_NAMES")
+        names = {language: (declared_names or {}).get(language)
+                 if type(declared_names) is dict else None for language in ("zh_CN", "en_US")}
+        for language, name in names.items():
+            if type(name) is not str or not name.strip():
+                names[language] = declarations.get("PAGE_NAME", identity)
+        result[identity] = {"groups": active, "settings": values, "names": names}
+    return result
+
+
+def page_settings_groups(identity, files):
+    """读取新版局部配置并校验每个值只属于一个组。"""
+    if type(identity) is not str or not identity.strip() or set(files) != {GROUPED_SETTINGS_FILE}:
+        raise ValueError("局部页面配置的对象无效。")
+    doc = strict_json(files[GROUPED_SETTINGS_FILE])
+    if type(doc) is not dict or set(doc) != {"groups", "settings", "names"}:
+        raise ValueError("局部页面配置结构无效。")
+    if (type(doc["names"]) is not dict or set(doc["names"]) != {"zh_CN", "en_US"}
+            or any(type(name) is not str or not name.strip() for name in doc["names"].values())):
+        raise ValueError("局部页面配置的页面名称无效。")
+    fields = validate_settings_groups(doc["groups"], allow_other=True)
+    if type(doc["settings"]) is not dict or doc["settings"].keys() != fields:
+        raise ValueError("局部页面配置与分组的字段不一致。")
+    for group in doc["groups"].values():
+        for field, path in group["fields"].items():
+            if path is None:
+                continue
+            value = doc["settings"][field]
+            for part in path:
+                if type(value) is not dict:
+                    break
+                value = value.get(part, {})
+            if type(value) is not dict:
+                raise ValueError(f"页面配置字段 {field} 的合并位置必须是对象。")
+    return _strict_json(doc)
+
+
+def settings_group_change(group, incoming, current):
+    """按声明计算局部更新及覆盖，名单等值整体替换，目录按条目替换。"""
+    def merge(value, old, path):
+        if path is None or type(old) is not dict:
+            return value, settings_version(value) != settings_version(old)
+        if not path:
+            return {**old, **value}, any(key in old and json_bytes(old[key]) != json_bytes(new)
+                                         for key, new in value.items())
+        key, *remaining = path
+        if key not in value:
+            return merge(value, old, [])
+        child, conflict = merge(value[key], old.get(key), remaining)
+        conflict = key in old and conflict or any(
+            name in old and json_bytes(old[name]) != json_bytes(new) for name, new in value.items() if name != key)
+        return {**old, **value, key: child}, conflict
+
+    update, overwrites = {}, False
+    for field, path in group["fields"].items():
+        value, conflict = merge(incoming[field], current.get(field), path)
+        update[field] = value
+        overwrites |= field in current and conflict
+    return update, overwrites
 
 
 def page_settings_config(identity, files, *, current=None):
@@ -380,7 +501,7 @@ def history_files(root, identity):
     return files
 
 
-def build_export(manager, selection, *, builtin_skills=False):
+def build_export(manager, selection, *, builtin_skills=False, settings_groups=None):
     """冻结明确选择及必要文件；Workflow 不分析或附带 Assets，不做隐私扫描。"""
     objects = []
     for kind in KINDS:
@@ -403,8 +524,15 @@ def build_export(manager, selection, *, builtin_skills=False):
                     raise ValueError(f"Skill 不存在：{identity}")
             elif kind == "page_settings":
                 config = UserSettings(manager.data_root).value["pages"][identity]
-                files = {"settings.json": json_bytes(config)}
-                page_settings_config(identity, files)
+                if settings_groups and identity in settings_groups:
+                    names, groups = settings_groups[identity]["names"], settings_groups[identity]["groups"]
+                    subset = {field: config[field] for group in groups.values() for field in group["fields"]}
+                    doc = {"names": names, "groups": groups, "settings": subset}
+                    files = {GROUPED_SETTINGS_FILE: json.dumps(doc, ensure_ascii=False, indent=2).encode("utf-8")}
+                    page_settings_groups(identity, files)
+                else:
+                    files = {"settings.json": json_bytes(config)}
+                    page_settings_config(identity, files)
             elif kind == "pages":
                 path = installed_page(manager.data_root, identity)
                 files = {"page.py": FileContent.from_path(path)} if path.is_file() else tree_files(path)
@@ -659,10 +787,21 @@ def inspect_objects(manager, package):
                               changed_files=[name for name in sorted(set(old or {}) | set(files)) if (old or {}).get(name) != files.get(name)])
             elif kind == "page_settings":
                 old = UserSettings(manager.data_root).value["pages"].get(identity)
-                config = page_settings_config(identity, files, current=old)
-                before, after = settings_version(old), settings_version(config)
-                result.update(config=config, current=old, before=before,
-                              same=before == after, conflict=old is not None and before != after)
+                before = settings_version(old)
+                if GROUPED_SETTINGS_FILE in files:
+                    doc = page_settings_groups(identity, files)
+                    groups = {}
+                    for key, group in doc["groups"].items():
+                        update, conflict = settings_group_change(group, doc["settings"], old or {})
+                        local = {field: old[field] for field in update if old is not None and field in old}
+                        groups[key] = {"names": group["names"], "fields": group["fields"], "current": local, "config": update,
+                                       "conflict": conflict, "same": settings_version(local) == settings_version(update)}
+                    result.update(groups=groups, names=doc["names"], before=before)
+                else:
+                    config = page_settings_config(identity, files, current=old)
+                    after = settings_version(config)
+                    result.update(config=config, current=old, before=before,
+                                  same=before == after, conflict=old is not None and before != after)
             elif kind == "pages":
                 page_filename(identity)
                 snapshot = PageSnapshot(files)
@@ -851,7 +990,8 @@ def page_selection_errors(manager, package, checks, selected, reviewed):
     return errors
 
 
-def import_selected(manager, package, checks, selected, *, asset_actions, reviewed, allow_unreviewed=False):
+def import_selected(manager, package, checks, selected, *, asset_actions, reviewed, allow_unreviewed=False,
+                    settings_groups=None, confirm_settings_overwrites=False):
     """调用方确认后逐对象提交，失败停止；已成功对象保留并明确列未处理项。"""
     package.verify()
     require_disk([(manager.data_root, sum(record["size"] + 4096 for obj in package.objects if obj["number"] in selected for record in obj["files"].values()))])
@@ -889,11 +1029,24 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                     current = store.value["pages"].get(identity)
                     if settings_version(current) != check["before"]:
                         raise ValueError("本地页面配置已变化，请重新检查。")
-                    config = page_settings_config(identity, package.files(obj), current=current)
-                    if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
+                    files = package.files(obj)
+                    if GROUPED_SETTINGS_FILE in files:
+                        doc = page_settings_groups(identity, files)
+                        chosen = (settings_groups or {}).get(number, set())
+                        if not chosen or not chosen <= doc["groups"].keys():
+                            raise ValueError("请选择有效的页面配置分组。")
+                        config = dict(current or {})
+                        for key in sorted(chosen):
+                            update, conflict = settings_group_change(doc["groups"][key], doc["settings"], current or {})
+                            if conflict and not confirm_settings_overwrites:
+                                raise ValueError("页面配置分组覆盖尚未确认。")
+                            config.update(update)
+                    else:
+                        config = page_settings_config(identity, files, current=current)
+                    if settings_version(current) == settings_version(config) or check.get("conflict") and asset_actions.get(number) == "skip":
                         outcome = {"status": "skipped"}
                     else:
-                        if check["conflict"] and asset_actions.get(number) != "replace":
+                        if check.get("conflict") and asset_actions.get(number) != "replace":
                             raise ValueError("页面配置冲突尚未选择替换或跳过。")
                         store.save("pages", identity, config)
                         outcome = {"status": "imported", "reload_required": True}
