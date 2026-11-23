@@ -2525,5 +2525,9 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>{0} names</source><translation>{0} 个</translation></message>
     <message><source>{0} images</source><translation>{0} 张</translation></message>
     <message><source>Asset inventory</source><translation>素材</translation></message>
+    <message><source>Calculating detailed log size…</source><translation>正在统计详细日志占用…</translation></message>
+    <message><source>Calculating usage from local Run history…</source><translation>正在统计本机 Run 历史用量…</translation></message>
+    <message><source>{0} (partial)</source><translation>{0}（部分）</translation></message>
+    <message><source>Size unavailable for {0} run logs.</source><translation>有 {0} 条运行日志无法统计占用。</translation></message>
 </context>
 </TS>

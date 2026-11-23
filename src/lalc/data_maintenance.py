@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import shutil
 import stat
+from threading import Lock
 import uuid
 
 from .assets import asset_name
@@ -37,24 +38,33 @@ def _datetime(value):
 def _file_stat(path):
     real_directory(path.parent)
     info = path.lstat()
-    if path.is_symlink() or path.is_junction() or not stat.S_ISREG(info.st_mode):
+    if not stat.S_ISREG(info.st_mode) or _junction(info):
         raise ValueError(f"Expected a regular file: {path.name}")
     return info
 
 
-def _tree(path):
-    """为预览记录文件身份和大小，拒绝目录联接和非普通文件。"""
-    if path.is_symlink() or path.is_junction():
-        raise ValueError(f"Cleanup does not accept links: {path.name}")
-    if path.is_dir():
-        real_directory(path)
-        info = path.stat()
-        entries = [(path, info.st_dev, info.st_ino, info.st_mtime_ns, 0)]
-        for child in sorted(path.iterdir()):
-            entries.extend(_tree(child))
-        return entries
-    info = _file_stat(path)
-    return [(path, info.st_dev, info.st_ino, info.st_mtime_ns, info.st_size)]
+def _junction(info):
+    return os.name == "nt" and info.st_reparse_tag == stat.IO_REPARSE_TAG_MOUNT_POINT
+
+
+def _tree(path, *, fingerprint=True):
+    """校验入口的父链，每个子项用一次不跟随链接的文件状态检查。"""
+    real_directory(path.parent)
+
+    def walk(current, info):
+        directory = stat.S_ISDIR(info.st_mode)
+        if _junction(info) or not (directory or stat.S_ISREG(info.st_mode)):
+            raise ValueError(f"Cleanup does not accept links or special files: {current.name}")
+        yield current, info.st_dev, info.st_ino, info.st_mtime_ns, 0 if directory else info.st_size
+        if directory:
+            with os.scandir(current) as children:
+                for child in sorted(children, key=lambda child: child.name):
+                    path = current / child.name
+                    # Windows 的 DirEntry.stat 不提供文件标识，预览快照需要真实 stat。
+                    info = path.lstat() if os.name == "nt" and fingerprint else child.stat(follow_symlinks=False)
+                    yield from walk(path, info)
+
+    return walk(path, path.lstat())
 
 
 def _summary(root, identity):
@@ -65,7 +75,7 @@ def _summary(root, identity):
         raise ValueError(f"Run {identity} has an incomplete Trace.")
     manifests = {}
     components = {}
-    for record in trace_records(root, identity):
+    for record in trace_records(root, identity, boundary=before):
         if record is None:
             raise ValueError(f"Run {identity} has a damaged Trace.")
         event = record.get("event")
@@ -131,6 +141,8 @@ class DataMaintenance:
         self.service = service
         self.manager = service.manifest_manager
         self.root = service.data_root.absolute()
+        self._usage_lock = Lock()
+        self._trace_usage = {}
 
     def _versions(self):
         """拿到完整的静态引用表，同时保留无法解析的条目用于阻止清理。"""
@@ -167,27 +179,38 @@ class DataMaintenance:
         return rows, invalid
 
     def _usage(self):
-        real_directory(self.root / "traces")
-        directory = real_directory(self.root / "run-usage")
-        runs = set(retained_runs(self.root))
-        saved = {int(path.stem) for path in directory.glob("*.json")
-                 if re.fullmatch(r"[1-9][0-9]*", path.stem)}
-        usage, invalid = ({}, {}), 0
-        for identity in runs | saved:
-            try:
-                if identity in runs:
-                    try:
-                        _add_summary(usage, _summary(self.root, identity), identity)
-                        continue
-                    except DATA_ERRORS:
-                        # 清理可能在枚举后提交，优先尝试刚落盘的摘要。
-                        pass
-                path = directory / f"{identity}.json"
-                _file_stat(path)
-                _add_summary(usage, json.loads(path.read_text(encoding="utf-8")), identity)
-            except DATA_ERRORS:
-                invalid += 1
-        return usage, invalid
+        """版本与组件页共享内存摘要，按 Trace 状态重新计算变化的 Run。"""
+        with self._usage_lock:
+            traces = real_directory(self.root / "traces")
+            directory = real_directory(self.root / "run-usage")
+            runs = set(retained_runs(self.root))
+            saved = {int(path.stem) for path in directory.glob("*.json")
+                     if re.fullmatch(r"[1-9][0-9]*", path.stem)}
+            usage, invalid = ({}, {}), 0
+            cache = {}
+            for identity in runs | saved:
+                try:
+                    if identity in runs:
+                        try:
+                            info = (traces / f"{identity}.jsonl").lstat()
+                            if not stat.S_ISREG(info.st_mode) or _junction(info):
+                                raise ValueError("Invalid Trace file.")
+                            key = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+                            cached = self._trace_usage.get(identity)
+                            value = cached[1] if cached is not None and cached[0] == key else _summary(self.root, identity)
+                            _add_summary(usage, value, identity)
+                            cache[identity] = (key, value)
+                            continue
+                        except DATA_ERRORS:
+                            # 清理可能在枚举后提交，优先尝试刚落盘的摘要。
+                            pass
+                    path = directory / f"{identity}.json"
+                    _file_stat(path)
+                    _add_summary(usage, json.loads(path.read_text(encoding="utf-8")), identity)
+                except DATA_ERRORS:
+                    invalid += 1
+            self._trace_usage = cache
+            return usage, invalid
 
     def _log_targets(self, entry):
         if entry["imported"]:
@@ -205,25 +228,35 @@ class DataMaintenance:
         return tuple(paths)
 
     def _logs(self, keys=None):
-        """从共享列表读取身份，但本机状态与导入包采用各自的清理范围。"""
+        """仅用日志首尾填表，截图目录的占用另行扫描。"""
         real_directory(self.root / "traces")
         rows, invalid = [], 0
-        for entry in list_logs(self.root):
-            if keys is not None and entry["key"] not in keys:
-                continue
+        for entry in list_logs(self.root, keys=keys, read_start=False):
             try:
                 info = run_summary(entry["root"], entry["run_id"])
                 date = _datetime(info["started_at"]) if info["started_at"] else None
-                targets = self._log_targets(entry)
-                fingerprints = tuple(item for path in targets for item in _tree(path))
             except DATA_ERRORS:
                 invalid += 1
                 continue
             cancelled = (info["result"] or {}).get("failure_code") == "user_cancelled"
             status = info["status"] if isinstance(info["status"], str) else "unknown"
-            rows.append({**entry, "date": date, "status": "cancelled" if cancelled else status,
-                         "size": sum(item[-1] for item in fingerprints)})
+            rows.append({**entry, "started_at": info["started_at"], "date": date,
+                         "status": "cancelled" if cancelled else status, "size": None})
+        rows.sort(key=lambda row: (row["date"] or datetime.min.replace(tzinfo=UTC), str(row["key"])), reverse=True)
         return rows, invalid
+
+    def log_sizes(self, rows, *, cancelled=None):
+        """后台补齐日志占用，无法安全遍历的条目仍可查看日志。"""
+        sizes = {}
+        for row in rows:
+            if cancelled is not None and cancelled.is_set():
+                break
+            try:
+                sizes[row["key"]] = sum(item[-1] for path in self._log_targets(row)
+                                        for item in _tree(path, fingerprint=False))
+            except DATA_ERRORS:
+                continue
+        return sizes
 
     def _assets(self):
         folder = real_directory(self.root / "assets")
@@ -261,14 +294,14 @@ class DataMaintenance:
         rows.sort(key=lambda row: (row["last"] or datetime.min.replace(tzinfo=UTC), row["key"]), reverse=True)
         return rows, invalid
 
-    def inventory(self, category):
+    def inventory(self, category, *, with_usage=True):
         """读取一类盘点。跨 Run 使用统计仅在查看相关页时计算。"""
         if category == "logs":
             return self._logs()
         if category == "assets":
             return self._assets()
         versions, invalid = self._versions()
-        (version_usage, component_usage), gaps = self._usage()
+        (version_usage, component_usage), gaps = self._usage() if with_usage else (({}, {}), 0)
         if category == "manifests":
             for row in versions:
                 row["count"], row["last"] = version_usage.get(row["key"], (None, None))
@@ -321,16 +354,20 @@ class DataMaintenance:
         keys = tuple(keys)
         if not keys or len(set(keys)) != len(keys):
             raise ValueError("Select at least one item.")
-        selected, sources = [], []
+        selected, sources, fingerprints = [], [], []
         if category == "logs":
             rows, _ = self._logs(set(keys))
             by_key = {row["key"]: row for row in rows}
+            targets = []
             for key in keys:
                 row = by_key.get(key)
                 if row is None or row["date"] is None:
                     raise ValueError("A selected run log is unavailable or has no start date.")
-                selected.append(row)
-            targets = tuple(path for row in selected for path in self._log_targets(row))
+                paths = self._log_targets(row)
+                files = [item for path in paths for item in _tree(path)]
+                targets.extend(paths)
+                fingerprints.extend(files)
+                selected.append({**row, "size": sum(item[-1] for item in files)})
         elif category == "manifests":
             versions, invalid = self._versions()
             if invalid:
@@ -351,11 +388,11 @@ class DataMaintenance:
                     sources.append((path, tuple(names)))
             targets = tuple(self.manager.manifests_dir / f"{row['key']}.json" for row in selected)
             targets += tuple(path for path, _ in sources)
+            fingerprints = [item for path in targets for item in _tree(path.absolute())]
         else:
             raise ValueError("This data category cannot be cleaned.")
         targets = tuple(path.absolute() for path in targets)
-        fingerprints = tuple(item for path in targets for item in _tree(path))
-        return CleanupPlan(category, keys, tuple(selected), tuple(sources), targets, fingerprints)
+        return CleanupPlan(category, keys, tuple(selected), tuple(sources), targets, tuple(fingerprints))
 
     def execute(self, plan):
         """排他复核、保留统计并提交永久清理。后续残留路径交给界面报告。"""

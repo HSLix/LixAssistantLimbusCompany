@@ -1,5 +1,7 @@
 """User GUI 数据与清理页及永久删除确认。"""
 
+from threading import Event
+
 from PySide6.QtCore import QSignalBlocker, QThreadPool, Qt, Slot
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QAbstractItemView, QHBoxLayout, QListWidgetItem, QTableWidgetItem, QVBoxLayout, QWidget
@@ -15,6 +17,8 @@ from .run_log_gui import ReadTask
 
 
 def _size(size):
+    if size is None:
+        return "—"
     for unit, scale in (("GiB", 1024**3), ("MiB", 1024**2), ("KiB", 1024)):
         if size >= scale:
             return f"{size / scale:.1f} {unit}"
@@ -151,7 +155,10 @@ class DataMaintenancePage(QWidget):
         self.rows, self.filtered, self.selected = [], [], set()
         self.eligible_keys = set()
         self.offset, self.serial = 0, 0
+        self.generation = 0
         self.tasks = {}
+        self.size_cancelled = Event()
+        self.destroyed.connect(lambda *_: self.size_cancelled.set())
         self.loading, self.busy, self.previewing = False, False, False
 
         layout = QVBoxLayout(self)
@@ -261,19 +268,22 @@ class DataMaintenancePage(QWidget):
             self.configure()
             self.refresh()
 
-    def submit(self, operation, callback):
+    def submit(self, operation, callback, kind):
         self.serial += 1
         task = ReadTask(self.serial, operation)
-        self.tasks[self.serial] = (task, callback)
+        self.tasks[self.serial] = (task, self.generation, callback, kind)
         task.signals.done.connect(self.completed, Qt.ConnectionType.QueuedConnection)
         QThreadPool.globalInstance().start(task)
 
     @Slot(int, object)
     def completed(self, identity, result):
-        _, callback = self.tasks.pop(identity)
-        if identity != self.serial:
+        _, generation, callback, kind = self.tasks.pop(identity)
+        if generation != self.generation:
             return
-        self.loading = self.previewing = False
+        if kind == "inventory":
+            self.loading = False
+        elif kind == "preview":
+            self.previewing = False
         if isinstance(result, Exception):
             self.note.setText(tr("Data operation failed: {0}").format(tr(str(result))))
             self.note.show()
@@ -282,6 +292,9 @@ class DataMaintenancePage(QWidget):
             callback(result)
 
     def refresh(self):
+        self.generation += 1
+        self.size_cancelled.set()
+        self.size_cancelled = Event()
         self.rows, self.filtered, self.selected = [], [], set()
         self.eligible_keys.clear()
         self.loading, self.previewing = True, False
@@ -290,17 +303,19 @@ class DataMaintenancePage(QWidget):
         self.totals.update_values([("", "—")] * 3)
         self.go_to(0)
         category = self.category
-        self.submit(lambda: self.data.inventory(category), self.show_inventory)
+        self.submit(lambda: self.data.inventory(category, with_usage=False),
+                    lambda result: self.show_inventory(result, collecting_usage=category in {"manifests", "components"}),
+                    "inventory")
 
-    def show_inventory(self, result):
+    def show_inventory(self, result, *, collecting_usage=False, offset=0):
         self.rows, invalid = result
         rows = self.rows
         if self.category == "logs":
             imported = sum(row["imported"] for row in rows)
             values = [(tr("Local logs"), tr("{0} logs").format(len(rows) - imported)),
                       (tr("Imported logs"), tr("{0} logs").format(imported)),
-                      (tr("Detailed log size"), _size(sum(row["size"] for row in rows)))]
-            notice = ""
+                      (tr("Detailed log size"), _size(None if rows else 0))]
+            notice = tr("Calculating detailed log size…") if rows else ""
         elif self.category == "manifests":
             values = [(tr("Published versions"), tr("{0} versions").format(len(rows))),
                       (tr("Protected versions"), tr("{0} versions").format(sum(row["default"] or row["latest"] for row in rows))),
@@ -309,7 +324,8 @@ class DataMaintenancePage(QWidget):
         elif self.category == "components":
             values = [(tr("Logical names"), tr("{0} names").format(len({row["name"] for row in rows if row["name"]}))),
                       (tr("Component source versions"), tr("{0} sources").format(len({row["key"] for row in rows}))),
-                      (tr("Versions with recorded calls"), tr("{0} sources").format(len({row["key"] for row in rows if row["count"]})))]
+                      (tr("Versions with recorded calls"), "—" if collecting_usage and rows else
+                       tr("{0} sources").format(len({row["key"] for row in rows if row["count"]})))]
             notice = tr("Calls are counted by source version from available local logs and usage summaries.")
         else:
             values = [(tr("Asset names"), tr("{0} names").format(len(rows))),
@@ -317,11 +333,43 @@ class DataMaintenancePage(QWidget):
                       (tr("Image size"), _size(sum(row["size"] for row in rows)))]
             notice = tr("Last match is read from the Asset usage index.")
         self.totals.update_values(values)
+        if collecting_usage and rows:
+            notice = tr("Calculating usage from local Run history…")
         if invalid:
             notice = (notice + " " + tr("{0} records could not be read. Statistics may be incomplete.").format(invalid)).strip()
         self.note.setText(notice)
         self.note.setVisible(bool(notice))
         self.filter_changed()
+        if offset:
+            self.go_to(min(offset, max(0, (len(self.filtered) - 1) // self.PAGE_SIZE * self.PAGE_SIZE)))
+        if self.category == "logs" and rows:
+            cancelled = self.size_cancelled
+            self.submit(lambda: self.data.log_sizes(rows, cancelled=cancelled),
+                        lambda sizes: self.show_log_sizes(sizes, invalid), "sizes")
+        elif collecting_usage and rows:
+            category = self.category
+            self.submit(lambda: self.data.inventory(category),
+                        lambda result: self.show_inventory(result, offset=self.offset), "usage")
+
+    def show_log_sizes(self, sizes, unreadable):
+        """补齐空间估算时保留日期、选择与当前分页。"""
+        for row in self.rows:
+            row["size"] = sizes.get(row["key"])
+        missing = len(self.rows) - len(sizes)
+        value = _size(sum(sizes.values())) if sizes else "—"
+        if missing and sizes:
+            value = tr("{0} (partial)").format(value)
+        self.totals.labels[2][1].setText(value)
+        notice = ""
+        if unreadable:
+            notice = tr("{0} records could not be read. Statistics may be incomplete.").format(unreadable)
+        if missing:
+            notice = (notice + " " + tr("Size unavailable for {0} run logs.").format(missing)).strip()
+        self.note.setText(notice)
+        self.note.setVisible(bool(notice))
+        if self.sort_column == 5:
+            self.sort_rows()
+        self.go_to(self.offset)
 
     def clear_dates(self):
         self.start.reset()
@@ -486,7 +534,7 @@ class DataMaintenancePage(QWidget):
         self.previewing = True
         self.render_actions()
         self.submit(lambda: self.data.preview(category, keys),
-                    lambda plan: self.confirm(plan, tr("{0} to {1} · Local dates").format(start, end)))
+                    lambda plan: self.confirm(plan, tr("{0} to {1} · Local dates").format(start, end)), "preview")
 
     def confirm(self, plan, dates):
         if (not self.isVisible() or self.busy or self.category != plan.category
