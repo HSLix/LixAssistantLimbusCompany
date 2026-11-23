@@ -20,7 +20,8 @@ def arguments(**values):
 
 
 def test_global_options_survive_provider_and_side_saves(tmp_path):
-    assert settings.load_settings(tmp_path, for_use=False)["max_requests"] == 50
+    for side in ("developer", "user"):
+        assert settings.load_settings(tmp_path, side=side, for_use=False)["max_requests"] == 100
     settings.save_options(tmp_path, history_enabled=False, runtime_feedback_enabled=True,
                           recovery_limit=3, automatic_repair_default=False)
     settings.save_selection(tmp_path, "user", "deepseek", enabled=True)

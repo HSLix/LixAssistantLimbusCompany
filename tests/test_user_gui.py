@@ -96,7 +96,39 @@ def test_framework_release_checks_require_two_user_actions_to_install(windows, t
     assert events == ["download", (workspace, ("user", "developer"))]
 
 
-def test_legacy_avatar_and_github_navigation(windows, monkeypatch):
+def test_announcement_explains_failure_and_displays_public_release_fallback(windows):
+    from lalc.framework_update import ReleaseStatus
+    from lalc.i18n import tr
+
+    _, _, user, _ = windows
+    user.show_framework_releases(ReleaseStatus(None, None, None))
+    assert user.announcement.placeholderText() == tr("Could not load the GitHub release announcement.")
+    user.show_framework_releases(ReleaseStatus("<h2>Latest release</h2><p>Release notes</p>", None, None, True))
+    assert "Latest release\nRelease notes" == user.announcement.toPlainText()
+
+
+def test_framework_compares_release_version_without_an_installable_package(windows):
+    from lalc.framework_update import ReleaseStatus
+    from lalc.i18n import tr
+
+    _, _, user, _ = windows
+    user.can_install_update = True
+    user.framework_build = {"version": "6.0.0"}
+    user.show_framework_releases(ReleaseStatus("Legacy announcement", None, None, github_version=(5, 0, 0)))
+    assert user.framework_status.text() == tr("The installed version is newer than the latest published version ({0}).").format("5.0.0")
+    assert not user.update_button.isEnabled()
+    user.show_framework_releases(ReleaseStatus("New announcement", None, None, github_version=(6, 0, 1)))
+    assert user.framework_status.text() == tr("Latest published version: {0}. A verified download is unavailable.").format("6.0.1")
+    assert not user.update_button.isEnabled()
+
+
+def test_developer_tools_are_last_in_user_settings(windows):
+    _, _, user, _ = windows
+    layout = user.general_settings.widget().layout()
+    assert layout.itemAt(layout.count() - 2).widget().objectName() == "developer-tools"
+
+
+def test_legacy_avatar_and_external_navigation(windows, monkeypatch):
     from PySide6.QtGui import QDesktopServices
     from qfluentwidgets import MessageBox, NavigationAvatarWidget
     from lalc.framework_update import REPOSITORY_URL
@@ -113,6 +145,8 @@ def test_legacy_avatar_and_github_navigation(windows, monkeypatch):
     assert dialog.isVisible()
     dialog.yesButton.click()
     assert opened == [REPOSITORY_URL, REPOSITORY_URL]
+    user.navigationInterface.widget("discord").clicked.emit(True)
+    assert opened[-1] == "https://discord.gg/bVzCuBU4bC"
 
 
 def test_default_resources_prompt_only_imports_on_confirmation(windows, tmp_path, monkeypatch):

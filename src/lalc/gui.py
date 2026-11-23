@@ -38,7 +38,7 @@ from .notifications import NotificationList
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
 from .lifecycle import ApplicationLifecycle, run_application
-from .framework_update import REPOSITORY_URL
+from .framework_update import LATEST_RELEASE_URL, REPOSITORY_URL
 
 
 class ReleaseAnnouncement(QTextBrowser):
@@ -47,9 +47,12 @@ class ReleaseAnnouncement(QTextBrowser):
     def loadResource(self, resource_type, name):
         return None
 
-    def show_release(self, content):
-        self.document().setMarkdown(content, QTextDocument.MarkdownFeature.MarkdownDialectGitHub |
-                                    QTextDocument.MarkdownFeature.MarkdownNoHTML)
+    def show_release(self, content, *, html=False):
+        if html:
+            self.setHtml(content)
+        else:
+            self.document().setMarkdown(content, QTextDocument.MarkdownFeature.MarkdownDialectGitHub |
+                                        QTextDocument.MarkdownFeature.MarkdownNoHTML)
 
 
 class StateBridge(QObject):
@@ -558,12 +561,12 @@ class UserWindow(MainWindow):
         self.announcement.setPlaceholderText(tr('No release announcement available.'))
         self.announcement.setMaximumHeight(240)
         view_release = QPushButton(tr('View latest GitHub Release'))
-        view_release.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(f'{REPOSITORY_URL}/releases/latest')))
+        view_release.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(LATEST_RELEASE_URL)))
         disclaimer = QLabel(
-            'LALC is a free open source software, if you paid for LALC from any channel, please refund for your rights.\n'
-            'LALC 是一款免费开源软件，仅供学习交流使用，如果你在任何渠道付费购买了 LALC，请为您自身权益退款。\n'
-            '软件图标素材来源网图，不属于 AGPL 协议开源的内容，如有侵权，请及时联系作者删除\n'
-            f'Project repository 项目地址：{REPOSITORY_URL}')
+            tr('LALC is free and open-source software for learning and discussion. If you paid for LALC, please request a refund.') + '\n' +
+            tr('The app icon was sourced online and is excluded from the AGPL license. If it infringes your rights, please contact the author to have it removed.') + '\n' +
+            tr('Project repository: {0}').format(REPOSITORY_URL))
+        disclaimer.setObjectName('software-disclaimer')
         disclaimer.setTextFormat(Qt.TextFormat.PlainText)
         disclaimer.setWordWrap(True)
         self.framework_version = QLabel(tr('Installed framework version: {0}').format(self.framework_build['version'] or '—'))
@@ -619,6 +622,7 @@ class UserWindow(MainWindow):
         self.edit_owner_notice = QLabel()
         options.addWidget(self.edit_owner_notice)
         tools = CardWidget()
+        tools.setObjectName('developer-tools')
         tools_layout = QVBoxLayout(tools)
         tools_layout.setContentsMargins(16, 16, 16, 16)
         tools_layout.addWidget(SubtitleLabel(tr('Developer Tools')))
@@ -628,7 +632,6 @@ class UserWindow(MainWindow):
         developer = QPushButton(tr('Open Developer GUI'))
         developer.clicked.connect(lambda: self._interact(self.open_developer))
         tools_layout.addWidget(developer)
-        options.addWidget(tools)
         sharing = CardWidget()
         sharing_layout = QVBoxLayout(sharing)
         sharing_layout.setContentsMargins(16, 16, 16, 16)
@@ -697,6 +700,7 @@ class UserWindow(MainWindow):
             entry.clicked.connect(lambda _, path=path: self.open_directory(path))
             application_layout.addWidget(entry)
         options.addWidget(application)
+        options.addWidget(tools)
         options.addStretch()
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -713,6 +717,9 @@ class UserWindow(MainWindow):
         for page in self.business_pages:
             page.widget.setObjectName(page.page_id)
             self.addSubInterface(page.widget, page.icon or FluentIcon.APPLICATION, page.name)
+        self.navigationInterface.addItem('discord', FluentIcon.CHAT, 'Discord',
+                                         onClick=lambda: QDesktopServices.openUrl(QUrl('https://discord.gg/bVzCuBU4bC')),
+                                         selectable=False, position=NavigationItemPosition.BOTTOM)
         self.navigationInterface.addItem('github-repository', FluentIcon.GITHUB, tr('GitHub repository'),
                                          onClick=self.open_repository, selectable=False, position=NavigationItemPosition.BOTTOM)
         self.navigationInterface.addWidget('author-avatar', NavigationAvatarWidget('陆爻齐-LuYaoQi', str(Path(__file__).with_name('MagicGirl.png'))),
@@ -783,6 +790,7 @@ class UserWindow(MainWindow):
         self.check_update_button.setEnabled(False)
         self.update_button.setEnabled(False)
         self.framework_status.setText(tr('Checking for updates…'))
+        self.announcement.setPlaceholderText(tr('Loading the GitHub release announcement…'))
         variant, mirror = self.framework_variant, self.framework_build.get('mirror', {})
 
         def query():
@@ -797,20 +805,31 @@ class UserWindow(MainWindow):
     def show_framework_releases(self, result):
         from .framework_update import version_number
         self.release_status = result
-        if result.announcement is not None:
-            self.announcement.show_release(result.announcement)
+        if result.announcement is None:
+            self.announcement.setPlaceholderText(tr('Could not load the GitHub release announcement.'))
+        else:
+            self.announcement.setPlaceholderText(tr('No release announcement available.'))
+            self.announcement.show_release(result.announcement, html=result.announcement_html)
         self.check_update_button.setEnabled(True)
-        github = result.github.version if result.github else None
+        github_package = result.github.version if result.github else None
+        github = result.github_version or github_package
         mirror = result.mirror if self.framework_variant == 'with-agent' else None
         newest = max(filter(None, (github, mirror)), default=None)
         current = version_number(self.framework_build['version'])
-        installable = github or (mirror if self.mirror_cdk_saved else None)
+        installable = github_package or (mirror if self.mirror_cdk_saved else None)
         self.framework_target = installable if installable and current and installable > current else None
         self.update_button.setEnabled(bool(self.framework_target) and self.can_install_update)
         self.update_button.setText(tr('Update to {0}').format('.'.join(map(str, self.framework_target)))
                                    if self.framework_target else tr('Update'))
         if newest and current and newest > current:
-            self.framework_status.setText(tr('Latest framework version: {0}').format('.'.join(map(str, newest))))
+            latest = '.'.join(map(str, newest))
+            if self.framework_target == newest:
+                self.framework_status.setText(tr('Latest framework version: {0}').format(latest))
+            else:
+                self.framework_status.setText(tr('Latest published version: {0}. A verified download is unavailable.').format(latest))
+        elif newest and current and newest < current:
+            self.framework_status.setText(tr('The installed version is newer than the latest published version ({0}).')
+                                          .format('.'.join(map(str, newest))))
         elif newest and current:
             self.framework_status.setText(tr('The framework is up to date.'))
         else:
