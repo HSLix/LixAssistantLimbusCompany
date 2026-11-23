@@ -3,10 +3,14 @@ name: Publish LALC
 on:
   workflow_dispatch:
     inputs:
-      publish:
-        description: Publish the Release after a successful Windows build
-        type: boolean
-        default: false
+      release:
+        description: Build only, publish a Beta, or publish a stable release
+        type: choice
+        default: build-only
+        options:
+          - build-only
+          - beta
+          - stable
 
 permissions:
   contents: read
@@ -30,10 +34,16 @@ jobs:
           uv run --no-sync pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
       - name: Download the pinned pi package and build
         shell: pwsh
+        env:
+          RELEASE_MODE: ${{ inputs.release }}
         run: |
           $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
           Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
-          uv run --no-sync python scripts/build_windows.py
+          $buildArgs = @()
+          if ($env:RELEASE_MODE -eq 'beta') {
+            $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
+          }
+          uv run --no-sync python scripts/build_windows.py @buildArgs
       - uses: actions/upload-artifact@v4
         with:
           name: LALC-windows-x64
@@ -42,7 +52,7 @@ jobs:
           compression-level: 0
 
   publish:
-    if: ${{ inputs.publish && github.ref == 'refs/heads/master' }}
+    if: ${{ (inputs.release == 'stable' && github.ref == 'refs/heads/master') || (inputs.release == 'beta' && github.ref_type == 'branch') }}
     needs: windows
     runs-on: ubuntu-latest
     permissions:
@@ -60,14 +70,23 @@ jobs:
           path: dist
       - name: Generate contributor notes and publish the tested commit
         shell: bash
+        env:
+          RELEASE_MODE: ${{ inputs.release }}
         run: |
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           previous=$(gh release view --json tagName --jq .tagName)
           python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
           (cd dist && sha256sum -c SHA256SUMS)
-          gh release create "v$version" --target "$GITHUB_SHA" --latest --title "LALC $version" \
+          release_flags=(--latest)
+          extra_assets=(dist/lalc.zip)
+          if [[ $RELEASE_MODE == beta ]]; then
+            version="$version-beta.$GITHUB_RUN_NUMBER"
+            release_flags=(--prerelease --latest=false)
+            extra_assets=()
+          fi
+          gh release create "v$version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $version" \
             --notes-file release-notes.md \
             "dist/LALC-$version-windows-x64-with-agent.zip" \
             "dist/LALC-$version-windows-x64-without-agent.zip" \
-            dist/lalc.zip dist/SHA256SUMS
+            "${extra_assets[@]}" dist/SHA256SUMS

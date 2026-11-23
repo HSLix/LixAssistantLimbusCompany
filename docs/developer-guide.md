@@ -2,9 +2,13 @@
 
 ## 发布 LALC 框架
 
-1. 用 `uv version --bump patch --no-sync` 更新补丁版本，也可以用 `uv version 6.1.0 --no-sync` 指定版本。提交版本改动并合入 `master`。Windows EXE、ZIP 和发布标签都从同一个项目版本号生成。
-2. 打开 GitHub 的 **Actions → Publish LALC → Run workflow**。验证构建时留空 `publish`。正式发布时选择 `master` 并勾选 `publish`。
-3. 检查 Windows 构建记录和 Release。工作流会按上一版以来的提交生成贡献者更新记录，并上传两个 Windows 包、供 5.x 使用的 `lalc.zip` 和 `SHA256SUMS`。验证构建可以从该次运行的 Artifacts 下载。
+需要调整基础版本时，用 `uv version --bump patch --no-sync` 更新补丁版本，也可以用 `uv version 6.1.0 --no-sync` 指定版本。提交版本改动后，打开 GitHub 的 **Actions → Publish LALC → Run workflow**，选择分支和 `release` 模式。
+
+- **`build-only`** 将构建结果留在当次运行的 Artifacts。
+- **`beta`** 从所选分支构建，使用 Actions 运行编号生成标签，例如 `v6.0.0-beta.12`。工作流将两个 Windows ZIP 和 `SHA256SUMS` 上传到 GitHub Pre-release。测试者从 Releases 手动下载，应用内框架更新仅支持正式版。
+- **`stable`** 从 `master` 正式发布。除两个 Windows ZIP 和 `SHA256SUMS` 外，还上传供 5.x 迁移的 `lalc.zip`。Windows EXE、ZIP 和发布标签都从同一个项目版本号生成。
+
+发布完成后，检查 Windows 构建记录和 Release。两种发布都会从上一个正式版开始汇总贡献记录。
 
 新代码首次合入 `master` 时，合并提交需要同时保留两边的历史，并以新版分支的文件树为基础。正式发版使用新版的 **Publish LALC** 工作流。
 

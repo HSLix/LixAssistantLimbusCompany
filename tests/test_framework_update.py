@@ -18,6 +18,15 @@ import pytest
 from lalc import framework_update as update
 
 
+def test_packaged_beta_has_a_display_version_but_no_stable_update_version(tmp_path, monkeypatch):
+    monkeypatch.setattr(update.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(update.sys, "executable", str(tmp_path / "LALC.exe"))
+    (tmp_path / "build-info.json").write_text('{"version": "6.0.0-beta.12"}', encoding="utf-8")
+    installed = update.installed_build()
+    assert installed["version"] == "6.0.0-beta.12"
+    assert update.version_number(installed["version"]) is None
+
+
 def test_old_release_is_an_announcement_but_not_a_package(monkeypatch):
     monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v5.0.0", "body": "legacy news"})
     assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None, github_version=(5, 0, 0))
