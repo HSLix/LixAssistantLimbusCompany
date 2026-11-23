@@ -4,6 +4,7 @@
 """
 
 import base64
+from contextlib import closing
 from io import BytesIO
 import json
 from pathlib import Path
@@ -166,6 +167,50 @@ def test_default_resources_export_and_import_use_only_selected_public_objects(so
     assert not (target.data_root / "developer-sessions").exists() and target.default_manifest_id() is None
     with pytest.raises(ValueError, match="已有用户资源"):
         import_default_resources(target, archive)
+
+
+def test_default_resources_include_only_mirror_gift_and_theme_settings(source, tmp_path):
+    from lalc.default_resources import check_default_package, export_default_resources, import_default_resources
+    from lalc.user_pages import UserSettings
+
+    manager, _ = source
+    defaults = {
+        "shop_gifts": {"catalog": {"gift-id": {"labels": ["Gift"]}}},
+        "theme_packs": {"catalog": {"theme-id": {"preference": "prefer"}}},
+    }
+    (manager.data_root / "pages" / "mirror.py").write_text('PAGE_ID = "mirror.settings"\n', encoding="utf-8")
+    settings = UserSettings(manager.data_root)
+    settings.save("pages", "mirror.settings", {**defaults, "mirror_teams": [3]})
+    settings.save("pages", "sharing.sample", {"private": True})
+    settings.save_task("mirror", True, 3)
+    archive = tmp_path / "default-resources.zip"
+    assert export_default_resources(manager.data_root, archive)["page_settings"] == 1
+
+    target = ManifestManager(tmp_path / "blank")
+    assert import_default_resources(target, archive)["failed"] is None
+    assert UserSettings(target.data_root).value == {"pages": {"mirror.settings": defaults}, "tasks": {}}
+
+    existing = ManifestManager(tmp_path / "existing")
+    existing.data_root.mkdir()
+    local = {"mirror_teams": [7], "shop_gifts": {"catalog": {}}}
+    UserSettings(existing.data_root).save("pages", "mirror.settings", local)
+    with closing(SharingPackage(archive, existing.data_root)) as package:
+        settings_obj, = (obj for obj in package.objects if obj["kind"] == "page_settings")
+        assert settings_obj["id"] == "mirror.settings"
+        number = settings_obj["number"]
+        checks = inspect_objects(existing, package)
+        assert checks[number]["config"] == {**local, **defaults}
+        assert checks[number]["conflict"]
+        result = import_selected(existing, package, checks, {number}, asset_actions={number: "replace"}, reviewed={})
+        assert result["failed"] is None
+        objects = [{**obj, "files": package.files(obj)} for obj in package.objects if obj["kind"] != "page_settings"]
+        objects.extend(build_export(manager, {"page_settings": ["mirror.settings"]}))
+        invalid = tmp_path / "whole-page.zip"
+        save_package(objects, invalid)
+    assert UserSettings(existing.data_root).value["pages"]["mirror.settings"] == {**local, **defaults}
+    with closing(SharingPackage(invalid, existing.data_root)) as package:
+        with pytest.raises(ValueError, match="只允许镜牢"):
+            check_default_package(package)
 
 
 def test_uuid_collision_gets_new_identity_without_default_changes(source, tmp_path):

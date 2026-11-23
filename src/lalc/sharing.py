@@ -28,6 +28,9 @@ from .process_lock import ProcessLock
 from .workflow_sharing import _prepare, import_workflow, inspect_workflow_import
 
 KINDS = ("workflow", "assets", "pages", "history", "skills", "page_settings")
+MIRROR_SETTINGS_ID = "mirror.settings"
+MIRROR_DEFAULT_FIELDS = {"shop_gifts", "theme_packs"}
+PAGE_DEFAULTS_FILE = "defaults.json"
 
 
 def digest(content):
@@ -239,15 +242,21 @@ def replace_skill(root, identity, files, expected):
             shutil.rmtree(work)
 
 
-def page_settings_config(identity, files):
-    """配置 ID 不是文件路径；仅接受单份 JSON 对象，不执行页面代码。"""
+def page_settings_config(identity, files, *, current=None):
+    """验证整页配置或镜牢默认配置；后者只合并自身包含的字段。"""
     if type(identity) is not str or not identity.strip():
         raise ValueError("页面配置 PAGE_ID 必须为非空字符串。")
-    if set(files) != {"settings.json"}:
-        raise ValueError("页面配置只允许 settings.json。")
-    config = strict_json(files["settings.json"])
+    if set(files) not in ({"settings.json"}, {PAGE_DEFAULTS_FILE}):
+        raise ValueError("页面配置只允许一份 settings.json 或 defaults.json。")
+    name, content = next(iter(files.items()))
+    config = strict_json(content)
     if type(config) is not dict:
         raise ValueError("页面配置必须是 JSON 对象。")
+    if name == PAGE_DEFAULTS_FILE:
+        if (identity != MIRROR_SETTINGS_ID or not config or not config.keys() <= MIRROR_DEFAULT_FIELDS
+                or any(type(value) is not dict for value in config.values())):
+            raise ValueError("默认页面配置只允许镜牢的饰品与主题包配置。")
+        config = {**(current or {}), **config}
     return _strict_json(config)
 
 
@@ -649,8 +658,8 @@ def inspect_objects(manager, package):
                               same=old == files, conflict=old is not None and old != files,
                               changed_files=[name for name in sorted(set(old or {}) | set(files)) if (old or {}).get(name) != files.get(name)])
             elif kind == "page_settings":
-                config = page_settings_config(identity, files)
                 old = UserSettings(manager.data_root).value["pages"].get(identity)
+                config = page_settings_config(identity, files, current=old)
                 before, after = settings_version(old), settings_version(config)
                 result.update(config=config, current=old, before=before,
                               same=before == after, conflict=old is not None and before != after)
@@ -876,10 +885,11 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                         (replace_asset if kind == "assets" else replace_skill)(manager.data_root, identity, package.files(obj), check["before"])
                         outcome = {"status": "imported"}
                 elif kind == "page_settings":
-                    config = page_settings_config(identity, package.files(obj))
                     store = UserSettings(manager.data_root)
-                    if settings_version(store.value["pages"].get(identity)) != check["before"]:
+                    current = store.value["pages"].get(identity)
+                    if settings_version(current) != check["before"]:
                         raise ValueError("本地页面配置已变化，请重新检查。")
+                    config = page_settings_config(identity, package.files(obj), current=current)
                     if check["same"] or check["conflict"] and asset_actions.get(number) == "skip":
                         outcome = {"status": "skipped"}
                     else:
@@ -887,8 +897,8 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                             raise ValueError("页面配置冲突尚未选择替换或跳过。")
                         store.save("pages", identity, config)
                         outcome = {"status": "imported", "reload_required": True}
-                    size = obj["files"]["settings.json"]["size"]
-                    transfer_file(size, size, "settings.json", finished=True)
+                    name, record = next(iter(obj["files"].items()))
+                    transfer_file(record["size"], record["size"], name, finished=True)
                 elif kind == "pages":
                     if number not in reviewed and not allow_unreviewed:
                         raise ValueError("页面尚未 Review，也未明确确认跳过 Review 安装。")

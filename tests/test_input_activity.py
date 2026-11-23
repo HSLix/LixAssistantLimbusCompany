@@ -102,9 +102,16 @@ def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(se
         ShowWindowAsync=lambda hwnd, command: None,
         SetForegroundWindow=attempt,
     )
+    attached = []
+    def fallback(hwnd, pid, foreground, still_idle):
+        assert still_idle()
+        attached.append((hwnd, pid, foreground))
+        return attempt(hwnd)
+
     env.clock.on_sleep = tick
     monkeypatch.setattr(env.window, "window_info", info)
     monkeypatch.setattr(env.window, "focus", platform.focus)
+    monkeypatch.setattr(env.window, "try_attached_focus", fallback, raising=False)
     if end == "foreground":
         env.inputs.check()
         assert env.window.foreground
@@ -113,6 +120,7 @@ def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(se
             env.inputs.check()
         assert caught.value.reason == ("cancel" if end == "cancel" else "pause")
     assert len(requests) == (12 if end == "foreground" else 11)
+    assert attached == [(42, 7, 99)] * 2
     assert requests[1] >= activity[-1] + 10
     assert env.inputs.paused is (end == "replaced")
     requested = [row for row in env.events if row.get("outcome") == "focus_requested"]
@@ -313,7 +321,7 @@ def test_minimized_game_waits_before_restore(session, monkeypatch):
     minimized = [True]
     def info(hwnd):
         return {**original_info(hwnd), "minimized": minimized[0]}
-    def focus(hwnd, *, checkpoint, max_attempts, on_first_attempt):
+    def focus(hwnd, *, checkpoint, max_attempts, on_first_attempt, fallback):
         checkpoint()
         assert env.clock.now == 110
         minimized[0] = False

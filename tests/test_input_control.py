@@ -117,7 +117,7 @@ class FakeWindow:
     def open_game_process(self, pid):
         return FakeProcess(pid)
 
-    def focus(self, hwnd, *, checkpoint=None, max_attempts=10, on_first_attempt=None):
+    def focus(self, hwnd, *, checkpoint=None, max_attempts=10, on_first_attempt=None, fallback=None):
         if checkpoint is not None:
             checkpoint()
         self.focus_calls += 1

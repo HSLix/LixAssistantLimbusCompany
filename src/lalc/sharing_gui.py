@@ -629,7 +629,7 @@ class ImportDialog(QDialog):
             lines.append(tr("Destination: {0}").format(self.manager.data_root / "user-settings.json"))
             lines.append(tr("Current settings:"))
             lines.append(json.dumps(check.get("current"), ensure_ascii=False, indent=2))
-            lines.append(tr("Imported settings (whole page replacement):"))
+            lines.append(tr("Settings after import:"))
             lines.append(json.dumps(check.get("config"), ensure_ascii=False, indent=2))
         elif obj["kind"] == "history":
             lines.append(tr("Destination: {0}").format(self.manager.data_root / "knowledge/imported-agent-history" / check.get("content_hash", "")))

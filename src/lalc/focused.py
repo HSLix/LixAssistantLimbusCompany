@@ -5,6 +5,7 @@ from __future__ import annotations
 import ctypes
 import struct
 import subprocess
+import sys
 import time
 import zlib
 from datetime import UTC, datetime
@@ -293,6 +294,14 @@ class WindowsWindowPlatform:
         u.ShowWindowAsync.restype = wintypes.BOOL
         u.SetForegroundWindow.argtypes = [wintypes.HWND]
         u.SetForegroundWindow.restype = wintypes.BOOL
+        u.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
+        u.AttachThreadInput.restype = wintypes.BOOL
+        u.BringWindowToTop.argtypes = [wintypes.HWND]
+        u.BringWindowToTop.restype = wintypes.BOOL
+        u.PeekMessageW.argtypes = [ctypes.POINTER(wintypes.MSG), wintypes.HWND, wintypes.UINT,
+                                  wintypes.UINT, wintypes.UINT]
+        u.PeekMessageW.restype = wintypes.BOOL
+        k.GetCurrentThreadId.restype = wintypes.DWORD
         u.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
         u.PostMessageW.restype = wintypes.BOOL
         u.ClientToScreen.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.POINT)]
@@ -444,9 +453,64 @@ class WindowsWindowPlatform:
         """以固定可执行文件及其目录启动游戏，不经过 shell。"""
         return subprocess.Popen([str(executable)], cwd=str(executable.parent))
 
+    def request_attached_focus(self, hwnd: int, pid: int, foreground: int) -> bool:
+        """子进程内短暂连接当前前台输入队列，并校验目标仍是原游戏窗口。"""
+        info = self.window_info(hwnd)
+        if not info["valid"] or info["process_id"] != pid:
+            return False
+        user32 = self.user32
+        if user32.GetForegroundWindow() != foreground:
+            return False
+        thread = user32.GetWindowThreadProcessId(foreground, None)
+        if not thread:
+            return False
+        # 子进程必须先建立自己的消息队列才能连接输入线程。
+        user32.PeekMessageW(ctypes.byref(wintypes.MSG()), None, 0, 0, 0)
+        current = self.kernel32.GetCurrentThreadId()
+        attached = thread != current
+        if attached and not user32.AttachThreadInput(thread, current, True):
+            return False
+        try:
+            user32.BringWindowToTop(hwnd)
+            return bool(user32.SetForegroundWindow(hwnd))
+        finally:
+            if attached:
+                user32.AttachThreadInput(thread, current, False)
+
+    @staticmethod
+    def try_attached_focus(hwnd: int, pid: int, foreground: int, still_idle: Callable[[], bool]) -> bool:
+        """置前可能卡在外部窗口，父进程只等待短时并能撤销尝试。"""
+        if not still_idle():
+            return False
+        command = [sys.executable]
+        if not getattr(sys, "frozen", False):
+            command.extend(("-m", "lalc"))
+        command.extend(("--focus-worker", str(hwnd), str(pid), str(foreground)))
+        try:
+            worker = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                      stderr=subprocess.DEVNULL, creationflags=subprocess.CREATE_NO_WINDOW)
+        except OSError:
+            return False
+        try:
+            deadline = time.monotonic() + 2.0
+            while still_idle() and time.monotonic() < deadline:
+                result = worker.poll()
+                if result is not None:
+                    return result == 0
+                time.sleep(0.02)
+            return False
+        finally:
+            if worker.poll() is None:
+                worker.kill()
+                try:
+                    worker.wait(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    pass
+
     def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None,
               max_attempts: int | None = 10,
-              on_first_attempt: Callable[[int | None, bool], None] | None = None) -> None:
+              on_first_attempt: Callable[[int | None, bool], None] | None = None,
+              fallback: Callable[[int], bool] | None = None) -> None:
         """每隔一秒请求置前；运行会话可在检查点管理持续等待。"""
 
         attempts = 0
@@ -470,20 +534,19 @@ class WindowsWindowPlatform:
                         f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, "
                         f"last_set_foreground_result={last_result}."
                     )
+                next_attempt = time.monotonic() + 1.0
                 if max_attempts is None:
                     if minimized:
                         self.user32.ShowWindowAsync(hwnd, 9)  # SW_RESTORE
-                    elif attempts == 1:
-                        # 第一次请求尚未生效时，请游戏窗口异步激活，保持原尺寸。
-                        self.user32.ShowWindowAsync(hwnd, 5)  # SW_SHOW
                 elif minimized:
                     self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-                last_result = bool(self.user32.SetForegroundWindow(hwnd))
+                if fallback is not None and attempts in (1, 2) and foreground_hwnd and foreground_hwnd != hwnd:
+                    last_result = fallback(foreground_hwnd)
+                else:
+                    last_result = bool(self.user32.SetForegroundWindow(hwnd))
                 attempts += 1
                 if attempts == 1 and on_first_attempt is not None:
                     on_first_attempt(foreground_hwnd, last_result)
-                # 返回成功也可能尚未完成跨线程激活，以真实前台句柄为准。
-                next_attempt = time.monotonic() + 1.0
             time.sleep(0.02)
 
     def cursor_position(self, hwnd: int) -> dict[str, Any]:
