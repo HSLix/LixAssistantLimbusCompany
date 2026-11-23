@@ -99,6 +99,7 @@ def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(se
         GetForegroundWindow=lambda: 42 if env.window.foreground else 99,
         IsWindow=lambda hwnd: True,
         IsIconic=lambda hwnd: False,
+        ShowWindowAsync=lambda hwnd, command: None,
         SetForegroundWindow=attempt,
     )
     env.clock.on_sleep = tick
@@ -114,6 +115,9 @@ def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(se
     assert len(requests) == (12 if end == "foreground" else 11)
     assert requests[1] >= activity[-1] + 10
     assert env.inputs.paused is (end == "replaced")
+    requested = [row for row in env.events if row.get("outcome") == "focus_requested"]
+    assert len(requested) == 1 and requested[0]["set_foreground_result"] is False
+    assert any(row.get("outcome") == "focus_confirmed" for row in env.events) == (end == "foreground")
 
 
 def test_foreground_takeover_wait_keeps_resetting_with_mouse_and_keyboard(session):
@@ -309,7 +313,7 @@ def test_minimized_game_waits_before_restore(session, monkeypatch):
     minimized = [True]
     def info(hwnd):
         return {**original_info(hwnd), "minimized": minimized[0]}
-    def focus(hwnd, *, checkpoint, max_attempts):
+    def focus(hwnd, *, checkpoint, max_attempts, on_first_attempt):
         checkpoint()
         assert env.clock.now == 110
         minimized[0] = False

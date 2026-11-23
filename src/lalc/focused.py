@@ -289,6 +289,8 @@ class WindowsWindowPlatform:
         u.GetClientRect.restype = wintypes.BOOL
         u.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
         u.ShowWindow.restype = wintypes.BOOL
+        u.ShowWindowAsync.argtypes = [wintypes.HWND, ctypes.c_int]
+        u.ShowWindowAsync.restype = wintypes.BOOL
         u.SetForegroundWindow.argtypes = [wintypes.HWND]
         u.SetForegroundWindow.restype = wintypes.BOOL
         u.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
@@ -443,7 +445,8 @@ class WindowsWindowPlatform:
         return subprocess.Popen([str(executable)], cwd=str(executable.parent))
 
     def focus(self, hwnd: int, *, checkpoint: Callable[[], None] | None = None,
-              max_attempts: int | None = 10) -> None:
+              max_attempts: int | None = 10,
+              on_first_attempt: Callable[[int | None, bool], None] | None = None) -> None:
         """每隔一秒请求置前；运行会话可在检查点管理持续等待。"""
 
         attempts = 0
@@ -455,10 +458,11 @@ class WindowsWindowPlatform:
             if self.checkpoint is not None:
                 self.checkpoint()
             foreground_hwnd = self.user32.GetForegroundWindow()
-            if foreground_hwnd == hwnd:
-                return
             if not self.user32.IsWindow(hwnd):
                 raise WindowError(f"Target Window disappeared while waiting for foreground: target_hwnd={hwnd}.")
+            minimized = self.user32.IsIconic(hwnd)
+            if foreground_hwnd == hwnd and not minimized:
+                return
             if time.monotonic() >= next_attempt:
                 if max_attempts is not None and attempts == max_attempts:
                     raise WindowError(
@@ -466,10 +470,18 @@ class WindowsWindowPlatform:
                         f"target_hwnd={hwnd}, foreground_hwnd={foreground_hwnd}, "
                         f"last_set_foreground_result={last_result}."
                     )
-                if self.user32.IsIconic(hwnd):
+                if max_attempts is None:
+                    if minimized:
+                        self.user32.ShowWindowAsync(hwnd, 9)  # SW_RESTORE
+                    elif attempts == 1:
+                        # 第一次请求尚未生效时，请游戏窗口异步激活，保持原尺寸。
+                        self.user32.ShowWindowAsync(hwnd, 5)  # SW_SHOW
+                elif minimized:
                     self.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
                 last_result = bool(self.user32.SetForegroundWindow(hwnd))
                 attempts += 1
+                if attempts == 1 and on_first_attempt is not None:
+                    on_first_attempt(foreground_hwnd, last_result)
                 # 返回成功也可能尚未完成跨线程激活，以真实前台句柄为准。
                 next_attempt = time.monotonic() + 1.0
             time.sleep(0.02)

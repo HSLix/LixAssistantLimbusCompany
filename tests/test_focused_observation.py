@@ -69,7 +69,7 @@ class FakeWindowPlatform:
     def find_windows(self) -> list[int]:
         return self.windows
 
-    def focus(self, hwnd: int, *, checkpoint=None, max_attempts=10) -> None:
+    def focus(self, hwnd: int, *, checkpoint=None, max_attempts=10, on_first_attempt=None) -> None:
         if checkpoint is not None:
             checkpoint()
         self.focus_calls += 1
@@ -419,6 +419,36 @@ def test_focus_succeeds_on_retry_and_restores_minimized_window(monkeypatch, succ
     platform.focus(42)
     assert len(requests) == success_attempt and foreground[0] == 42
     assert restores == [(42, 9)]
+
+
+@pytest.mark.parametrize("minimized", [False, True])
+def test_managed_focus_uses_async_activation_and_confirms_foreground(monkeypatch, minimized):
+    """直接置前请求被拒绝时，模拟异步激活，等待真实前台返回。"""
+    now = [0.0]
+    state = {"foreground": 42 if minimized else 10, "minimized": minimized}
+    requests, shows, reports = [], [], []
+    platform = WindowsWindowPlatform.__new__(WindowsWindowPlatform)
+    platform.checkpoint = None
+
+    def sleep(seconds):
+        now[0] = round(now[0] + seconds, 6)
+        if shows:
+            state.update(foreground=42, minimized=False)
+
+    platform.user32 = SimpleNamespace(
+        GetForegroundWindow=lambda: state["foreground"],
+        IsWindow=lambda hwnd: True,
+        IsIconic=lambda hwnd: state["minimized"],
+        ShowWindowAsync=lambda hwnd, command: shows.append((hwnd, command, now[0])),
+        SetForegroundWindow=lambda hwnd: requests.append(hwnd) or False,
+    )
+    monkeypatch.setattr(focused.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(focused.time, "sleep", sleep)
+    platform.focus(42, max_attempts=None, on_first_attempt=lambda *fields: reports.append(fields))
+    assert shows == [(42, 9 if minimized else 5, 0 if minimized else 1)]
+    assert requests == [42] * (1 if minimized else 2)
+    assert reports == [(42 if minimized else 10, False)]
+    assert state == {"foreground": 42, "minimized": False}
 
 
 @pytest.mark.parametrize("interrupt", ["cancel", "disappeared"])
