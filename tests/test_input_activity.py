@@ -13,7 +13,7 @@ from lalc import control, run_logs
 from lalc.control import InputSession
 from lalc.focused import FocusedAutomationSession, WindowsWindowPlatform
 from lalc.runtime import RunGate, UserInterruption
-from lalc.windows_input import WindowsInputBackend
+from lalc.windows_input import INPUT_EXTRA_INFO, WindowsInputBackend
 from test_input_control import FakeWindow, service_for, finished, paused
 
 
@@ -264,13 +264,81 @@ def test_click_that_switches_foreground_delays_refocus_from_the_click(session):
     def during_wait():
         assert env.window.focus_calls == 1
         if env.clock.now == 125:
-            backend._mouse_event(0x200, SimpleNamespace(flags=1, pt=wintypes.POINT(100, 100)))
+            backend._mouse_event(0x200, SimpleNamespace(flags=1, dwExtraInfo=INPUT_EXTRA_INFO))
 
     env.clock.on_sleep = during_wait
     env.inputs.check()
     assert env.clock.now == 130
     assert env.window.focus_calls == 2
     assert not env.inputs.paused
+
+
+@pytest.mark.parametrize("takeover", [False, True])
+def test_external_injected_mouse_and_keyboard_reset_idle_wait(session, takeover):
+    """远程或辅助输入延长等待，本程序有标记的动作不更新钩子计时。"""
+    env = session
+    backend = native_backend()
+    backend.monitor = env.inputs.monitor
+    env.clock.now = 120
+    if takeover:
+        env.inputs.monitor.record("鼠标", False)
+    else:
+        env.window.foreground = False
+
+    def activity():
+        assert env.window.focus_calls == 1
+        if env.clock.now == 126:
+            backend._mouse_event(0x200, SimpleNamespace(flags=1, dwExtraInfo=0))
+        if env.clock.now == 133:
+            backend._keyboard_event(0x100, SimpleNamespace(flags=0x10, vkCode=0x41, dwExtraInfo=0))
+        if env.clock.now == 140:
+            backend._mouse_event(0x200, SimpleNamespace(flags=1, dwExtraInfo=INPUT_EXTRA_INFO))
+            backend._keyboard_event(0x100, SimpleNamespace(flags=0x10, vkCode=0x41, dwExtraInfo=INPUT_EXTRA_INFO))
+
+    env.clock.on_sleep = activity
+    if takeover:
+        env.inputs.prepare_resume(automatic=True)
+    else:
+        env.inputs.check()
+    assert env.clock.now == 143
+    assert backend.monitor.snapshot()[0] == (1 if takeover else 0)
+    assert not backend.monitor.pause_requested
+
+
+@pytest.mark.parametrize("takeover", [False, True])
+def test_windows_idle_clock_covers_events_not_received_by_the_hooks(session, monkeypatch, takeover):
+    """钩子漏报期间仍等到 Windows 会话确认连续空闲十秒。"""
+    env = session
+    env.clock.now = 120
+    if takeover:
+        env.inputs.monitor.record("鼠标", False)
+    else:
+        env.window.foreground = False
+    last_activity = [120]
+    monkeypatch.setattr(env.window.backend, "session_idle_seconds", lambda: env.clock.now - last_activity[0],
+                        raising=False)
+
+    def activity():
+        assert env.window.focus_calls == 1
+        if env.clock.now in {126, 134}:
+            last_activity[0] = env.clock.now
+
+    env.clock.on_sleep = activity
+    if takeover:
+        env.inputs.prepare_resume(automatic=True)
+    else:
+        env.inputs.check()
+    assert env.clock.now == 144
+
+
+def test_windows_idle_clock_handles_tick_counter_wrap():
+    backend = native_backend()
+    def last_input(info):
+        info._obj.dwTime = 0xFFFFFF00
+        return True
+    backend.user32.GetLastInputInfo = last_input
+    backend.kernel32 = SimpleNamespace(GetTickCount=lambda: 0x100)
+    assert backend.session_idle_seconds() == 0.512
 
 
 @pytest.mark.parametrize("message,x,foreground,expected", [
@@ -284,7 +352,7 @@ def test_mouse_filter_uses_event_type_client_area_and_foreground(message, x, for
     backend.user32.GetForegroundWindow = lambda: foreground
     backend._mouse_event(message, SimpleNamespace(flags=0, pt=wintypes.POINT(x, 100)))
     assert backend.monitor.snapshot()[0] == int(expected)
-    backend._mouse_event(message, SimpleNamespace(flags=1, pt=wintypes.POINT(x, 100)))
+    backend._mouse_event(message, SimpleNamespace(flags=1, dwExtraInfo=INPUT_EXTRA_INFO))
     assert backend.monitor.snapshot()[0] == int(expected)
 
 
@@ -296,7 +364,7 @@ def test_keyboard_and_global_hotkey_ignore_injected_keys():
     assert backend.monitor.snapshot()[0] == 1
     backend.user32.GetForegroundWindow = lambda: 99
     for key in (0xA2, 0xA4, 0x50):
-        backend._keyboard_event(0x100, SimpleNamespace(flags=0x10, vkCode=key))
+        backend._keyboard_event(0x100, SimpleNamespace(flags=0x10, vkCode=key, dwExtraInfo=0))
     assert not backend.monitor.pause_requested
     for key in (0xA2, 0xA4, 0x50):
         backend._keyboard_event(0x100, SimpleNamespace(flags=0, vkCode=key))

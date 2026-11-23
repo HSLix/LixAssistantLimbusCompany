@@ -9,6 +9,15 @@ from ctypes import wintypes
 from .control import PhysicalInputMonitor
 from .focused import WindowError
 
+INPUT_EXTRA_INFO = 0x4C414C43
+
+
+class LASTINPUTINFO(ctypes.Structure):
+    """Windows 会话最近一次输入的计时值。"""
+
+    _fields_ = [("cbSize", wintypes.UINT), ("dwTime", wintypes.DWORD)]
+
+
 # INPUT 必须包含完整 union；只声明键盘成员会使 Win32 拒绝其尺寸。
 class MSLLHOOKSTRUCT(ctypes.Structure):
     """Windows 鼠标钩子记录，保留注入标志与指针宽度。"""
@@ -180,6 +189,7 @@ class WindowsInputBackend:
             "PeekMessageW": ([ctypes.POINTER(MSG), wintypes.HWND, wintypes.UINT, wintypes.UINT, wintypes.UINT], wintypes.BOOL),
             "PostThreadMessageW": ([wintypes.DWORD, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM], wintypes.BOOL),
             "GetAsyncKeyState": ([ctypes.c_int], wintypes.SHORT),
+            "GetLastInputInfo": ([ctypes.POINTER(LASTINPUTINFO)], wintypes.BOOL),
             "WindowFromPoint": ([wintypes.POINT], wintypes.HWND),
             "GetAncestor": ([wintypes.HWND, wintypes.UINT], wintypes.HWND),
             "MapVirtualKeyW": ([wintypes.UINT, wintypes.UINT], wintypes.UINT),
@@ -195,6 +205,7 @@ class WindowsInputBackend:
             function.argtypes, function.restype = arguments, result
         k.GetModuleHandleW.argtypes, k.GetModuleHandleW.restype = [wintypes.LPCWSTR], wintypes.HMODULE
         k.GetCurrentThreadId.argtypes, k.GetCurrentThreadId.restype = [], wintypes.DWORD
+        k.GetTickCount.argtypes, k.GetTickCount.restype = [], wintypes.DWORD
 
     def _listen(self) -> None:
         """独立消息循环内只记录输入；慢速 Trace/界面处理留在运行线程。"""
@@ -251,6 +262,9 @@ class WindowsInputBackend:
     def _mouse_event(self, message: int, event: MSLLHOOKSTRUCT) -> None:
         """仅前台游戏客户区的按钮按下和滚轮构成接管，移动仅记录活动。"""
         if event.flags & 0x1:
+            # 远程控制也可能通过注入传递输入，只让它延长空闲等待。
+            if event.dwExtraInfo != INPUT_EXTRA_INFO:
+                self.monitor.record("鼠标", False, takeover=False)
             return
         hwnd = self.monitor.target_hwnd
         foreground = bool(hwnd and self.user32.GetForegroundWindow() == hwnd)
@@ -268,6 +282,8 @@ class WindowsInputBackend:
     def _keyboard_event(self, message: int, event: KBDLLHOOKSTRUCT) -> None:
         """物理按键按前台判定；Ctrl Alt P 不依赖游戏焦点且只暂停。"""
         if event.flags & 0x10:
+            if event.dwExtraInfo != INPUT_EXTRA_INFO:
+                self.monitor.record("键盘", False, takeover=False)
             return
         down = message in {0x100, 0x104}
         if down:
@@ -280,6 +296,13 @@ class WindowsInputBackend:
         foreground = bool(self.monitor.target_hwnd and
                           self.user32.GetForegroundWindow() == self.monitor.target_hwnd)
         self.monitor.record("键盘", False, takeover=down and foreground and not hotkey, pause=hotkey)
+
+    def session_idle_seconds(self) -> float | None:
+        """会话计时补足钩子漏报，按 GetTickCount 的 32 位时间计算。"""
+        last = LASTINPUTINFO(cbSize=ctypes.sizeof(LASTINPUTINFO))
+        if not self.user32.GetLastInputInfo(ctypes.byref(last)):
+            return None
+        return ((self.kernel32.GetTickCount() - last.dwTime) & 0xFFFFFFFF) / 1000
 
     def any_pressed(self) -> bool:
         """避免用户仍按住按键、修饰键或鼠标时恢复自动化。"""
@@ -309,7 +332,7 @@ class WindowsInputBackend:
         item.type = 0
         item.mi = MOUSEINPUT(round((x - left) * 65535 / (width - 1)),
                              round((y - top) * 65535 / (height - 1)), 0,
-                             0x0001 | 0x8000 | 0x4000, 0, 0x4C414C43)
+                             0x0001 | 0x8000 | 0x4000, 0, INPUT_EXTRA_INFO)
         ctypes.set_last_error(0)
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
             raise OSError(f"SendInput failed: winerror={ctypes.get_last_error()}, {diagnostics}")
@@ -324,7 +347,7 @@ class WindowsInputBackend:
         item.type = 0
         item.mi = MOUSEINPUT(round((x - left) * 65535 / (width - 1)),
                              round((y - top) * 65535 / (height - 1)), 0,
-                             0x0001 | 0x8000 | 0x4000, 0, 0x4C414C43)
+                             0x0001 | 0x8000 | 0x4000, 0, INPUT_EXTRA_INFO)
         ctypes.set_last_error(0)
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
             raise OSError(f"Cursor SendInput failed: winerror={ctypes.get_last_error()}")
@@ -333,7 +356,7 @@ class WindowsInputBackend:
         """发送一格垂直滚轮输入；负值以 DWORD 补码传递。"""
         item = INPUT()
         item.type = 0
-        item.mi = MOUSEINPUT(0, 0, delta & 0xFFFFFFFF, 0x0800, 0, 0x4C414C43)
+        item.mi = MOUSEINPUT(0, 0, delta & 0xFFFFFFFF, 0x0800, 0, INPUT_EXTRA_INFO)
         ctypes.set_last_error(0)
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
             raise OSError(f"Wheel SendInput failed: winerror={ctypes.get_last_error()}")
@@ -342,7 +365,7 @@ class WindowsInputBackend:
         item = INPUT()
         item.type = 1
         item.ki = KEYBDINPUT(virtual_key, self.user32.MapVirtualKeyW(virtual_key, 0),
-                           0x2 if up else 0, 0, 0x4C414C43)
+                           0x2 if up else 0, 0, INPUT_EXTRA_INFO)
         ctypes.set_last_error(0)
         if self.user32.SendInput(1, ctypes.byref(item), ctypes.sizeof(INPUT)) != 1:
             raise ctypes.WinError(ctypes.get_last_error())
