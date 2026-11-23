@@ -1,25 +1,101 @@
-"""单次运行日志的只读快照、ZIP 传输及隔离导入，不修改本机运行编号。"""
+"""单次运行日志的只读快照、ZIP 传输及隔离导入。"""
 
 from datetime import datetime
 import hashlib
 import json
 import math
+import os
 from pathlib import Path
 import re
 import stat
 import uuid
 import zipfile
 
-from .work_files import WorkDirectory
+from .work_files import WorkDirectory, work_file
 from .file_content import (FileContent, checkpoint, copy_content, require_disk, require_memory,
                            content_hash, file_transfers, transfer_file)
 from .page_packages import real_directory
+from .process_lock import ProcessLock
 from .run_logs import image_path, lines, snapshot, trace_path
+from .runtime import atomic_write_json
 from .sharing import strict_json, json_bytes
 from threading import Event
 
 
 AI_REPAIR_SUMMARY = 'ai-repair-summary.json'
+
+
+def run_id_lock(root):
+    """本机执行、导入提交及旧副本补号共用短时编号锁。"""
+    return ProcessLock('run-id:' + os.path.normcase(str(root.resolve())), blocking=True)
+
+
+def reserve_run_ids(root, count=1):
+    """持有编号锁时持久预留一段编号；写入失败后的空号允许保留。"""
+    path = root / 'run-sequence.json'
+    if path.exists():
+        value = json.loads(path.read_text(encoding='utf-8'))
+        if (type(value) is not dict or set(value) != {'last_run_id'}
+                or type(value['last_run_id']) is not int or value['last_run_id'] < 0):
+            raise ValueError('run-sequence.json is invalid')
+        last = value['last_run_id']
+    else:
+        last = max((data.get('local_run_id', 0) for _, data in _import_metadata(root)), default=0)
+    existing = (int(item.stem) for folder, pattern in (('traces', '*.jsonl'), ('run-usage', '*.json'))
+                for item in (root / folder).glob(pattern) if item.stem.isdecimal())
+    last = max(last, max(existing, default=0))
+    atomic_write_json(path, {'last_run_id': last + count})
+    return range(last + 1, last + count + 1)
+
+
+def _import_metadata(root, *, keys=None, check=lambda: None):
+    """只枚举可定位到真实 Trace 的已提交副本。"""
+    imported = real_directory(root / 'imported-run-logs')
+    for folder in imported.iterdir() if imported.is_dir() else ():
+        if folder.name.startswith('.') or (keys is not None and folder.name not in keys):
+            continue
+        check()
+        try:
+            real_directory(folder)
+            data = strict_json(FileContent.from_path(folder / 'run.json'))
+            original, local = data['run_id'], data.get('local_run_id', 0)
+            if type(original) is not int or original < 1:
+                continue
+            if 'local_run_id' in data and (type(local) is not int or local < 1):
+                continue
+            trace_path(folder, original)
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        yield folder, data
+
+
+def imported_logs(root, *, keys=None, assign_missing=True, check=lambda: None):
+    """为旧导入副本补号，原始 Trace、截图和副本路径保留。"""
+    entries = dict(_import_metadata(root, keys=keys, check=check))
+    missing = {folder for folder, data in entries.items() if 'local_run_id' not in data}
+    if assign_missing and missing:
+        with run_id_lock(root):
+            current = dict(_import_metadata(root, keys={folder.name for folder in missing}, check=check))
+            pending = sorted(folder for folder, data in current.items() if 'local_run_id' not in data)
+            if pending:
+                for folder, identity in zip(pending, reserve_run_ids(root, len(pending))):
+                    check()
+                    data = {**current[folder], 'local_run_id': identity}
+                    try:
+                        with work_file(dir=folder, prefix='.run-id-') as stream:
+                            stream.write(json_bytes(data))
+                            stream.close()
+                            Path(stream.name).replace(folder / 'run.json')
+                    except FileNotFoundError:
+                        # 数据清理可能已移走副本，不能重新创建目录。
+                        current.pop(folder)
+                    else:
+                        current[folder] = data
+            for folder in missing:
+                entries.pop(folder)
+            entries.update(current)
+    return [dict(key=folder.name, root=folder, run_id=data.get('local_run_id'),
+                 original_run_id=data['run_id'], imported=True) for folder, data in entries.items()]
 
 
 def start_time(root, run_id):
@@ -38,7 +114,7 @@ def start_time(root, run_id):
     return None
 
 
-def list_logs(root, *, keys=None, read_start=True):
+def list_logs(root, *, keys=None, read_start=True, assign_missing=True):
     """枚举本机与隔离导入日志，按原始开始时间排序。"""
     result = []
     for path in (root / 'traces').glob('*.jsonl'):
@@ -53,21 +129,11 @@ def list_logs(root, *, keys=None, read_start=True):
                 continue
             result.append(dict(key=identity, root=root, run_id=identity, imported=False,
                                started_at=started_at))
-    imported = root / 'imported-run-logs'
-    real_directory(imported)
-    for folder in imported.glob('*'):
-        if (folder.name.startswith('.') or keys is not None and folder.name not in keys
-                or not folder.is_dir()):
-            continue
+    for entry in imported_logs(root, keys=keys, assign_missing=assign_missing):
         try:
-            real_directory(folder)
-            metadata = strict_json(FileContent.from_path(folder / 'run.json'))
-            identity = metadata['run_id']
-            if type(identity) is not int or identity < 1:
-                continue
-            result.append(dict(key=folder.name, root=folder, run_id=identity, imported=True,
-                               started_at=start_time(folder, identity) if read_start else None))
-        except (OSError, ValueError, KeyError, TypeError):
+            started_at = start_time(entry['root'], entry['original_run_id']) if read_start else None
+            result.append({**entry, 'started_at': started_at})
+        except (OSError, ValueError):
             continue
     def order(item):
         value = item['started_at']
@@ -266,12 +332,14 @@ def import_log(root, archive_path):
                         raise ValueError('ZIP hash mismatch.')
                     transfer_file(size, record["size"], name, finished=True)
                     progress.complete()
-                (stage / 'run.json').write_bytes(json_bytes(metadata))
                 if snapshot(stage, identity)[2] != (stage / trace_name).stat().st_size:
                     raise ValueError('Incomplete log record.')
                 checkpoint(len(files), len(files), 'Import')
                 key = str(uuid.uuid4())
                 progress.update(phase="Finishing…")
-                stage.rename(folder / key)
+                with run_id_lock(root):
+                    metadata['local_run_id'] = reserve_run_ids(root).start
+                    (stage / 'run.json').write_bytes(json_bytes(metadata))
+                    stage.rename(folder / key)
     progress.update(finished=True)
     return key

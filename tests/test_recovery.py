@@ -166,6 +166,9 @@ def _finish(service: ApplicationService, run_id: int) -> dict[str, Any]:
 def test_interruption_inside_recovery_ocr_keeps_run_alive(tmp_path, monkeypatch, role, phase, intent):
     """规则 OCR 中的暂停保留调用者和恢复额度，继续时重新检测，取消正常收尾。"""
     from test_input_control import FakeWindow, finished, paused
+    from lalc.control import InputSession
+
+    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
     manager = ManifestManager(tmp_path)
     observation = 'ctx.action("observe.capture_screen"); ctx.action("observe.ocr"); '
@@ -204,17 +207,21 @@ def test_interruption_inside_recovery_ocr_keeps_run_alive(tmp_path, monkeypatch,
     monkeypatch.setattr(service, "_ocr", interrupted_ocr)
     try:
         service.start_plan(use_saved_config=False, manifest_id=base)
-        state = paused(service)
-        assert state["phase"] == "running"
-        assert not state["pause_info"]["restart_step"]
-        assert not state["pause_info"]["has_condition"]
-        assert service._active_executor.run_state.recovery_count == 0
-        assert not any(e["event"] == "plan_item_finished" for e in state["trace"])
-        if intent == "cancel":
-            service.stop()
-        else:
-            service.resume()
+        if intent != "takeover":
+            state = paused(service)
+            assert state["phase"] == "running"
+            assert not state["pause_info"]["restart_step"]
+            assert not state["pause_info"]["has_condition"]
+            assert service._active_executor.run_state.recovery_count == 0
+            assert not any(e["event"] == "plan_item_finished" for e in state["trace"])
+            if intent == "cancel":
+                service.stop()
+            else:
+                service.resume()
         state = finished(service)
+        if intent == "takeover":
+            assert not any(e["event"] == "paused_by_user" for e in state["trace"])
+            assert any(e["event"] == "input_resumed" and e["automatic"] for e in state["trace"])
         assert not state["result"].get("fatal")
         if intent == "cancel":
             assert state["result"]["failure_code"] == "user_cancelled"

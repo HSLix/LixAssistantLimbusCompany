@@ -178,7 +178,7 @@ class WorkflowExecutor:
         control_input: Callable[[str, dict[str, Any]], None] | None = None,
         check_input: Callable[[], None] | None = None,
         game_process_exited: Callable[[], bool] | None = None,
-        prepare_resume: Callable[[], None] | None = None,
+        prepare_resume: Callable[[bool], None] | None = None,
         manifest_manager: ManifestManager | None = None,
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         select_manifest: Callable[[LoadedManifest], None] | None = None,
@@ -397,35 +397,37 @@ class WorkflowExecutor:
             raise EnvironmentFailure("game_restart_failed", str(error), cause=error) from error
         self.emit("step_reinvocation_started", {"logical_name": step_name, "reason": "game_restart"})
 
-    def _wait_manual_resume(
+    def _wait_input_resume(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
         parent_call_id: int | None, error: UserInterruption,
         *, recovering: bool = False,
-    ) -> None:
-        """保持暂停并重新观察；规则恢复未完成时不提前检查 Step condition。"""
+    ) -> str:
+        """接管等空闲，显式暂停等人工；两种恢复均重新观察并检查前置条件。"""
 
         reason = str(error)
         diagnostic = _exception_fields(error)
         restart_step = component.role == "step" and not recovering
         condition = getattr(component.module, "condition", None) if restart_step else None
+        automatic = error.reason == "takeover"
         while True:
-            self.gate.pause()
-            self.emit("paused_by_user", {
-                "logical_name": logical_name,
-                "description": (
-                    inspect.getdoc(component.module.execute) or inspect.getdoc(component.module) or logical_name
-                ) if restart_step else (
-                    "恢复规则已中断；继续后重新检测恢复规则。" if recovering else
-                    "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。"
-                ),
-                "has_condition": callable(condition), "restart_step": restart_step,
-                "reason": reason, **diagnostic,
-            })
-            self.gate.checkpoint()
+            if not automatic:
+                self.gate.pause()
+                self.emit("paused_by_user", {
+                    "logical_name": logical_name,
+                    "description": (
+                        inspect.getdoc(component.module.execute) or inspect.getdoc(component.module) or logical_name
+                    ) if restart_step else (
+                        "恢复规则已中断；继续后重新检测恢复规则。" if recovering else
+                        "尚未进入下一 Step；恢复后重新观察并继续 Workflow 调度。"
+                    ),
+                    "has_condition": callable(condition), "restart_step": restart_step,
+                    "reason": reason, **diagnostic,
+                })
+                self.gate.checkpoint()
             try:
                 if self._prepare_resume is None:
                     raise ExecutionFailure("execution_failed", "Input Resume is unavailable.")
-                self._prepare_resume()
+                self._prepare_resume(automatic)
                 if condition is not None:
                     self._run_condition(component, condition, {
                         "logical_name": logical_name, "component_id": component.component_id,
@@ -437,44 +439,47 @@ class WorkflowExecutor:
                     raise
                 reason = str(pause_error)
                 diagnostic = _exception_fields(pause_error)
+                automatic = automatic and pause_error.reason == "takeover"
                 continue
             except (TraceWriteError, EnvironmentFailure):
                 raise
             except Exception as check_error:
                 reason = str(check_error)
                 diagnostic = _exception_fields(check_error)
+                automatic = False
                 self.emit("input_resume_rejected", {"logical_name": logical_name, **diagnostic})
                 continue
-            self.emit("input_resumed", {"logical_name": logical_name})
-            return
+            self.emit("input_resumed", {"logical_name": logical_name, "automatic": automatic})
+            return "takeover_idle" if automatic else "manual_resume"
 
     def _resume_step(
         self, logical_name: str, component: LoadedComponent, inputs: dict[str, Any],
         parent_call_id: int | None, error: UserInterruption,
     ) -> Any:
-        """用户接管只走手动恢复；保留调用者帧，不进入自动恢复阶梯。"""
+        """释放后按中断原因恢复，保留调用者帧和前置检查。"""
 
         while True:
             self.emit("step_interrupted", {"logical_name": logical_name,
                       "component_id": component.component_id, "outcome": "unknown", **_exception_fields(error)})
-            automatic = error.reason == "focus"
+            focus_loss = error.reason == "focus"
             try:
-                if automatic:
+                if focus_loss:
+                    reason = "focus"
                     if self._check_input is not None:
                         self._check_input()
                 else:
-                    self._wait_manual_resume(logical_name, component, inputs, parent_call_id, error)
+                    reason = self._wait_input_resume(logical_name, component, inputs, parent_call_id, error)
             except UserInterruption as next_error:
                 if next_error.reason == "cancel":
                     raise
                 error = next_error
                 continue
             self.emit("step_reinvocation_started", {"logical_name": logical_name,
-                      "component_id": component.component_id, "reason": "focus" if automatic else "manual_resume"})
+                      "component_id": component.component_id, "reason": reason})
             try:
                 try:
                     result = self._invoke_component(logical_name, component, inputs,
-                                                    parent_call_id=parent_call_id, skip_condition=not automatic)
+                                                    parent_call_id=parent_call_id, skip_condition=not focus_loss)
                 except UserInterruption:
                     raise
                 except EnvironmentFailure:
@@ -489,7 +494,7 @@ class WorkflowExecutor:
                 error = next_error
                 continue
             self.emit("step_reinvocation_returned", {"logical_name": logical_name,
-                      "component_id": component.component_id, "reason": "focus" if automatic else "manual_resume"})
+                      "component_id": component.component_id, "reason": reason})
             return result
 
     def _invoke_step_recovery(self, logical_name, component, inputs, parent_call_id, error):
@@ -523,8 +528,8 @@ class WorkflowExecutor:
                             raise
                         if interrupted.reason != "focus":
                             # 规则尚未完成，不能先检查失败 Step 的 condition 或重放 Workflow。
-                            self._wait_manual_resume(logical_name, original, inputs, parent_call_id,
-                                                     interrupted, recovering=True)
+                            self._wait_input_resume(logical_name, original, inputs, parent_call_id,
+                                                    interrupted, recovering=True)
                         continue
                     if recovered:
                         self.run_state._recovery_count += 1
@@ -695,7 +700,7 @@ class WorkflowExecutor:
                     raise
                 # 没有活动 Step 时保留当前观察调用，不重启已经返回的 Step。
                 component = self.manifest.components[caller.logical_name]
-                self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
+                self._wait_input_resume(caller.logical_name, component, {}, caller.call_id, error)
         inputs = _bind_and_normalize(action.execute, arguments)
         call_id = self._allocate_call_id()
         fields = {
@@ -734,7 +739,7 @@ class WorkflowExecutor:
                     raise
                 # 只重做无副作用的观察；在这里等待可保留 Workflow 调用栈。
                 component = self.manifest.components[caller.logical_name]
-                self._wait_manual_resume(caller.logical_name, component, {}, caller.call_id, error)
+                self._wait_input_resume(caller.logical_name, component, {}, caller.call_id, error)
                 fields = {**fields, "call_id": self._allocate_call_id()}
 
 

@@ -12,13 +12,14 @@ from pathlib import Path
 class ProcessLock:
     """持有文件锁直至显式释放；锁文件保留以避免删除重建竞争。"""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, *, blocking: bool = False):
         identity = hashlib.sha256(f"{Path.home()}:{getpass.getuser()}:{name}".encode()).hexdigest()
         self.path = Path(tempfile.gettempdir()) / f"lalc-{identity}.lock"
         self.file = None
+        self.blocking = blocking
 
     def acquire(self) -> None:
-        """非阻塞取得排他权；竞争和系统错误交给调用方报告。"""
+        """默认非阻塞取得排他权；系统错误交给调用方报告。"""
         if self.file is not None:
             raise RuntimeError("Lock already held")
         handle = open(self.path, "a+b")
@@ -30,10 +31,10 @@ class ProcessLock:
                     handle.write(b"\0")
                     handle.flush()
                 handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK if self.blocking else msvcrt.LK_NBLCK, 1)
             else:
                 import fcntl
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX if self.blocking else fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BaseException:
             handle.close()
             raise

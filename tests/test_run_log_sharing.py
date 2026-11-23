@@ -4,6 +4,7 @@
 QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_run_log_sharing.py
 """
 
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 import stat
@@ -13,6 +14,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from lalc.application import ApplicationService
 from lalc.file_content import file_operation
 from lalc.run_log_sharing import AI_REPAIR_SUMMARY, export_log, import_log, list_logs
 from lalc.run_logs import read_page, snapshot
@@ -49,8 +51,9 @@ def test_roundtrip_snapshot_images_and_same_number(tmp_path):
     entries = list_logs(target)
     assert len(entries) == 3
     assert sum(entry['imported'] for entry in entries) == 2
-    assert all(entry['run_id'] == 1 for entry in entries)
-    assert not (target / 'run-sequence.json').exists()
+    assert {entry['run_id'] for entry in entries} == {1, 2, 3}
+    assert {entry['original_run_id'] for entry in entries if entry['imported']} == {1}
+    assert ApplicationService(target)._allocate_run_id() == 4
     entry = next(entry for entry in entries if entry['key'] == first)
     rows = read_page(entry['root'], 1, snapshot(entry['root'], 1))['rows']
     assert len(rows) == 3
@@ -58,6 +61,28 @@ def test_roundtrip_snapshot_images_and_same_number(tmp_path):
     assert entry['started_at'] == '2026-11-06T12:00:00Z'
     export_log(entry['root'], 1, tmp_path / 'again.zip')
     assert len(list(zipfile.ZipFile(tmp_path / 'again.zip').namelist())) == 3
+
+
+def test_legacy_imports_get_one_persisted_id_each_under_concurrent_listing(tmp_path):
+    archive = tmp_path / 'log.zip'
+    package(tmp_path, archive)
+    keys = [import_log(tmp_path, archive), import_log(tmp_path, archive)]
+    for key in keys:
+        metadata = tmp_path / 'imported-run-logs' / key / 'run.json'
+        legacy = json.loads(metadata.read_text(encoding='utf-8'))
+        legacy.pop('local_run_id')
+        metadata.write_text(json.dumps(legacy), encoding='utf-8')
+    with ThreadPoolExecutor(max_workers=3) as workers:
+        first = workers.submit(list_logs, tmp_path)
+        local = workers.submit(ApplicationService(tmp_path)._allocate_run_id)
+        second = workers.submit(list_logs, tmp_path)
+        def imported_ids(entries):
+            return {entry['key']: entry['run_id'] for entry in entries if entry['imported']}
+        ids = imported_ids(first.result())
+        assert ids == imported_ids(second.result()) == imported_ids(list_logs(tmp_path))
+        assert set(ids) == set(keys) and len({local.result(), *ids.values()}) == 3
+    (tmp_path / 'run-sequence.json').unlink()
+    assert ApplicationService(tmp_path)._allocate_run_id() == max(ids.values()) + 1
 
 
 def test_ai_summary_uses_export_snapshot_and_survives_import(tmp_path):
@@ -152,9 +177,16 @@ def test_cancelled_import_and_export_clean_up(tmp_path):
     assert not (tmp_path / 'cancelled.zip').exists()
 
 
-def test_gui_local_and_imported_same_number_are_separate(log_page, tmp_path):
+def test_gui_local_and_imported_show_numbers_and_manifests(log_page, tmp_path):
     from PySide6.QtCore import Qt
     app, page, path, until = log_page
+    original = path.read_text(encoding='utf-8')
+    path.write_text(json.dumps(dict(event='run_started', base_manifest_id='base-version',
+                                   recorded_at='2026-11-06T12:00:00Z')) + '\n'
+                    + original + '\n'.join(json.dumps(row) for row in [
+                        dict(event='working_manifest_selected', manifest_id='repaired-version'),
+                        dict(event='run_finished', result={'status': 'success'}),
+                    ]) + '\n', encoding='utf-8')
     archive = tmp_path / 'log.zip'
     export_log(tmp_path, 1, archive)
     key = import_log(tmp_path, archive)
@@ -165,13 +197,29 @@ def test_gui_local_and_imported_same_number_are_separate(log_page, tmp_path):
     page.select_run(imported)
     until(lambda: not page.loading and bool(page.model.rows))
     assert page.read_root == tmp_path / 'imported-run-logs' / key
-    assert page.run_id == 1
+    assert page.run_id == 2 and page.trace_run_id == 1
     assert 'Imported' in page.run_title.text()
-    assert 'Log No.1' in imported.text()
+    assert 'Run ID 2' in imported.text() and 'Original Run ID 1' in imported.text()
+    assert 'Original Run ID 1' in page.run_metadata.text()
+    assert 'Based on Manifest: base-version' in page.run_metadata.text()
+    assert 'Final Manifest: repaired-version' in page.run_metadata.text()
+    assert page.run_metadata.isHidden()
+    page.copy_details.click()
+    assert app.clipboard().text() == page.run_title.text() + '\n' + page.run_metadata.text()
+    page.details_toggle.click()
+    assert page.run_metadata.isVisible()
+    page.copy_run_id.click()
+    assert app.clipboard().text() == '2'
     page.source_filter.setCurrentItem('local')
     page.select_source('local')
-    until(lambda: page.runs.count() == 1 and page.selected_key == 1)
+    until(lambda: page.runs.count() == 1 and page.selected_key == 1 and not page.loading)
     assert page.read_root == tmp_path
+    assert 'Based on Manifest: base-version' in page.run_metadata.text()
+    assert 'Final Manifest: repaired-version' in page.run_metadata.text()
+    assert 'Original Run ID' not in page.run_metadata.text()
+    assert page.run_metadata.isHidden()
+    page.copy_details.click()
+    assert app.clipboard().text() == page.run_title.text() + '\n' + page.run_metadata.text()
 
 
 def test_gui_export_then_import_without_review(log_page, tmp_path, monkeypatch):
@@ -209,14 +257,14 @@ def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
     path.write_text(path.read_text(encoding="utf-8").replace('2026-11-06T', '2026-11-01T'), encoding="utf-8")
     export_log(tmp_path, 1, archive)
     imported = import_log(tmp_path, archive)
-    for identity in range(2, 26):
+    for identity in range(3, 27):
         (path.parent / f'{identity}.jsonl').write_text(json.dumps(dict(
             event='component_log', level='info', message=str(identity),
             recorded_at=f'2026-11-{identity:02}T12:00:00Z')) + '\n', encoding="utf-8")
     page.refresh_runs()
-    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    until(lambda: page.runs.count() == 10 and page.selected_key == 26 and not page.loading)
     keys = lambda: [page.runs.item(i).data(Qt.ItemDataRole.UserRole) for i in range(page.runs.count())]
-    assert keys() == list(range(25, 15, -1))
+    assert keys() == list(range(26, 16, -1))
     assert len(page.entries) == 10
     rows = page.model.rows
     bar = page.runs.verticalScrollBar()
@@ -226,8 +274,8 @@ def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
     until(lambda: page.runs.count() == 20)
     app.processEvents()
     assert bar.value() == previous_bottom
-    assert keys() == list(range(25, 5, -1))
-    assert page.selected_key == 25 and page.model.rows is rows
+    assert keys() == list(range(26, 6, -1))
+    assert page.selected_key == 26 and page.model.rows is rows
     app.processEvents()
     bar.setValue(bar.maximum())
     until(lambda: page.runs.count() == 26)
@@ -237,15 +285,15 @@ def test_gui_run_list_loads_ten_at_a_time_and_resets_source(log_page, tmp_path):
     page.select_run(page.runs.item(19))
     until(lambda: not page.loading)
     page.refresh_runs()
-    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    until(lambda: page.runs.count() == 10 and page.selected_key == 26 and not page.loading)
     page.select_source('imported')
     until(lambda: page.runs.count() == 1 and page.selected_key == imported and not page.loading)
     page.select_source('local')
-    until(lambda: page.runs.count() == 10 and page.selected_key == 25 and not page.loading)
+    until(lambda: page.runs.count() == 10 and page.selected_key == 26 and not page.loading)
     page.select_source('imported')
     page.select_source('local')
     until(lambda: not page.tasks)
-    assert keys() == list(range(25, 15, -1))
+    assert keys() == list(range(26, 16, -1))
 
 
 def test_gui_run_list_without_scrollbar_accepts_wheel_and_keyboard(log_page, tmp_path):

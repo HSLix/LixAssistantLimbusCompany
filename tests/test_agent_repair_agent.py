@@ -964,6 +964,7 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
 
     from lalc.agent_policy import KNOWLEDGE_TOOLS
     from lalc.agent_settings import save_options
+    from lalc.run_log_sharing import export_log, import_log
     from lalc import agent_prompts
     chat, options, state = conversation
     chat.entry = 'gui'
@@ -976,6 +977,9 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
     evidence = root / 'evidence/1/1.png'
     evidence.parent.mkdir(parents=True)
     Image.new('RGB', (64, 64), 'white').save(evidence)
+    archive = root / 'log.zip'
+    export_log(root, 1, archive)
+    import_log(root, archive)
     save_options(root, knowledge_enabled=False)
     ticks = iter([{'now': '2026-11-12T10:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'},
                   {'now': '2026-11-12T11:00:00+08:00', 'timezone': 'CST', 'utc_offset': '+0800'}])
@@ -983,12 +987,16 @@ def test_log_tool_schema_round_time_and_knowledge_switch_are_frozen(conversation
     def respond(body):
         names = {item['function']['name'] for item in body['tools']}
         assert 'search_run_logs' in names
-        if len(state['calls']) <= 2:
+        if len(state['calls']) <= 3:
             assert not names & set(KNOWLEDGE_TOOLS)
         if len(state['calls']) == 1:
             save_options(root, knowledge_enabled=True)
-            return tool('read_run_log', {'run_id': 1, 'render_sequence': 1})
+            return tool('list_runs', {})
         if len(state['calls']) == 2:
+            listed = [message for message in body['messages'] if message['role'] == 'tool']
+            assert 'original_run_id' in json.dumps(listed)
+            return tool('read_run_log', {'run_id': 2, 'render_sequence': 1})
+        if len(state['calls']) == 3:
             assert 'data:image/jpeg;base64,' in json.dumps(body)
         return answer()
     state['respond'] = respond

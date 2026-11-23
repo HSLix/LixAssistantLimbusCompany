@@ -82,7 +82,7 @@ def test_usage_and_imported_identity_survive_local_cleanup(tmp_path):
     assert data.inventory("components")[0] == before
     assert data.inventory("manifests")[0][0]["count"] == 1
     assert [row["key"] for row in data.inventory("logs")[0]] == [imported]
-    assert data.service._allocate_run_id() == 5
+    assert data.service._allocate_run_id() == 6
     data.execute(data.preview("logs", [imported]))
     assert data.inventory("logs")[0] == [] and data.inventory("components")[0] == before
 

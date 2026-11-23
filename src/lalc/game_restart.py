@@ -36,6 +36,15 @@ def restart_game(data_root: Path, inputs) -> None:
                 if error.reason == "cancel":
                     raise
                 started = time.monotonic()
+                if error.reason == "takeover":
+                    try:
+                        inputs.wait_after_takeover()
+                    except UserInterruption as wait_error:
+                        if wait_error.reason == "cancel":
+                            raise
+                    finally:
+                        paused_seconds += time.monotonic() - started
+                    continue
                 log("游戏重启已暂停；手动恢复后继续当前阶段。", level="warning")
                 inputs.gate.pause()
                 inputs.emit("paused_by_user", {
