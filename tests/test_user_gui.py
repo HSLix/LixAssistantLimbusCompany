@@ -73,6 +73,29 @@ def test_steam_directory_validates_before_save_and_uses_shared_config(windows, t
     assert game_version.load_steam_root(user.service.data_root) == str(root)
 
 
+def test_framework_release_checks_require_two_user_actions_to_install(windows, tmp_path, monkeypatch):
+    from lalc import framework_update as update
+
+    _, owner, user, _ = windows
+    user.can_install_update = True
+    user.framework_build = {"version": "6.0.0"}
+    package = update.Package((6, 0, 1), "https://github.example/package", "0" * 64)
+    events = []
+    workspace = tmp_path / "prepared"
+    monkeypatch.setattr(update, "prepare_update", lambda *args: events.append("download") or workspace)
+    monkeypatch.setattr(update, "hand_off_update", lambda path, gui: events.append((path, gui)))
+    monkeypatch.setattr(user, "launch", lambda operation, done: done(operation()))
+    monkeypatch.setattr(owner, "request_reload", lambda restart: restart(("user", "developer")))
+
+    user.show_framework_releases(update.ReleaseStatus("<b>Release notes</b>", package, None))
+    assert user.announcement.toPlainText() == "<b>Release notes</b>"
+    assert user.update_button.isEnabled() and not events
+    user.update_button.click()
+    assert events == ["download"] and user.update_workspace == workspace
+    user.update_button.click()
+    assert events == ["download", (workspace, ("user", "developer"))]
+
+
 @pytest.mark.parametrize("frozen", [False, True])
 def test_application_and_both_windows_use_shipped_icon(tmp_path, monkeypatch, frozen):
     from PySide6.QtGui import QIcon

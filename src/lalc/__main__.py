@@ -327,13 +327,19 @@ def main(argv: list[str] | None = None) -> int:
         from .packaging_probe import run_probe
 
         return run_probe(args[1], args[2])
-    if len(args) == 1 and args[0].startswith("--restore-gui="):
+    if len(args) in (1, 2) and args[0].startswith("--restore-gui="):
         restore = tuple(args[0].split("=", 1)[1].split(","))
         if not restore or len(set(restore)) != len(restore) or set(restore) - {"user", "developer"}:
             raise ValueError("Invalid GUI restoration request")
+        ready = None
+        if len(args) == 2:
+            if sys.platform != "win32" or not getattr(sys, "frozen", False) or not args[1].startswith("--update-ready="):
+                raise ValueError("Invalid update restoration request")
+            from .framework_update import confirm_update_start
+            ready = lambda: confirm_update_start(args[1].split("=", 1)[1])
         from .gui import run_gui
         from .lifecycle import run_application
-        return run_application(lambda owner: run_gui(owner, restore=restore))
+        return run_application(lambda owner: run_gui(owner, restore=restore, ready=ready))
     if not args or args == ["--developer"]:
         from .lifecycle import run_application
 

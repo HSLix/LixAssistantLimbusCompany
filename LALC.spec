@@ -1,11 +1,22 @@
 # Build on Windows x64; user data and optional pi are assembled separately.
 import sys
+import tomllib
 from pathlib import Path
 from PyInstaller.utils.hooks import copy_metadata, collect_data_files, collect_dynamic_libs
 from PySide6.QtCore import QLibraryInfo
 from lalc.ocr import model_files
 
 root = Path(SPECPATH)
+version_file = None
+if sys.platform == "win32":
+    version = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    version_parts = tuple(int(part) for part in version.split("."))
+    if len(version_parts) != 3 or any(not 0 <= part <= 65535 for part in version_parts):
+        raise ValueError("Windows releases require three numeric version components")
+    version_file = Path(workpath) / "LALC.version"
+    template = (root / "LALC.version").read_text(encoding="utf-8")
+    version_file.write_text(template.replace("@VERSION_TUPLE@", str((*version_parts, 0)))
+                            .replace("@VERSION_STRING@", f"{version}.0"), encoding="utf-8")
 
 a = Analysis(
     [str(root / "packaging_entry.py")],
@@ -50,14 +61,14 @@ exe = EXE(
     upx=False,
     console=False,
     icon=str(root / "MagicAndWonder.ico"),
-    version=str(root / "LALC.version") if sys.platform == "win32" else None,
+    version=version_file,
 )
 coll = COLLECT(
     exe,
     EXE(pyz, a.scripts, [], exclude_binaries=True, name="LALC-console", console=True,
         debug=False, strip=False, upx=False,
         icon=str(root / "MagicAndWonder.ico"),
-        version=str(root / "LALC.version") if sys.platform == "win32" else None),
+        version=version_file),
     a.binaries,
     a.datas,
     strip=False,
