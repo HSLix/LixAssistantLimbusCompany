@@ -109,8 +109,9 @@ def test_scroll_stops_after_first_tick(scrolling, stop):
 def test_cursor_movement_failure_prevents_wheel(scrolling, monkeypatch):
     session, window, *_ = scrolling
     monkeypatch.setattr(window.backend, "move_cursor", lambda *args: None)
-    with pytest.raises(UserInterruption):
+    with pytest.raises(UserInterruption) as caught:
         session.execute("scroll", dict(x=100, y=100, direction="down", steps=1))
+    assert caught.value.reason == "takeover"
     assert window.backend.events == []
     assert not session.holding
 
@@ -148,14 +149,41 @@ def test_registered_action_runs_through_executor_with_trace(tmp_path, monkeypatc
     assert window.backend.closed
 
 
-def test_partial_scroll_reenters_step_after_automatic_wait(tmp_path, monkeypatch):
+def test_cursor_mismatch_waits_ten_seconds_even_without_recent_input(scrolling, monkeypatch):
+    from lalc import control
+
+    session, window, *_ = scrolling
+    now = [100.0]
+    session.monitor.last_input = 80.0
+    session.POLL_SECONDS = 1
+
+    def sleep(seconds):
+        now[0] += seconds
+        if now[0] in {106, 114}:
+            session.monitor.record("键鼠", False, takeover=False)
+
+    monkeypatch.setattr(control.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(control.time, "sleep", sleep)
+    monkeypatch.setattr(window.backend, "move_cursor", lambda *args: None)
+    with pytest.raises(UserInterruption):
+        session.execute("scroll", dict(x=100, y=100, direction="down", steps=1))
+    session.wait_after_takeover()
+    assert now[0] == 124
+    assert window.backend.events == [] and not session.paused
+
+
+@pytest.mark.parametrize("interruption", ["user", "cursor"])
+def test_partial_scroll_reenters_step_after_automatic_wait(tmp_path, monkeypatch, interruption):
     service, window = service_for(tmp_path)
-    install_scroll_backend(monkeypatch, window)
+    cursor = install_scroll_backend(monkeypatch, window)
     monkeypatch.setattr(InputSession, "_wait", lambda self, seconds: self.check())
     monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
 
     def take_over_once():
-        window.backend.monitor.record("鼠标", False)
+        if interruption == "user":
+            window.backend.monitor.record("鼠标", False)
+        else:
+            cursor["x"] += 20
         window.backend.on_down = lambda: None
 
     window.backend.on_down = take_over_once
@@ -170,6 +198,7 @@ def test_partial_scroll_reenters_step_after_automatic_wait(tmp_path, monkeypatch
     state = finished(service)
     assert state["result"]["status"] == "success", state["result"]
     assert any(row.get("waiting_for") == "takeover" for row in state["trace"])
+    assert not any(row["event"] == "paused_by_user" for row in state["trace"])
     # 已发送的一格保留，恢复后按既有语义重入 Step，重新发送三格。
     assert window.backend.events.count(("wheel", 120)) == 4
     assert sum(event["event"] == "trusted_action_interrupted" and

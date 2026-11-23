@@ -20,19 +20,15 @@ class PhysicalInputMonitor:
         self.generation = 0
         self.last_input = time.monotonic()
         self.kind = ""
-        self.last_other_activity = time.monotonic()
         self.target_hwnd: int | None = None
         self.pause_requested = False
         self.error: BaseException | None = None
 
-    def record(self, kind: str, injected: bool, *, takeover: bool = True,
-               other_application: bool = False, pause: bool = False) -> None:
+    def record(self, kind: str, injected: bool, *, takeover: bool = True, pause: bool = False) -> None:
         if injected:
             return
         with self.lock:
             self.last_input = time.monotonic()
-            if other_application:
-                self.last_other_activity = self.last_input
             if takeover or pause:
                 self.generation += 1
                 self.kind = kind
@@ -59,6 +55,7 @@ class InputSession:
         self.window, self.backend, self.gate, self.emit = window, backend, gate, emit
         self.monitor = backend.monitor
         self.owned_generation = self.monitor.snapshot()[0]
+        self.cursor_interrupted_at: float | None = None
         self.paused = False
         self.failed = False
         self.holding = False
@@ -109,7 +106,9 @@ class InputSession:
         self.window.size = None
         if first:
             self.emit("input_takeover", {"reason": reason, "source": source, "outcome": "unknown"})
-        intent = "takeover" if source == "physical_input" else "pause"
+        if source == "cursor_position":
+            self.cursor_interrupted_at = time.monotonic()
+        intent = "takeover" if source in {"physical_input", "cursor_position"} else "pause"
         if original is not None:
             raise UserInterruption(reason, reason=intent) from original
         raise UserInterruption(reason, reason=intent)
@@ -183,9 +182,8 @@ class InputSession:
                 if not info["visible"] or info["width"] <= 0 or info["height"] <= 0:
                     raise WindowError("Target Window is hidden or has an empty client area.")
                 foreground = info["foreground"] and not info["minimized"]
-                with self.monitor.lock:
-                    activity = self.monitor.last_input
-                    last = activity if after_takeover else self.monitor.last_other_activity
+                # 点击其他窗口的回调可能先于前台切换，空闲计时不依赖当时的前台。
+                activity = self.monitor.snapshot()[1]
                 if self.resume_focus:
                     self.resume_focus = False
                     immediate_since = activity
@@ -195,15 +193,13 @@ class InputSession:
                 if foreground and not after_takeover:
                     outcome = "foreground"
                     return None, activity
-                if time.monotonic() - last >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
-                    with self.monitor.lock:
-                        if last == (self.monitor.last_input if after_takeover else self.monitor.last_other_activity):
-                            outcome = "idle"
-                            return None, activity
+                if time.monotonic() - activity >= self.ACTIVITY_SECONDS and not self.backend.any_pressed():
+                    if self.monitor.snapshot()[1] == activity:
+                        outcome = "idle"
+                        return None, activity
                 if not waiting:
                     waiting = True
-                    scope = "键鼠" if after_takeover else "其他应用"
-                    self.log_input_wait(f"等待{scope}连续空闲 {self.ACTIVITY_SECONDS:g} 秒后聚焦游戏。",
+                    self.log_input_wait(f"等待键鼠连续空闲 {self.ACTIVITY_SECONDS:g} 秒后聚焦游戏。",
                                         idle_seconds=self.ACTIVITY_SECONDS)
                 time.sleep(self.POLL_SECONDS)
         finally:
@@ -280,9 +276,12 @@ class InputSession:
     def wait_after_takeover(self) -> None:
         """动作释放后等待全局物理输入安静，即使游戏还在前台。"""
         started = time.monotonic()
-        self.log_input_wait("用户接管后，等待键鼠连续空闲 10 秒再自动恢复。",
+        cursor_interrupted_at = self.cursor_interrupted_at
+        self.cursor_interrupted_at = None
+        reason = "滚轮位置不符，" if cursor_interrupted_at is not None else "用户接管后，"
+        self.log_input_wait(f"{reason}等待键鼠连续空闲 {self.ACTIVITY_SECONDS:g} 秒再自动恢复。",
                             waiting_for="takeover", idle_seconds=self.ACTIVITY_SECONDS)
-        self.owned_generation = self.wait_quiet(self.ACTIVITY_SECONDS)
+        self.owned_generation = self.wait_quiet(self.ACTIVITY_SECONDS, since=cursor_interrupted_at)
         self.paused = False
         self.log_input_wait("键鼠已连续空闲，开始恢复前检查。", waiting_for="takeover", outcome="idle",
                             duration_seconds=time.monotonic() - started)
@@ -309,7 +308,7 @@ class InputSession:
         if self.backend.any_pressed():
             raise WindowError("恢复检查期间仍有用户输入，请再次恢复。")
 
-    def wait_quiet(self, seconds: float | None = None) -> int:
+    def wait_quiet(self, seconds: float | None = None, *, since: float | None = None) -> int:
         """等待物理输入释放且安静，供普通恢复与重启过渡期共用。"""
         duration = self.QUIET_SECONDS if seconds is None else seconds
         while True:
@@ -320,7 +319,8 @@ class InputSession:
                 self._interrupt("全局快捷键请求暂停。", "pause")
             if self.gate.paused:
                 self._interrupt("自动化已暂停。", "pause")
-            if time.monotonic() - last >= duration and not self.backend.any_pressed():
+            idle_since = last if since is None else max(last, since)
+            if time.monotonic() - idle_since >= duration and not self.backend.any_pressed():
                 # 查询实际按住状态期间也可能有键鼠输入。
                 if self.monitor.snapshot()[:2] == (generation, last):
                     break

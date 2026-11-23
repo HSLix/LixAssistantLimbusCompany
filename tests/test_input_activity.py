@@ -49,9 +49,9 @@ def test_other_activity_restarts_ten_seconds_and_logs_visible_info(session):
     env.window.foreground = False
     def activity():
         if env.clock.now == 105:
-            env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+            env.inputs.monitor.record("鼠标", False, takeover=False)
         if env.clock.now == 114:
-            env.inputs.monitor.record("键盘", False, takeover=False, other_application=True)
+            env.inputs.monitor.record("键盘", False, takeover=False)
     env.clock.on_sleep = activity
     env.inputs.check()
     assert env.clock.now == 124
@@ -88,10 +88,10 @@ def test_run_focus_retries_keep_waiting_after_ten_failures_and_reset_on_input(se
     def tick():
         if not activity and requests and env.clock.now >= requests[0] + 0.2:
             activity.append(env.clock.now)
-            env.inputs.monitor.record("键盘", False, takeover=False, other_application=True)
+            env.inputs.monitor.record("键盘", False, takeover=False)
         elif len(activity) == 1 and env.clock.now >= activity[0] + 8:
             activity.append(env.clock.now)
-            env.inputs.monitor.record("鼠标", False, takeover=False, other_application=True)
+            env.inputs.monitor.record("鼠标", False, takeover=False)
         if end == "cancel" and len(requests) == 11:
             env.inputs.gate.stop()
 
@@ -225,6 +225,29 @@ def native_backend():
                                     ScreenToClient=client, GetClientRect=rect,
                                     WindowFromPoint=lambda point: 42, GetAncestor=lambda hwnd, flag: hwnd)
     return backend
+
+
+def test_click_that_switches_foreground_delays_refocus_from_the_click(session):
+    """鼠标回调先看到旧前台，点击其他窗口也必须计入聚焦等待。"""
+    env = session
+    backend = native_backend()
+    backend.monitor = env.inputs.monitor
+    backend.user32.WindowFromPoint = lambda point: 99
+    env.clock.now = 120
+    backend._mouse_event(0x201, SimpleNamespace(flags=0, pt=wintypes.POINT(100, 100)))
+    assert backend.monitor.snapshot()[:2] == (0, 120)
+    env.window.foreground = False
+
+    def during_wait():
+        assert env.window.focus_calls == 1
+        if env.clock.now == 125:
+            backend._mouse_event(0x200, SimpleNamespace(flags=1, pt=wintypes.POINT(100, 100)))
+
+    env.clock.on_sleep = during_wait
+    env.inputs.check()
+    assert env.clock.now == 130
+    assert env.window.focus_calls == 2
+    assert not env.inputs.paused
 
 
 @pytest.mark.parametrize("message,x,foreground,expected", [
