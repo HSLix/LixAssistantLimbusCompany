@@ -214,6 +214,95 @@ def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
     assert (root / 'run-usage/7.json').is_file()
 
 
+def test_data_maintenance_cache_shortcuts_and_scroll(windows, monkeypatch):
+    """缓存跨标签复用，首批外的匹配项也能被快捷键选中。"""
+    from collections import Counter
+    from datetime import UTC, datetime, timedelta
+    from threading import Event
+    from PySide6.QtCore import QDate, Qt
+    from lalc import data_maintenance_gui
+
+    app, _, user, _ = windows
+    page = user.data_maintenance
+    now = datetime.now(UTC)
+    recent, old = now - timedelta(hours=2), now - timedelta(days=4)
+    boundary = now - timedelta(days=3)
+
+    class FrozenClock(datetime):
+        @classmethod
+        def now(cls, tz):
+            return now.astimezone(tz)
+
+    monkeypatch.setattr(data_maintenance_gui, 'datetime', FrozenClock)
+    reads = Counter()
+    listing_ready = Event()
+    logs = [dict(key=key, run_id=key, date=recent if key < 3 else boundary if key == 3 else old,
+                 imported=False, size=None, status='success') for key in range(1, 61)]
+
+    def manifest(key, published, last, *, default=False, latest=False):
+        return dict(key=key, date=published, last=last, count=1 if last else None, default=default,
+                    latest=latest, notes='', members=(), file_date=False)
+
+    versions = [manifest('protected', old, old, default=True), manifest('latest', recent, None, latest=True),
+                manifest('used recently', old, recent), manifest('used long ago', old, old),
+                manifest('never used', old, None)]
+    assets = [dict(key=key, count=1, size=10, last=stamp)
+              for key, stamp in [('recent', recent), ('old', old), ('unknown', None)]]
+    components = [dict(key='sha256:' + char * 64, name=char, role='step', count=None, last=None,
+                       references=refs) for char, refs in [('a', 0), ('b', 1)]]
+
+    def inventory(category, *, with_usage=True):
+        reads[category, with_usage] += 1
+        if category == 'logs':
+            listing_ready.wait(5)
+        rows = {'logs': logs, 'manifests': versions, 'assets': assets, 'components': components}[category]
+        return [{**row, **({'last': None} if category == 'manifests' and not with_usage else {})} for row in rows], 0
+
+    def wait_until(test):
+        deadline = time.monotonic() + 3
+        while not test() and time.monotonic() < deadline:
+            app.processEvents()
+            time.sleep(0.01)
+        assert test(), page.note.text()
+
+    monkeypatch.setattr(page.data, 'inventory', inventory)
+    monkeypatch.setattr(page.data, 'log_sizes', lambda rows, **_: {row['key']: 10 for row in rows})
+    user.switchTo(page)
+    assert page.loading_card.isVisible()
+    assert '正在加载运行日志' in page.loading_title.text() and page.end.date == QDate.currentDate()
+    assert not page.start.date.isValid()
+    page.switch_category('manifests')
+    listing_ready.set()
+    wait_until(lambda: page.quick_select.isEnabled())
+    page.quick_select.click()
+    assert page.selected == {'used long ago', 'never used'}
+    page.switch_category('logs')
+    wait_until(lambda: page.table.rowCount() == 50 and page.table.item(0, 5).text() != '—')
+    page.quick_select.click()
+    assert page.selected == set(range(4, 61))
+    app.processEvents()
+    bar = page.table.verticalScrollBar()
+    assert bar.maximum() > 0
+    bar.setValue(bar.maximum())
+    assert page.table.rowCount() == 60
+    assert page.table.item(59, 0).checkState() == Qt.CheckState.Checked
+    page.switch_category('components')
+    wait_until(lambda: page.inventory.step == '')
+    page.quick_select.click()
+    assert page.selected == {'sha256:' + 'a' * 64} and page.preview_button.isEnabled()
+    page.switch_category('assets')
+    wait_until(lambda: page.table.rowCount() == 3)
+    assert [row['key'] for row in page.filtered] == ['recent', 'old', 'unknown']
+    page.filter.setCurrentIndex(1)
+    assert [row['key'] for row in page.filtered] == ['old', 'recent', 'unknown']
+    page.switch_category('manifests')
+    page.switch_category('logs')
+    assert reads['logs', False] == reads['manifests', False] == reads['manifests', True] == 1
+    page.refresh()
+    wait_until(lambda: not page.inventory.step)
+    assert reads['logs', False] == 2
+
+
 def test_native_owned_modal_keeps_other_fluent_window_editable(windows):
     from PySide6.QtCore import Qt
     from PySide6.QtTest import QTest

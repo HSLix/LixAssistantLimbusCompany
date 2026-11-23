@@ -308,14 +308,17 @@ class DataMaintenance:
             return versions, invalid + gaps
         if category != "components":
             raise ValueError("Unknown inventory category.")
+        references_unknown = bool(invalid)
         references = defaultdict(set)
+        names = set()
         for row in versions:
-            for key in row["members"]:
-                references[key].add(row["key"])
+            for name, digest in row["members"]:
+                names.add((name, digest))
+                references[digest].add(row["key"])
         folder = real_directory(self.manager.components_dir)
         rows, roles = [], {}
         rules = {digest for row in versions for digest in row["rules"]}
-        for name, digest in references.keys() | component_usage.keys():
+        for name, digest in names | component_usage.keys():
             path = folder / f"{digest.removeprefix('sha256:')}.py"
             if not re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or not path.is_file():
                 continue
@@ -332,7 +335,7 @@ class DataMaintenance:
                     roles[digest] = ""
                     invalid += 1
             count, last = component_usage.get((name, digest), (None, None))
-            rows.append(dict(key=digest, name=name, references=len(references[name, digest]),
+            rows.append(dict(key=digest, name=name, references=None if references_unknown else len(references[digest]),
                              count=count, last=last, role=roles[digest]))
         for path in folder.glob("*.py"):
             if re.fullmatch(r"[0-9a-f]{64}", path.stem) and f"sha256:{path.stem}" not in roles:
@@ -341,7 +344,8 @@ class DataMaintenance:
                 except DATA_ERRORS:
                     invalid += 1
                     continue
-                rows.append(dict(key=f"sha256:{path.stem}", name=None, references=0, count=None, last=None, role=""))
+                rows.append(dict(key=f"sha256:{path.stem}", name=None,
+                                 references=None if references_unknown else 0, count=None, last=None, role=""))
         rows.sort(key=lambda row: (-(row["count"] or 0), row["name"] or "", row["key"]))
         return rows, invalid + gaps
 
@@ -368,26 +372,38 @@ class DataMaintenance:
                 targets.extend(paths)
                 fingerprints.extend(files)
                 selected.append({**row, "size": sum(item[-1] for item in files)})
-        elif category == "manifests":
+        elif category in {"manifests", "components"}:
             versions, invalid = self._versions()
             if invalid:
                 raise ValueError("An unreadable Manifest or Default pointer prevents safe cleanup.")
-            by_key = {row["key"]: row for row in versions}
-            for key in keys:
-                row = by_key.get(key)
-                if row is None or row["default"] or row["latest"]:
-                    raise ValueError("A selected Manifest is unavailable or protected.")
-                selected.append(row)
-            removed = {digest for row in selected for _, digest in row["members"]}
-            retained = {digest for row in versions if row["key"] not in keys for _, digest in row["members"]}
-            for digest in sorted(removed - retained):
-                path = self.manager.components_dir / f"{digest.removeprefix('sha256:')}.py"
-                if path.exists() or path.is_symlink() or path.is_junction():
-                    _file_stat(path)
-                    names = sorted({name for row in selected for name, member in row["members"] if member == digest})
-                    sources.append((path, tuple(names)))
-            targets = tuple(self.manager.manifests_dir / f"{row['key']}.json" for row in selected)
-            targets += tuple(path for path, _ in sources)
+            selected_keys = set(keys)
+            retained = {digest for row in versions if category == "components" or row["key"] not in selected_keys
+                        for _, digest in row["members"]}
+            if category == "components":
+                targets = []
+                for digest in keys:
+                    if not isinstance(digest, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest) or digest in retained:
+                        raise ValueError("A selected Component source is invalid or still referenced.")
+                    path = self.manager.components_dir / f"{digest[7:]}.py"
+                    info = _file_stat(path)
+                    targets.append(path)
+                    selected.append(dict(key=digest, size=info.st_size))
+            else:
+                by_key = {row["key"]: row for row in versions}
+                for key in keys:
+                    row = by_key.get(key)
+                    if row is None or row["default"] or row["latest"]:
+                        raise ValueError("A selected Manifest is unavailable or protected.")
+                    selected.append(row)
+                removed = {digest for row in selected for _, digest in row["members"]}
+                for digest in sorted(removed - retained):
+                    path = self.manager.components_dir / f"{digest.removeprefix('sha256:')}.py"
+                    if path.exists() or path.is_symlink() or path.is_junction():
+                        _file_stat(path)
+                        names = sorted({name for row in selected for name, member in row["members"] if member == digest})
+                        sources.append((path, tuple(names)))
+                targets = [self.manager.manifests_dir / f"{row['key']}.json" for row in selected]
+                targets.extend(path for path, _ in sources)
             fingerprints = [item for path in targets for item in _tree(path.absolute())]
         else:
             raise ValueError("This data category cannot be cleaned.")
