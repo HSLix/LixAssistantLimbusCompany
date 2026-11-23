@@ -158,6 +158,7 @@ def test_empty_navigation_groups_expand_and_compact_without_extra_pages(windows)
 def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
     """日期筛选包含当天，只有确认后才删除并保存摘要。"""
     from datetime import datetime
+    from threading import Event
     from PySide6.QtCore import QDate
     from lalc.data_maintenance_gui import CleanupDialog
     from test_data_maintenance import trace
@@ -166,6 +167,14 @@ def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
     root = user.service.data_root
     path = trace(root, 7, 'manifest', [])
     page = user.data_maintenance
+    size_ready = Event()
+    log_sizes = page.data.log_sizes
+
+    def delayed_sizes(rows, **options):
+        size_ready.wait(5)
+        return log_sizes(rows, **options)
+
+    monkeypatch.setattr(page.data, 'log_sizes', delayed_sizes)
     user.switchTo(page)
 
     def wait_until(test):
@@ -176,6 +185,7 @@ def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
         assert test(), page.note.text()
 
     wait_until(lambda: page.table.rowCount() == 1)
+    assert page.table.item(0, 5).text() == '—'
     page.open_details(0, 6)
     wait_until(lambda: user.log_page.selected_key == 7)
     assert user.pages.currentWidget() is user.log_page
@@ -194,6 +204,10 @@ def test_data_maintenance_date_selection_and_confirmation(windows, monkeypatch):
     page.preview_button.click()
     wait_until(lambda: not page.previewing)
     assert path.exists()
+    assert page.table.item(0, 5).text() == '—'
+    size_ready.set()
+    wait_until(lambda: page.table.item(0, 5).text() != '—')
+    assert page.selected == {7} and page.preview_button.isEnabled()
     page.preview_button.click()
     wait_until(lambda: not path.exists() and not user.jobs and not page.loading)
     assert page.table.rowCount() == 0

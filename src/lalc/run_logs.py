@@ -188,9 +188,10 @@ def retained_runs(root):
                    if path.stem.isdecimal() and int(path.stem) > 0 and not path.is_symlink()), reverse=True)
 
 
-def trace_records(root, run_id, *, reverse=False, check=lambda: None):
+def trace_records(root, run_id, *, boundary=None, reverse=False, check=lambda: None):
     """按快照流式读取完整事件；损坏行交给调用者计数，不读取追加中的半行。"""
-    boundary = snapshot(root, run_id)
+    if boundary is None:
+        boundary = snapshot(root, run_id)
     for _, _, raw in lines(trace_path(root, run_id), 0, boundary[2], reverse, Event()):
         check()
         try:
@@ -217,8 +218,9 @@ def run_log_counts(root, run_id, *, check=lambda: None):
 
 def run_summary(root, run_id, *, check=lambda: None):
     """只读首尾事件，给列表提供终态摘要，完整结果留在 Trace。"""
-    first = next((r for r in trace_records(root, run_id, check=check) if r), {})
-    last = next((r for r in trace_records(root, run_id, reverse=True, check=check) if r), {})
+    boundary = snapshot(root, run_id)
+    first = next((r for r in trace_records(root, run_id, boundary=boundary, check=check) if r), {})
+    last = next((r for r in trace_records(root, run_id, boundary=boundary, reverse=True, check=check) if r), {})
     start = first if first.get("event") == "run_started" else {}
     end = last if last.get("event") == "run_finished" else {}
     result = end.get("result")

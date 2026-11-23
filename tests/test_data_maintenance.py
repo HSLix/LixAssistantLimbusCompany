@@ -188,3 +188,46 @@ def test_asset_inventory_reads_latest_match_without_touching_images(tmp_path):
     assert data.inventory("assets") == ([
         {"key": "ui/menu", "count": 1, "size": 26, "last": datetime(2026, 11, 8, 6, tzinfo=UTC)},
     ], 0)
+
+
+def test_log_list_loads_before_evidence_scan_and_preview_checks_selected_files(tmp_path, monkeypatch):
+    data = DataMaintenance(ApplicationService(tmp_path))
+    trace(tmp_path, 1, "manifest", [])
+    trace(tmp_path, 2, "manifest", [])
+    targets = data._log_targets
+
+    def selected_only(row):
+        assert row["run_id"] == 1
+        return targets(row)
+
+    monkeypatch.setattr(data, "_log_targets", selected_only)
+    rows, invalid = data.inventory("logs")
+    assert invalid == 0 and len(rows) == 2
+    assert all(row["size"] is None for row in rows)
+    selected = [row for row in rows if row["run_id"] == 1]
+    assert data.log_sizes(selected) == {1: data.preview("logs", [1]).size}
+
+
+def test_usage_is_shared_between_pages_and_recomputed_after_trace_change(tmp_path, monkeypatch):
+    from lalc import data_maintenance
+
+    data = DataMaintenance(ApplicationService(tmp_path))
+    digest = source(tmp_path, "step")
+    manifest = version(tmp_path, 10, one=digest)
+    trace(tmp_path, 1, manifest, [("one", digest)])
+    original = data_maintenance._summary
+    reads = []
+
+    def track(root, identity):
+        reads.append(identity)
+        return original(root, identity)
+
+    monkeypatch.setattr(data_maintenance, "_summary", track)
+    assert data.inventory("manifests", with_usage=False)[0][0]["count"] is None
+    assert reads == []
+    assert data.inventory("manifests")[0][0]["count"] == 1
+    assert data.inventory("components")[0][0]["count"] == 1
+    assert reads == [1]
+    trace(tmp_path, 1, manifest, [("one", digest)] * 2)
+    assert data.inventory("components")[0][0]["count"] == 2
+    assert reads == [1, 1]

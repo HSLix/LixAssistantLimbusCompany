@@ -38,14 +38,16 @@ def start_time(root, run_id):
     return None
 
 
-def list_logs(root):
+def list_logs(root, *, keys=None, read_start=True):
     """枚举本机与隔离导入日志，按原始开始时间排序。"""
     result = []
     for path in (root / 'traces').glob('*.jsonl'):
         if re.fullmatch(r'[1-9][0-9]*', path.stem) and not path.is_symlink():
             identity = int(path.stem)
+            if keys is not None and identity not in keys:
+                continue
             try:
-                started_at = start_time(root, identity)
+                started_at = start_time(root, identity) if read_start else None
             except (FileNotFoundError, ValueError):
                 # 另一窗口可能刚提交清理，重新枚举时不保留已消失的行。
                 continue
@@ -54,7 +56,8 @@ def list_logs(root):
     imported = root / 'imported-run-logs'
     real_directory(imported)
     for folder in imported.glob('*'):
-        if not folder.is_dir() or folder.name.startswith('.'):
+        if (folder.name.startswith('.') or keys is not None and folder.name not in keys
+                or not folder.is_dir()):
             continue
         try:
             real_directory(folder)
@@ -62,15 +65,14 @@ def list_logs(root):
             identity = metadata['run_id']
             if type(identity) is not int or identity < 1:
                 continue
-            trace_path(folder, identity)
             result.append(dict(key=folder.name, root=folder, run_id=identity, imported=True,
-                               started_at=start_time(folder, identity)))
+                               started_at=start_time(folder, identity) if read_start else None))
         except (OSError, ValueError, KeyError, TypeError):
             continue
     def order(item):
         value = item['started_at']
         return (datetime.fromisoformat(value).timestamp() if value else float('-inf'), str(item['key']))
-    return sorted(result, key=order, reverse=True)
+    return sorted(result, key=order, reverse=True) if read_start else result
 
 
 def _evidence(value):
