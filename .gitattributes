@@ -1,0 +1,2 @@
+# MiniLM 模型按原始字节校验，检出时保留上游换行。
+/codesearch_resources/models/** -text
