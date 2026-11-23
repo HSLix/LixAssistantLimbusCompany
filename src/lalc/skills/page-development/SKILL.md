@@ -15,3 +15,22 @@ description: 开发、修改和预览 LALC Business Settings Page 时使用，�
 9. 总结页面修改、兼容性影响、预览和安装状态及未验证业务行为。试填配置不会随安装保存；提醒开发者主动重启应用以应用变更，安装不会自动重启。Workflow 修改和运行另读 `../publish-and-trial/SKILL.md`。
 10. page_list(scope="installed") 包含启用及停用页面，enabled 表示重启后采用的保存状态。通过实际启用的 page_set_enabled(filename, enabled, summary) 请求启用/停用，必须等待专用弹窗的真实确认；普通反馈、历史确认、关闭或取消不授权。GUI Construct 与受控远程 MCP 可提供页面工具，按当前入口权限判断；没有页面永久删除工具，不新增管理入口。
 11. 停用保留源码、资源、页面配置和任务勾选/次数，重启后隐藏页面及其全部任务，关联任务传 0；重新启用恢复原设置，但仍受 Plan 支持列表约束。更新、覆盖安装及 Sharing 不改变本机启停状态。启停与安装一样在轮次结束并清理后统一提示重启；未重启前不改变当前页面或运行任务。
+
+## 配置分组
+
+需要支持按组分享时，可在页面模块声明字面量 `PAGE_SETTINGS_GROUPS`。组 ID 保持稳定。每组提供中英文名称和它负责的顶层配置字段。同一字段只属于一组。未分组的已保存字段显示为「其他配置」。
+
+```python
+PAGE_SETTINGS_GROUPS = {
+    "starlight": {
+        "names": {"zh_CN": "星光强化", "en_US": "Starlight"},
+        "fields": {"star_levels": [], "star_selected": None},
+    },
+    "theme_packs": {
+        "names": {"zh_CN": "主题包", "en_US": "Theme packs"},
+        "fields": {"theme_packs": ["preferences"]},
+    },
+}
+```
+
+`None` 表示用分享包的整个字段值，例如一份有序名单。`[]` 表示在该字段的对象下按键覆盖条目。`["preferences"]` 表示到字段内的 `preferences` 对象下按键覆盖。包里有这个键时采用包里的完整条目，缺少时保留本机条目。

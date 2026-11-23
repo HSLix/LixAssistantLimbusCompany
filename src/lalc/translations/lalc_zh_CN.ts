@@ -2596,6 +2596,18 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>No publish manifest yet</source><translation>暂无 publish manifest</translation></message>
     <message><source>Page Settings</source><translation>页面配置</translation></message>
     <message><source>Page Settings shares saved values only. Unsaved edits, task counts and page availability are excluded.</source><translation>页面配置仅分享已保存的业务值，不包含未保存的修改、任务次数／开关或页面启停状态。</translation></message>
+    <message><source>Select a settings group to see its saved values.</source><translation>选择一个配置分组，查看已保存的值。</translation></message>
+    <message><source>Entire page settings</source><translation>整页配置</translation></message>
+    <message><source>Saved settings to export</source><translation>将导出的已保存配置</translation></message>
+    <message><source>Select settings groups to import. Unselected groups keep their local values.</source><translation>勾选要导入的配置分组。未选分组保留本机设置。</translation></message>
+    <message><source>Select a settings group to inspect the changes.</source><translation>选择一个配置分组，查看导入后的变化。</translation></message>
+    <message><source>Will overwrite</source><translation>将覆盖</translation></message>
+    <message><source>Keeps local value</source><translation>保留本机值</translation></message>
+    <message><source>Prioritize</source><translation>优先选择</translation></message>
+    <message><source>Avoid if possible</source><translation>尽量不选</translation></message>
+    <message><source>Consume first</source><translation>优先消耗</translation></message>
+    <message><source>Confirm settings overwrites</source><translation>确认覆盖配置</translation></message>
+    <message><source>Imported values will overwrite local values in these groups:</source><translation>以下分组中的部分本机值将被覆盖</translation></message>
     <message><source>Page settings may contain private information. The matching page may not be installed; configuration compatibility is not verified.</source><translation>页面配置可能包含私人信息。对应页面可能尚未安装；配置字段兼容性未经验证。</translation></message>
     <message><source>Current settings:</source><translation>当前配置：</translation></message>
     <message><source>Settings after import:</source><translation>导入后的配置：</translation></message>

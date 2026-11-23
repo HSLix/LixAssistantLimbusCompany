@@ -4,12 +4,15 @@
 """
 
 from contextlib import closing
+from pprint import pformat
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMessageBox
 
 from lalc.manifest import ManifestManager
-from lalc.sharing import (SharingPackage, build_export, catalog, import_selected,
-                          inspect_objects, json_bytes, save_package)
+from lalc.sharing import (GROUPED_SETTINGS_FILE, SharingPackage, build_export, catalog, import_selected,
+                          inspect_objects, json_bytes, page_settings_groups, save_package, saved_settings_groups)
 from lalc.sharing_gui import ExportDialog, ImportDialog
 from lalc.user_pages import UserSettings
 from test_sharing_gui import window
@@ -101,7 +104,7 @@ def test_gui_defaults_conflict_details_recheck_and_commit(window, tmp_path, monk
     store.save("pages", "sample.page", {"local": 1})
     export = ExportDialog(window)
     try:
-        assert export.selectors["page_settings"].count() == 1
+        assert export.selectors["page_settings"].topLevelItemCount() == 1
         assert export.selection()["page_settings"] == []
     finally:
         export.close()
@@ -112,7 +115,7 @@ def test_gui_defaults_conflict_details_recheck_and_commit(window, tmp_path, monk
         monkeypatch.setattr("lalc.sharing_gui.QMessageBox.information", lambda *args: None)
         try:
             assert not dialog.selected
-            assert dialog.page_settings.item(0).checkState().value == 0
+            assert dialog.page_settings.topLevelItem(0).checkState(0).value == 0
             assert '"local": 1' in dialog.settings_details.toPlainText()
             assert '"imported": 2' in dialog.settings_details.toPlainText()
             dialog.trust.setChecked(True)
@@ -130,6 +133,93 @@ def test_gui_defaults_conflict_details_recheck_and_commit(window, tmp_path, monk
             assert UserSettings(window.service.data_root).value["pages"]["sample.page"] == {"imported": 2}
         finally:
             dialog.close()
+
+
+def test_grouped_export_and_import_from_gui(window, tmp_path, monkeypatch):
+    manager = ManifestManager(tmp_path / "group-source")
+    names = {"zh_CN": "镜牢", "en_US": "Mirror"}
+    groups = {
+        "themes": {"names": {"zh_CN": "主题包", "en_US": "Theme packs"},
+                   "fields": {"theme_packs": ["preferences"]}},
+        "star": {"names": {"zh_CN": "星光", "en_US": "Starlight"},
+                 "fields": {"star_levels": [], "star_selected": None}},
+    }
+    (manager.data_root / "pages").mkdir(parents=True)
+    (manager.data_root / "pages" / "mirror.py").write_text(
+        'PAGE_ID = "mirror.settings"\nPAGE_NAME = "Mirror"\nPAGE_NAMES = ' + repr(names) +
+        "\nPAGE_SETTINGS_GROUPS = " + pformat(groups, sort_dicts=False) +
+        '\nraise AssertionError("declaration reader must not execute the page")\n', encoding="utf-8")
+    incoming = {"theme_packs": {"preferences": {"A Certain World": "default", "New": "prefer"}},
+                "star_levels": {"guidance": 2}, "star_selected": [], "private": "exclude"}
+    UserSettings(manager.data_root).save("pages", "mirror.settings", incoming)
+    spec = saved_settings_groups(manager, ["mirror.settings"])["mirror.settings"]
+    assert set(spec["groups"]) == {"themes", "star", "__other__"}
+    archive = tmp_path / "grouped.zip"
+    with monkeypatch.context() as patch:
+        patch.setattr(window.host, "manager", manager)
+        patch.setattr("lalc.sharing_gui.QFileDialog.getSaveFileName", lambda *args: (str(archive), "ZIP"))
+        export = ExportDialog(window)
+        try:
+            tree = export.selectors["page_settings"]
+            assert not tree.selected()
+            for key in ("themes", "star"):
+                tree.leaves["mirror.settings", key].setCheckState(0, Qt.CheckState.Checked)
+            assert tree.topLevelItem(0).checkState(0) == Qt.CheckState.PartiallyChecked
+            export.advance()
+            assert archive.is_file()
+        finally:
+            export.close()
+    local = {"theme_packs": {"preferences": {"A Certain World": "prefer", "ASEA": "avoid"}},
+             "star_levels": {"guidance": 1, "other": 1}, "star_selected": ["guidance"], "private": "keep"}
+    store = UserSettings(window.service.data_root)
+    store.save("pages", "mirror.settings", local)
+    monkeypatch.setattr("lalc.sharing_gui.QMessageBox.information", lambda *args: None)
+    window.imported_page_settings = lambda ids: None
+    with closing(SharingPackage(archive)) as package:
+        document = page_settings_groups("mirror.settings", package.files(package.objects[0]))
+        assert document["settings"] == {key: value for key, value in incoming.items() if key != "private"}
+        checks = inspect_objects(window.host.manager, package)
+        assert checks[0]["groups"]["themes"]["conflict"]
+        assert checks[0]["groups"]["star"]["conflict"]
+        assert import_selected(window.host.manager, package, checks, {0}, asset_actions={}, reviewed={},
+                               settings_groups={0: {"themes"}})["failed"]
+        dialog = ImportDialog(window, package)
+        try:
+            tree = dialog.page_settings
+            theme = tree.leaves[0, "themes"]
+            star = tree.leaves[0, "star"]
+            assert not tree.selected()
+            tree.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
+            assert tree.selected() == {(0, "themes"), (0, "star")}
+            star.setCheckState(0, Qt.CheckState.Unchecked)
+            assert tree.topLevelItem(0).checkState(0) == Qt.CheckState.PartiallyChecked
+            tree.setCurrentItem(theme)
+            assert "A Certain World    Prioritize → Default" in dialog.settings_details.toPlainText()
+            assert "ASEA    Avoid if possible · Keeps local value" in dialog.settings_details.toPlainText()
+            dialog.trust.setChecked(True)
+            monkeypatch.setattr("lalc.sharing_gui.QMessageBox.exec", lambda self: QMessageBox.StandardButton.No)
+            dialog.submit()
+            assert UserSettings(window.service.data_root).value["pages"]["mirror.settings"] == local
+            monkeypatch.setattr("lalc.sharing_gui.QMessageBox.exec", lambda self: QMessageBox.StandardButton.Yes)
+            dialog.submit()
+            assert dialog.result_data["failed"] is None
+            expected = {**local, "theme_packs": {"preferences": {"A Certain World": "default", "ASEA": "avoid", "New": "prefer"}}}
+            assert UserSettings(window.service.data_root).value["pages"]["mirror.settings"] == expected
+            checks = inspect_objects(window.host.manager, package)
+            result = import_selected(window.host.manager, package, checks, {0}, asset_actions={}, reviewed={},
+                                     settings_groups={0: {"star"}}, confirm_settings_overwrites=True)
+            assert result["failed"] is None
+            assert UserSettings(window.service.data_root).value["pages"]["mirror.settings"] == {
+                **expected, "star_levels": {"guidance": 2, "other": 1}, "star_selected": []}
+        finally:
+            dialog.close()
+
+
+def test_grouped_payload_rejects_duplicate_field_ownership():
+    group = {"names": {"zh_CN": "主题包", "en_US": "Theme packs"}, "fields": {"themes": None}}
+    with pytest.raises(ValueError, match="字段重复"):
+        page_settings_groups("mirror.settings", {GROUPED_SETTINGS_FILE: json_bytes(
+            {"names": group["names"], "groups": {"one": group, "two": group}, "settings": {"themes": {}}})})
 
 
 def test_imported_page_is_frozen_until_reload_and_other_pages_still_save(owner, monkeypatch):
