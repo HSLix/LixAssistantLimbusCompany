@@ -15,6 +15,54 @@
       <translation>Beta 版请从 GitHub Releases 手动下载更新。</translation>
     </message>
     <message>
+      <source>Framework</source>
+      <translation>框架</translation>
+    </message>
+    <message>
+      <source>Official resource package</source>
+      <translation>官方资源包</translation>
+    </message>
+    <message>
+      <source>Download and preview</source>
+      <translation>下载并预览</translation>
+    </message>
+    <message>
+      <source>Preview again</source>
+      <translation>再次预览</translation>
+    </message>
+    <message>
+      <source>Downloading resource package…</source>
+      <translation>正在下载资源包…</translation>
+    </message>
+    <message>
+      <source>Official resource updates have not been checked.</source>
+      <translation>尚未检查资源包更新。</translation>
+    </message>
+    <message>
+      <source>Could not check for an official resource update.</source>
+      <translation>暂时无法检查官方资源包更新。</translation>
+    </message>
+    <message>
+      <source>No official resource package is available.</source>
+      <translation>暂无可下载的官方资源包。</translation>
+    </message>
+    <message>
+      <source>Latest resource package: {0}
+Already viewed.</source>
+      <translation>最新资源包：{0}
+已查看。</translation>
+    </message>
+    <message>
+      <source>Latest resource package: {0}
+A new package is available to import.</source>
+      <translation>最新资源包：{0}
+有新版可导入。</translation>
+    </message>
+    <message>
+      <source>The official resource package contains unsupported items.</source>
+      <translation>官方资源包包含不支持的内容。</translation>
+    </message>
+    <message>
       <source>LALC is free and open-source software for learning and discussion. If you paid for LALC, please request a refund.</source>
       <translation>LALC 是一款免费开源软件，仅供学习交流使用。如果你在任何渠道付费购买了 LALC，请为自身权益申请退款。</translation>
     </message>
@@ -618,9 +666,9 @@ Log: {1}</source>
       <translation>跟随系统</translation>
     </message>
     <message>
-      <location filename="../gui.py" line="517" />
-      <source>For observation, Candidate development and trials after publication.</source>
-      <translation>用于观察、Candidate 开发与发布后试运行。</translation>
+      <location filename="../gui.py" line="641" />
+      <source>Develop or repair workflows and start conversations with the built-in Agent.</source>
+      <translation>辅助开发者开发或修复工作流，以及和内置 Agent 主动对话。</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="313" />

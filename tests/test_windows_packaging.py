@@ -78,6 +78,8 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
         assert json.loads(core["LALC/build-info.json"])["default_resources_sha256"] == build.hashlib.sha256(
             core["LALC/default-resources.zip"]).hexdigest()
+        assert outputs[3].name == "default-resources.zip"
+        assert outputs[3].read_bytes() == core["LALC/default-resources.zip"]
         with zipfile.ZipFile(outputs[2]) as legacy:
             assert outputs[2].name == "lalc.zip"
             assert b"-Legacy" in legacy.read("lalc/update_to.bat")
@@ -86,7 +88,8 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
                 name.removeprefix("LALC/"): bundled.read(name) for name in bundled.namelist()}
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
     assert all(build.digest(path) in sums for path in outputs)
-    beta = build.assemble(app, archive, tmp_path / "beta", {"version": "0.1.0"}, beta_number=12)
+    beta = build.assemble(app, archive, tmp_path / "beta", {"version": "0.1.0"},
+                          default_resources=outputs[3], beta_number=12)
     assert [path.name for path in beta] == [
         "LALC-0.1.0-beta.12-windows-x64-without-agent.zip",
         "LALC-0.1.0-beta.12-windows-x64-with-agent.zip",
@@ -94,6 +97,7 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     for path in beta:
         with zipfile.ZipFile(path) as package:
             assert json.loads(package.read("LALC/build-info.json"))["version"] == "0.1.0-beta.12"
+            assert package.read("LALC/default-resources.zip") == outputs[3].read_bytes()
     assert len((tmp_path / "beta/SHA256SUMS").read_text(encoding="utf-8").splitlines()) == 2
     before = {path: build.digest(path) for path in outputs}
     (app / "_internal/lalc/skills/workflow-development/SKILL.md").unlink()

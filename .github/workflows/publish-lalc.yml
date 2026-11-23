@@ -43,6 +43,12 @@ jobs:
           if ($env:RELEASE_MODE -eq 'beta') {
             $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
           }
+          if ($env:RELEASE_MODE -eq 'stable') {
+            if (!(Test-Path -LiteralPath 'packaging/default-resources.zip' -PathType Leaf)) {
+              throw 'Stable releases require packaging/default-resources.zip'
+            }
+            $buildArgs += '--default-resources', 'packaging/default-resources.zip'
+          }
           uv run --no-sync python scripts/build_windows.py @buildArgs
       - uses: actions/upload-artifact@v4
         with:
@@ -79,7 +85,7 @@ jobs:
           python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
           (cd dist && sha256sum -c SHA256SUMS)
           release_flags=(--latest)
-          extra_assets=(dist/lalc.zip)
+          extra_assets=(dist/lalc.zip dist/default-resources.zip)
           if [[ $RELEASE_MODE == beta ]]; then
             version="$version-beta.$GITHUB_RUN_NUMBER"
             release_flags=(--prerelease --latest=false)
