@@ -13,6 +13,7 @@ import pytest
 
 from lalc import application
 import lalc.__main__ as cli
+from test_sharing import source
 
 
 spec = importlib.util.spec_from_file_location("windows_build", Path(__file__).parents[1] / "scripts/build_windows.py")
@@ -50,7 +51,7 @@ def agent_resources(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "MODEL_FILES", hashes)
 
 
-def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch):
+def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch, source):
     app = tmp_path / "application"
     for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
@@ -63,7 +64,7 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     monkeypatch.setattr(build, "MODEL_HASHES", {name: build.digest(app / "_internal/rapidocr/models" / name)
                                               for name in build.MODEL_HASHES})
     (tmp_path / "user-settings.json").write_text('"private"', encoding="utf-8")
-    outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
+    outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"}, default_resources=source[0].data_root)
     with zipfile.ZipFile(outputs[0]) as plain, zipfile.ZipFile(outputs[1]) as bundled:
         core = {name: plain.read(name) for name in plain.namelist()}
         assert core == {name: bundled.read(name) for name in bundled.namelist() if not name.startswith(("LALC/pi/", "LALC/agent/"))}
@@ -75,6 +76,8 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
         assert outputs[0].name.endswith("without-agent.zip") and outputs[1].name.endswith("with-agent.zip")
         assert not any("user-settings" in name or "candidate" in name for name in bundled.namelist())
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
+        assert json.loads(core["LALC/build-info.json"])["default_resources_sha256"] == build.hashlib.sha256(
+            core["LALC/default-resources.zip"]).hexdigest()
         with zipfile.ZipFile(outputs[2]) as legacy:
             assert outputs[2].name == "lalc.zip"
             assert b"-Legacy" in legacy.read("lalc/update_to.bat")

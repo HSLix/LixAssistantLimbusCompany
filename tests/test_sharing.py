@@ -134,6 +134,40 @@ def test_four_type_roundtrip_without_execution_or_session_restore(source, tmp_pa
         package.close()
 
 
+def test_default_resources_export_and_import_use_only_selected_public_objects(source, tmp_path):
+    from lalc.agent_skills import DEFAULT_SKILL_NAMES
+    from lalc.default_resources import export_default_resources, import_default_resources, is_empty_for_default_resources
+    from lalc.user_pages import UserSettings
+
+    manager, marker = source
+    original, = manager.list_manifests()
+    old_path = manager.manifests_dir / f"{original['manifest_id']}.json"
+    older = str(uuid.uuid4())
+    content = json.loads(old_path.read_text(encoding="utf-8"))
+    (manager.manifests_dir / f"{older}.json").write_text(json.dumps({**content, "manifest_id": older,
+        "published_at": "2025-01-01T00:00:00Z"}), encoding="utf-8")
+    UserSettings(manager.data_root).save("pages", "sharing.sample", {"private": True})
+    extra = manager.data_root / "skills" / "local-skill"
+    extra.mkdir(parents=True)
+    (extra / "SKILL.md").write_text("# Local skill\n", encoding="utf-8")
+    archive = tmp_path / "default-resources.zip"
+    assert export_default_resources(manager.data_root, archive) == {
+        "workflow": 1, "assets": 2, "pages": 1, "skills": len(DEFAULT_SKILL_NAMES) + 1}
+
+    target = ManifestManager(tmp_path / "blank")
+    (target.data_root / "logs").mkdir(parents=True)
+    (target.data_root / "logs/startup.log").touch()
+    assert is_empty_for_default_resources(target.data_root)
+    result = import_default_resources(target, archive)
+    assert {entry["kind"] for entry in result["completed"]} == {"workflow", "assets", "pages", "skills"}
+    assert [item["manifest_id"] for item in target.list_manifests()] == [original["manifest_id"]]
+    assert len(list((target.data_root / "skills").iterdir())) == len(DEFAULT_SKILL_NAMES) + 1
+    assert not marker.exists() and not (target.data_root / "user-settings.json").exists()
+    assert not (target.data_root / "developer-sessions").exists() and target.default_manifest_id() is None
+    with pytest.raises(ValueError, match="已有用户资源"):
+        import_default_resources(target, archive)
+
+
 def test_uuid_collision_gets_new_identity_without_default_changes(source, tmp_path):
     manager, _ = source
     identity = catalog(manager)["workflow"][0]

@@ -24,6 +24,7 @@ a = Analysis(
     binaries=collect_dynamic_libs("onnxruntime") + collect_dynamic_libs("PIL"),
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
            (str(root / "MagicAndWonder.ico"), "lalc"),
+           (str(root / "src/lalc/MagicGirl.png"), "lalc"),
            (str(root / "src/lalc/pi_probe.ts"), "lalc"),
            (str(root / "src/lalc/pi_context.ts"), "lalc"),
            (str(root / "src/lalc/skills"), "lalc/skills"),

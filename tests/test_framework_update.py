@@ -22,6 +22,12 @@ def test_old_release_is_an_announcement_but_not_a_package(monkeypatch):
     assert update.check_releases("with-agent", {}) == update.ReleaseStatus("legacy news", None, None)
 
 
+def test_bad_download_metadata_does_not_hide_release_body(monkeypatch):
+    monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v6.0.1", "body": "## Latest GitHub notes", "assets": [
+        None, {"name": "LALC-6.0.1-windows-x64-with-agent.zip", "digest": 8}]})
+    assert update.check_releases("with-agent", {}) == update.ReleaseStatus("## Latest GitHub notes", None, None)
+
+
 def test_release_channels_are_independent_and_use_exact_package(monkeypatch):
     def api(url):
         if "mirrorchyan" in url:
@@ -105,8 +111,12 @@ def test_release_notes_count_direct_commits_and_coauthors(tmp_path):
     git("commit", "--allow-empty", "-qm", "direct fix", "-m", "Co-authored-by: Second Author <second@example.com>")
     script = Path(__file__).parents[1] / "scripts/release_notes.py"
     notes = subprocess.check_output([sys.executable, str(script), "v6.0.0", "HEAD"], cwd=tmp_path, encoding="utf-8")
-    assert "First Author (1)" in notes and "Second Author (1)" in notes
-    assert notes.count("direct fix") == 2 and "previous release" not in notes
+    links, changelog = notes.split("\n\n## 更新记录\n", 1)
+    assert ["mirrorchyan.com", "github.com", "pan.quark.cn", "discord.gg"] == [
+        next(domain for domain in ("mirrorchyan.com", "github.com", "pan.quark.cn", "discord.gg") if domain in line)
+        for line in links.splitlines()]
+    assert "First Author (1)" in changelog and "Second Author (1)" in changelog
+    assert changelog.count("direct fix") == 2 and "previous release" not in changelog
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows directory and process behavior")
