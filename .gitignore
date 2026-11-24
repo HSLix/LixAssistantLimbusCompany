@@ -3,3 +3,16 @@ lalc.zip
 logs/
 
 AGENTS.md
+
+# Local development files
+.DS_Store
+__pycache__/
+*.egg-info/
+/.candidate-baseline.json
+/.generated/
+/.scratch/
+/candidate/
+/CONTEXT.md
+/docs/adr/
+/pi_resources/pi-windows-x64.zip
+/work/

@@ -1,0 +1,98 @@
+name: Publish LALC
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: Build only, publish a Beta, or publish a stable release
+        type: choice
+        default: build-only
+        options:
+          - build-only
+          - beta
+          - stable
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lalc-framework-release
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-2025
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: Install build dependencies and run focused checks
+        shell: pwsh
+        run: |
+          uv sync --locked --all-extras
+          uv run --no-sync pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
+      - name: Download the pinned pi package and build
+        shell: pwsh
+        env:
+          RELEASE_MODE: ${{ inputs.release }}
+        run: |
+          $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
+          Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
+          $buildArgs = @()
+          if ($env:RELEASE_MODE -eq 'beta') {
+            $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
+          }
+          if ($env:RELEASE_MODE -eq 'stable') {
+            if (!(Test-Path -LiteralPath 'packaging/default-resources.zip' -PathType Leaf)) {
+              throw 'Stable releases require packaging/default-resources.zip'
+            }
+            $buildArgs += '--default-resources', 'packaging/default-resources.zip'
+          }
+          uv run --no-sync python scripts/build_windows.py @buildArgs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LALC-windows-x64
+          path: dist/*
+          if-no-files-found: error
+          compression-level: 0
+
+  publish:
+    if: ${{ (inputs.release == 'stable' && github.ref == 'refs/heads/master') || (inputs.release == 'beta' && github.ref_type == 'branch') }}
+    needs: windows
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: LALC-windows-x64
+          path: dist
+      - name: Generate contributor notes and publish the tested commit
+        shell: bash
+        env:
+          RELEASE_MODE: ${{ inputs.release }}
+        run: |
+          version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
+          [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          previous=$(gh release view --json tagName --jq .tagName)
+          python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
+          (cd dist && sha256sum -c SHA256SUMS)
+          release_flags=(--latest)
+          extra_assets=(dist/lalc.zip dist/default-resources.zip)
+          if [[ $RELEASE_MODE == beta ]]; then
+            version="$version-beta.$GITHUB_RUN_NUMBER"
+            release_flags=(--prerelease --latest=false)
+            extra_assets=()
+          fi
+          gh release create "v$version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $version" \
+            --notes-file release-notes.md \
+            "dist/LALC-$version-windows-x64-with-agent.zip" \
+            "dist/LALC-$version-windows-x64-without-agent.zip" \
+            "${extra_assets[@]}" dist/SHA256SUMS
