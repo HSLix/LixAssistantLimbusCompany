@@ -107,8 +107,9 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_p
     assert page.provider.currentData() == provider
     assert page.key is None
     dialog, buttons = key_dialog(page)
-    assert not buttons.button(QDialogButtonBox.StandardButton.Ok).isEnabled()
+    assert not buttons.button(QDialogButtonBox.StandardButton.Save).isEnabled()
     page.key.setText("cancel-key")
+    page.save()
     with pytest.raises(ValueError, match="确认或取消"):
         page.submit()
     assert not owner.host.secrets
@@ -122,16 +123,19 @@ def test_api_key_dialog_cancel_save_and_clear(owner, app, monkeypatch, api_key_p
     app.processEvents()
     assert page.key is None
     assert owner.host.secrets == {provider: "saved-key"}
-    assert page.secret_state.text() == "API Key：已设置"
+    assert page.secret_state.text() == "已设置"
     assert "saved-key" not in (owner.service.data_root / "agent-settings.json").read_text(encoding="utf-8")
     dialog, buttons = key_dialog(page)
     assert page.key.text() == ""
-    buttons.rejected.emit()
+    page.key.setText("   ")
+    buttons.accepted.emit()
+    assert dialog.isVisible()
+    dialog.close()
     app.processEvents()
     assert owner.host.secrets == {provider: "saved-key"}
     page.clear_button.click()
     assert not owner.host.secrets
-    assert page.secret_state.text() == "API Key：未设置"
+    assert page.secret_state.text() == "未设置"
 
 
 def test_api_key_save_failure_preserves_dialog_and_redacts_error(owner, app, monkeypatch, api_key_page):

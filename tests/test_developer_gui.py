@@ -684,7 +684,7 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     assert page.model.text() == 'deepseek-flash' and page.model.isReadOnly()
     assert page.url.text() == 'https://api.deepseek.com'
     assert page.thinking.isChecked() and page.effort.currentData() == 'high'
-    assert page.key is None and page.secret_state.text() == 'API Key：未设置'
+    assert page.key is None and page.secret_state.text() == '未设置'
     page.thinking.setChecked(False)
     assert not page.effort.isEnabled()
     page.save(secret='cloud-temporary-key')
@@ -697,7 +697,7 @@ def test_settings_provider_options_and_memory_keys_are_independent(gui, monkeypa
     page.provider.setCurrentIndex(page.provider.findData('llama.cpp'))
     assert page.deepseek_options.isHidden() and not page.model.isReadOnly()
     assert page.url.text() == 'http://local/custom/api' and page.model.text() == 'local-model'
-    assert page.secret_state.text() == 'API Key：已设置'
+    assert page.secret_state.text() == '已设置'
     page.save(clear=True)
     wait_jobs(app, window)
     assert 'llama.cpp' not in window.host.secrets

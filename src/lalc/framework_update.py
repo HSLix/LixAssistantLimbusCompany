@@ -28,6 +28,8 @@ from .work_files import create_work_directory
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
 LATEST_RELEASE_URL = f"{REPOSITORY_URL}/releases/latest"
+MIRROR_PROJECT_URL = "https://mirrorchyan.com/zh/projects?rid=LALC"
+QUARK_SHARE_URL = "https://pan.quark.cn/s/333d6608dddd"
 CDK_SECRET = "lalc-mirrorchyan-cdk"
 VERSION_PATTERN = r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
 REQUIRED_FILES = ("LALC.exe", "LALC-console.exe", "build-info.json", "install-update.ps1",

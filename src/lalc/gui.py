@@ -9,8 +9,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize, QUrl
-from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QTextDocument
+from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize, QUrl, QPointF, QRectF
+from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap, QTextDocument
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -26,7 +26,8 @@ from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBarIcon,
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
     NavigationAvatarWidget, NavigationItemPosition,
-    TransparentToolButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel, setCustomStyleSheet, Theme, setTheme,
+    TransparentToolButton, ToolButton, HyperlinkButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel,
+    setCustomStyleSheet, Theme, setTheme,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
@@ -37,7 +38,7 @@ from .notifications import NotificationList
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
 from .errors import result_diagnostics
 from .lifecycle import ApplicationLifecycle, run_application
-from .framework_update import LATEST_RELEASE_URL, REPOSITORY_URL
+from .framework_update import LATEST_RELEASE_URL, MIRROR_PROJECT_URL, QUARK_SHARE_URL, REPOSITORY_URL
 
 
 class ReleaseAnnouncement(QTextBrowser):
@@ -93,6 +94,45 @@ class StateBridge(QObject):
         self.service.on_change = None
         self.changed.disconnect()
         self.deleteLater()
+
+
+class SecretInputDialog(QDialog):
+    """密码输入只存活于弹窗，只有非空输入可以提交。"""
+
+    save_requested = Signal(str)
+
+    def __init__(self, parent, title, placeholder):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setWindowModality(Qt.WindowModality.WindowModal)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        self.setMinimumWidth(340)
+        layout = QVBoxLayout(self)
+        self.editor = QLineEdit()
+        self.editor.setEchoMode(QLineEdit.EchoMode.Password)
+        self.editor.setPlaceholderText(placeholder)
+        self.editor.setAccessibleName(placeholder)
+        layout.addWidget(self.editor)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        save = buttons.button(QDialogButtonBox.StandardButton.Save)
+        save.setEnabled(False)
+        self.editor.textChanged.connect(lambda text: save.setEnabled(bool(text.strip())))
+        buttons.accepted.connect(self.submit)
+        buttons.rejected.connect(self.reject)
+        self.finished.connect(self.editor.clear)
+        layout.addWidget(buttons)
+
+    def submit(self):
+        """直接提交和按钮提交遵守相同的非空规则。"""
+        if self.editor.text().strip():
+            self.save_requested.emit(self.editor.text())
+
+
+def show_secret_status(label, configured):
+    """用相同的短标签显示 API Key 和 CDK 是否已保存。"""
+    label.setText(tr('Credential set') if configured else tr('Credential not set'))
+    colors = 'color: #126442; background: #e8f5ee;' if configured else 'color: #50565c; background: #eceff1;'
+    label.setStyleSheet(f'{colors} border-radius: 10px; padding: 2px 9px;')
 
 
 class ErrorDialog(QDialog):
@@ -343,7 +383,7 @@ class MainWindow(FluentWindow):
             job.wait()
         self.service.shutdown()
 
-    def _interact(self, operation) -> None:
+    def _interact(self, operation, *, secrets=()) -> None:
         """交互层统一接住操作错误，记录原始异常并允许修正后继续操作。"""
 
         try:
@@ -352,7 +392,7 @@ class MainWindow(FluentWindow):
             from .agent_diagnostics import error_details, details_text
             from .agent_repair import RepairLog
             settings_page = getattr(self, "settings_page", None)
-            keys = {*self.host.secrets.values(), settings_page.pending_key() if settings_page else None} - {None, ""}
+            keys = {*secrets, *self.host.secrets.values(), settings_page.pending_key() if settings_page else None} - {None, ""}
             workbench = getattr(self, "repair_page", None)
             conversation = workbench.host.conversation if workbench and workbench.session else self.host.conversation
             if conversation:
@@ -605,6 +645,24 @@ class UserWindow(MainWindow):
         header = QHBoxLayout()
         header.addWidget(SubtitleLabel(tr('Version & Update')))
         header.addStretch()
+        self.mirror_icon = QIcon(str(Path(__file__).with_name('mirror_chyan.png')))
+        self.mirror_settings_button = ToolButton(self.mirror_icon)
+        self.mirror_settings_button.setObjectName('mirror-cdk-shortcut')
+        self.mirror_settings_button.clicked.connect(self.open_mirror_settings)
+        quark = ToolButton(FluentIcon.CLOUD)
+        quark.setObjectName('quark-drive')
+        quark.setToolTip(tr('Quark Drive'))
+        quark.setAccessibleName(quark.toolTip())
+        quark.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(QUARK_SHARE_URL)))
+        github = ToolButton(FluentIcon.GITHUB)
+        github.setObjectName('github-repository')
+        github.setToolTip(tr('GitHub repository'))
+        github.setAccessibleName(github.toolTip())
+        github.clicked.connect(self.open_repository)
+        for button in (self.mirror_settings_button, quark, github):
+            button.setFixedSize(34, 34)
+            button.setIconSize(QSize(24, 24) if button is self.mirror_settings_button else QSize(18, 18))
+            header.addWidget(button)
         header.addWidget(self.check_update_button)
         update_layout.addLayout(header)
         for icon, title, labels, button in (
@@ -686,19 +744,31 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
-        if sys.platform == 'win32' and (self.framework_build.get('mirror') or {}).get('rid'):
-            from .framework_update import CDK_SECRET, secret_path
-            application_layout.addWidget(QLabel(tr('MirrorChyan CDK')))
-            self.mirror_cdk = QLineEdit()
-            self.mirror_cdk.setEchoMode(QLineEdit.EchoMode.Password)
-            self.mirror_cdk_saved = secret_path(service.data_root, CDK_SECRET).is_file()
-            self.show_mirror_cdk_state()
-            application_layout.addWidget(self.mirror_cdk)
-            save_cdk = QPushButton(tr('Save MirrorChyan CDK'))
-            save_cdk.clicked.connect(lambda: self._interact(self.save_mirror_cdk))
-            application_layout.addWidget(save_cdk)
-        else:
-            self.mirror_cdk_saved = False
+        from .agent_settings import secret_path
+        from .framework_update import CDK_SECRET
+        self.mirror_cdk_row = QWidget()
+        self.mirror_cdk_row.setObjectName('mirror-cdk-settings')
+        cdk_row = QHBoxLayout(self.mirror_cdk_row)
+        cdk_row.setContentsMargins(0, 0, 0, 0)
+        cdk_row.addWidget(StrongBodyLabel(tr('MirrorChyan CDK')))
+        self.mirror_cdk_status = QLabel()
+        cdk_row.addWidget(self.mirror_cdk_status)
+        cdk_row.addStretch()
+        cdk_row.addWidget(HyperlinkButton(FluentIcon.LINK, MIRROR_PROJECT_URL, tr('Open the MirrorChyan project page')))
+        self.set_cdk_button = QPushButton(tr('Set'))
+        self.set_cdk_button.setAccessibleName(tr('Set MirrorChyan CDK'))
+        self.set_cdk_button.clicked.connect(self.open_mirror_cdk_dialog)
+        cdk_row.addWidget(self.set_cdk_button)
+        self.clear_cdk_button = QPushButton(tr('Clear'))
+        self.clear_cdk_button.setAccessibleName(tr('Clear MirrorChyan CDK'))
+        self.clear_cdk_button.clicked.connect(lambda: self._interact(lambda: self.save_mirror_cdk('')))
+        cdk_row.addWidget(self.clear_cdk_button)
+        application_layout.addWidget(self.mirror_cdk_row)
+        self.mirror_cdk_saved = secret_path(service.data_root, CDK_SECRET).is_file()
+        self.set_cdk_button.setEnabled(sys.platform == 'win32')
+        if sys.platform != 'win32':
+            self.set_cdk_button.setToolTip(tr('Saving a MirrorChyan CDK requires Windows'))
+        self.show_mirror_cdk_state()
         from .game_version import load_steam_root
         application_layout.addWidget(QLabel(tr('Steam client directory')))
         self.steam_directory = QLineEdit()
@@ -759,8 +829,6 @@ class UserWindow(MainWindow):
         self.navigationInterface.addItem('discord', FluentIcon.CHAT, 'Discord',
                                          onClick=lambda: QDesktopServices.openUrl(QUrl('https://discord.gg/bVzCuBU4bC')),
                                          selectable=False, position=NavigationItemPosition.BOTTOM)
-        self.navigationInterface.addItem('github-repository', FluentIcon.GITHUB, tr('GitHub repository'),
-                                         onClick=self.open_repository, selectable=False, position=NavigationItemPosition.BOTTOM)
         self.navigationInterface.addWidget('author-avatar', NavigationAvatarWidget('陆爻齐-LuYaoQi', str(Path(__file__).with_name('MagicGirl.png'))),
                                            onClick=self.show_author_support, position=NavigationItemPosition.BOTTOM, tooltip=tr('Support the author'))
         for error in self.page_errors:
@@ -833,16 +901,52 @@ class UserWindow(MainWindow):
         QMessageBox.information(self, title, tr('Default resources imported. Reload LALC to load the pages, then select the imported Workflow version.'))
 
     def show_mirror_cdk_state(self):
-        self.mirror_cdk.setPlaceholderText(tr('CDK saved. Save an empty field to remove it.') if self.mirror_cdk_saved
-                                           else tr('Optional, for faster downloads'))
+        """将已保存状态同步到设置和首页，无需联网。"""
+        status = tr('MirrorChyan CDK: set') if self.mirror_cdk_saved else tr('MirrorChyan CDK: not set')
+        show_secret_status(self.mirror_cdk_status, self.mirror_cdk_saved)
+        self.mirror_cdk_status.setAccessibleName(status)
+        self.mirror_settings_button.setToolTip(status)
+        self.mirror_settings_button.setAccessibleName(status)
+        self.clear_cdk_button.setEnabled(sys.platform == 'win32' and self.mirror_cdk_saved)
+        if self.mirror_cdk_saved:
+            pixmap = QPixmap(48, 48)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            with QPainter(pixmap) as painter:
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.drawPixmap(0, 0, self.mirror_icon.pixmap(42, 42))
+                painter.setPen(QPen(Qt.GlobalColor.white, 2))
+                painter.setBrush(QColor('#168160'))
+                painter.drawEllipse(QRectF(25, 25, 22, 22))
+                painter.drawLine(QPointF(30, 36), QPointF(34, 40))
+                painter.drawLine(QPointF(34, 40), QPointF(42, 32))
+        else:
+            pixmap = self.mirror_icon.pixmap(QSize(48, 48), QIcon.Mode.Disabled)
+        self.mirror_settings_button.setIcon(QIcon(pixmap))
 
-    def save_mirror_cdk(self):
+    def open_mirror_settings(self):
+        """切换到通用设置并滚动到 CDK 一栏。"""
+        self.switchTo(self.general_settings)
+        QTimer.singleShot(0, lambda: self.general_settings.ensureWidgetVisible(self.mirror_cdk_row, 0, 12))
+
+    def open_mirror_cdk_dialog(self):
+        """弹窗保存成功后关闭，存储失败时保留输入供用户重试。"""
+        dialog = SecretInputDialog(self.mirror_cdk_row, tr('Set MirrorChyan CDK'), tr('Enter a new CDK'))
+
+        def save(value):
+            def operation():
+                self.save_mirror_cdk(value)
+                dialog.accept()
+            self._interact(operation, secrets=(value,))
+
+        dialog.save_requested.connect(save)
+        dialog.open()
+
+    def save_mirror_cdk(self, value):
         """CDK 单独保存为当前 Windows 用户的加密凭证。"""
         from .framework_update import set_mirror_cdk
-        value = self.mirror_cdk.text().strip()
+        value = value.strip()
         set_mirror_cdk(self.service.data_root, value)
         self.mirror_cdk_saved = bool(value)
-        self.mirror_cdk.clear()
         self.show_mirror_cdk_state()
         if self.release_status is not None and self.update_workspace is None and self.check_update_button.isEnabled():
             self.show_framework_releases(self.release_status)

@@ -832,10 +832,14 @@ class SettingsPage(QWidget):
             layout.addWidget(control)
         self.secret_state = QLabel()
         key_layout = QHBoxLayout()
-        key_layout.addWidget(self.secret_state, 1)
-        self.key_button = button(tr('Set API key'), self.set_api_key, key_layout)
+        key_layout.addWidget(QLabel(tr('API Key')))
+        key_layout.addWidget(self.secret_state)
+        key_layout.addStretch()
+        self.key_button = button(tr('Set'), self.set_api_key, key_layout)
+        self.key_button.setAccessibleName(tr('Set API key'))
         layout.addLayout(key_layout)
-        self.clear_button = button(tr('Clear API key'), lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
+        self.clear_button = button(tr('Clear'), lambda: self.window._interact(lambda: self.save(clear=True)), key_layout)
+        self.clear_button.setAccessibleName(tr('Clear API key'))
         self.advanced = QWidget()
         advanced = QVBoxLayout(self.advanced)
         advanced.setContentsMargins(0, 0, 0, 0)
@@ -903,29 +907,21 @@ class SettingsPage(QWidget):
 
     def set_api_key(self):
         """密钥只在输入弹窗存活期间保留，成功保存后关闭。"""
-        dialog = QDialog(self)
-        dialog.setWindowTitle(tr('Set API key'))
-        dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        layout = QVBoxLayout(dialog)
-        self.key = QLineEdit()
-        self.key.setEchoMode(QLineEdit.EchoMode.Password)
-        self.key.setPlaceholderText(tr('Enter a new API key'))
-        layout.addWidget(self.key)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
-        self.key.textChanged.connect(lambda text: buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(bool(text.strip())))
-        layout.addWidget(buttons)
-        def confirm():
+        from .gui import SecretInputDialog
+
+        dialog = SecretInputDialog(self, tr('Set API key'), tr('Enter a new API key'))
+        self.key = dialog.editor
+
+        def confirm(secret):
             def operation():
-                self.save(secret=self.pending_key())
-                dialog.accept()
+                if self.save(secret=secret) is not None:
+                    dialog.accept()
             self.window._interact(operation)
+
         def finished():
-            self.key.clear()
             self.key = None
-        buttons.accepted.connect(confirm)
-        buttons.rejected.connect(dialog.reject)
+
+        dialog.save_requested.connect(confirm)
         dialog.finished.connect(finished)
         dialog.open()
 
@@ -1055,15 +1051,17 @@ class SettingsPage(QWidget):
             self.window._interact(lambda: save_options(self.host.service.data_root, **{name: value}))
 
     def show_secret(self, value):
-        configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
-        self.secret_state.setText(tr('API Key: set') if configured else tr('API Key: not set'))
+        from .gui import show_secret_status
 
-    def save(self, *, clear=False, secret=None):
+        configured = bool(self.host.secrets.get(value["provider"])) or bool(value["secret_name"])
+        show_secret_status(self.secret_state, configured)
+        self.secret_state.setAccessibleName(tr('API Key: set') if configured else tr('API Key: not set'))
+
+    def save(self, *, clear=False, secret=""):
         """本地保存不占用后台活动队列；失败保留表单和未保存状态。"""
         if not self.isEnabled():
             return
         value = self.values()
-        secret = self.pending_key() if secret is None else secret
         saved = save_settings(self.host.service.data_root, value, secret=secret, clear=clear,
                               side=self.side, temporary_keys=self.host.secrets)
         self.loading = True

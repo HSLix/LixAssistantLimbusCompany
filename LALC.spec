@@ -25,6 +25,7 @@ a = Analysis(
     datas=[(str(root / "LICENSE"), "."), (str(root / "THIRD_PARTY_NOTICES.md"), "."),
            (str(root / "MagicAndWonder.ico"), "lalc"),
            (str(root / "src/lalc/MagicGirl.png"), "lalc"),
+           (str(root / "src/lalc/mirror_chyan.png"), "lalc"),
            (str(root / "src/lalc/pi_probe.ts"), "lalc"),
            (str(root / "src/lalc/pi_context.ts"), "lalc"),
            (str(root / "src/lalc/skills"), "lalc/skills"),

@@ -164,19 +164,19 @@ A new package is available to import.</source>
     </message>
     <message>
       <source>MirrorChyan CDK</source>
-      <translation>Mirror酱 CDK</translation>
+      <translation>Mirror 酱 CDK</translation>
     </message>
     <message>
-      <source>Save MirrorChyan CDK</source>
-      <translation>保存 Mirror酱 CDK</translation>
+      <source>Set MirrorChyan CDK</source>
+      <translation>设置 Mirror 酱 CDK</translation>
     </message>
     <message>
-      <source>CDK saved. Save an empty field to remove it.</source>
-      <translation>已保存 CDK。留空并保存即可清除。</translation>
+      <source>MirrorChyan CDK: set</source>
+      <translation>Mirror 酱 CDK：已设置</translation>
     </message>
     <message>
-      <source>Optional, for faster downloads</source>
-      <translation>可选，用于加速下载</translation>
+      <source>MirrorChyan CDK: not set</source>
+      <translation>Mirror 酱 CDK：未设置</translation>
     </message>
     <message>
       <source>Checking for updates…</source>
@@ -2753,5 +2753,15 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Calculating usage from local Run history…</source><translation>正在统计本机 Run 历史用量…</translation></message>
     <message><source>{0} (partial)</source><translation>{0}（部分）</translation></message>
     <message><source>Size unavailable for {0} run logs.</source><translation>有 {0} 条运行日志无法统计占用。</translation></message>
+    <message><source>API Key</source><translation>API Key</translation></message>
+    <message><source>Set</source><translation>设置</translation></message>
+    <message><source>Clear</source><translation>清空</translation></message>
+    <message><source>Credential set</source><translation>已设置</translation></message>
+    <message><source>Credential not set</source><translation>未设置</translation></message>
+    <message><source>Quark Drive</source><translation>夸克网盘</translation></message>
+    <message><source>Clear MirrorChyan CDK</source><translation>清空 Mirror 酱 CDK</translation></message>
+    <message><source>Enter a new CDK</source><translation>输入新的 CDK</translation></message>
+    <message><source>Open the MirrorChyan project page</source><translation>打开 Mirror 酱项目页</translation></message>
+    <message><source>Saving a MirrorChyan CDK requires Windows</source><translation>Mirror 酱 CDK 需要在 Windows 上保存</translation></message>
 </context>
 </TS>

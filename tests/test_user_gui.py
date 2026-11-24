@@ -203,23 +203,90 @@ def test_developer_tools_are_last_in_user_settings(windows):
 
 def test_legacy_avatar_and_external_navigation(windows, monkeypatch):
     from PySide6.QtGui import QDesktopServices
+    from PySide6.QtWidgets import QToolButton, QWidget
     from qfluentwidgets import MessageBox, NavigationAvatarWidget
-    from lalc.framework_update import REPOSITORY_URL
+    from lalc.framework_update import QUARK_SHARE_URL, REPOSITORY_URL
+    from lalc.i18n import tr
 
     _, _, user, _ = windows
     opened = []
     monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
     avatar = user.navigationInterface.widget("author-avatar")
     assert isinstance(avatar, NavigationAvatarWidget) and avatar.name == "陆爻齐-LuYaoQi"
-    user.navigationInterface.widget("github-repository").clicked.emit(True)
-    assert opened == [REPOSITORY_URL]
+    assert "github-repository" not in user.navigationInterface.panel.items
+    header = user.findChild(QWidget, 'version-updates').layout().itemAt(0).layout()
+    buttons = [header.itemAt(i).widget() for i in range(header.count())]
+    shortcuts = [widget for widget in buttons if isinstance(widget, QToolButton)]
+    assert [widget.objectName() for widget in shortcuts] == ['mirror-cdk-shortcut', 'quark-drive', 'github-repository']
+    assert shortcuts[1].toolTip() == tr('Quark Drive')
+    shortcuts[1].click()
+    shortcuts[2].click()
+    assert opened == [QUARK_SHARE_URL, REPOSITORY_URL]
     avatar.clicked.emit(True)
     dialog = user.findChild(MessageBox)
     assert dialog.isVisible()
     dialog.yesButton.click()
-    assert opened == [REPOSITORY_URL, REPOSITORY_URL]
+    assert opened == [QUARK_SHARE_URL, REPOSITORY_URL, REPOSITORY_URL]
     user.navigationInterface.widget("discord").clicked.emit(True)
     assert opened[-1] == "https://discord.gg/bVzCuBU4bC"
+
+
+def test_mirror_cdk_can_be_saved_before_download_channel_is_configured(windows, monkeypatch):
+    from types import SimpleNamespace
+    from PySide6.QtGui import QDesktopServices
+    from PySide6.QtWidgets import QDialogButtonBox, QLineEdit
+    from qfluentwidgets import HyperlinkButton
+    from lalc import agent_settings, framework_update, gui
+    from lalc.i18n import tr
+
+    app, owner, user, _ = windows
+    assert user.close()
+    monkeypatch.setattr(gui, "sys", SimpleNamespace(platform="win32", executable=sys.executable))
+    monkeypatch.setattr(framework_update, "installed_build", lambda: {"version": "6.0.0"})
+    monkeypatch.setattr(agent_settings, "dpapi", lambda value: b"encrypted:" + value[::-1])
+    user = owner.open_window()
+    shortcut = user.mirror_settings_button
+    path = agent_settings.secret_path(user.service.data_root, framework_update.CDK_SECRET)
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl", lambda url: opened.append(url.toString()))
+    assert shortcut.toolTip() == tr('MirrorChyan CDK: not set')
+    assert not shortcut.icon().isNull() and not user.clear_cdk_button.isEnabled()
+    assert not user.mirror_cdk_row.findChildren(QLineEdit)
+    shortcut.click()
+    app.processEvents()
+    assert user.pages.currentWidget() is user.general_settings
+    user.mirror_cdk_row.findChild(HyperlinkButton).click()
+    assert opened == [framework_update.MIRROR_PROJECT_URL]
+
+    user.set_cdk_button.click()
+    dialog = user.mirror_cdk_row.findChild(gui.SecretInputDialog)
+    assert dialog.editor.echoMode() == QLineEdit.EchoMode.Password
+    buttons = dialog.findChild(QDialogButtonBox)
+    save = buttons.button(QDialogButtonBox.StandardButton.Save)
+    dialog.editor.setText("  ")
+    assert not save.isEnabled()
+    buttons.accepted.emit()
+    assert not path.exists()
+    dialog.editor.setText("  sample-cdk  ")
+    save.click()
+    assert path.read_bytes() == b"encrypted:kdc-elpmas"
+    assert shortcut.toolTip() == tr('MirrorChyan CDK: set')
+    app.processEvents()
+
+    for cancel in ("reject", "close"):
+        user.set_cdk_button.click()
+        dialog = next(item for item in user.mirror_cdk_row.findChildren(gui.SecretInputDialog) if item.isVisible())
+        assert dialog.editor.text() == ""
+        dialog.editor.setText("unsaved")
+        getattr(dialog, cancel)()
+        app.processEvents()
+        assert path.read_bytes() == b"encrypted:kdc-elpmas"
+    assert user.close()
+    user = owner.open_window()
+    assert user.mirror_settings_button.toolTip() == tr('MirrorChyan CDK: set')
+    user.clear_cdk_button.click()
+    assert not path.exists()
+    assert user.mirror_settings_button.toolTip() == tr('MirrorChyan CDK: not set')
 
 
 def test_easter_egg_opens_a_titleless_dialog_with_a_close_button(windows):
