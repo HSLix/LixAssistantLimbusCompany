@@ -102,6 +102,30 @@ def test_steam_directory_validates_before_save_and_uses_shared_config(windows, t
     assert game_version.load_steam_root(user.service.data_root) == str(root)
 
 
+@pytest.mark.parametrize('packaged, has_agent, expected', [
+    (True, True, 'Bundled with Agent'),
+    (True, False, 'Without bundled Agent'),
+    (False, True, 'Running from source'),
+])
+def test_framework_build_type_in_version_card(windows, tmp_path, monkeypatch, packaged, has_agent, expected):
+    from PySide6.QtWidgets import QLabel, QWidget
+    from lalc.i18n import tr
+
+    _, owner, user, _ = windows
+    assert user.close()
+    monkeypatch.setattr(sys, 'frozen', packaged, raising=False)
+    monkeypatch.setattr(sys, 'executable', str(tmp_path / 'LALC.exe'))
+    if has_agent:
+        (tmp_path / 'agent').mkdir()
+        (tmp_path / 'agent' / 'codesearch.exe').touch()
+
+    reopened = owner.open_window()
+    card = reopened.findChild(QWidget, 'version-updates')
+    assert tr('Build type: {0}').format(tr(expected)) in [label.text() for label in card.findChildren(QLabel)]
+    if not packaged:
+        assert not reopened.can_install_update
+
+
 def test_framework_release_checks_require_two_user_actions_to_install(windows, tmp_path, monkeypatch):
     from lalc import framework_update as update
 

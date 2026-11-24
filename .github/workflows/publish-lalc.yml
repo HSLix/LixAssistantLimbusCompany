@@ -29,6 +29,8 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Install build dependencies and run focused checks
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           uv sync --locked --all-extras
           uv run --no-sync pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
