@@ -143,6 +143,22 @@ A new package is available to import.</source>
       <translation>已安装的框架版本：{0}</translation>
     </message>
     <message>
+      <source>Build type: {0}</source>
+      <translation>运行类型：{0}</translation>
+    </message>
+    <message>
+      <source>Bundled with Agent</source>
+      <translation>自带 Agent 包</translation>
+    </message>
+    <message>
+      <source>Without bundled Agent</source>
+      <translation>不自带 Agent 包</translation>
+    </message>
+    <message>
+      <source>Running from source</source>
+      <translation>源码运行</translation>
+    </message>
+    <message>
       <source>Check for updates</source>
       <translation>检查更新</translation>
     </message>

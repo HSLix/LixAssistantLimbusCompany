@@ -548,9 +548,11 @@ class UserWindow(MainWindow):
         information.setSpacing(12)
         from .framework_update import installed_build, installed_variant, REQUIRED_FILES
         self.framework_build = installed_build()
-        self.framework_variant = installed_variant(Path(sys.executable).parent)
-        self.can_install_update = (sys.platform == 'win32' and getattr(sys, 'frozen', False)
-                                   and all((Path(sys.executable).parent / name).is_file() for name in REQUIRED_FILES))
+        application_dir = Path(sys.executable).parent
+        packaged = getattr(sys, 'frozen', False)
+        self.framework_variant = installed_variant(application_dir) if packaged else 'without-agent'
+        self.can_install_update = (sys.platform == 'win32' and packaged
+                                   and all((application_dir / name).is_file() for name in REQUIRED_FILES))
         self.release_status = None
         self.update_workspace = None
         self.releases_checked.connect(self.show_framework_releases)
@@ -569,6 +571,11 @@ class UserWindow(MainWindow):
         disclaimer.setTextFormat(Qt.TextFormat.PlainText)
         disclaimer.setWordWrap(True)
         self.framework_version = QLabel(tr('Installed framework version: {0}').format(self.framework_build['version'] or '—'))
+        if packaged:
+            build_type = tr('Bundled with Agent') if self.framework_variant == 'with-agent' else tr('Without bundled Agent')
+        else:
+            build_type = tr('Running from source')
+        framework_build_type = QLabel(tr('Build type: {0}').format(build_type))
         self.framework_status = QLabel()
         self.framework_status.setWordWrap(True)
         self.check_update_button = QPushButton(tr('Check for updates'))
@@ -601,7 +608,7 @@ class UserWindow(MainWindow):
         header.addWidget(self.check_update_button)
         update_layout.addLayout(header)
         for icon, title, labels, button in (
-            (FluentIcon.APPLICATION, tr('Framework'), (self.framework_version, self.framework_status), self.update_button),
+            (FluentIcon.APPLICATION, tr('Framework'), (self.framework_version, framework_build_type, self.framework_status), self.update_button),
             (FluentIcon.FOLDER, tr('Official resource package'), (self.resource_status,), self.resource_button),
         ):
             update_layout.addSpacing(6)
