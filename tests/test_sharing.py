@@ -213,6 +213,29 @@ def test_default_resources_include_only_mirror_gift_and_theme_settings(source, t
             check_default_package(package)
 
 
+def test_prepare_default_resource_keeps_previous_zip_if_validation_fails(source, tmp_path, monkeypatch):
+    from scripts import prepare_default_resource as prepare
+
+    packaging = tmp_path / "packaging"
+    packaging.mkdir()
+    archive = packaging / "default-resources.zip"
+    monkeypatch.setattr(prepare, "ROOT", tmp_path)
+    monkeypatch.setattr(prepare, "default_data_root", lambda: source[0].data_root)
+    prepare.main()
+    with closing(SharingPackage(archive, tmp_path)) as package:
+        prepare.check_default_package(package)
+    previous = archive.read_bytes()
+
+    def reject(package):
+        raise ValueError("invalid resource package")
+
+    monkeypatch.setattr(prepare, "check_default_package", reject)
+    with pytest.raises(ValueError, match="invalid resource package"):
+        prepare.main()
+    assert archive.read_bytes() == previous
+    assert list(packaging.iterdir()) == [archive]
+
+
 def test_uuid_collision_gets_new_identity_without_default_changes(source, tmp_path):
     manager, _ = source
     identity = catalog(manager)["workflow"][0]

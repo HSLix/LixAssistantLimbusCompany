@@ -91,14 +91,16 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     beta = build.assemble(app, archive, tmp_path / "beta", {"version": "0.1.0"},
                           default_resources=outputs[3], beta_number=12)
     assert [path.name for path in beta] == [
-        "LALC-0.1.0-beta.12-windows-x64-without-agent.zip",
-        "LALC-0.1.0-beta.12-windows-x64-with-agent.zip",
+        "LALC-0.1.0-windows-x64-without-agent.zip",
+        "LALC-0.1.0-windows-x64-with-agent.zip",
     ]
     for path in beta:
         with zipfile.ZipFile(path) as package:
             assert json.loads(package.read("LALC/build-info.json"))["version"] == "0.1.0-beta.12"
             assert package.read("LALC/default-resources.zip") == outputs[3].read_bytes()
-    assert len((tmp_path / "beta/SHA256SUMS").read_text(encoding="utf-8").splitlines()) == 2
+    assert (tmp_path / "beta/SHA256SUMS").read_text(encoding="utf-8").splitlines() == [
+        f"{build.digest(path)}  {path.name}" for path in beta
+    ]
     before = {path: build.digest(path) for path in outputs}
     (app / "_internal/lalc/skills/workflow-development/SKILL.md").unlink()
     with pytest.raises(ValueError, match="SKILL.md"):

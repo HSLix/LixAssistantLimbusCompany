@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONIOENCODING: utf-8
+
 concurrency:
   group: lalc-framework-release
   cancel-in-progress: false
@@ -29,8 +32,6 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Install build dependencies and run focused checks
         shell: pwsh
-        env:
-          PYTHONIOENCODING: utf-8
         run: |
           uv sync --locked --all-extras
           uv run --no-sync pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
@@ -39,18 +40,21 @@ jobs:
         env:
           RELEASE_MODE: ${{ inputs.release }}
         run: |
-          $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
-          Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
           $buildArgs = @()
+          $resourceZip = 'packaging/default-resources.zip'
+          if (Test-Path -LiteralPath $resourceZip) {
+            if (-not (Test-Path -LiteralPath $resourceZip -PathType Leaf)) {
+              throw "Expected a ZIP file at $resourceZip."
+            }
+            $buildArgs += '--default-resources', $resourceZip
+          } elseif ($env:RELEASE_MODE -eq 'stable') {
+            throw "Stable releases require $resourceZip in the release commit."
+          }
           if ($env:RELEASE_MODE -eq 'beta') {
             $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
           }
-          if ($env:RELEASE_MODE -eq 'stable') {
-            if (!(Test-Path -LiteralPath 'packaging/default-resources.zip' -PathType Leaf)) {
-              throw 'Stable releases require packaging/default-resources.zip'
-            }
-            $buildArgs += '--default-resources', 'packaging/default-resources.zip'
-          }
+          $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
+          Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
           uv run --no-sync python scripts/build_windows.py @buildArgs
       - uses: actions/upload-artifact@v4
         with:
@@ -76,7 +80,7 @@ jobs:
         with:
           name: LALC-windows-x64
           path: dist
-      - name: Generate contributor notes and publish the tested commit
+      - name: Create a stable release draft or publish a Beta
         shell: bash
         env:
           RELEASE_MODE: ${{ inputs.release }}
@@ -84,16 +88,30 @@ jobs:
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           previous=$(gh release view --json tagName --jq .tagName)
-          python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
           (cd dist && sha256sum -c SHA256SUMS)
-          release_flags=(--latest)
-          extra_assets=(dist/lalc.zip dist/default-resources.zip)
+          release_flags=(--draft)
+          extra_assets=(dist/lalc.zip)
+          release_version="$version"
           if [[ $RELEASE_MODE == beta ]]; then
-            version="$version-beta.$GITHUB_RUN_NUMBER"
+            release_version="$version-beta.$GITHUB_RUN_NUMBER"
             release_flags=(--prerelease --latest=false)
             extra_assets=()
+          else
+            if [[ ! -f dist/default-resources.zip ]]; then
+              echo "Windows build did not produce the required default-resources.zip." >&2
+              exit 1
+            fi
+            extra_assets+=(dist/default-resources.zip)
           fi
-          gh release create "v$version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $version" \
+          {
+            if [[ ! -f packaging/default-resources.zip ]]; then
+              printf '%s\n' '> [!IMPORTANT]' \
+                '> 此版本未内置默认资源包。运行工作流前，请另行获取并导入与此版本兼容的资源包。' '>' \
+                '> This release does not include default resources. Obtain and import a compatible resource package before running workflows.' ''
+            fi
+            python scripts/release_notes.py "$previous" "$GITHUB_SHA"
+          } > release-notes.md
+          gh release create "v$release_version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $release_version" \
             --notes-file release-notes.md \
             "dist/LALC-$version-windows-x64-with-agent.zip" \
             "dist/LALC-$version-windows-x64-without-agent.zip" \

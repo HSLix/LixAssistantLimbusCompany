@@ -53,17 +53,27 @@ def visit_all(dialog):
     dialog.trust.setChecked(True)
 
 
-def test_official_download_uses_import_preview_and_records_view_without_installing(window, source, tmp_path, monkeypatch):
+@pytest.mark.parametrize("default_bundle", [False, True])
+def test_official_download_uses_import_preview_and_records_view_without_installing(
+        window, source, tmp_path, monkeypatch, default_bundle):
     from hashlib import sha256
-    from lalc.default_resources import viewed_resource_packages
+    from lalc.default_resources import export_default_resources, viewed_resource_packages
     from lalc.framework_update import ResourceRelease
     from lalc.sharing_gui import open_sharing
+    from lalc.user_pages import UserSettings
 
     manager, _ = source
     path = tmp_path / "official.zip"
-    save_package(build_export(manager, {"assets": ["ui"]}), path)
+    if default_bundle:
+        (manager.data_root / "pages/mirror.py").write_text('PAGE_ID = "mirror.settings"\n', encoding="utf-8")
+        UserSettings(manager.data_root).save("pages", "mirror.settings", {"shop_gifts": {"catalog": {}}})
+        assert export_default_resources(manager.data_root, path)["page_settings"] == 1
+        name = "default-resources.zip"
+    else:
+        save_package(build_export(manager, {"assets": ["ui"]}), path)
+        name = "lalc-sharing-20261123-143000-001.zip"
     payload = path.read_bytes()
-    resource = ResourceRelease("default-resources.zip", "https://example.test/package",
+    resource = ResourceRelease(name, "https://example.test/package",
                                sha256(payload).hexdigest(), len(payload), datetime.fromisoformat("2026-11-23T14:30:00Z"))
     monkeypatch.setattr("lalc.framework_update.download_resource", lambda item, target: target.write_bytes(payload))
     seen = []
@@ -72,6 +82,7 @@ def test_official_download_uses_import_preview_and_records_view_without_installi
     assert len(seen) == 1 and not seen[0].exists()
     assert resource.sha256 in viewed_resource_packages(window.service.data_root)
     assert not (window.service.data_root / "assets").exists()
+    assert not (window.service.data_root / "user-settings.json").exists()
 
 
 def test_export_defaults_and_direct_save(window, source, tmp_path, monkeypatch):
