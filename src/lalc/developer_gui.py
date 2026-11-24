@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
-from PySide6.QtCore import Qt, QThread, QThreadPool, Signal, Slot, QRect, QTimer, QSize, QPoint, QSignalBlocker
+from PySide6.QtCore import Qt, QThread, QThreadPool, Signal, Slot, QRect, QTimer, QSize, QPoint
 from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase, QTextCursor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
@@ -34,6 +34,7 @@ from .chat_input import ChatInput
 from .chat_attachments import AttachmentTray, attachment_path, draft_attachments, history_attachments
 from .agent_settings import load_settings, save_settings, save_selection, settings_snapshot, settings_document, save_options
 from .agent_diagnostics import check_settings, details_text
+from .manifest_source_gui import ManifestSourceBox
 
 
 def saved_round_result(log, number, rows):
@@ -1237,7 +1238,7 @@ class RepairPage(QWidget):
         source_layout = QHBoxLayout(self.source_panel)
         source_layout.setContentsMargins(0, 0, 0, 0)
         source_layout.addWidget(QLabel(tr('Source Manifest')))
-        self.baseline = QComboBox()
+        self.baseline = ManifestSourceBox()
         self.baseline.setMinimumWidth(0)
         self.baseline.currentIndexChanged.connect(self.update_source_label)
         source_layout.addWidget(self.baseline, 1)
@@ -1586,17 +1587,7 @@ class RepairPage(QWidget):
                                   else tr('Select a published Manifest'))
 
     def set_manifests(self, values):
-        previous = self.baseline.currentData()
-        with QSignalBlocker(self.baseline):
-            self.baseline.clear()
-            self.baseline.addItem(tr('Select a published Manifest'), userData=None)
-            for value in values:
-                self.baseline.addItem(value['manifest_id'], userData=value['manifest_id'])
-            index = self.baseline.findData(previous)
-            if previous is not None and index < 0:
-                self.baseline.addItem(previous, userData=previous)
-                index = self.baseline.count() - 1
-            self.baseline.setCurrentIndex(max(0, index))
+        self.baseline.set_manifests(values)
         self.update_source()
 
     def saved_title(self, path):

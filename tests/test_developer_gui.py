@@ -321,6 +321,76 @@ def test_required_pages_recognition_after_capture_scaled_crop_and_no_implicit_se
     assert (session.host.candidate / "manifest.json").read_text(encoding="utf-8") == "invalid"
 
 
+def test_source_manifest_search_filters_without_changing_selection(gui):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    from lalc.i18n import tr
+
+    app, window = gui
+    page = window.repair_page
+    first = '2da8f1b9-5f10-4ae2-a7c3-84bade1f302d'
+    second = '77f2c713-e244-4fd0-8ac4-b842fa002326'
+    legacy = 'a41e2e26-9d31-40cc-a802-1e70077ff73e'
+    page.new()
+    window.pages.setCurrentWidget(page)
+    window.show()
+    page.context_button.click()
+    versions = [
+        {'manifest_id': first, 'AdditionalMessage': '镜牢任务\nMirror 更新'},
+        {'manifest_id': second, 'AdditionalMessage': '镜牢结算修复'},
+        {'manifest_id': legacy},
+    ]
+    page.apply_session_list(([], {}, versions))
+    box = page.baseline
+    box.setCurrentIndex(box.findData(legacy))
+    app.processEvents()
+    QTest.mouseClick(box, Qt.MouseButton.LeftButton)
+    app.processEvents()
+    assert box.popup.isVisible() and box.search.hasFocus()
+
+    def results():
+        return [box.results.item(i).text() for i in range(box.results.count())]
+
+    box.search.setText(' 镜牢 ')
+    assert results() == [first, second]
+    assert box.results.verticalScrollBar().maximum() == 0
+    assert box.currentData() == legacy
+    assert box.delegate.pattern.findall('补充镜牢礼物与镜牢主题包') == ['镜牢', '镜牢']
+    QTest.keyClick(box.search, Qt.Key.Key_Down)
+    page.set_manifests(versions)
+    assert box.popup.isVisible() and box.search.text().strip() == '镜牢'
+    assert box.results.currentItem().text() == second
+    QTest.keyClick(box.search, Qt.Key.Key_Return)
+    assert box.currentData() == second
+    assert second in page.source_label.toolTip()
+    assert not box.popup.isVisible()
+
+    QTest.keyClick(box, Qt.Key.Key_Down)
+    assert box.search.text() == ''
+    assert results()[1:] == [first, second, legacy]
+    box.search.setText('MIRROR')
+    assert results() == [first]
+    box.search.setText('A41E2')
+    assert results() == [legacy]
+    box.search.setText('[')
+    assert results() == [] and box.empty.isVisible()
+    QTest.keyClick(box.search, Qt.Key.Key_Return)
+    assert box.currentData() == second and box.popup.isVisible()
+    QTest.keyClick(box.search, Qt.Key.Key_Escape)
+    assert box.currentData() == second and not box.popup.isVisible()
+
+    page.mode.setCurrentItem('Construct')
+    QTest.keyClick(box, Qt.Key.Key_Space)
+    assert results()[0] == tr('Blank (Construct only)')
+    blank = box.results.visualItemRect(box.results.item(0)).center()
+    QTest.mouseClick(box.results.viewport(), Qt.MouseButton.LeftButton, pos=blank)
+    assert box.currentData() is None and not box.popup.isVisible()
+    QTest.keyClick(box, Qt.Key.Key_Down)
+    assert box.popup.isVisible()
+    box.setEnabled(False)
+    assert not box.popup.isVisible()
+
+
 def test_async_operation_and_host_busy_state(gui):
     import threading
     app, window = gui

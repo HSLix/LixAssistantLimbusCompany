@@ -1350,6 +1350,14 @@ Original pixel region: {2}</source>
       <translation>来源 工作流版本</translation>
     </message>
     <message>
+      <source>Search Manifests</source>
+      <translation>搜索 Manifest</translation>
+    </message>
+    <message>
+      <source>No matching Manifests</source>
+      <translation>没有匹配的 Manifest</translation>
+    </message>
+    <message>
       <source>Send the first message to start and fix mode and source.</source>
       <translation>发送首条消息后开始会话并固定模式和来源。</translation>
     </message>
