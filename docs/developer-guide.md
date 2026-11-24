@@ -18,7 +18,7 @@
 
 在存有正式资源的 Windows 机器上运行仓库根目录的 `prepare_default_resource.cmd`。脚本从 `%LOCALAPPDATA%\LALC` 导出默认包，校验通过后更新当前工作目录里的 `packaging/default-resources.zip`。核对内容后，由开发者按正常流程提交和推送 ZIP。发版工作流使用所选提交中的文件。
 
-默认包包括最新已发布 Workflow、Assets、已安装扩展页面和 Skills，以及镜牢页面已保存的饰品与主题包配置。缺少的内置 Skill 使用程序随附版本。已有用户可在导入预览中勾选镜牢默认配置，导入会保留该页面的其他字段。Agent 对话历史和其他页面配置留在本机。
+默认包包括最新已发布 Workflow、Assets、已安装扩展页面和 Skills，以及镜牢已保存的饰品配置、星光强化和主题包配置。缺少的内置 Skill 使用程序随附版本。已有用户可在导入预览中分别勾选这三组，导入会保留该页面的其他字段。Agent 对话历史和其他页面配置留在本机。
 
 需要在 Windows 本机构建时，运行 `uv run --locked --all-extras python scripts/build_windows.py`，可用 `--default-resources 路径` 指定数据目录或已核对的资源 ZIP。
 

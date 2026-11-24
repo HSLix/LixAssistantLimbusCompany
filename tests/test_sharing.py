@@ -169,18 +169,21 @@ def test_default_resources_export_and_import_use_only_selected_public_objects(so
         import_default_resources(target, archive)
 
 
-def test_default_resources_include_only_mirror_gift_and_theme_settings(source, tmp_path):
+def test_default_resources_include_only_three_mirror_settings_groups(source, tmp_path):
     from lalc.default_resources import check_default_package, export_default_resources, import_default_resources
+    from lalc.sharing import GROUPED_SETTINGS_FILE, page_settings_groups
     from lalc.user_pages import UserSettings
 
     manager, _ = source
     defaults = {
-        "shop_gifts": {"catalog": {"gift-id": {"labels": ["Gift"]}}},
-        "theme_packs": {"catalog": {"theme-id": {"preference": "prefer"}}},
+        "shop_gifts": {"preferences": {"gift-id": "prefer"}},
+        "star_levels": {"guidance": 2},
+        "star_selected": [],
+        "theme_packs": {"preferences": {"theme-id": "prefer"}},
     }
     (manager.data_root / "pages" / "mirror.py").write_text('PAGE_ID = "mirror.settings"\n', encoding="utf-8")
     settings = UserSettings(manager.data_root)
-    settings.save("pages", "mirror.settings", {**defaults, "mirror_teams": [3]})
+    settings.save("pages", "mirror.settings", {**defaults, "mirror_teams": [3], "floor_gift_debuffs": ["Poise"]})
     settings.save("pages", "sharing.sample", {"private": True})
     settings.save_task("mirror", True, 3)
     archive = tmp_path / "default-resources.zip"
@@ -192,25 +195,45 @@ def test_default_resources_include_only_mirror_gift_and_theme_settings(source, t
 
     existing = ManifestManager(tmp_path / "existing")
     existing.data_root.mkdir()
-    local = {"mirror_teams": [7], "shop_gifts": {"catalog": {}}}
+    local = {"mirror_teams": [7], "floor_gift_debuffs": ["Burn"], "star_levels": {"other": 1},
+             "star_selected": ["other"], "theme_packs": {"preferences": {"ASEA": "avoid"}}}
     UserSettings(existing.data_root).save("pages", "mirror.settings", local)
     with closing(SharingPackage(archive, existing.data_root)) as package:
         settings_obj, = (obj for obj in package.objects if obj["kind"] == "page_settings")
         assert settings_obj["id"] == "mirror.settings"
+        doc = page_settings_groups(settings_obj["id"], package.files(settings_obj))
+        assert doc["settings"] == defaults
+        assert set(doc["groups"]) == {"gifts", "starlight", "theme_packs"}
         number = settings_obj["number"]
         checks = inspect_objects(existing, package)
-        assert checks[number]["config"] == {**local, **defaults}
-        assert checks[number]["conflict"]
-        result = import_selected(existing, package, checks, {number}, asset_actions={number: "replace"}, reviewed={})
+        assert checks[number]["groups"]["starlight"]["conflict"]
+        result = import_selected(existing, package, checks, {number}, asset_actions={}, reviewed={},
+                                 settings_groups={number: set(doc["groups"])}, confirm_settings_overwrites=True)
         assert result["failed"] is None
         objects = [{**obj, "files": package.files(obj)} for obj in package.objects if obj["kind"] != "page_settings"]
-        objects.extend(build_export(manager, {"page_settings": ["mirror.settings"]}))
         invalid = tmp_path / "whole-page.zip"
-        save_package(objects, invalid)
-    assert UserSettings(existing.data_root).value["pages"]["mirror.settings"] == {**local, **defaults}
-    with closing(SharingPackage(invalid, existing.data_root)) as package:
-        with pytest.raises(ValueError, match="只允许镜牢"):
-            check_default_package(package)
+        save_package([*objects, *build_export(manager, {"page_settings": ["mirror.settings"]})], invalid)
+
+        legacy = tmp_path / "legacy-defaults.zip"
+        legacy_settings = {key: defaults[key] for key in ("shop_gifts", "theme_packs")}
+        save_package([*objects, {**settings_obj, "files": {"defaults.json": json_bytes(legacy_settings)}}], legacy)
+
+        unexpected = tmp_path / "unexpected-defaults.zip"
+        doc["groups"]["starlight"]["fields"]["floor_gift_debuffs"] = None
+        doc["settings"]["floor_gift_debuffs"] = ["Poise"]
+        save_package([*objects, {**settings_obj, "files": {GROUPED_SETTINGS_FILE: json_bytes(doc)}}], unexpected)
+
+    assert UserSettings(existing.data_root).value["pages"]["mirror.settings"] == {
+        **local, **defaults, "star_levels": {"other": 1, "guidance": 2},
+        "theme_packs": {"preferences": {"ASEA": "avoid", "theme-id": "prefer"}},
+    }
+    for invalid_package in (invalid, unexpected):
+        with closing(SharingPackage(invalid_package, existing.data_root)) as package:
+            with pytest.raises(ValueError, match="只允许镜牢"):
+                check_default_package(package)
+    legacy_target = ManifestManager(tmp_path / "legacy")
+    assert import_default_resources(legacy_target, legacy)["failed"] is None
+    assert UserSettings(legacy_target.data_root).value["pages"] == {"mirror.settings": legacy_settings}
 
 
 def test_prepare_default_resource_keeps_previous_zip_if_validation_fails(source, tmp_path, monkeypatch):
