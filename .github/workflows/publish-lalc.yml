@@ -45,12 +45,6 @@ jobs:
           if ($env:RELEASE_MODE -eq 'beta') {
             $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
           }
-          if ($env:RELEASE_MODE -eq 'stable') {
-            if (!(Test-Path -LiteralPath 'packaging/default-resources.zip' -PathType Leaf)) {
-              throw 'Stable releases require packaging/default-resources.zip'
-            }
-            $buildArgs += '--default-resources', 'packaging/default-resources.zip'
-          }
           uv run --no-sync python scripts/build_windows.py @buildArgs
       - uses: actions/upload-artifact@v4
         with:
@@ -76,7 +70,7 @@ jobs:
         with:
           name: LALC-windows-x64
           path: dist
-      - name: Generate contributor notes and publish the tested commit
+      - name: Create a stable release draft or publish a Beta
         shell: bash
         env:
           RELEASE_MODE: ${{ inputs.release }}
@@ -86,12 +80,14 @@ jobs:
           previous=$(gh release view --json tagName --jq .tagName)
           python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
           (cd dist && sha256sum -c SHA256SUMS)
-          release_flags=(--latest)
-          extra_assets=(dist/lalc.zip dist/default-resources.zip)
+          release_flags=(--draft)
+          extra_assets=(dist/lalc.zip)
           if [[ $RELEASE_MODE == beta ]]; then
             version="$version-beta.$GITHUB_RUN_NUMBER"
             release_flags=(--prerelease --latest=false)
             extra_assets=()
+          elif [[ -f dist/default-resources.zip ]]; then
+            extra_assets+=(dist/default-resources.zip)
           fi
           gh release create "v$version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $version" \
             --notes-file release-notes.md \
