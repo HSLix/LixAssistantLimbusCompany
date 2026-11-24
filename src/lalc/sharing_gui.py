@@ -1147,7 +1147,7 @@ def open_sharing(window, *, exporting, resource=None):
         root = window.service.data_root
         try:
             if resource is not None:
-                from .default_resources import RESOURCE_KINDS
+                from .default_resources import DEFAULT_RESOURCE_NAME, RESOURCE_KINDS, check_default_package
                 from .framework_update import download_resource
                 from .work_files import WorkDirectory
                 work = root / "work"
@@ -1159,7 +1159,9 @@ def open_sharing(window, *, exporting, resource=None):
             return
         cleanup.callback(package.close)
         if resource is not None and any(obj["kind"] not in RESOURCE_KINDS for obj in package.objects):
-            raise ValueError(tr("The official resource package contains unsupported items."))
+            if resource.name != DEFAULT_RESOURCE_NAME:
+                raise ValueError(tr("The official resource package contains unsupported items."))
+            check_default_package(package)
         ImportDialog(window, package).exec()
         if resource is not None:
             from .default_resources import record_viewed_resource

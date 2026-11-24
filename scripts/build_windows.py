@@ -126,6 +126,7 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
             finally:
                 package.close()
             info = {**info, "default_resources_sha256": digest(resource_zip)}
+        package_version = info["version"]
         if beta_number is not None:
             info = {**info, "version": f"{info['version']}-beta.{beta_number}"}
         (base / "build-info.json").write_text(json.dumps(info, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -151,8 +152,8 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
 
         if file_manifest(base) != file_manifest(with_pi, exclude_pi=True):
             raise ValueError("Two packages have different application files")
-        archives = [(f"LALC-{info['version']}-windows-x64-without-agent", base, "LALC"),
-                    (f"LALC-{info['version']}-windows-x64-with-agent", with_pi, "LALC")]
+        archives = [(f"LALC-{package_version}-windows-x64-without-agent", base, "LALC"),
+                    (f"LALC-{package_version}-windows-x64-with-agent", with_pi, "LALC")]
         if beta_number is None:
             archives.append(("lalc", with_pi, "lalc"))
         outputs = []

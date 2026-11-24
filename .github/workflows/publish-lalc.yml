@@ -40,12 +40,21 @@ jobs:
         env:
           RELEASE_MODE: ${{ inputs.release }}
         run: |
-          $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
-          Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
           $buildArgs = @()
+          $resourceZip = 'packaging/default-resources.zip'
+          if (Test-Path -LiteralPath $resourceZip) {
+            if (-not (Test-Path -LiteralPath $resourceZip -PathType Leaf)) {
+              throw "Expected a ZIP file at $resourceZip."
+            }
+            $buildArgs += '--default-resources', $resourceZip
+          } elseif ($env:RELEASE_MODE -eq 'stable') {
+            throw "Stable releases require $resourceZip in the release commit."
+          }
           if ($env:RELEASE_MODE -eq 'beta') {
             $buildArgs += '--beta', $env:GITHUB_RUN_NUMBER
           }
+          $piUrl = uv run --no-sync python -c 'from scripts.build_windows import PI_URL; print(PI_URL)'
+          Invoke-WebRequest -Uri $piUrl -OutFile pi_resources/pi-windows-x64.zip
           uv run --no-sync python scripts/build_windows.py @buildArgs
       - uses: actions/upload-artifact@v4
         with:
@@ -79,18 +88,30 @@ jobs:
           version=$(python -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')
           [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           previous=$(gh release view --json tagName --jq .tagName)
-          python scripts/release_notes.py "$previous" "$GITHUB_SHA" > release-notes.md
           (cd dist && sha256sum -c SHA256SUMS)
           release_flags=(--draft)
           extra_assets=(dist/lalc.zip)
+          release_version="$version"
           if [[ $RELEASE_MODE == beta ]]; then
-            version="$version-beta.$GITHUB_RUN_NUMBER"
+            release_version="$version-beta.$GITHUB_RUN_NUMBER"
             release_flags=(--prerelease --latest=false)
             extra_assets=()
-          elif [[ -f dist/default-resources.zip ]]; then
+          else
+            if [[ ! -f dist/default-resources.zip ]]; then
+              echo "Windows build did not produce the required default-resources.zip." >&2
+              exit 1
+            fi
             extra_assets+=(dist/default-resources.zip)
           fi
-          gh release create "v$version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $version" \
+          {
+            if [[ ! -f packaging/default-resources.zip ]]; then
+              printf '%s\n' '> [!IMPORTANT]' \
+                '> 此版本未内置默认资源包。运行工作流前，请另行获取并导入与此版本兼容的资源包。' '>' \
+                '> This release does not include default resources. Obtain and import a compatible resource package before running workflows.' ''
+            fi
+            python scripts/release_notes.py "$previous" "$GITHUB_SHA"
+          } > release-notes.md
+          gh release create "v$release_version" --target "$GITHUB_SHA" "${release_flags[@]}" --title "LALC $release_version" \
             --notes-file release-notes.md \
             "dist/LALC-$version-windows-x64-with-agent.zip" \
             "dist/LALC-$version-windows-x64-without-agent.zip" \
