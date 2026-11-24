@@ -6,6 +6,12 @@ from dataclasses import dataclass
 from typing import Any, Callable, overload
 
 
+ASSET_MATCH_ACTIONS = frozenset({
+    "observe.match_asset", "observe.match_asset_group",
+    "observe.match_asset_group_in_regions", "observe.match_feature",
+})
+
+
 ACTION_ACCESS = {
     ("automation_plan", "execute"): {"page_resource"},
     ("task_workflow", "execute"): {"observe", "page_resource"},
@@ -146,6 +152,22 @@ def match_asset_group(ctx, *, group: str, region: dict[str, int] | None = None,
     """
     return ctx.match_asset(group, region=region, threshold=threshold, nms=nms,
                            nms_iou_threshold=nms_iou_threshold, _group=True)
+
+
+def match_asset_group_in_regions(
+    ctx, *, group: str, regions: list[dict[str, int]], threshold: float = 0.9,
+    nms: bool = True, nms_iou_threshold: float = 0.5,
+) -> list[list[dict[str, str | int | float | list[str] | tuple[int, int] | dict[str, float]]]]:
+    """用同一当前内存帧，在多个客户区矩形中独立匹配同一 Asset Group。
+
+    regions 按输入顺序对应返回的各组命中。窗口需在客户区内，由整数 x、y、width、height
+    给出；只有完整落入窗口的模板位置参与匹配。窗口可重叠，同一命中可以出现在多组结果中。
+    每个窗口的排序、NMS、命中字段与 observe.match_asset_group 一致，坐标仍为客户区原图像素。
+    每张模板只读、验哈希和解码一次。无命中的窗口返回空列表；空 regions 返回 []。
+    非法窗口、组路径、坏模板或无当前帧时报错。
+    """
+    return ctx._match_asset_group_in_regions(group, regions=regions, threshold=threshold,
+                                             nms=nms, nms_iou_threshold=nms_iou_threshold)
 
 
 def match_feature(ctx, *, asset: str, region: dict[str, int] | None = None,
@@ -405,6 +427,7 @@ def application_actions() -> dict[str, TrustedAction]:
         "observe.ocr": TrustedAction(ocr, "observe"),
         "observe.match_asset": TrustedAction(match_asset, "observe"),
         "observe.match_asset_group": TrustedAction(match_asset_group, "observe"),
+        "observe.match_asset_group_in_regions": TrustedAction(match_asset_group_in_regions, "observe"),
         "observe.match_feature": TrustedAction(match_feature, "observe"),
         "observe.crop_asset": TrustedAction(crop_asset, "observe"),
         "observe.stage_asset_crop": TrustedAction(stage_asset_crop, "observe"),

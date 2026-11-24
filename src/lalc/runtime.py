@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Literal, Union, get_args, get_origin, get_type_hints
 
-from .actions import ACTION_ACCESS
+from .actions import ACTION_ACCESS, ASSET_MATCH_ACTIONS
 from .run_context import RunContext as RunContext, RunState as RunState
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ class WorkflowExecutor:
         choose_manifest: Callable[[str, str, tuple[str, ...]], str | None] | None = None,
         select_manifest: Callable[[LoadedManifest], None] | None = None,
         game_language: str = "en",
-        match_asset: Callable[..., list[dict[str, Any]]] | None = None,
+        match_asset: Callable[..., Any] | None = None,
         ocr: Callable[..., dict[str, Any]] | None = None,
         crop_asset: Callable[..., dict[str, Any]] | None = None,
         stage_asset_crop: Callable[[dict[str, int]], str] | None = None,
@@ -740,8 +740,7 @@ class WorkflowExecutor:
                 if logical_name in {"control.click", "control.drag", "control.scroll"}:
                     fields = {**fields, "debug_image": self._debug_screenshot() if self._debug_screenshot
                               else {"image_unavailable": True}}
-                elif logical_name in {"observe.ocr", "observe.match_asset", "observe.match_asset_group",
-                                      "observe.match_feature", "observe.stage_asset_crop"}:
+                elif logical_name in ASSET_MATCH_ACTIONS or logical_name in {"observe.ocr", "observe.stage_asset_crop"}:
                     fields = {**fields, "debug_image": self._observation_evidence()
                               if self._observation_evidence else {"image_unavailable": True}}
                 return self._invoke(invoke, fields, phase="execute", event="trusted_action")
@@ -781,7 +780,7 @@ class WorkflowExecutor:
             raise ExecutionFailure("execution_failed", "Screenshot capture requires an observe Trusted Action.")
         return self._capture_screen(save, auto_park_cursor=auto_park_cursor)
 
-    def match_asset(self, logical_name: str, options: dict[str, Any]) -> list[dict[str, Any]]:
+    def match_asset(self, logical_name: str, options: dict[str, Any]) -> Any:
         if self._active_action != "observe" or self._match_asset is None:
             raise ExecutionFailure("execution_failed", "Asset matching requires an observe Trusted Action.")
         return self._match_asset(logical_name, **options)

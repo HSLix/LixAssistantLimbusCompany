@@ -100,6 +100,16 @@ class RunContext:
             "nms_iou_threshold": nms_iou_threshold, **({"_group": True} if _group else {}),
         })
 
+    def _match_asset_group_in_regions(
+        self, logical_name: str, *, regions: list[dict[str, int]], threshold: float,
+        nms: bool, nms_iou_threshold: float,
+    ) -> list[list[dict[str, Any]]]:
+        """通过现有 observe 门禁在同一帧上匹配多个矩形。"""
+        return self._executor.match_asset(logical_name, {
+            "_group": True, "_regions": regions, "threshold": threshold,
+            "nms": nms, "nms_iou_threshold": nms_iou_threshold,
+        })
+
     def match_feature(self, logical_name: str, *, region: dict[str, int] | None = None,
                       nms: bool = True, nms_iou_threshold: float = 0.4,
                       grayscale: bool = True, scale: int = 3, clahe: bool = True,

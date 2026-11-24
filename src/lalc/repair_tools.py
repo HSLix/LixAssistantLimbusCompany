@@ -10,7 +10,7 @@ import threading
 import uuid
 from typing import Any, Callable
 
-from .actions import application_actions
+from .actions import ASSET_MATCH_ACTIONS, application_actions
 from .assets import AssetLibrary, asset_name
 from .focused import FocusedAutomationSession, WindowsWindowPlatform
 from .agent_diagnostics import error_details
@@ -586,9 +586,9 @@ class RepairTools:
             if not events or events[0]["sequence"] != render_sequence:
                 raise ValueError("指定的事件序号不存在。")
             record = events[0]
+            action = record.get("logical_name")
             if (record.get("event") not in ACTION_ENDS
-                    or record.get("logical_name") not in ("observe.match_asset", "observe.match_asset_group",
-                                                             "observe.match_feature", "observe.ocr", "control.click")):
+                    or (action not in ASSET_MATCH_ACTIONS and action not in {"observe.ocr", "control.click"})):
                 raise ValueError("请选择匹配、OCR 或点击的动作结束事件。")
             metadata = image_metadata(record)
             evidence_id = metadata.get("evidence_id") if isinstance(metadata, dict) else None

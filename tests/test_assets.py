@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import shutil
+from collections import Counter
 from pathlib import Path
 
 import cv2
@@ -100,8 +101,9 @@ class Window:
         from test_input_control import FakeProcess
         return FakeProcess(pid)
 
-    def focus(self, hwnd):
-        pass
+    def focus(self, hwnd, *, checkpoint=None, max_attempts=10, on_first_attempt=None, fallback=None):
+        if checkpoint is not None:
+            checkpoint()
 
     def window_info(self, hwnd):
         return {"hwnd": 7, "process_id": 1, "width": 12, "height": 8,
@@ -230,6 +232,91 @@ def test_full_hash_path_never_overwrites_different_bytes(tmp_path):
 
 def finish(service, run_id):
     return service.wait_for(lambda state: state["run_id"] == run_id and state["phase"] == "finished")
+
+
+def test_group_in_regions_matches_independent_searches_on_one_frame(tmp_path, monkeypatch):
+    from lalc.image_annotations import action_annotations
+    from lalc.run_logs import log_text
+    from runtime_support import add_plan
+
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    (candidate / "step.py").write_text('''"""对照各窗口的正式 Action 返回值。"""
+from lalc import step
+
+@step
+def execute(ctx) -> str:
+    ctx.action("observe.capture_screen")
+    right = {"x": 7, "y": 4, "width": 5, "height": 4}
+    partial = {"x": 3, "y": 1, "width": 3, "height": 2}
+    left = {"x": 1, "y": 0, "width": 4, "height": 4}
+    overlap = {"x": 2, "y": 1, "width": 4, "height": 4}
+    regions = [right, partial, left, overlap]
+    group = "items"
+    for nms in [True, False]:
+        options = {"group": group, "threshold": 0.999, "nms": nms}
+        expected = [ctx.action("observe.match_asset_group", region=region, **options) for region in regions]
+        actual = ctx.action("observe.match_asset_group_in_regions", regions=regions, **options)
+        assert actual == expected
+        count = 1 if nms else 2
+        assert [len(hits) for hits in actual] == [1, 0, count, count]
+        assert actual[2] == actual[3]
+        assert actual[0][0]["centerxy"] == (9, 6)
+    assert ctx.action("observe.match_asset_group_in_regions", group="missing", regions=regions) == [[], [], [], []]
+    assert ctx.action("observe.match_asset_group_in_regions", group=group, regions=[]) == []
+    return "ok"
+''', encoding="utf-8")
+    manifest = candidate / "manifest.json"
+    manifest.write_text(json.dumps({"schema_version": 2, "components": {
+        "steps.find": {"source_path": "step.py"}}, "recovery_rules": {}}), encoding="utf-8")
+    add_plan(manifest)
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(manifest)
+    assert published.ok, published.errors
+
+    second = np.flip(template(), axis=0).copy()
+    entries = [entry(tmp_path, "items/one"), entry(tmp_path, "items/duplicate"),
+               entry(tmp_path, "items/other/two", second)]
+    reads = Counter()
+    read = AssetLibrary.read
+
+    def counted_read(library, asset):
+        reads[asset["path"]] += 1
+        return read(library, asset)
+
+    monkeypatch.setattr(AssetLibrary, "read", counted_read)
+    window = Window()
+    window.image[5:7, 8:10] = second
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=window)
+    state = finish(service, service.start("steps.find", {}, manifest_id=published.loaded.manifest_id))
+    assert state["result"]["status"] == "success", state["result"]
+    assert window.captures == 1
+    assert reads == {asset["path"]: 10 for asset in entries}
+
+    calls = [record for record in state["trace"] if record["event"] == "trusted_action_returned"
+             and record.get("logical_name") == "observe.match_asset_group_in_regions"]
+    assert [len(record["return_value"]) for record in calls] == [4, 4, 4, 0]
+    assert calls[0]["debug_image"]["evidence_id"].endswith("/1")
+    assert [(box["number"], box["x"]) for box in action_annotations(calls[0])] == [(1, 8), (2, 2), (3, 2)]
+    assert f'#3: score={calls[0]["return_value"][3][0]["score"]}' in log_text(calls[0])
+    matches = [record for record in state["trace"] if record["event"] == "asset_matched" and "search_regions" in record]
+    assert matches[0]["search_regions"] == calls[0]["inputs"]["regions"]
+    assert len(matches[0]["templates"]) == 3
+    index = json.loads((tmp_path / "asset-usage.json").read_text(encoding="utf-8"))
+    assert index["items/other/two"]["search_regions"] == matches[0]["search_regions"]
+    assert index["items/other/two"]["detections"][0]["logical_name"] == "items/other/two"
+
+
+def test_group_in_regions_rejects_invalid_window_before_reading_assets(tmp_path):
+    asset = entry(tmp_path, "items/test")
+    library = AssetLibrary(tmp_path)
+    library.path(asset["path"]).write_bytes(b"invalid template")
+    window = {"x": 0, "y": 0, "width": 4, "height": 4}
+    options = dict(run_id=1, observation=1, emit=lambda *_: None, _group=True)
+    with pytest.raises(ValueError, match="inside the client area"):
+        library.match("items", pixels(screenshot()), (12, 8), _regions=[window, {**window, "width": 20}], **options)
+    with pytest.raises(ValueError, match="Asset hash mismatch"):
+        library.match("items", pixels(screenshot()), (12, 8), _regions=[window, window], **options)
 
 
 def test_same_run_sees_new_crops_tags_and_preserves_manifest(tmp_path):

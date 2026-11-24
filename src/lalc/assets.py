@@ -392,8 +392,9 @@ class AssetLibrary:
         threshold: float = 0.9, nms: bool = True, nms_iou_threshold: float = 0.5,
         record_usage: bool = True, _feature_options: dict[str, Any] | None = None,
         _group: bool = False, _checkpoint: Callable[[], None] | None = None,
-    ) -> list[dict[str, Any]]:
-        """每次读取目录及标签；内部 SIFT 参数切换算法，调试可关闭使用索引。"""
+        _regions: list[dict[str, int]] | None = None,
+    ) -> list[dict[str, Any]] | list[list[dict[str, Any]]]:
+        """每次读取目录及标签；多区域模式按输入顺序返回各区独立命中。"""
         import math
         from .recognition import checked_region, client_image, decode_image, detect_template, suppress_overlaps
         asset_name(name)
@@ -405,6 +406,9 @@ class AssetLibrary:
             raise ValueError("nms must be bool.")
         if type(record_usage) is not bool:
             raise ValueError("record_usage must be bool.")
+        areas = None if _regions is None else [checked_region(item, *size) for item in _regions]
+        if areas == []:
+            return []
         directory = self.path(name)
         if _group and directory != self.root.resolve() / name:
             raise ValueError("Asset group does not accept path aliases.")
@@ -435,40 +439,45 @@ class AssetLibrary:
                 candidates.append({"path": f"{logical_name}/{path.name}", "sha256": path.stem,
                                    "tags": list(mapping.get(path.stem, []))})
         image = client_image(pixels, size)
-        area = checked_region(region, *size)
+        if areas is None:
+            areas = [checked_region(region, *size)]
         preferred = [entry for entry in candidates if set(entry["tags"]) & set(preferred_tags)]
         remaining = [entry for entry in candidates if not set(entry["tags"]) & set(preferred_tags)]
         attempted = []
-        output = []
+        results: list[list[dict[str, Any]]] = [[] for _ in areas]
         batch = "remaining"
         for label, entries in (("preferred", preferred), ("remaining", remaining)):
-            detections = []
             for entry in entries:
                 if _checkpoint is not None:
                     _checkpoint()
                 attempted.append(entry)
                 template = decode_image(self.read({key: entry[key] for key in ("path", "sha256")}))
-                # 跨模板统一 NMS，避免先抑制同模板的框导致最终结果丢失。
-                if _feature_options is None:
-                    found = detect_template(image, template, region=area, threshold=threshold, nms=False)
-                else:
-                    from .feature_matching import detect_features
-                    found = detect_features(image, template, region=area, **_feature_options)
-                for detection in found:
-                    normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
-                                  for key, value in detection.items() if key in {"x", "y", "width", "height"}}
-                    detections.append({**detection, **entry,
-                                       "centerxy": (detection["x"] + detection["width"] // 2,
-                                                    detection["y"] + detection["height"] // 2),
-                                       "normalized_region": normalized,
-                                       "logical_name": entry["path"].rsplit("/", 1)[0], "observation": observation})
-            if detections:
-                detections.sort(key=lambda d: (-d["score"], d["y"], d["x"], d["sha256"]))
-                output = suppress_overlaps(detections, nms_iou_threshold) if nms else detections
+                for area, detections in zip(areas, results):
+                    # 区域内跨模板统一 NMS，避免过早丢掉同模板的候选框。
+                    if _feature_options is None:
+                        found = detect_template(image, template, region=area, threshold=threshold, nms=False)
+                    else:
+                        from .feature_matching import detect_features
+                        found = detect_features(image, template, region=area, **_feature_options)
+                    for detection in found:
+                        normalized = {key: value / (size[0] if key in {"x", "width"} else size[1])
+                                      for key, value in detection.items() if key in {"x", "y", "width", "height"}}
+                        detections.append({**detection, **entry,
+                                           "centerxy": (detection["x"] + detection["width"] // 2,
+                                                        detection["y"] + detection["height"] // 2),
+                                           "normalized_region": normalized,
+                                           "logical_name": entry["path"].rsplit("/", 1)[0], "observation": observation})
+            if any(results):
+                for index, detections in enumerate(results):
+                    detections.sort(key=lambda d: (-d["score"], d["y"], d["x"], d["sha256"]))
+                    if nms:
+                        results[index] = suppress_overlaps(detections, nms_iou_threshold)
                 batch = label
                 break
+        output = results[0] if _regions is None else [hit for hits in results for hit in hits]
+        search = {"search_region": areas[0]} if _regions is None else {"search_regions": areas}
         event = {"logical_name": name, "run_id": run_id, "observation": observation,
-                 "search_region": area, "trace_path": f"traces/{run_id}.jsonl",
+                 **search, "trace_path": f"traces/{run_id}.jsonl",
                  "threshold": threshold, "nms": nms, "nms_iou_threshold": nms_iou_threshold,
                  "priority_tags": preferred_tags, "matched_batch": batch,
                  "templates": attempted, "detections": output}
@@ -494,4 +503,4 @@ class AssetLibrary:
             else:
                 index[name] = {**event, "last_used_at": last_used}
             atomic_write_json(index_path, index)
-        return output
+        return output if _regions is None else results

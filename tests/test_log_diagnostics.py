@@ -128,6 +128,8 @@ def test_tool_renders_exact_action_on_shared_evidence(gui_run_tools, extension):
             {'text': '確認', 'box': {'x': 600, 'y': 420, 'width': 200, 'height': 150}}]}),
         dict(common, sequence=3, logical_name='control.click', inputs={'centerxy': [900, 300]}),
         dict(common, sequence=4, logical_name='observe.match_asset', return_value=[]),
+        dict(common, sequence=5, logical_name='observe.match_asset_group_in_regions',
+             return_value=[[], [{'x': 300, 'y': 220, 'width': 200, 'height': 180}]]),
         dict(common, sequence=6, logical_name='observe.ocr', debug_image={'image_unavailable': True}),
         dict(common, sequence=7, logical_name='control.click', debug_image={'evidence_id': '2/2'}),
         dict(common, sequence=8, logical_name='control.scroll'),
@@ -149,7 +151,7 @@ def test_tool_renders_exact_action_on_shared_evidence(gui_run_tools, extension):
         return any(r > g + 70 for r, g, _ in image.crop((x - 2, y - 2, x + 3, y + 3)).get_flattened_data())
 
     raw = preview(tools.read_run_log(1, evidence_id='1/2'))
-    for sequence, point in [(1, (200, 160)), (2, (400, 260)), (3, (450, 330))]:
+    for sequence, point in [(1, (200, 160)), (2, (400, 260)), (3, (450, 330)), (5, (250, 160))]:
         result = tools.read_run_log(1, render_sequence=sequence)
         assert [e['sequence'] for e in result['details']['events']] == [sequence]
         assert result['details']['render_sequence'] == sequence
@@ -161,7 +163,7 @@ def test_tool_renders_exact_action_on_shared_evidence(gui_run_tools, extension):
             assert any(r > g + 70 for r, g, _ in rendered.crop((305, 213, 324, 226)).get_flattened_data())
     assert preview(tools.read_run_log(1, render_sequence=4)).tobytes() == raw.tobytes()
     assert path.read_bytes() == original
-    for sequence, message in [(True, '正整数'), (5, '事件序号不存在'), (6, '截图证据不可用'),
+    for sequence, message in [(True, '正整数'), (10, '事件序号不存在'), (6, '截图证据不可用'),
                               (7, '截图证据不可用'), (8, '动作结束事件'), (9, '动作结束事件')]:
         with pytest.raises(ValueError, match=message):
             tools.read_run_log(1, render_sequence=sequence)

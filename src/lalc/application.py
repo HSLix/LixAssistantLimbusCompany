@@ -414,7 +414,7 @@ class ApplicationService:
             return {"image_unavailable": True}
         return self._save_screenshot()
 
-    def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]]:
+    def _match_asset(self, name: str, **options: Any) -> list[dict[str, Any]] | list[list[dict[str, Any]]]:
         """使用当前有效内存截图，匹配过程不隐式刷新或保存截图。"""
 
         session = self._focused_session

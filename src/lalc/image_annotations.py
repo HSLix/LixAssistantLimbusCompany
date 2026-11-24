@@ -5,6 +5,9 @@ from __future__ import annotations
 from math import atan2, cos, sin, pi, isfinite
 from typing import TYPE_CHECKING
 
+from .actions import ASSET_MATCH_ACTIONS
+from .run_logs import action_match_hits
+
 if TYPE_CHECKING:
     from PySide6.QtCore import QRectF
 
@@ -20,9 +23,9 @@ def action_annotations(record: dict) -> list[dict]:
             return [{"kind": "cross", "x": point[0], "y": point[1]}]
     if name == "control.drag" and all(type(inputs.get(key)) is int for key in ("x", "y", "end_x", "end_y")):
         return [{"kind": "arrow", **{key: inputs[key] for key in ("x", "y", "end_x", "end_y")}}]
-    if name in {"observe.match_asset", "observe.match_asset_group", "observe.match_feature"} and isinstance(record.get("return_value"), list):
+    if name in ASSET_MATCH_ACTIONS:
         return [{"kind": "box", "number": i, **{key: item[key] for key in ("x", "y", "width", "height")}}
-                for i, item in enumerate(record["return_value"], 1) if isinstance(item, dict)
+                for i, item in enumerate(action_match_hits(record), 1) if isinstance(item, dict)
                 and all(type(item.get(key)) in {int, float} and isfinite(item[key]) for key in ("x", "y", "width", "height"))]
     result = record.get("return_value")
     if name == "observe.ocr" and isinstance(result, dict) and isinstance(result.get("items"), list):

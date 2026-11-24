@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from threading import Event
 
+from .actions import ASSET_MATCH_ACTIONS
 from .file_content import FileContent, open_image, require_memory
 
 
@@ -128,6 +129,16 @@ def display_json(value, depth=0):
     return "[\n" + ",\n".join(child + display_json(item, depth + 1) for item in value) + "\n" + pad + "]"
 
 
+def action_match_hits(record: dict) -> list[dict]:
+    """按返回顺序提取匹配动作的扁平命中，供日志和原图标注共用。"""
+    name, result = record.get("logical_name"), record.get("return_value")
+    if name not in ASSET_MATCH_ACTIONS or not isinstance(result, list):
+        return []
+    if name == "observe.match_asset_group_in_regions":
+        return [hit for hits in result if isinstance(hits, list) for hit in hits]
+    return result
+
+
 def log_text(record: dict) -> str:
     """构造完整可搜索正文；显示折叠不改变此文本。"""
     if record.get("event") not in ACTION_ENDS:
@@ -143,8 +154,9 @@ def log_text(record: dict) -> str:
         status += " (attempted)"
     text = f"{record['logical_name']} · {status}\n" + json.dumps(record.get("inputs", {}), ensure_ascii=False)
     result = record.get("return_value")
-    if record["logical_name"] in {"observe.match_asset", "observe.match_asset_group", "observe.match_feature"} and isinstance(result, list):
-        text += "\n" + "\n".join(f"#{i}: score={item['score']}" for i, item in enumerate(result, 1))
+    for i, item in enumerate(action_match_hits(record), 1):
+        if isinstance(item, dict) and "score" in item:
+            text += f"\n#{i}: score={item['score']}"
     if result is not None:
         text += "\n" + display_json(result)
     for key in ("failure_message", "message", "traceback", "reason"):

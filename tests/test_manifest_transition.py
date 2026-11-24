@@ -60,6 +60,7 @@ def test_production_action_registration_is_shared_and_not_manifest_owned(tmp_pat
     manager = ManifestManager(tmp_path, actions=actions)
     assert set(actions) == {
         "observe.capture_screen", "observe.ocr", "observe.match_asset", "observe.match_asset_group",
+        "observe.match_asset_group_in_regions",
         "observe.match_feature", "observe.crop_asset", "observe.stage_asset_crop", "observe.save_asset_crop",
         "observe.discard_asset_crop", "observe.wait", "control.click", "control.key_press",
         "control.drag", "control.scroll", "control.restart_game",
