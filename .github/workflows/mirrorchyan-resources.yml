@@ -1,0 +1,37 @@
+name: mirrorchyan-resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag containing the resource ZIP
+        type: string
+        required: true
+      version:
+        description: Resource export version (for example 20261125T031330Z)
+        type: string
+        required: true
+
+jobs:
+  mirrorchyan:
+    if: ${{ github.repository_owner == 'HSLix' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Download default resources
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RESOURCE_TAG: ${{ inputs.tag }}
+          RESOURCE_VERSION: ${{ inputs.version }}
+        run: |
+          gh release download "$RESOURCE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern "default-resources-$RESOURCE_VERSION.zip" --dir downloads
+      - uses: MirrorChyan/uploading-action@v1
+        with:
+          filetype: local
+          filename: downloads/default-resources-${{ inputs.version }}.zip
+          version_name: ${{ inputs.version }}
+          mirrorchyan_rid: LALC-resources
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
