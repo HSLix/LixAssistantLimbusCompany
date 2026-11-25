@@ -19,7 +19,7 @@
 [![AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-orange)](LICENSE)
 [![Discord](https://img.shields.io/badge/Discord-加入群聊-5865F2)](https://discord.gg/bVzCuBU4bC)
 
-LixAssistantLimbusCompany（LALC）是运行在 Windows x64 上的《边狱公司》自动化助手。自 2023 年 7 月 10 日立项以来，我一直想把游戏里的重复操作交给工作流，让大家有更多时间看喜欢的剧情，也有更多时间留给家人和自己的生活。
+LixAssistantLimbusCompany（LALC）是运行在 Windows x64 上的《边狱公司》自动化助手。自 2023 年 7 月 10 日立项以来，就一直想把游戏里的重复操作交给工作流，让大家有更多时间看喜欢的剧情，也有更多时间留给家人和自己的生活。
 
 ## 声明
 
@@ -45,6 +45,8 @@ LALC 免费开源，仅供学习交流。如果你付费购买了 LALC，请向�
 ## 使用说明
 
 打开 LALC 后，在 **通用设置 → 分享** 导入所需的工作流分享包，再回到首页选中对应版本。安装、任务设置、暂停、AI 修复和故障反馈都可以查阅[用户指南](docs/user-guide.md)。
+
+想了解 Agent 何时介入、如何自定义和分享资源包，或其他问题可以先看[常见问题（FAQ）](docs/faq.md)。
 
 旧版的图示和视频仍可在历史 README 中找到，所示界面和操作对应当时的版本。[图示范例][legacy-screenshots] · [视频教程][legacy-videos]
 
