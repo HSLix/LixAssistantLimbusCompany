@@ -1153,7 +1153,7 @@ def open_sharing(window, *, exporting, resource=None):
                 work = root / "work"
                 work.mkdir(parents=True, exist_ok=True)
                 filename = Path(cleanup.enter_context(WorkDirectory(dir=work, prefix="resource-update-"))) / resource.name
-                sharing_task(window, lambda: download_resource(resource, filename), title="Downloading resource package…")
+                sharing_task(window, lambda: download_resource(resource, filename, root=root), title="Downloading resource package…")
             package = sharing_task(window, lambda: SharingPackage(filename, root), title="Import sharing package")
         except InterruptedError:
             return

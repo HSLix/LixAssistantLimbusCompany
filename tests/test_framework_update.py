@@ -78,6 +78,53 @@ def test_resource_download_verifies_size_and_digest(tmp_path, monkeypatch):
     bad = update.ResourceRelease(resource.name, resource.url, "0" * 64, resource.size, resource.uploaded)
     with pytest.raises(ValueError, match="checksum"):
         update.download_resource(bad, tmp_path / "invalid.zip")
+    assert not (tmp_path / "invalid.zip").exists()
+
+
+@pytest.mark.parametrize(("scenario", "providers"), [
+    ("match", ["mirror"]),
+    ("wrong version", ["github"]),
+    ("wrong digest", ["github"]),
+    ("corrupt download", ["mirror", "github"]),
+    ("cancelled", ["mirror"]),
+])
+def test_resource_uses_mirror_only_for_the_verified_stable_attachment(tmp_path, monkeypatch, scenario, providers):
+    payload = b"official resources"
+    digest = hashlib.sha256(payload).hexdigest()
+    exported = datetime(2026, 11, 25, 10, 30, 45, tzinfo=timezone.utc)
+    resource = update.ResourceRelease("default-resources-20261125T103045Z.zip", "https://github.test/official",
+                                      digest, len(payload), exported, exported)
+    attempts = []
+    monkeypatch.setattr(update, "_read_cdk", lambda root: "test-cdk")
+
+    def mirror(config, cdk):
+        assert config == {"rid": "LALC-resources"} and cdk == "test-cdk"
+        return {"version_name": "20261126T103045Z" if scenario == "wrong version" else "20261125T103045Z",
+                "sha256": "0" * 64 if scenario == "wrong digest" else digest,
+                "url": "https://mirror.test/official", "update_type": "full"}
+
+    class Response(io.BytesIO):
+        def geturl(self):
+            return f"https://{attempts[-1]}.test/official"
+
+    def download(request, *, timeout):
+        source = request.host.split(".")[0]
+        attempts.append(source)
+        if source == "mirror" and scenario == "cancelled":
+            raise InterruptedError
+        return Response(b"incorrect archive" if source == "mirror" and scenario == "corrupt download" else payload)
+
+    monkeypatch.setattr(update, "_mirror", mirror)
+    monkeypatch.setattr(update, "urlopen", download)
+    destination = tmp_path / resource.name
+    if scenario == "cancelled":
+        with pytest.raises(InterruptedError):
+            update.download_resource(resource, destination, root=tmp_path)
+        assert not destination.exists()
+    else:
+        update.download_resource(resource, destination, root=tmp_path)
+        assert destination.read_bytes() == payload
+    assert attempts == providers
 
 
 def test_versioned_resource_uses_export_time_even_when_upload_order_differs(monkeypatch):
@@ -107,6 +154,8 @@ def test_api_rate_limit_reads_only_latest_release_body(monkeypatch, caplog):
     def open_release(request, *, timeout):
         if request.full_url.startswith("https://api.github.com/"):
             raise HTTPError(request.full_url, 403, "rate limit exceeded", None, None)
+        if request.host == "mirrorchyan.com":
+            return io.BytesIO(b'{"code":8001}')
         assert request.full_url == update.LATEST_RELEASE_URL
         return ReleasePage(f'<div>GitHub navigation</div>\n<div data-test-selector="body-content">\n{expected}\n</div><div>Assets</div>'.encode())
 
@@ -134,6 +183,18 @@ def test_release_channels_are_independent_and_use_exact_package(monkeypatch):
     assert update.check_releases("with-agent", mirror).github is None
 
 
+@pytest.mark.parametrize(("variant", "rid"), [("with-agent", "LALC"), ("without-agent", "LALC-no-agent")])
+def test_release_checks_use_the_matching_official_rid(monkeypatch, variant, rid):
+    def api(url):
+        if url.startswith("https://mirrorchyan.com/"):
+            assert url == f"https://mirrorchyan.com/api/resources/{rid}/latest?user_agent=LALC&channel=stable"
+            return {"code": 0, "data": {"version_name": "v6.0.1"}}
+        return {"tag_name": "v6.0.0"}
+
+    monkeypatch.setattr(update, "_json", api)
+    assert update.check_releases(variant, {"rid": "", "os": "", "arch": ""}).mirror == (6, 0, 1)
+
+
 @pytest.mark.parametrize("name", ["LALC/../outside", "LALC/AUX.txt", "LALC/test:stream", "LALC/dir\\file", "other/file"])
 def test_reject_update_archive_paths(name, tmp_path):
     archive = tmp_path / "bad.zip"
@@ -149,10 +210,12 @@ def test_reject_update_archive_paths(name, tmp_path):
     assert not list(extract_to.iterdir())
 
 
-def test_bad_mirror_package_falls_back_to_verified_github(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("variant", "rid"), [("with-agent", "LALC"), ("without-agent", "LALC-no-agent")])
+def test_bad_mirror_package_falls_back_to_verified_github(tmp_path, monkeypatch, variant, rid):
     published = io.BytesIO()
+    paths = (*update.REQUIRED_FILES, "agent/codesearch.exe") if variant == "with-agent" else update.REQUIRED_FILES
     with zipfile.ZipFile(published, "w") as archive:
-        for name in (*update.REQUIRED_FILES, "agent/codesearch.exe"):
+        for name in paths:
             archive.writestr(f"LALC/{name}", json.dumps({"version": "6.0.1"}) if name == "build-info.json" else b"fixture")
     payload = published.getvalue()
     executable = tmp_path / "LALC.exe"
@@ -160,8 +223,11 @@ def test_bad_mirror_package_falls_back_to_verified_github(tmp_path, monkeypatch)
     monkeypatch.setattr(update.sys, "executable", str(executable))
     monkeypatch.setattr(update, "_read_cdk", lambda _: "fake-secret")
     mirror_url = "https://mirror.example/package"
-    monkeypatch.setattr(update, "_mirror", lambda *args: {
-        "version_name": "v6.0.1", "url": mirror_url, "update_type": "full", "sha256": "0" * 64})
+    def mirror(config, cdk):
+        assert config == {"rid": rid} and cdk == "fake-secret"
+        return {"version_name": "v6.0.1", "url": mirror_url, "update_type": "full", "sha256": "0" * 64}
+
+    monkeypatch.setattr(update, "_mirror", mirror)
     attempts = []
 
     class Response(io.BytesIO):
@@ -177,13 +243,13 @@ def test_bad_mirror_package_falls_back_to_verified_github(tmp_path, monkeypatch)
     github = update.Package(version, "https://github.example/package", hashlib.sha256(payload).hexdigest())
     status = update.ReleaseStatus("news", github, version)
     root = tmp_path / "data"
-    workspace = update.prepare_update(root, status, version, "with-agent", {"rid": "LALC6"})
+    workspace = update.prepare_update(root, status, version, variant, {})
     assert attempts == [mirror_url, github.url]
     assert (workspace / "LALC/LALC.exe").is_file()
     assert (workspace / "install-update.ps1").read_text() == "trusted installed script"
     assert list((root / "work").iterdir()) == [workspace]
     attempts.clear()
-    assert update.prepare_update(root, status, version, "with-agent", {"rid": "LALC6"}, lambda: bool(attempts)) is None
+    assert update.prepare_update(root, status, version, variant, {}, lambda: bool(attempts)) is None
     assert attempts == [mirror_url] and list((root / "work").iterdir()) == [workspace]
 
 

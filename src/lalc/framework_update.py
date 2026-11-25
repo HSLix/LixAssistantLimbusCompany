@@ -1,6 +1,7 @@
 """查询框架版本，下载经过校验的完整程序包并交给 Windows 更新进程。"""
 
-from dataclasses import dataclass
+from contextlib import ExitStack
+from dataclasses import dataclass, replace
 from datetime import datetime
 import hashlib
 from html.parser import HTMLParser
@@ -23,13 +24,15 @@ import zipfile
 
 from .agent_settings import dpapi, save_secret, secret_path
 from .file_content import checkpoint, require_disk
-from .resource_version import RESOURCE_VERSION_PATTERN, parse_resource_version
+from .resource_version import RESOURCE_VERSION_FORMAT, RESOURCE_VERSION_PATTERN, parse_resource_version
 from .work_files import create_work_directory
 
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
 REPOSITORY_URL = f"https://github.com/{REPOSITORY}"
 LATEST_RELEASE_URL = f"{REPOSITORY_URL}/releases/latest"
 MIRROR_PROJECT_URL = "https://mirrorchyan.com/zh/projects?rid=LALC"
+MIRROR_FRAMEWORK_RIDS = {"with-agent": "LALC", "without-agent": "LALC-no-agent"}
+MIRROR_RESOURCE_RID = "LALC-resources"
 QUARK_SHARE_URL = "https://pan.quark.cn/s/333d6608dddd"
 CDK_SECRET = "lalc-mirrorchyan-cdk"
 VERSION_PATTERN = r"v?(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
@@ -244,6 +247,12 @@ def _mirror(config, cdk=""):
     return response["data"]
 
 
+def _framework_mirror(variant, config):
+    """按安装包类型选择 Mirror 酱资源，保留显式构建配置。"""
+    overrides = {key: value for key, value in config.items() if value} if isinstance(config, dict) else {}
+    return {"rid": MIRROR_FRAMEWORK_RIDS.get(variant, ""), **overrides}
+
+
 def check_releases(variant, mirror):
     """单个服务不可用时仍返回另一方的结果。"""
     announcement_html = False
@@ -262,7 +271,7 @@ def check_releases(variant, mirror):
         except (OSError, ValueError, HTTPException) as fallback_error:
             logger.warning("GitHub release page request failed (%s)", type(fallback_error).__name__)
     try:
-        mirror_version = version_number(_mirror(mirror).get("version_name"))
+        mirror_version = version_number(_mirror(_framework_mirror(variant, mirror)).get("version_name"))
     except (OSError, ValueError, TypeError, HTTPException):
         mirror_version = None
     return ReleaseStatus(announcement, github, mirror_version if mirror_version and mirror_version[0] >= 6 else None,
@@ -298,27 +307,45 @@ def _download_verified(package, archive, cancelled, *, size=None):
     digest = hashlib.sha256()
     done = 0
     request = Request(package.url, headers={"User-Agent": "LALC"})
-    with urlopen(request, timeout=30) as response, archive.open("xb") as output:
-        if urlsplit(response.geturl()).scheme != "https":
-            raise ValueError("Download requires HTTPS")
-        while chunk := response.read(1024 * 1024):
-            if cancelled():
-                raise InterruptedError
-            done += len(chunk)
-            if size is not None:
-                if done > size:
-                    raise ValueError("Update download size mismatch")
-                checkpoint(done, size, archive.name)
-            output.write(chunk)
-            digest.update(chunk)
-    if (size is not None and done != size) or digest.hexdigest() != package.sha256:
-        raise ValueError("Update checksum mismatch")
+    with ExitStack() as cleanup:
+        with urlopen(request, timeout=30) as response, archive.open("xb") as output:
+            cleanup.callback(archive.unlink, missing_ok=True)
+            if urlsplit(response.geturl()).scheme != "https":
+                raise ValueError("Download requires HTTPS")
+            while chunk := response.read(1024 * 1024):
+                if cancelled():
+                    raise InterruptedError
+                done += len(chunk)
+                if size is not None:
+                    if done > size:
+                        raise ValueError("Update download size mismatch")
+                    checkpoint(done, size, archive.name)
+                output.write(chunk)
+                digest.update(chunk)
+        if (size is not None and done != size) or digest.hexdigest() != package.sha256:
+            raise ValueError("Update checksum mismatch")
+        cleanup.pop_all()
 
 
-def download_resource(package, archive):
-    """预留资源 ZIP 所需空间，复用分享进度的取消检查。"""
+def download_resource(package, archive, *, root=None):
+    """优先下载与正式资源版本和摘要一致的镜像完整包，失败后回退。"""
     require_disk([(archive.parent, package.size)])
     checkpoint(0, package.size, archive.name)
+    if root is not None and package.exported is not None:
+        try:
+            if cdk := _read_cdk(root):
+                data = _mirror({"rid": MIRROR_RESOURCE_RID}, cdk)
+                url = data.get("url", "")
+                if (data.get("version_name") == package.exported.strftime(RESOURCE_VERSION_FORMAT)
+                        and data.get("update_type") == "full"
+                        and str(data.get("sha256", "")).lower() == package.sha256
+                        and isinstance(url, str) and urlsplit(url).scheme == "https"):
+                    _download_verified(replace(package, url=url), archive, lambda: False, size=package.size)
+                    return
+        except InterruptedError:
+            raise
+        except (OSError, ValueError, TypeError, HTTPException):
+            checkpoint(0, package.size, archive.name)
     _download_verified(package, archive, lambda: False, size=package.size)
 
 
@@ -340,10 +367,10 @@ def _prepare(package, workspace, variant, cancelled):
 def prepare_update(root, status, target_version, variant, mirror, cancelled=lambda: False):
     """优先尝试同版镜像完整包，失败则向 GitHub 取同一版。"""
     providers = []
-    if variant == "with-agent" and status.mirror == target_version:
+    if status.mirror == target_version:
         try:
             if cdk := _read_cdk(root):
-                data = _mirror(mirror, cdk)
+                data = _mirror(_framework_mirror(variant, mirror), cdk)
                 url, digest = data.get("url", ""), data.get("sha256", "")
                 if (version_number(data.get("version_name")) == target_version and data.get("update_type") == "full"
                         and urlsplit(url).scheme == "https" and re.fullmatch(r"[0-9a-fA-F]{64}", digest)):

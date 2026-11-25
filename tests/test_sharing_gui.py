@@ -80,7 +80,11 @@ def test_official_download_uses_import_preview_and_records_view_without_installi
     resource = ResourceRelease(name, "https://example.test/package",
                                sha256(payload).hexdigest(), len(payload), datetime.fromisoformat("2026-11-24T14:30:00Z"),
                                exported)
-    monkeypatch.setattr("lalc.framework_update.download_resource", lambda item, target: target.write_bytes(payload))
+    def download(item, target, *, root):
+        assert item == resource and root == window.service.data_root
+        target.write_bytes(payload)
+
+    monkeypatch.setattr("lalc.framework_update.download_resource", download)
     seen = []
     monkeypatch.setattr(ImportDialog, "exec", lambda dialog: seen.append(dialog.package.path))
     open_sharing(window, exporting=False, resource=resource)

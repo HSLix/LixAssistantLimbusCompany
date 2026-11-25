@@ -175,6 +175,23 @@ def test_framework_compares_release_version_without_an_installable_package(windo
     assert not user.update_button.isEnabled()
 
 
+def test_without_agent_can_update_to_a_newer_mirror_version_with_cdk(windows):
+    from lalc.framework_update import Package, ReleaseStatus
+
+    _, _, user, _ = windows
+    user.framework_variant = "without-agent"
+    user.framework_build = {"version": "6.0.0"}
+    user.can_install_update = True
+    github = Package((6, 0, 1), "https://github.test/package", "a" * 64)
+    result = ReleaseStatus("News", github, (6, 0, 2))
+    user.show_framework_releases(result)
+    assert user.framework_target == (6, 0, 1)
+    user.mirror_cdk_saved = True
+    user.show_framework_releases(result)
+    assert user.framework_target == (6, 0, 2)
+    assert user.update_button.isEnabled()
+
+
 def test_current_framework_and_unseen_resource_are_independent(windows):
     from datetime import datetime
     from lalc.default_resources import record_viewed_resource

@@ -984,10 +984,10 @@ class UserWindow(MainWindow):
         self.check_update_button.setEnabled(True)
         github_package = result.github.version if result.github else None
         github = result.github_version or github_package
-        mirror = result.mirror if self.framework_variant == 'with-agent' else None
+        mirror = result.mirror
         newest = max(filter(None, (github, mirror)), default=None)
         current = version_number(self.framework_build['version'])
-        installable = github_package or (mirror if self.mirror_cdk_saved else None)
+        installable = max(filter(None, (github_package, mirror if self.mirror_cdk_saved else None)), default=None)
         self.framework_target = installable if installable and current and installable > current else None
         self.update_button.setEnabled(bool(self.framework_target) and self.can_install_update)
         self.update_button.setVisible(self.update_button.isEnabled())
