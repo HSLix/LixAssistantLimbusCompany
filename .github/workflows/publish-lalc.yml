@@ -34,7 +34,7 @@ jobs:
         shell: pwsh
         run: |
           uv sync --locked --all-extras
-          uv run --no-sync pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
+          uv run --no-sync python -m pytest -q tests/test_windows_packaging.py tests/test_framework_update.py
       - name: Download the pinned pi package and build
         shell: pwsh
         env:
