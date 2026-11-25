@@ -2,19 +2,38 @@ name: mirrorchyan-uploading
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        default: ''
+        required: false
+  release:
+    types: [published]
 
 jobs:
-
   mirrorchyan:
-    runs-on: macos-latest
+    if: ${{ github.repository_owner == 'HSLix' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: LALC
+            filename: 'LALC-*-windows-x64-with-agent.zip'
+          - rid: LALC-no-agent
+            filename: 'LALC-*-windows-x64-without-agent.zip'
+
     steps:
       - uses: MirrorChyan/uploading-action@v1
         with:
           filetype: latest-release
-          filename: "lalc.zip"
-          mirrorchyan_rid: LALC
+          filename: ${{ matrix.filename }}
+          mirrorchyan_rid: ${{ matrix.rid }}
+          tag: ${{ inputs.tag || github.event.release.tag_name }}
 
-          github_token: ${{ secrets.GITHUB_TOKEN }}
           owner: HSLix
           repo: LixAssistantLimbusCompany
-          upload_token: ${{ secrets.MIRRORCHYANUPLOADTOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
