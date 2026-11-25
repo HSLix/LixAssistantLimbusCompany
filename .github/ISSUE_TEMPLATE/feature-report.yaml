@@ -1,0 +1,23 @@
+name: 需求建议 / Feature request
+description: 建议新功能或改进现有功能。 / Suggest a new feature or an improvement to an existing one.
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请用标题概括建议，并先搜索是否已有类似 Issue。
+
+        Summarize your suggestion in the title and search for similar issues first.
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景 / Use case
+      description: 你想完成什么？目前遇到了什么困难？ / What are you trying to do, and what gets in your way today?
+    validations:
+      required: true
+  - type: textarea
+    id: feature
+    attributes:
+      label: 希望的改进 / Proposed improvement
+      description: 如果已有想法，请描述你希望 LALC 怎么做。 / If you have an idea, describe how you’d like LALC to work.

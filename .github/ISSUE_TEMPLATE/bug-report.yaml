@@ -1,0 +1,48 @@
+name: 问题反馈 / Bug report
+description: 反馈 LALC 使用中遇到的问题。 / Report a problem you encountered while using LALC.
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请用标题概括问题，并先搜索是否已有类似 Issue。
+
+        Summarize the problem in the title and search for similar issues first.
+  - type: input
+    id: version
+    attributes:
+      label: LALC 版本 / LALC version
+      description: 填写出现问题时使用的 LALC 版本。 / Enter the LALC version you were using when the problem occurred.
+    validations:
+      required: true
+  - type: textarea
+    id: describe
+    attributes:
+      label: 问题描述 / What happened?
+      description: 描述实际发生了什么，以及你预期会发生什么。 / Describe what happened and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: rebug
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: >-
+        如果能复现，请写下操作步骤和游戏画面。如果涉及工作流，请附上名称和版本。 /
+        If you can reproduce the issue, list the steps and describe the in-game screen.
+        If a workflow was involved, include its name and version.
+  - type: textarea
+    id: log
+    attributes:
+      label: 日志、截图或录屏 / Logs, screenshots, or recordings
+      description: >-
+        如有，请从「运行记录」找到出问题的那次运行，附上错误详情、相关日志、截图或录屏。上传前请移除敏感信息以减少隐私泄露。 /
+        If available, find the affected run in Run History and attach the error details, relevant logs, screenshots, or a recording.
+        Remove sensitive information before uploading.
+  - type: textarea
+    id: others
+    attributes:
+      label: 其他环境信息 / Additional environment details
+      description: >-
+        如与问题有关，请补充 Windows 版本、游戏语言、分辨率或显示缩放比例。 /
+        If relevant, include your Windows version, game language, screen resolution, or display scaling.
