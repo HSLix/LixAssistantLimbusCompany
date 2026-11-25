@@ -80,6 +80,23 @@ def test_resource_download_verifies_size_and_digest(tmp_path, monkeypatch):
         update.download_resource(bad, tmp_path / "invalid.zip")
 
 
+def test_versioned_resource_uses_export_time_even_when_upload_order_differs(monkeypatch):
+    name = "default-resources-20261125T103045Z.zip"
+    assets = [
+        (name, "2026-11-25T11:00:00Z"),
+        ("default-resources-20261125T103044Z.zip", "2026-11-26T00:00:00Z"),
+        ("default-resources-20261131T103046Z.zip", "2026-11-27T00:00:00Z"),
+        ("default-resources.zip", "2026-11-28T00:00:00Z"),
+    ]
+    monkeypatch.setattr(update, "_json", lambda _: {"tag_name": "v6.0.0", "assets": [
+        {"name": name, "created_at": date, "state": "uploaded", "size": 42, "digest": "sha256:" + "3" * 64}
+        for name, date in assets
+    ]})
+    resource = update.check_releases("with-agent", {}).resource
+    assert resource.name == name
+    assert resource.exported == datetime(2026, 11, 25, 10, 30, 45, tzinfo=timezone.utc)
+
+
 def test_api_rate_limit_reads_only_latest_release_body(monkeypatch, caplog):
     expected = '<h2>Release changes</h2>\n<div><p>Nested notes</p></div>\n<p>More changes</p>'
 

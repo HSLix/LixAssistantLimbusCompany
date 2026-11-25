@@ -1158,10 +1158,11 @@ def open_sharing(window, *, exporting, resource=None):
         except InterruptedError:
             return
         cleanup.callback(package.close)
-        if resource is not None and any(obj["kind"] not in RESOURCE_KINDS for obj in package.objects):
-            if resource.name != DEFAULT_RESOURCE_NAME:
+        if resource is not None:
+            if resource.exported is not None or resource.name == DEFAULT_RESOURCE_NAME:
+                check_default_package(package)
+            elif any(obj["kind"] not in RESOURCE_KINDS for obj in package.objects):
                 raise ValueError(tr("The official resource package contains unsupported items."))
-            check_default_package(package)
         ImportDialog(window, package).exec()
         if resource is not None:
             from .default_resources import record_viewed_resource

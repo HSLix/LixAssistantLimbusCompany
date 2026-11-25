@@ -23,6 +23,7 @@ import zipfile
 
 from .agent_settings import dpapi, save_secret, secret_path
 from .file_content import checkpoint, require_disk
+from .resource_version import RESOURCE_VERSION_PATTERN, parse_resource_version
 from .work_files import create_work_directory
 
 REPOSITORY = "HSLix/LixAssistantLimbusCompany"
@@ -68,6 +69,7 @@ class ResourceRelease:
     sha256: str
     size: int
     uploaded: datetime
+    exported: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -195,19 +197,23 @@ def _github(variant):
             url = f"{REPOSITORY_URL}/releases/download/{tag}/{asset_name}"
             if asset_name == name:
                 package = Package(version, url, digest[7:])
-            elif isinstance(asset_name, str) and re.fullmatch(
-                r"(?:default-resources|lalc-sharing-[0-9]{8}-[0-9]{6}-[0-9]{3})\.zip", asset_name
-            ):
+            elif isinstance(asset_name, str):
+                stamped = re.fullmatch(rf"default-resources-({RESOURCE_VERSION_PATTERN})\.zip", asset_name)
+                legacy = re.fullmatch(r"(?:default-resources|lalc-sharing-[0-9]{8}-[0-9]{6}-[0-9]{3})\.zip", asset_name)
+                if not stamped and not legacy:
+                    continue
                 size = asset.get("size")
                 if asset.get("state") != "uploaded" or type(size) is not int or size < 1:
                     continue
                 try:
                     uploaded = datetime.fromisoformat(asset["created_at"])
+                    exported = parse_resource_version(stamped[1]) if stamped else None
                 except (KeyError, ValueError, TypeError):
                     continue
                 if uploaded.tzinfo is not None:
-                    resources.append(ResourceRelease(asset_name, url, digest[7:], size, uploaded))
-    resource = max(resources, key=lambda item: (item.uploaded, item.name), default=None)
+                    resources.append(ResourceRelease(asset_name, url, digest[7:], size, uploaded, exported))
+    resource = max(resources, key=lambda item: (item.exported is not None, item.exported or item.uploaded, item.name),
+                   default=None)
     return (announcement if isinstance(announcement, str) else ""), package, version, resource
 
 

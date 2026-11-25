@@ -1024,7 +1024,7 @@ class UserWindow(MainWindow):
                 message = tr('Could not check for an official resource update.')
             self.resource_status.setText(message)
             return
-        date = resource.uploaded.astimezone().strftime('%Y-%m-%d %H:%M')
+        date = (resource.exported or resource.uploaded).astimezone().strftime('%Y-%m-%d %H:%M:%S')
         viewed = resource.sha256 in viewed_resource_packages(self.service.data_root)
         self.resource_status.setText(tr('Latest resource package: {0}\nAlready viewed.').format(date) if viewed
                                      else tr('Latest resource package: {0}\nA new package is available to import.').format(date))

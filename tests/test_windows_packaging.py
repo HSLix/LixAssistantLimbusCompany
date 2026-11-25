@@ -13,12 +13,25 @@ import pytest
 
 from lalc import application
 import lalc.__main__ as cli
+from lalc.resource_version import read_resource_version, resource_asset_name
+from scripts import prepare_default_resource, publish_default_resources
 from test_sharing import source
 
 
 spec = importlib.util.spec_from_file_location("windows_build", Path(__file__).parents[1] / "scripts/build_windows.py")
 build = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(build)
+
+
+@pytest.fixture
+def prepared_resources(tmp_path, monkeypatch, source):
+    packaging = tmp_path / "packaging"
+    packaging.mkdir()
+    monkeypatch.setattr(prepare_default_resource, "ROOT", tmp_path)
+    monkeypatch.setattr(prepare_default_resource, "default_data_root", lambda: source[0].data_root)
+    prepare_default_resource.main()
+    resource = packaging / "default-resources.zip"
+    return resource, read_resource_version(resource)
 
 
 @pytest.fixture
@@ -51,7 +64,7 @@ def agent_resources(tmp_path, monkeypatch):
     monkeypatch.setattr(build, "MODEL_FILES", hashes)
 
 
-def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch, source):
+def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, archive, monkeypatch, prepared_resources):
     app = tmp_path / "application"
     for name in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico", "_internal/lalc/mirror_chyan.png", "_internal/lalc/pi_probe.ts", "_internal/lalc/pi_context.ts", *[f"_internal/lalc/skills/{name}/SKILL.md" for name in build.DEFAULT_SKILL_NAMES],
                  "_internal/lalc/translations/lalc_zh_CN.qm", "_internal/PySide6/translations/qtbase_zh_CN.qm",
@@ -64,7 +77,10 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     monkeypatch.setattr(build, "MODEL_HASHES", {name: build.digest(app / "_internal/rapidocr/models" / name)
                                               for name in build.MODEL_HASHES})
     (tmp_path / "user-settings.json").write_text('"private"', encoding="utf-8")
-    outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"}, default_resources=source[0].data_root)
+    resource, version = prepared_resources
+    attachment_name = resource_asset_name(version)
+    outputs = build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"},
+                             default_resources=resource, resource_version=version)
     with zipfile.ZipFile(outputs[0]) as plain, zipfile.ZipFile(outputs[1]) as bundled:
         core = {name: plain.read(name) for name in plain.namelist()}
         assert core == {name: bundled.read(name) for name in bundled.namelist() if not name.startswith(("LALC/pi/", "LALC/agent/"))}
@@ -78,7 +94,8 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
         assert b'"%~dp0LALC.exe" --developer' in core["LALC/Developer.cmd"]
         assert json.loads(core["LALC/build-info.json"])["default_resources_sha256"] == build.hashlib.sha256(
             core["LALC/default-resources.zip"]).hexdigest()
-        assert outputs[3].name == "default-resources.zip"
+        assert json.loads(core["LALC/build-info.json"])["default_resources_version"] == version
+        assert outputs[3].name == attachment_name
         assert outputs[3].read_bytes() == core["LALC/default-resources.zip"]
         with zipfile.ZipFile(outputs[2]) as legacy:
             assert outputs[2].name == "lalc.zip"
@@ -89,12 +106,14 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     sums = (tmp_path / "dist/SHA256SUMS").read_text(encoding="utf-8")
     assert all(build.digest(path) in sums for path in outputs)
     beta = build.assemble(app, archive, tmp_path / "beta", {"version": "0.1.0"},
-                          default_resources=outputs[3], beta_number=12)
+                          default_resources=resource, beta_number=12, resource_version=version)
     assert [path.name for path in beta] == [
         "LALC-0.1.0-windows-x64-without-agent.zip",
         "LALC-0.1.0-windows-x64-with-agent.zip",
+        attachment_name,
     ]
-    for path in beta:
+    assert beta[2].read_bytes() == resource.read_bytes()
+    for path in beta[:2]:
         with zipfile.ZipFile(path) as package:
             assert json.loads(package.read("LALC/build-info.json"))["version"] == "0.1.0-beta.12"
             assert package.read("LALC/default-resources.zip") == outputs[3].read_bytes()
@@ -106,6 +125,48 @@ def test_two_archives_share_application_and_keep_complete_pi_runtime(tmp_path, a
     with pytest.raises(ValueError, match="SKILL.md"):
         build.assemble(app, archive, tmp_path / "dist", {"version": "0.1.0"})
     assert {path: build.digest(path) for path in outputs} == before
+
+
+def test_export_metadata_rejects_missing_and_mismatched_zip(tmp_path):
+    resource = tmp_path / "default-resources.zip"
+    resource.write_bytes(b"new resource package")
+    with pytest.raises(ValueError, match="缺少"):
+        read_resource_version(resource)
+    resource.with_suffix(".txt").write_text("20261125T103045Z\n" + "0" * 64 + "\n", encoding="ascii")
+    with pytest.raises(ValueError, match="SHA-256"):
+        read_resource_version(resource)
+
+
+@pytest.mark.parametrize("existing", ["absent", "matching", "conflict"])
+def test_append_resource_keeps_existing_assets(monkeypatch, prepared_resources, existing):
+    source, version = prepared_resources
+    asset_name = resource_asset_name(version)
+    digest = build.digest(source) if existing == "matching" else "0" * 64
+    assets = [] if existing == "absent" else [{"name": asset_name, "digest": "sha256:" + digest, "state": "uploaded"}]
+    repo, tag = "HSLix/LixAssistantLimbusCompany", "v6.0.0-beta.5"
+    uploads = []
+
+    def release(args, *, text):
+        assert args == ["gh", "api", f"repos/{repo}/releases/tags/{tag}"]
+        return json.dumps({"draft": False, "assets": assets})
+
+    def upload(args, *, check):
+        assert args[:4] == ["gh", "release", "upload", tag]
+        assert args[5:] == ["--repo", repo]
+        asset = Path(args[4])
+        assert asset.name == asset_name and asset.read_bytes() == source.read_bytes()
+        assert check
+        uploads.append(asset.name)
+
+    monkeypatch.setattr(publish_default_resources, "ROOT", source.parents[1])
+    monkeypatch.setattr(publish_default_resources.subprocess, "check_output", release)
+    monkeypatch.setattr(publish_default_resources.subprocess, "run", upload)
+    if existing == "conflict":
+        with pytest.raises(ValueError, match="同名附件"):
+            publish_default_resources.publish(repo, tag)
+    else:
+        publish_default_resources.publish(repo, tag)
+    assert uploads == ([asset_name] if existing == "absent" else [])
 
 
 def test_tampered_ocr_model_prevents_replacing_archives(tmp_path, archive, monkeypatch):

@@ -47,6 +47,9 @@ jobs:
               throw "Expected a ZIP file at $resourceZip."
             }
             $buildArgs += '--default-resources', $resourceZip
+            if ($env:RELEASE_MODE -ne 'build-only') {
+              $buildArgs += '--require-resource-version'
+            }
           } elseif ($env:RELEASE_MODE -eq 'stable') {
             throw "Stable releases require $resourceZip in the release commit."
           }
@@ -96,12 +99,15 @@ jobs:
             release_version="$version-beta.$GITHUB_RUN_NUMBER"
             release_flags=(--prerelease --latest=false)
             extra_assets=()
-          else
-            if [[ ! -f dist/default-resources.zip ]]; then
-              echo "Windows build did not produce the required default-resources.zip." >&2
+          fi
+          if [[ -f packaging/default-resources.zip || $RELEASE_MODE == stable ]]; then
+            shopt -s nullglob
+            resource_assets=(dist/default-resources-*.zip)
+            if [[ ${#resource_assets[@]} != 1 ]]; then
+              echo "Windows build must produce exactly one versioned default resource ZIP." >&2
               exit 1
             fi
-            extra_assets+=(dist/default-resources.zip)
+            extra_assets+=("${resource_assets[0]}")
           fi
           {
             if [[ ! -f packaging/default-resources.zip ]]; then

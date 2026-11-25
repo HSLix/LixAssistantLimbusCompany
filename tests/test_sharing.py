@@ -236,7 +236,7 @@ def test_default_resources_include_only_three_mirror_settings_groups(source, tmp
     assert UserSettings(legacy_target.data_root).value["pages"] == {"mirror.settings": legacy_settings}
 
 
-def test_prepare_default_resource_keeps_previous_zip_if_validation_fails(source, tmp_path, monkeypatch):
+def test_prepare_default_resource_keeps_previous_export_if_validation_fails(source, tmp_path, monkeypatch):
     from scripts import prepare_default_resource as prepare
 
     packaging = tmp_path / "packaging"
@@ -248,6 +248,8 @@ def test_prepare_default_resource_keeps_previous_zip_if_validation_fails(source,
     with closing(SharingPackage(archive, tmp_path)) as package:
         prepare.check_default_package(package)
     previous = archive.read_bytes()
+    metadata = archive.with_suffix(".txt")
+    previous_metadata = metadata.read_bytes()
 
     def reject(package):
         raise ValueError("invalid resource package")
@@ -256,7 +258,34 @@ def test_prepare_default_resource_keeps_previous_zip_if_validation_fails(source,
     with pytest.raises(ValueError, match="invalid resource package"):
         prepare.main()
     assert archive.read_bytes() == previous
-    assert list(packaging.iterdir()) == [archive]
+    assert metadata.read_bytes() == previous_metadata
+    assert set(packaging.iterdir()) == {archive, metadata}
+
+
+def test_prepare_default_resource_rolls_back_time_if_zip_replace_fails(source, tmp_path, monkeypatch):
+    from scripts import prepare_default_resource as prepare
+
+    packaging = tmp_path / "packaging"
+    packaging.mkdir()
+    archive = packaging / "default-resources.zip"
+    metadata = archive.with_suffix(".txt")
+    archive.write_bytes(b"previous archive")
+    metadata.write_bytes(b"previous metadata")
+    monkeypatch.setattr(prepare, "ROOT", tmp_path)
+    monkeypatch.setattr(prepare, "default_data_root", lambda: source[0].data_root)
+    replace = Path.replace
+
+    def refuse_archive(self, target):
+        if target == archive:
+            raise PermissionError("archive is in use")
+        return replace(self, target)
+
+    monkeypatch.setattr(Path, "replace", refuse_archive)
+    with pytest.raises(PermissionError, match="archive is in use"):
+        prepare.main()
+    assert archive.read_bytes() == b"previous archive"
+    assert metadata.read_bytes() == b"previous metadata"
+    assert set(packaging.iterdir()) == {archive, metadata}
 
 
 def test_uuid_collision_gets_new_identity_without_default_changes(source, tmp_path):

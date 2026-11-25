@@ -20,6 +20,7 @@ from lalc.work_files import WorkDirectory
 from lalc.ocr import MODEL_HASHES
 from lalc.codesearch import MODEL_REPO, MODEL_REVISION, MODEL_FILES
 from lalc.agent_skills import DEFAULT_SKILL_NAMES
+from lalc.resource_version import read_resource_version, resource_asset_name
 
 PI_VERSION = "1.5.0"
 PI_SHA256 = "12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3"
@@ -89,7 +90,8 @@ def check_codesearch(archive: Path, models: Path) -> None:
 
 
 def assemble(application: Path, archive: Path, destination: Path, info: dict, *, codesearch_archive=None, models=None,
-             default_resources: Path | None = None, beta_number: int | None = None) -> list[Path]:
+             default_resources: Path | None = None, beta_number: int | None = None,
+             resource_version: str | None = None) -> list[Path]:
     """只复制冻结产物，另加官方 pi 目录；全部校验完成后替换输出 ZIP。"""
     check_pi(archive)
     for relative in ("LALC.exe", "LALC-console.exe", "_internal/lalc/MagicAndWonder.ico",
@@ -127,6 +129,8 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
             finally:
                 package.close()
             info = {**info, "default_resources_sha256": digest(resource_zip)}
+            if resource_version:
+                info["default_resources_version"] = resource_version
         package_version = info["version"]
         if beta_number is not None:
             info = {**info, "version": f"{info['version']}-beta.{beta_number}"}
@@ -167,8 +171,13 @@ def assemble(application: Path, archive: Path, destination: Path, info: dict, *,
                 if prefix == "lalc":
                     bundle.write(ROOT / "packaging/update_to.bat", "lalc/update_to.bat")
             outputs.append(output)
-        if default_resources is not None and beta_number is None:
-            outputs.append(base / DEFAULT_RESOURCE_NAME)
+        if default_resources is not None:
+            if resource_version:
+                attachment = stage / resource_asset_name(resource_version)
+                shutil.copyfile(resource_zip, attachment)
+                outputs.append(attachment)
+            elif beta_number is None:
+                outputs.append(resource_zip)
         checksums = "".join(f"{digest(path)}  {path.name}\n" for path in outputs)
         for path in outputs:
             path.replace(destination / path.name)
@@ -182,6 +191,7 @@ def main(argv=None) -> int:
     parser.add_argument("--codesearch-zip", type=Path, default=CODESEARCH_ARCHIVE)
     parser.add_argument("--models", type=Path, default=MODEL_ROOT)
     parser.add_argument("--default-resources", type=Path, help="默认资源来源，可指定 LALC 数据目录或分享 ZIP。")
+    parser.add_argument("--require-resource-version", action="store_true", help="要求配套的导出时间文本通过校验。")
     parser.add_argument("--beta", type=int, metavar="NUMBER", help="构建指定编号的 Beta 双包。")
     args = parser.parse_args(argv)
     if args.beta is not None and args.beta < 1:
@@ -203,6 +213,9 @@ def main(argv=None) -> int:
             source = approved_zip
     if source is None:
         print("未发现默认资源包或正式数据目录，此次只构建框架。")
+    resource_version = None
+    if source is not None and (args.require_resource_version or source.with_suffix(".txt").exists()):
+        resource_version = read_resource_version(source)
     version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
     work = ROOT / ".generated/windows-build"
     env = {**os.environ, "UV_PROJECT_ENVIRONMENT": str(work / "venv")}
@@ -221,7 +234,8 @@ def main(argv=None) -> int:
             "pi": {"version": PI_VERSION, "archive_sha256": PI_SHA256, "source": PI_URL}, "codesearch": {"version": CODESEARCH_VERSION,
             "archive_sha256": CODESEARCH_SHA256, "model_revision": MODEL_REVISION, "model_files": MODEL_FILES}}
     for path in assemble(work / "dist/LALC", archive, ROOT / "dist", info,
-                         codesearch_archive=args.codesearch_zip, models=args.models, default_resources=source, beta_number=args.beta):
+                         codesearch_archive=args.codesearch_zip, models=args.models, default_resources=source,
+                         beta_number=args.beta, resource_version=resource_version):
         print(path)
     return 0
 
