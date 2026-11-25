@@ -137,6 +137,49 @@ def test_export_metadata_rejects_missing_and_mismatched_zip(tmp_path):
         read_resource_version(resource)
 
 
+def test_resource_target_resolves_github_latest_stable(monkeypatch):
+    repo = "HSLix/LixAssistantLimbusCompany"
+
+    def api(args, *, text):
+        assert args == ["gh", "api", f"repos/{repo}/releases/latest"]
+        return '{"tag_name":"v6.1.0"}'
+
+    monkeypatch.setattr(publish_default_resources.subprocess, "check_output", api)
+    assert publish_default_resources.resolve_release_tag(repo, "", "最新正式版") == "v6.1.0"
+
+
+def test_resource_target_resolves_newest_published_beta_across_pages(monkeypatch):
+    repo = "HSLix/LixAssistantLimbusCompany"
+
+    def release(tag, day, *, draft=False, prerelease=True):
+        return {"tag_name": tag, "published_at": f"2026-11-{day:02}T00:00:00Z",
+                "draft": draft, "prerelease": prerelease, "id": day}
+
+    pages = [[release("v6.0.0-beta.8", 25, draft=True), release("v6.0.0", 24, prerelease=False),
+              release("v6.0.0-rc.1", 23), release("v6.0.0-beta.6", 21)],
+             [release("v6.0.0-beta.5", 22), release("v6.0.0-beta.4", 20)]]
+
+    def api(args, *, text):
+        assert args == ["gh", "api", "--paginate", "--slurp", f"repos/{repo}/releases"]
+        return json.dumps(pages)
+
+    monkeypatch.setattr(publish_default_resources.subprocess, "check_output", api)
+    assert publish_default_resources.resolve_release_tag(repo, "", "最新 Beta") == "v6.0.0-beta.5"
+    pages.clear()
+    with pytest.raises(ValueError, match="找不到已发布"):
+        publish_default_resources.resolve_release_tag(repo, "", "最新 Beta")
+
+
+@pytest.mark.parametrize(("selection", "tag", "message"), [
+    ("指定 Release", "", "必须填写目标标签"),
+    ("最新正式版", "v6.0.0", "请留空目标标签"),
+    ("最新 Beta", "v6.0.0-beta.5", "请留空目标标签"),
+])
+def test_resource_target_rejects_missing_or_conflicting_input(selection, tag, message):
+    with pytest.raises(ValueError, match=message):
+        publish_default_resources.resolve_release_tag("HSLix/LixAssistantLimbusCompany", tag, selection)
+
+
 @pytest.mark.parametrize("existing", ["absent", "matching", "conflict"])
 def test_append_resource_keeps_existing_assets(monkeypatch, prepared_resources, existing):
     source, version = prepared_resources

@@ -3,10 +3,19 @@ name: Publish LALC Resources
 on:
   workflow_dispatch:
     inputs:
-      target_release:
-        description: Existing Release tag (for example v6.0.0 or v6.0.0-beta.5)
-        type: string
+      release_target:
+        description: Select the Release to update
+        type: choice
         required: true
+        default: 指定 Release
+        options:
+          - 指定 Release
+          - 最新正式版
+          - 最新 Beta
+      target_release:
+        description: Existing tag for 指定 Release only (for example v6.0.0-beta.5)
+        type: string
+        required: false
 
 permissions:
   contents: write
@@ -20,6 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
+      RELEASE_TARGET: ${{ inputs.release_target }}
       TARGET_RELEASE: ${{ inputs.target_release }}
     steps:
       - uses: actions/checkout@v4
@@ -27,4 +37,4 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v6
       - name: Verify and append default resources
-        run: uv run --locked --no-default-groups python scripts/publish_default_resources.py "$GITHUB_REPOSITORY" "$TARGET_RELEASE"
+        run: uv run --locked --no-default-groups python scripts/publish_default_resources.py "$GITHUB_REPOSITORY" "$TARGET_RELEASE" "$RELEASE_TARGET"

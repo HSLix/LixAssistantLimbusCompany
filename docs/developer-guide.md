@@ -24,6 +24,12 @@
 
 ## 单独更新官方资源包
 
-导出并推送上述两个文件后，在 **Actions → Publish LALC Resources → Run workflow** 选择含有该提交的分支，填写 `target_release`，可以指定已发布的正式版或 Beta 标签。CI 会追加 `default-resources-20261125T103045Z.zip` 这类附件。同名且摘要一致时重跑成功，同名但摘要不一致时停止。目标 Release 必须允许追加附件。
+导出并推送上述两个文件后，在 **Actions → Publish LALC Resources → Run workflow** 选择含有该提交的分支，再选择目标 Release。
+
+- **最新正式版** 使用 GitHub 标为最新的正式 Release。
+- **最新 Beta** 使用最近发布的 Beta Release。
+- **指定 Release** 需要填写 `target_release`，可指定已发布的正式版或 Beta 标签。
+
+CI 会在日志中显示选中的标签，并追加 `default-resources-20261125T103045Z.zip` 这类附件。同名且摘要一致时重跑成功，同名但摘要不一致时停止。目标 Release 必须允许追加附件。
 
 所有客户端都只从最新已发布的正式 Release 检查资源。首页按资源导出时间选择新版附件，旧格式仍可按上传时间识别。Beta 的资源附件供手动下载。准备下一次正式框架发布时，确认发版提交包含最新已发布的正式资源。

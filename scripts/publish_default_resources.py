@@ -15,12 +15,48 @@ from lalc.sharing import SharingPackage
 from lalc.work_files import WorkDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
+RELEASE_TAG = re.compile(r"v(?:[6-9]|[1-9][0-9]+)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(-beta\.[1-9][0-9]*)?")
 
 
-def publish(repo, tag):
+def resolve_release_tag(repo, tag, target):
+    """从 GitHub 确定实际发布标签，避免把手填标签与自动选择混用。"""
+    tag = tag.strip()
+    if target == "指定 Release":
+        if not tag:
+            raise ValueError("选择「指定 Release」时必须填写目标标签。")
+        return tag
+    if tag:
+        raise ValueError("选择最新版本时请留空目标标签。")
+    endpoint = f"repos/{repo}/releases"
+    if target == "最新正式版":
+        release = json.loads(subprocess.check_output(["gh", "api", f"{endpoint}/latest"], text=True))
+        match = RELEASE_TAG.fullmatch(release["tag_name"])
+        if not match or match[1]:
+            raise ValueError(f"GitHub 当前最新正式版 {release['tag_name']} 不是受支持的 LALC 正式版。")
+        return release["tag_name"]
+    if target == "最新 Beta":
+        pages = json.loads(subprocess.check_output(
+            ["gh", "api", "--paginate", "--slurp", endpoint], text=True))
+        candidates = []
+        for page in pages:
+            for release in page:
+                if release["draft"] or not release["prerelease"] or not release["published_at"]:
+                    continue
+                match = RELEASE_TAG.fullmatch(release["tag_name"])
+                if match and match[1]:
+                    candidates.append(release)
+        if not candidates:
+            raise ValueError("找不到已发布的 LALC 6 或更新版本的 Beta Release。")
+        return max(candidates, key=lambda release: (release["published_at"], release["id"]))["tag_name"]
+    raise ValueError(f"无效的 Release 选择方式：{target}")
+
+
+def publish(repo, tag, target="指定 Release"):
     """追加新附件。重跑时核对远端摘要并保留现有附件。"""
-    if not re.fullmatch(r"v([6-9]|[1-9][0-9]+)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-beta\.[1-9][0-9]*)?", tag):
+    tag = resolve_release_tag(repo, tag, target)
+    if not RELEASE_TAG.fullmatch(tag):
         raise ValueError("目标必须是已发布的 LALC 6 或更新版本的 Release 标签。")
+    print(f"目标 Release：{tag}", flush=True)
     source = ROOT / "packaging" / DEFAULT_RESOURCE_NAME
     if not source.is_file() or source.is_symlink():
         raise ValueError(f"缺少可发布的默认资源 ZIP：{source}")
