@@ -1,4 +1,4 @@
-"""Agent 新会话的来源 Manifest 下拉搜索。"""
+"""来源 Manifest 下拉框与版本历史共用的搜索和结果绘制。"""
 
 import re
 from html import escape
@@ -17,6 +17,12 @@ from .i18n import tr
 ROW_HEIGHT = 50
 INDEX_ROLE = Qt.ItemDataRole.UserRole
 NOTES_ROLE = Qt.ItemDataRole.UserRole + 1
+METADATA_ROLE = Qt.ItemDataRole.UserRole + 2
+
+
+def manifest_search_text(text):
+    """把发布说明和搜索词里的换行与空白统一成单个空格。"""
+    return ' '.join(text.split())
 
 
 class ManifestResultDelegate(ListItemDelegate):
@@ -26,35 +32,49 @@ class ManifestResultDelegate(ListItemDelegate):
         super().__init__(view)
         self.pattern = None
 
+    def set_query(self, query):
+        """两个入口都按忽略大小写的字面子串匹配。"""
+        query = manifest_search_text(query)
+        self.pattern = re.compile(re.escape(query), re.IGNORECASE) if query else None
+        self.parent().viewport().update()
+        return self.pattern
+
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
         option.text = ''
 
     def sizeHint(self, option, index):
-        return QSize(0, ROW_HEIGHT)
+        height = ROW_HEIGHT + 17 if index.data(NOTES_ROLE) and index.data(METADATA_ROLE) else ROW_HEIGHT
+        return QSize(0, height)
 
     def paint(self, painter, option, index):
         rect = option.rect.adjusted(12, 0, -12, 0)
         super().paint(painter, option, index)
         notes = index.data(NOTES_ROLE)
         identity = index.data(Qt.ItemDataRole.DisplayRole)
+        metadata = index.data(METADATA_ROLE)
         dark = isDarkTheme()
         primary = QColor('#f5f5f5' if dark else '#242424')
         secondary = QColor('#bcbcbc' if dark else '#5d5d5d')
         painter.save()
         painter.setClipRect(rect)
+        if notes or metadata:
+            self.draw_line(painter, rect, notes or identity, getFont(14), primary, rect.top() + 6)
         if notes:
-            self.draw_line(painter, rect, notes, getFont(14), primary, rect.top() + 6)
             self.draw_line(painter, rect, identity, getFont(12), secondary, rect.top() + 26)
-        else:
+        if metadata:
+            y = rect.top() + (43 if notes else 26)
+            self.draw_line(painter, rect, metadata, getFont(12), secondary, y, highlight=False)
+        if not notes and not metadata:
             font = getFont(14)
             y = rect.top() + (rect.height() - QFontMetrics(font).height()) / 2
             self.draw_line(painter, rect, identity, font, primary, y)
         painter.restore()
 
-    def draw_line(self, painter, rect, text, font, color, y):
+    def draw_line(self, painter, rect, text, font, color, y, *, highlight=True):
         metrics = QFontMetrics(font)
-        match = self.pattern.search(text) if self.pattern else None
+        pattern = self.pattern if highlight else None
+        match = pattern.search(text) if pattern else None
         visible = metrics.elidedText(text, Qt.TextElideMode.ElideRight, rect.width())
         prefix = ''
         if match and visible != text and match.end() > len(visible.removesuffix('…')):
@@ -64,12 +84,12 @@ class ManifestResultDelegate(ListItemDelegate):
             visible = metrics.elidedText(text, Qt.TextElideMode.ElideRight, rect.width())
         layout = QTextLayout(visible, font)
         matches = []
-        if self.pattern:
+        if pattern:
             style = QTextCharFormat()
             style.setBackground(QColor('#6a501a' if isDarkTheme() else '#ffeeb4'))
             style.setForeground(QColor('#fff2c7' if isDarkTheme() else '#4a3400'))
             end = len(visible if visible == text else visible.removesuffix('…'))
-            for match in self.pattern.finditer(visible, len(prefix), end):
+            for match in pattern.finditer(visible, len(prefix), end):
                 span = QTextLayout.FormatRange()
                 # Qt 的文本位置按 UTF-16 计算，发布说明可以含 emoji。
                 span.start = len(visible[:match.start()].encode('utf-16-le')) // 2
@@ -149,16 +169,14 @@ class ManifestSourceBox(ComboBox):
 
     def filter_results(self, query, *, focused_text=None):
         """保留版本原有排序，空白起点只在未搜索时显示。"""
-        query = ' '.join(query.split())
-        pattern = re.compile(re.escape(query), re.IGNORECASE) if query else None
-        self.delegate.pattern = pattern
+        pattern = self.delegate.set_query(query)
         self.results.clear()
         selected_row = 0
         for index in range(self.count()):
             text = self.itemText(index)
             identity = self.itemData(index)
             notes = self.notes.get(identity, '').strip()
-            summary = ' '.join(notes.split())
+            summary = manifest_search_text(notes)
             if pattern and (identity is None or not (pattern.search(text) or pattern.search(summary))):
                 continue
             if text == focused_text or (focused_text is None and not pattern and index == self.currentIndex()):

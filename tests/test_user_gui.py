@@ -778,27 +778,55 @@ def test_manifest_summary_is_short_and_empty_notes_are_hidden(windows):
 @pytest.mark.parametrize('apply', [False, True])
 def test_history_marks_versions_and_only_applies_explicit_selection(windows, monkeypatch, apply):
     from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
     from PySide6.QtWidgets import QDialog, QDialogButtonBox
-    from qfluentwidgets import ListWidget, PlainTextEdit
+    from qfluentwidgets import BodyLabel, ListWidget, PlainTextEdit, PushButton, SearchLineEdit
     from lalc.i18n import tr
+    from lalc.manifest_source_gui import METADATA_ROLE
     from test_manifest import _write_candidate
-    _, _, user, _ = windows
+    app, _, user, _ = windows
     manager = user.host.manager
     original = manager.default_manifest_id()
-    result = manager.publish(_write_candidate(manager.data_root / 'history-candidate'))
+    candidate = _write_candidate(manager.data_root / 'history-candidate')
+    data = json.loads(candidate.read_text(encoding='utf-8'))
+    notes = '<b>镜牢</b>改进\nMirror 更新'
+    data['AdditionalMessage'] = notes
+    candidate.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
+    result = manager.publish(candidate)
     assert result.ok
     latest = result.loaded.manifest_id
+
     def inspect(dialog):
         choices = dialog.findChild(ListWidget, 'manifest-history')
         buttons = dialog.findChild(QDialogButtonBox)
-        select = next(button for button in buttons.buttons() if buttons.buttonRole(button) == QDialogButtonBox.ButtonRole.AcceptRole)
+        select = dialog.findChild(PushButton, 'manifest-history-set-default')
+        search = dialog.findChild(SearchLineEdit, 'manifest-history-search')
+        empty = dialog.findChild(BodyLabel, 'manifest-history-empty')
+        details = dialog.findChild(PlainTextEdit, 'manifest-details')
+        dialog.show()
+        app.processEvents()
         assert not select.isEnabled()
-        assert tr('Current version') in choices.currentItem().text()
+        assert tr('Current version') in choices.currentItem().data(METADATA_ROLE)
         assert choices.item(0).data(Qt.ItemDataRole.UserRole)['manifest_id'] == latest
-        assert tr('Latest version') in choices.item(0).text()
-        choices.setCurrentRow(0)
+        assert tr('Latest version') in choices.item(0).data(METADATA_ROLE)
+        search.setText(' 镜牢 ')
+        assert choices.item(1).isHidden()
+        assert choices.currentRow() == 0
+        assert details.toPlainText() == f'{latest}\n\n{notes}'
         assert select.isEnabled()
-        assert latest in dialog.findChild(PlainTextEdit, 'manifest-details').toPlainText()
+        search.setFocus()
+        QTest.keyClick(search, Qt.Key.Key_Return)
+        assert dialog.isVisible()
+        assert manager.default_manifest_id() == original
+        search.setText('[无匹配')
+        assert empty.isVisible() and empty.text() == tr('No matching Manifests')
+        assert not select.isEnabled() and not details.toPlainText()
+        search.setText(latest[-12:].upper())
+        assert choices.currentItem().text() == latest
+        assert not empty.isVisible()
+        search.clear()
+        assert all(not choices.item(row).isHidden() for row in range(choices.count()))
+        assert choices.currentItem().text() == latest
         assert manager.default_manifest_id() == original
         if apply:
             select.click()
@@ -812,6 +840,31 @@ def test_history_marks_versions_and_only_applies_explicit_selection(windows, mon
     user.choose_manifest()
     assert manager.default_manifest_id() == (latest if apply else original)
     assert {path.name for path in manager.manifests_dir.glob('*.json')} == before
+
+
+def test_history_and_dashboard_show_when_no_workflows_exist(windows, monkeypatch):
+    from PySide6.QtWidgets import QDialog
+    from qfluentwidgets import BodyLabel, PushButton, SearchLineEdit
+    from lalc.i18n import tr
+
+    _, _, user, _ = windows
+    manager = user.host.manager
+    monkeypatch.setattr(manager, 'list_manifests', lambda: [])
+    monkeypatch.setattr(manager, 'default_manifest_id', lambda: None)
+    user.refresh_manifest_card()
+    message = tr('No available workflows detected')
+    assert user.manifest_label.text() == message
+    assert user.latest_card.isHidden()
+
+    def inspect(dialog):
+        empty = dialog.findChild(BodyLabel, 'manifest-history-empty')
+        assert not empty.isHidden() and empty.text() == message
+        assert not dialog.findChild(SearchLineEdit, 'manifest-history-search').isEnabled()
+        assert not dialog.findChild(PushButton, 'manifest-history-set-default').isEnabled()
+        return dialog.result()
+
+    monkeypatch.setattr(QDialog, 'exec', inspect)
+    user.choose_manifest()
 
 
 def test_trace_updates_do_not_reload_settings_or_versions(windows, monkeypatch):

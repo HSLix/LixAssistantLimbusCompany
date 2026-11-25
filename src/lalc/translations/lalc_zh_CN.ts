@@ -1358,6 +1358,10 @@ Original pixel region: {2}</source>
       <translation>没有匹配的 Manifest</translation>
     </message>
     <message>
+      <source>No available workflows detected</source>
+      <translation>当前没有检测到可用工作流</translation>
+    </message>
+    <message>
       <source>Send the first message to start and fix mode and source.</source>
       <translation>发送首条消息后开始会话并固定模式和来源。</translation>
     </message>
@@ -2152,6 +2156,10 @@ Original pixel region: {2}</source>
     <message>
       <source>Version history…</source>
       <translation>版本历史…</translation>
+    </message>
+    <message>
+      <source>Version history</source>
+      <translation>版本历史</translation>
     </message>
     <message>
       <source>Use latest version</source>

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
 
 from qfluentwidgets import (
     FluentWindow, FluentIcon, InfoBarIcon,
-    CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout,
+    CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout, SearchLineEdit,
     NavigationAvatarWidget, NavigationItemPosition,
     TransparentToolButton, ToolButton, HyperlinkButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel,
     setCustomStyleSheet, Theme, setTheme,
@@ -33,6 +33,7 @@ from qfluentwidgets import (
 )
 
 from .i18n import tr
+from .manifest_source_gui import METADATA_ROLE, NOTES_ROLE, ManifestResultDelegate, manifest_search_text
 from .notifications import NotificationList
 
 from .application import ApplicationService, StartError, default_data_root, default_candidate_root
@@ -1119,10 +1120,14 @@ class UserWindow(MainWindow):
         self.coordinator.open_window(True)
 
     @staticmethod
-    def manifest_summary(item):
-        """Dashboard 只显示短身份与本地分钟级时间。"""
-        stamp = datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M")
-        return f'{item["manifest_id"][:8]} · {stamp}'
+    def manifest_time(item):
+        """以本地时间显示发布时间，精确到分钟。"""
+        return datetime.fromtimestamp(item["saved_at"]).strftime("%Y-%m-%d %H:%M")
+
+    @classmethod
+    def manifest_summary(cls, item):
+        """Dashboard 只显示短身份与发布时间。"""
+        return f'{item["manifest_id"][:8]} · {cls.manifest_time(item)}'
 
     @staticmethod
     def show_manifest_notes(label, item):
@@ -1140,8 +1145,10 @@ class UserWindow(MainWindow):
             self.refresh_tasks()
         current = next((item for item in versions if item["manifest_id"] == identity), None)
         summary = self.manifest_summary(current) if current else identity[:8] if identity else tr('Not selected')
+        if not versions:
+            summary = tr('No available workflows detected')
         self.manifest_label.setText(tr('Current version') + " · " + summary if current else summary)
-        self.manifest_label.setToolTip(identity or tr('No Manifest selected'))
+        self.manifest_label.setToolTip((identity or tr('No Manifest selected')) if versions else summary)
         self.show_manifest_notes(self.manifest_notes, current)
         self.latest_manifest_id = versions[0]["manifest_id"] if versions else None
         self.latest_card.setVisible(bool(versions and self.latest_manifest_id != identity))
@@ -1169,16 +1176,28 @@ class UserWindow(MainWindow):
             self.render_state(self.service.status)
 
     def choose_manifest(self):
-        """独立历史列表只更新 Default，校验失败时保留选择供修正。"""
+        """筛选只影响浏览，显式设置默认版本后才更新 Default。"""
         dialog = QDialog(self)
-        dialog.setWindowTitle(tr('Choose Default Manifest'))
+        dialog.setWindowTitle(tr('Version history'))
         dialog.resize(580, 460)
         layout = QVBoxLayout(dialog)
         notice = QLabel(tr('Select the default version for future runs. Started runs keep their version.'))
         notice.setWordWrap(True)
         layout.addWidget(notice)
+        search = SearchLineEdit()
+        search.setObjectName('manifest-history-search')
+        search.setPlaceholderText(tr('Search Manifests'))
+        search.setAccessibleName(tr('Search Manifests'))
+        layout.addWidget(search)
         choices = ListWidget()
         choices.setObjectName('manifest-history')
+        choices.setAccessibleName(tr('Version history'))
+        choices.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        delegate = ManifestResultDelegate(choices)
+        choices.setItemDelegate(delegate)
+        empty = QLabel()
+        empty.setObjectName('manifest-history-empty')
+        empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
         versions = self.host.manager.list_manifests()
         current = self.host.manager.default_manifest_id()
         latest = versions[0]['manifest_id'] if versions else None
@@ -1189,42 +1208,75 @@ class UserWindow(MainWindow):
                 marks.append(tr('Current version'))
             if identity == latest:
                 marks.append(tr('Latest version'))
-            item = QListWidgetItem(self.manifest_summary(version) + (' · ' + ' / '.join(marks) if marks else ''))
+            metadata = self.manifest_time(version) + (' · ' + ' / '.join(marks) if marks else '')
+            notes = manifest_search_text(version['AdditionalMessage'])
+            item = QListWidgetItem(identity)
             item.setData(Qt.ItemDataRole.UserRole, version)
+            item.setData(NOTES_ROLE, notes)
+            item.setData(METADATA_ROLE, metadata)
+            item.setData(Qt.ItemDataRole.AccessibleTextRole, '\n'.join(filter(None, (notes, identity, metadata))))
             item.setToolTip(identity)
             choices.addItem(item)
             if identity == current:
                 choices.setCurrentItem(item)
         layout.addWidget(choices, 1)
+        layout.addWidget(empty, 1)
         details = QPlainTextEdit()
         details.setObjectName('manifest-details')
         details.setReadOnly(True)
         details.setFixedHeight(110)
+        details.setVisible(bool(versions))
         layout.addWidget(details)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
         select_button = QPushButton(tr('Set as default version'))
-        buttons.addButton(select_button, QDialogButtonBox.ButtonRole.AcceptRole)
+        select_button.setObjectName('manifest-history-set-default')
+        buttons.addButton(select_button, QDialogButtonBox.ButtonRole.ActionRole)
+        for button in buttons.buttons():
+            button.setAutoDefault(False)
         layout.addWidget(buttons)
         def selection_changed():
             item = choices.currentItem()
-            version = item.data(Qt.ItemDataRole.UserRole) if item else None
+            version = item.data(Qt.ItemDataRole.UserRole) if item and not item.isHidden() else None
             select_button.setEnabled(bool(version and version['manifest_id'] != self.host.manager.default_manifest_id()))
             details.setPlainText(version['manifest_id'] + ('\n\n' + version['AdditionalMessage'].strip()
                                  if version['AdditionalMessage'].strip() else '') if version else '')
         choices.currentItemChanged.connect(selection_changed)
-        selection_changed()
+
+        def filter_versions(query):
+            pattern = delegate.set_query(query)
+            first_visible = -1
+            for row in range(choices.count()):
+                item = choices.item(row)
+                matches = not pattern or pattern.search(item.text()) or pattern.search(item.data(NOTES_ROLE))
+                item.setHidden(not matches)
+                if matches and first_visible < 0:
+                    first_visible = row
+            selected = choices.currentItem()
+            if not selected or selected.isHidden():
+                choices.setCurrentRow(first_visible)
+            choices.setVisible(first_visible >= 0)
+            empty.setVisible(first_visible < 0)
+            selection_changed()
+
+        empty.setText(tr('No matching Manifests') if versions else tr('No available workflows detected'))
+        search.setEnabled(bool(versions))
+        search.textChanged.connect(filter_versions)
+        search.returnPressed.connect(lambda: choices.setFocus() if choices.currentItem() else None)
+        filter_versions('')
+        search.setFocus()
+
         def select():
             if (remote := getattr(self.service, "_remote_mcp", None)) is not None:
                 remote.check_local("Default")
             item = choices.currentItem()
-            if item is None:
+            if item is None or item.isHidden():
                 return
             result = self.host.manager.set_default(item.data(Qt.ItemDataRole.UserRole)['manifest_id'])
             if not result.ok:
                 raise ValueError("; ".join(error.message for error in result.errors))
             self.render_state(self.service.status)
             dialog.accept()
-        buttons.accepted.connect(lambda: self._interact(select))
+        select_button.clicked.connect(lambda: self._interact(select))
         buttons.rejected.connect(dialog.reject)
         dialog.exec()
 
