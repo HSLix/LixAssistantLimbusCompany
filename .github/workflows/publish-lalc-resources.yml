@@ -19,6 +19,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: lalc-framework-release
@@ -37,4 +38,26 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@v6
       - name: Verify and append default resources
-        run: uv run --locked --no-default-groups python scripts/publish_default_resources.py "$GITHUB_REPOSITORY" "$TARGET_RELEASE" "$RELEASE_TARGET"
+        id: resources
+        run: |
+          uv run --locked --no-default-groups python - <<'PY'
+          import os
+          from pathlib import Path
+
+          from lalc.resource_version import read_resource_version
+          from scripts.publish_default_resources import publish, resolve_release_tag
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          tag = resolve_release_tag(repo, os.environ["TARGET_RELEASE"], os.environ["RELEASE_TARGET"])
+          publish(repo, tag)
+          version = read_resource_version(Path("packaging/default-resources.zip"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"tag={tag}", f"version={version}", sep="\n", file=output)
+          PY
+      - name: Trigger MirrorChyanResourcesUploading
+        env:
+          RESOURCE_TAG: ${{ steps.resources.outputs.tag }}
+          RESOURCE_VERSION: ${{ steps.resources.outputs.version }}
+        run: |
+          gh workflow run --repo "$GITHUB_REPOSITORY" mirrorchyan-resources.yml \
+            -f tag="$RESOURCE_TAG" -f version="$RESOURCE_VERSION"
