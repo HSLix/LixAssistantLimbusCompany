@@ -1,0 +1,30 @@
+name: Publish LALC Resources
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_release:
+        description: Existing Release tag (for example v6.0.0 or v6.0.0-beta.5)
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lalc-framework-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TARGET_RELEASE: ${{ inputs.target_release }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - name: Verify and append default resources
+        run: uv run --locked --no-default-groups python scripts/publish_default_resources.py "$GITHUB_REPOSITORY" "$TARGET_RELEASE"
