@@ -2,18 +2,33 @@ name: mirrorchyan-release-note
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        default: ''
+        required: false
   release:
-    types: [edited]
+    types: [published, edited]
 
 jobs:
   mirrorchyan:
-    runs-on: macos-latest
+    if: ${{ github.repository_owner == 'HSLix' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [LALC, LALC-no-agent]
 
     steps:
       - id: uploading
         uses: MirrorChyan/release-note-action@v1
         with:
-          mirrorchyan_rid: LALC
+          mirrorchyan_rid: ${{ matrix.rid }}
+          version_name: ${{ inputs.tag || github.event.release.tag_name }}
 
-          upload_token: ${{ secrets.MIRRORCHYANUPLOADTOKEN }}
+          owner: HSLix
+          repo: LixAssistantLimbusCompany
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_token: ${{ secrets.MirrorChyanUploadToken }}
