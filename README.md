@@ -193,6 +193,13 @@
     </td></tr>
 <tr>
     <td align="center">
+        <a href="https://github.com/MirrorChyanDesu">
+            <img src="https://avatars.githubusercontent.com/u/277286474?v=4" width="100;" alt="MirrorChyanDesu"/>
+            <br />
+            <sub><b>Mirror酱</b></sub>
+        </a>
+    </td>
+    <td align="center">
         <a href="https://github.com/pasathornpGStudio">
             <img src="https://avatars.githubusercontent.com/u/126454008?v=4" width="100;" alt="pasathornpGStudio"/>
             <br />
