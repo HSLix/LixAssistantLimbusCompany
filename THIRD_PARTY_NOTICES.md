@@ -15,6 +15,11 @@ The packaged application includes the following distributions' metadata and lice
 - darkdetect 0.8.0: original license and copyright notice are included in its metadata.
   https://github.com/albertosottile/darkdetect
 
+The bundled page-development skill also includes the upstream PySide6 Gallery
+examples as offline reference material under `references/gallery/`, at commit
+`d6f5a01f7f3fe285c6900e476349467810267839`. The original GPLv3 license text is
+included alongside the examples in `gallery/LICENSE`.
+
 Platform libraries, Python, and other runtime dependencies retain their original
 licenses and notices. Refer to the corresponding distributions and packaged metadata.
 
