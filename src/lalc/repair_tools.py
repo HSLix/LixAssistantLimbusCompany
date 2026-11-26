@@ -617,26 +617,18 @@ class RepairTools:
         result["content"].append({"type": "image", "mimeType": "image/jpeg", "data": base64.b64encode(content).decode()})
         return result
 
-    def search_run_logs(self, keyword, run_id=None, *, all_runs=False, start_run_id=None,
+    def search_run_logs(self, keyword, run_id, *, start_run_id=None,
                         start_sequence=1, limit=100, levels=None, logical_name=None):
-        """按本机 Run ID 查询一个或全部可读日志；匹配和续读游标使用本机编号。"""
+        """只搜索指定的可读 Run；续读游标必须属于同一 Run。"""
         from .run_logs import query_trace
-        if not isinstance(keyword, str) or not keyword.strip() or type(all_runs) is not bool:
-            raise ValueError("keyword 必须非空，all_runs 必须为布尔值。")
-        if (all_runs and run_id is not None) or (not all_runs and (type(run_id) is not int or run_id < 1)):
-            raise ValueError("指定正整数 run_id，或显式 all_runs=true，不能同时选择。")
-        if start_run_id is not None and (type(start_run_id) is not int or start_run_id < 1):
-            raise ValueError("start_run_id 必须为正整数。")
-        if start_run_id is not None:
-            if not all_runs and start_run_id != run_id:
-                raise ValueError("游标不属于选定 Run。")
-        locations = self.visible_run_locations() if all_runs else {run_id: self.run_location(run_id)}
-        ids = sorted(locations, reverse=True)
-        if start_run_id is not None:
-            ids = [identity for identity in ids if identity <= start_run_id]
-            if ids and ids[0] != start_run_id:
-                start_sequence = 1
-        return self.text(query_trace(self.library.data_root, ids, start_sequence=start_sequence, limit=limit,
+        if not isinstance(keyword, str) or not keyword.strip():
+            raise ValueError("keyword 必须非空。")
+        if type(run_id) is not int or run_id < 1:
+            raise ValueError("必须指定正整数 run_id。")
+        if start_run_id is not None and (type(start_run_id) is not int or start_run_id != run_id):
+            raise ValueError("游标不属于选定 Run。")
+        locations = {run_id: self.run_location(run_id)}
+        return self.text(query_trace(self.library.data_root, [run_id], start_sequence=start_sequence, limit=limit,
                                     levels=levels, logical_name=logical_name, keyword=keyword, check=self.checkpoint,
                                     locations=locations))
 

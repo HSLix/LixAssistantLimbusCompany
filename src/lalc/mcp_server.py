@@ -28,7 +28,7 @@ Release only when idle. If control_token is lost, ask the local user to revoke. 
 def parameter_schema(name, default, tool):
     """把现有服务签名映射为工具参数；实际服务继续执行内容和路径校验。"""
     integer = {"offset", "limit", "start_sequence", "render_sequence", "run_id", "start_run_id", "text_offset", "history_offset"}
-    boolean = {"image", "unknown", "all_runs", "remove", "enabled", "use_saved_config", "auto_park_cursor", "explicit_user_request"}
+    boolean = {"image", "unknown", "remove", "enabled", "use_saved_config", "auto_park_cursor", "explicit_user_request"}
     arrays = {"images", "tags", "levels", "round_numbers", "repositories"}
     objects = {"inputs", "run_state", "version_group"}
     value: dict[str, Any]
