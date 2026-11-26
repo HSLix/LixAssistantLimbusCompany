@@ -3,6 +3,66 @@
   <context>
     <name>LALC</name>
     <message>
+      <source>Change details</source>
+      <translation>变更详情</translation>
+    </message>
+    <message>
+      <source>Package Manifest UUID: {0}</source>
+      <translation>包内 Manifest UUID：{0}</translation>
+    </message>
+    <message>
+      <source>The existing Manifest is not overwritten.</source>
+      <translation>不会覆盖现有 Manifest。</translation>
+    </message>
+    <message>
+      <source>Name</source>
+      <translation>名称</translation>
+    </message>
+    <message>
+      <source>Change</source>
+      <translation>变更</translation>
+    </message>
+    <message>
+      <source>Import action</source>
+      <translation>导入处理</translation>
+    </message>
+    <message>
+      <source>Show changes only</source>
+      <translation>只看有变化的项</translation>
+    </message>
+    <message>
+      <source>Modified</source>
+      <translation>有修改</translation>
+    </message>
+    <message>
+      <source>Removed</source>
+      <translation>移除</translation>
+    </message>
+    <message>
+      <source>Blocked</source>
+      <translation>无法导入</translation>
+    </message>
+    <message>
+      <source>Import as new version</source>
+      <translation>另存为新版本</translation>
+    </message>
+    <message>
+      <source>No import needed</source>
+      <translation>无需导入</translation>
+    </message>
+    <message>
+      <source>Decision needed</source>
+      <translation>待选择</translation>
+    </message>
+    <message>
+      <source>File changes</source>
+      <translation>文件变更</translation>
+    </message>
+    <message>
+      <source>{0} registered components</source>
+      <translation>{0} 个已登记组件</translation>
+    </message>
+    <message>
       <source>Latest published version: {0}. A verified download is unavailable.</source>
       <translation>最新发布版本为 {0}，暂无法取得通过校验的下载信息。</translation>
     </message>
@@ -1511,11 +1571,11 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review settings page</source>
-      <translation>审查业务设置页面</translation>
+      <translation>核验业务设置页面</translation>
     </message>
     <message>
       <source>Review both pages here. Other LALC windows are locked until this review closes.</source>
-      <translation>请在此对比两侧页面。关闭审查前，其他 LALC 窗口暂时锁定。</translation>
+      <translation>请在此对比两侧页面。关闭核验前，其他 LALC 窗口暂时锁定。</translation>
     </message>
     <message>
       <source>Current installed page</source>
@@ -1543,7 +1603,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Finish or close the page review before using other LALC windows.</source>
-      <translation>请先完成或关闭页面审查，再使用其他 LALC 窗口。</translation>
+      <translation>请先完成或关闭页面核验，再使用其他 LALC 窗口。</translation>
     </message>
     <message>
       <source>Page installed</source>
@@ -1563,11 +1623,11 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review</source>
-      <translation>Agent 审查</translation>
+      <translation>Agent 核验</translation>
     </message>
     <message>
       <source>Review the proposed page. Use Current and Review for comparison and details.</source>
-      <translation>请审查拟安装页，可切换原页面及 Agent 审查查看对比与详情。</translation>
+      <translation>请核验拟安装页，可切换原页面及 Agent 核验查看对比与详情。</translation>
     </message>
     <message>
       <source>File: {0}</source>
@@ -1603,7 +1663,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Page loading was checked. Configuration and Plan compatibility are reviewed by the Agent.</source>
-      <translation>已检查拟安装页加载。配置及 Plan 兼容影响由 Agent 审查说明。</translation>
+      <translation>已检查拟安装页加载。配置及 Plan 兼容影响由 Agent 核验说明。</translation>
     </message>
     <message>
       <source>Workflow</source>
@@ -1639,7 +1699,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review contents</source>
-      <translation>审阅导出内容</translation>
+      <translation>核验导出内容</translation>
     </message>
     <message>
       <source>Import Package</source>
@@ -1659,7 +1719,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review Page…</source>
-      <translation>Review 页面…</translation>
+      <translation>核验页面…</translation>
     </message>
     <message>
       <source>I understand imported code and records are untrusted.</source>
@@ -1679,7 +1739,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Imported page package. Check code, resources and effects on existing settings. Approval is only for this version.</source>
-      <translation>导入的页面包：请审阅代码、资源及其对现有配置的影响。批准仅适用于此版本。</translation>
+      <translation>导入的页面包：请核验代码、资源及其对现有配置的影响。批准仅适用于此版本。</translation>
     </message>
     <message>
       <source>An operation has not finished.</source>
@@ -1711,7 +1771,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review runs page Python in this application. Approval does not install it. Unreviewed pages require an extra installation confirmation.</source>
-      <translation>Review 会在本应用中运行页面 Python；批准不会立即安装。未 Review 的页面在安装前需要额外确认。</translation>
+      <translation>核验会在本应用中运行页面 Python；批准不会立即安装。未核验的页面在安装前需要额外确认。</translation>
     </message>
     <message>
       <source>Imported history is read-only external knowledge. Conversations, baseline, Candidate and page drafts cannot restore a Session or replay tools.</source>
@@ -1723,7 +1783,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Review failed</source>
-      <translation>Review 失败</translation>
+      <translation>核验失败</translation>
     </message>
     <message>
       <source>Import results</source>
@@ -1735,7 +1795,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Step 2 of 2 · Review and save</source>
-      <translation>第 2 步，共 2 步 · 审阅并保存</translation>
+      <translation>第 2 步，共 2 步 · 核验并保存</translation>
     </message>
     <message>
       <source>Save ZIP…</source>
@@ -1763,19 +1823,19 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Reviewed</source>
-      <translation>已 Review</translation>
+      <translation>已核验</translation>
     </message>
     <message>
       <source>Not reviewed</source>
-      <translation>未 Review</translation>
+      <translation>未核验</translation>
     </message>
     <message>
       <source>Install these pages without Review? Runtime identity, loading and interface have not been verified; they may fail after reload.</source>
-      <translation>是否安装以下尚未 Review 的页面？运行时身份、加载和页面接口未经验证，重载后可能报错。</translation>
+      <translation>是否安装以下尚未核验 的页面？运行时身份、加载和页面接口未经验证，重载后可能报错。</translation>
     </message>
     <message>
       <source>Unreviewed pages</source>
-      <translation>未 Review 的页面</translation>
+      <translation>未核验的页面</translation>
     </message>
     <message>
       <source>Pages were installed. Reload the application manually to use them.</source>
@@ -1787,7 +1847,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Unreviewed runtime identity, loading and interface are not verified. Existing settings are kept. Reload manually after installation.</source>
-      <translation>未 Review 时，运行身份、加载和接口未经验证；保留现有配置，安装后请手动重载。</translation>
+      <translation>核验前，运行时身份、加载和接口未经验证；保留现有配置，安装后请手动重载。</translation>
     </message>
     <message>
       <source>{0}: {1} changed files. Action: {2}</source>
@@ -1915,7 +1975,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Reviewed page identity: {0}</source>
-      <translation>已 Review 的页面身份：{0}</translation>
+      <translation>已核验的页面身份：{0}</translation>
     </message>
     <message>
       <source>Select all</source>
