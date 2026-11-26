@@ -86,6 +86,7 @@ class Window:
         self.image = screenshot()
         self.captures = 0
         self.foreground = True
+        self.size = (12, 8)
 
     def find_windows(self):
         return [7]
@@ -106,13 +107,19 @@ class Window:
             checkpoint()
 
     def window_info(self, hwnd):
-        return {"hwnd": 7, "process_id": 1, "width": 12, "height": 8,
+        return {"hwnd": 7, "process_id": 1, "width": self.size[0], "height": self.size[1],
                 "valid": True, "visible": True, "minimized": False,
                 "foreground": self.foreground, "title": "LimbusCompany"}
 
     def capture(self, hwnd, width, height):
         self.captures += 1
-        return pixels(self.image)
+        frame = np.zeros((height, width, 3), dtype=self.image.dtype)
+        image_height, image_width = self.image.shape[:2]
+        frame[:image_height, :image_width] = self.image
+        return pixels(frame)
+
+    def resize_client(self, hwnd, width, height):
+        self.size = (width, height)
 
 
 

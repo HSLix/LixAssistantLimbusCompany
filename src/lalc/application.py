@@ -519,7 +519,7 @@ class ApplicationService:
             self._input_session.execute(operation, arguments)
 
     def _start_session(self) -> None:
-        """首次聚焦前安装监听，启动后新增的键鼠活动进入统一等待。"""
+        """受控恢复并置前游戏窗口，在执行业务步骤前核验客户区尺寸。"""
 
         assert self._gate is not None
         self._gate.checkpoint()
@@ -555,6 +555,18 @@ class ApplicationService:
             try:
                 inputs.focus_window(hwnd, process_id=process_id, after_takeover=True,
                                     immediate_since=inputs.monitor.started_at)
+                startup_checkpoint()
+                before = platform.window_info(hwnd)
+                self._focused_session._require_window(before)
+                if before["process_id"] != process_id:
+                    raise WindowError("Target Window process changed before resize.")
+                if (before["width"], before["height"]) != (1280, 720):
+                    platform.resize_client(hwnd, 1280, 720)
+                    after = platform.window_info(hwnd)
+                    self._focused_session._require_window(after)
+                    if after["process_id"] != process_id or (after["width"], after["height"]) != (1280, 720):
+                        raise WindowError("Target Window did not reach the required 1280 × 720 client area.")
+                    self._emit("target_window_resized", {"before": before, "after": after})
             except GameProcessExited as error:
                 raise WindowError("Target Window process exited during startup.") from error
             finally:

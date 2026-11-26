@@ -91,6 +91,10 @@ class FakeWindowPlatform:
             self.foreground = False
         return bytes([self.captures, 2, 3, 255]) * (width * height)
 
+    def resize_client(self, hwnd, width, height):
+        assert self.foreground and not self.minimized
+        self.width, self.height = width, height
+
 
 def test_connect_saves_exact_screenshot_without_creating_run(tmp_path: Path) -> None:
     platform = FakeWindowPlatform()
@@ -265,8 +269,9 @@ def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) ->
     assert Path(output["evidence_path"]).suffix == ".avif"
     from PIL import Image
     with Image.open(output["evidence_path"]) as image:
-        assert image.format == "AVIF" and image.size == (2, 2)
+        assert image.format == "AVIF" and image.size == (1280, 720)
     events = [item["event"] for item in state["trace"]]
+    assert events.index("target_window_resized") < events.index("target_window_connected")
     assert events.index("target_window_connected") < events.index("screenshot_refreshed")
     assert events.index("screenshot_refreshed") < events.index("screenshot_saved")
     assert "trusted_action_returned" in events
@@ -278,6 +283,28 @@ def test_run_capture_uses_service_trace_and_explicit_evidence(tmp_path: Path) ->
     assert next_state["result"]["status"] == "success"
     assert "evidence_path" not in next_state["result"]["output"]
     assert not (tmp_path / "evidence" / str(next_run)).exists()
+
+
+def test_run_does_not_capture_when_client_resize_fails(tmp_path, monkeypatch):
+    manager = ManifestManager(tmp_path)
+    published = manager.publish(FIXTURE / "manifest.json")
+    assert published.ok, published.errors
+    platform = FakeWindowPlatform()
+    platform.width = platform.height = 0
+    monkeypatch.setattr(platform, "resize_client", lambda *_: None)
+    focus = platform.focus
+
+    def restore(hwnd, **kwargs):
+        focus(hwnd, **kwargs)
+        platform.width = platform.height = 2
+
+    monkeypatch.setattr(platform, "focus", restore)
+    service = ApplicationService(tmp_path, manifest_manager=manager, window_platform=platform)
+    run_id = service.start("steps.capture_screen", {}, manifest_id=published.loaded.manifest_id)
+    state = service.wait_for(lambda current: current["run_id"] == run_id and current["phase"] == "finished")
+    assert state["result"]["failure_code"] == "execution_failed"
+    assert "1280" in state["result"]["failure_message"]
+    assert platform.focus_calls == 1 and platform.captures == 0
 
 
 def test_focus_loss_during_run_capture_retries_before_saving(tmp_path: Path, monkeypatch) -> None:
@@ -318,6 +345,7 @@ def test_cancelled_run_does_not_cancel_later_developer_observation(tmp_path, mon
         def resize(hwnd, width, height):
             if checkpoint is not None:
                 checkpoint()
+            platform.width, platform.height = width, height
             return {"width": width, "height": height}
 
         platform.focus = checked_focus
