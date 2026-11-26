@@ -128,6 +128,9 @@ class FakeWindow:
                 "minimized": False, "foreground": self.foreground,
                 "title": "LimbusCompany", "width": self.width, "height": self.height}
 
+    def resize_client(self, hwnd, width, height):
+        self.width, self.height = width, height
+
     def capture(self, hwnd, width, height):
         self.captures += 1
         if self.capture_error:

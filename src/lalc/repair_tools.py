@@ -90,7 +90,8 @@ class RepairTools:
                        "page_list": self.page_list, "page_read": self.page_read,
                        "page_create": self.page_create, "page_update": self.page_update,
                        "page_resource": self.page_resource,
-                       "page_preview": self.page_preview, "page_set_enabled": self.page_set_enabled}
+                       "page_render": self.page_render, "page_preview": self.page_preview,
+                       "page_set_enabled": self.page_set_enabled}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
@@ -191,6 +192,17 @@ class RepairTools:
             else:
                 raise ValueError("资源复制仅允许页面、Asset 或知识库中的明确文件。")
         return self.text(self.page_drafts().write_resource(filename, path, content, remove=remove))
+
+    def page_render(self, filename, *, width=900):
+        """仅内置 Construct 可渲染当前草稿；结果不参与安装审批。"""
+        from .i18n import current_language
+        from .page_render import render_snapshot
+        drafts = self.page_drafts()
+        if drafts.session.entry != "gui" or "page_render" not in self.allowed:
+            raise ValueError("草稿截图仅限内置 Construct Agent。")
+        snapshot = drafts.snapshot(filename)
+        image = render_snapshot(snapshot["package"], self.library.data_root, current_language(), width, self.checkpoint)
+        return self.image(image, {"filename": filename, "sha256": snapshot["sha256"], "view": "draft_defaults"})
 
     def page_preview(self, filename, summary):
         """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""
@@ -617,26 +629,18 @@ class RepairTools:
         result["content"].append({"type": "image", "mimeType": "image/jpeg", "data": base64.b64encode(content).decode()})
         return result
 
-    def search_run_logs(self, keyword, run_id=None, *, all_runs=False, start_run_id=None,
+    def search_run_logs(self, keyword, run_id, *, start_run_id=None,
                         start_sequence=1, limit=100, levels=None, logical_name=None):
-        """按本机 Run ID 查询一个或全部可读日志；匹配和续读游标使用本机编号。"""
+        """只搜索指定的可读 Run；续读游标必须属于同一 Run。"""
         from .run_logs import query_trace
-        if not isinstance(keyword, str) or not keyword.strip() or type(all_runs) is not bool:
-            raise ValueError("keyword 必须非空，all_runs 必须为布尔值。")
-        if (all_runs and run_id is not None) or (not all_runs and (type(run_id) is not int or run_id < 1)):
-            raise ValueError("指定正整数 run_id，或显式 all_runs=true，不能同时选择。")
-        if start_run_id is not None and (type(start_run_id) is not int or start_run_id < 1):
-            raise ValueError("start_run_id 必须为正整数。")
-        if start_run_id is not None:
-            if not all_runs and start_run_id != run_id:
-                raise ValueError("游标不属于选定 Run。")
-        locations = self.visible_run_locations() if all_runs else {run_id: self.run_location(run_id)}
-        ids = sorted(locations, reverse=True)
-        if start_run_id is not None:
-            ids = [identity for identity in ids if identity <= start_run_id]
-            if ids and ids[0] != start_run_id:
-                start_sequence = 1
-        return self.text(query_trace(self.library.data_root, ids, start_sequence=start_sequence, limit=limit,
+        if not isinstance(keyword, str) or not keyword.strip():
+            raise ValueError("keyword 必须非空。")
+        if type(run_id) is not int or run_id < 1:
+            raise ValueError("必须指定正整数 run_id。")
+        if start_run_id is not None and (type(start_run_id) is not int or start_run_id != run_id):
+            raise ValueError("游标不属于选定 Run。")
+        locations = {run_id: self.run_location(run_id)}
+        return self.text(query_trace(self.library.data_root, [run_id], start_sequence=start_sequence, limit=limit,
                                     levels=levels, logical_name=logical_name, keyword=keyword, check=self.checkpoint,
                                     locations=locations))
 

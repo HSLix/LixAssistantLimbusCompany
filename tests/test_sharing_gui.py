@@ -157,12 +157,41 @@ def test_tabs_view_state_asset_conflicts_and_recheck_are_independent(window, sou
         dialog.assets.setCurrentItem(leaf)
         assert not dialog.asset_more.isChecked()
         assert "changed files" in dialog.asset_summary.text()
+        assert [leaf.text(column) for column in range(3)] == ["ui", "Modified", "Skip"]
+        assert "New · " in dialog.asset_changes.toPlainText()
+        assert "Removed · " in dialog.asset_changes.toPlainText()
         viewed = set(dialog.viewed)
         dialog.recheck()
         assert dialog.viewed == viewed and dialog.asset_actions
         put_asset(window.service.data_root, "ui", png("purple"))
         dialog.recheck()
         assert not dialog.asset_actions and not dialog.commit.isEnabled()
+    finally:
+        dialog.close()
+        package.close()
+
+
+def test_import_change_columns_filter_and_full_name(window, source, tmp_path):
+    manager, _ = source
+    identity = "ui/a-very-long-asset-group-name-that-cannot-fit-in-the-left-pane"
+    put_asset(manager.data_root, identity, png("red"))
+    put_asset(window.service.data_root, identity, png("red"))
+    package = make_package(source, tmp_path)
+    dialog = ImportDialog(window, package)
+    try:
+        dialog.visit("assets")
+        leaf = next(item for item in tree_items(dialog.assets) if item.data(0, 256) == identity)
+        dialog.assets.setCurrentItem(leaf)
+        assert leaf.text(1) == "Same content"
+        assert leaf.text(2) == "No import needed"
+        assert leaf.toolTip(0) == identity
+        assert identity in dialog.asset_summary.text()
+        selected = set(dialog.selected)
+        dialog.changes_only.setChecked(True)
+        assert leaf.isHidden() and dialog.selected == selected
+        assert identity not in dialog.asset_summary.text()
+        dialog.changes_only.setChecked(False)
+        assert not leaf.isHidden()
     finally:
         dialog.close()
         package.close()
@@ -348,7 +377,7 @@ def test_skill_import_defaults_and_asset_tree_depth(window, source, tmp_path):
         dialog.trust.setChecked(True)
         dialog.set_kind_selected('skills', True)
         assert dialog.commit.isEnabled()
-        assert dialog.skills.item(0).checkState().value == 2
+        assert dialog.skills.topLevelItem(0).checkState(0).value == 2
     finally:
         dialog.close()
         package.close()

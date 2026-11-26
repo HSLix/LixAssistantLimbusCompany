@@ -323,6 +323,10 @@ def _dispatch(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
+    if len(args) == 5 and args[0] == "--page-render-worker":
+        from .page_render import render_worker
+
+        return render_worker(Path(args[1]), Path(args[2]), args[3], int(args[4]))
     if len(args) == 4 and args[0] == "--focus-worker" and sys.platform == "win32":
         from .focused import WindowsWindowPlatform
 

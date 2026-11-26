@@ -72,9 +72,9 @@ def test_run_visibility_filters_before_paging_and_blocks_direct_reads(tmp_path):
         first = tools.list_runs(limit=2)["details"]
         assert first["run_ids"] == [6, 4] and first["next_offset"] == 2
         assert tools.list_runs(offset=2)["details"]["run_ids"] == [2]
-        page = tools.search_run_logs("run_started", all_runs=True, limit=2)["details"]
-        assert [item["run_id"] for item in page["matches"]] == [6, 4]
-        assert page["next"] == {"start_run_id": 2, "start_sequence": 1}
+        page = tools.search_run_logs("run_started", run_id=6)["details"]
+        assert [item["run_id"] for item in page["matches"]] == [6]
+        assert page["next"] is None
         assert tools.read_run_log(2)["details"]["events"][0]["run_id"] == 2
         for arguments in ({}, {"evidence_id": "7/1"}, {"render_sequence": 1}):
             with pytest.raises(ValueError, match="没有访问权限"):

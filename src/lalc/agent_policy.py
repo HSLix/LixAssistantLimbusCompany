@@ -7,7 +7,7 @@ BASE_TOOLS = ("read", "edit", "asset_tree", "asset_directory", "asset_images",
               "list_game_versions", "search_agent_sessions", "read_agent_session")
 KNOWLEDGE_TOOLS = ("knowledge_list", "knowledge_read", "knowledge_search_literal", "knowledge_search_hybrid", "knowledge_git")
 GUI_TOOLS = KNOWLEDGE_TOOLS + ("request_feedback", "delete_component")
-PAGE_TOOLS = ("page_list", "page_create", "page_resource", "page_preview", "page_set_enabled")
+PAGE_TOOLS = ("page_list", "page_create", "page_resource", "page_render", "page_preview", "page_set_enabled")
 MANIFEST_REFERENCE_TOOLS = ("list_manifests", "read_manifest", "read_manifest_source", "search_manifest_source")
 HISTORY_TOOLS = ("list_game_versions", "search_agent_sessions", "read_agent_session")
 RUNTIME_TOOLS = tuple(name for name in BASE_TOOLS if name not in {"remove_asset", "restore_asset", "trial_run"}) + (

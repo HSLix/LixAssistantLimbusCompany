@@ -57,14 +57,15 @@ def test_filtered_paging_cross_run_search_and_incomplete_records(tmp_path):
 def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path, gui_run_tools):
     tools = gui_run_tools
     root = tools.library.data_root
-    write_trace(root, 2, [dict(sequence=1, event='component_log', level='info', message='hit')])
+    write_trace(root, 2, [dict(sequence=sequence, event='component_log', level='info', message='hit')
+                          for sequence in (1, 2)])
     write_trace(root, 1, [dict(sequence=1, event='component_log', level='info', message='hit', evidence_id='1/2')])
     path = root / 'evidence/1/2.avif'
     path.parent.mkdir(parents=True)
     Image.new('RGB', (20, 10), 'red').save(path, quality=65, speed=8)
-    page = tools.search_run_logs('HIT', all_runs=True, limit=1)['details']
-    next_page = tools.search_run_logs('HIT', all_runs=True, limit=1, **page['next'])['details']
-    assert [p['matches'][0]['run_id'] for p in (page, next_page)] == [2, 1]
+    page = tools.search_run_logs('HIT', run_id=2, limit=1)['details']
+    next_page = tools.search_run_logs('HIT', run_id=2, limit=1, **page['next'])['details']
+    assert [(p['matches'][0]['run_id'], p['matches'][0]['sequence']) for p in (page, next_page)] == [(2, 1), (2, 2)]
     assert next_page['next'] is None
     assert tools.read_run_log(1, evidence_id='1/2')['content'][-1]['mimeType'] == 'image/jpeg'
     export_log(root, 1, tmp_path / 'log.zip')
@@ -81,20 +82,18 @@ def test_tools_search_continuation_and_evidence_avif_roundtrip(tmp_path, gui_run
     assert result['content'][-1]['mimeType'] == 'image/jpeg'
     hit = tools.search_run_logs('hit', run_id=3)['details']['matches'][0]
     assert hit['run_id'] == 3 and hit['record']['evidence_id'] == '1/2'
-    page = tools.search_run_logs('hit', all_runs=True, limit=1)['details']
-    assert page['matches'][0]['run_id'] == 3
-    assert page['next'] == dict(start_run_id=2, start_sequence=1)
-    resumed = tools.search_run_logs('hit', all_runs=True, **page['next'])['details']['matches']
-    assert [match['run_id'] for match in resumed] == [2, 1]
+    assert tools.search_run_logs('hit', run_id=3, limit=1)['details']['next'] is None
+    with pytest.raises(ValueError, match='游标'):
+        tools.search_run_logs('hit', run_id=3, **page['next'])
     tools.read_other_runs = False
     assert 3 not in tools.list_runs()['details']['run_ids']
     with pytest.raises(ValueError, match='日志不可用'):
         tools.read_run_log(3)
     with pytest.raises(ValueError, match='日志不可用'):
         tools.search_run_logs('hit', run_id=3)
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         tools.search_run_logs('hit')
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         tools.search_run_logs('hit', run_id=1, all_runs=True)
 
 

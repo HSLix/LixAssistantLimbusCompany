@@ -188,7 +188,7 @@ class InputSession:
                     raise WindowError("Target Window disappeared while waiting for user activity.")
                 if info["process_id"] != process_id:
                     raise WindowError("Target Window process changed.")
-                if not info["visible"] or info["width"] <= 0 or info["height"] <= 0:
+                if not info["visible"] or (not info["minimized"] and (info["width"] <= 0 or info["height"] <= 0)):
                     raise WindowError("Target Window is hidden or has an empty client area.")
                 foreground = info["foreground"] and not info["minimized"]
                 # 点击其他窗口的回调可能先于前台切换，空闲计时不依赖当时的前台。

@@ -784,7 +784,7 @@ def inspect_objects(manager, package):
                 old = (asset_files if kind == "assets" else skill_files)(manager.data_root, identity)
                 result.update(before=files_version(old) if old is not None else None,
                               same=old == files, conflict=old is not None and old != files,
-                              changed_files=[name for name in sorted(set(old or {}) | set(files)) if (old or {}).get(name) != files.get(name)])
+                              changed_files=file_changes(old or {}, files))
             elif kind == "page_settings":
                 old = UserSettings(manager.data_root).value["pages"].get(identity)
                 before = settings_version(old)
@@ -807,7 +807,10 @@ def inspect_objects(manager, package):
                 snapshot = PageSnapshot(files)
                 result.update(declarations=page_declarations(snapshot), package=snapshot)
                 target = installed_page(manager.data_root, identity)
-                result.update(target=target, before=snapshot_page(target, freeze=False).sha256 if target.exists() else None)
+                old = snapshot_page(target, freeze=False) if target.exists() else None
+                result.update(target=target, before=old.sha256 if old else None,
+                              same=old is not None and old.sha256 == snapshot.sha256,
+                              changed_files=file_changes(old.files if old else {}, files))
             else:
                 _relative(identity)
                 if any(not (name.startswith(("log/", "candidate/", "baseline/", "page-drafts/", "runs/")) or name in {"baseline-origin.json", "missing-evidence.json", "snapshot-info.json"}) for name in files):
@@ -823,6 +826,13 @@ def inspect_objects(manager, package):
             result["errors"].append(str(error))
         results[obj["number"]] = result
     return results
+
+
+def file_changes(old, new):
+    """依内容比较文件，保留新增、修改和移除的类别。"""
+    return {name: "added" if name not in old else "removed" if name not in new else "modified"
+            for name in sorted(old.keys() | new.keys())
+            if name not in old or name not in new or content_hash(old[name]) != content_hash(new[name])}
 
 
 def validate_history(root, *, output=None, log_root=None):
@@ -1054,7 +1064,7 @@ def import_selected(manager, package, checks, selected, *, asset_actions, review
                     transfer_file(record["size"], record["size"], name, finished=True)
                 elif kind == "pages":
                     if number not in reviewed and not allow_unreviewed:
-                        raise ValueError("页面尚未 Review，也未明确确认跳过 Review 安装。")
+                        raise ValueError("页面尚未核验，也未明确确认跳过核验并安装。")
                     target = installed_page(manager.data_root, identity)
                     before = snapshot_page(target, freeze=False).sha256 if target.exists() else None
                     if before != check["before"]:
