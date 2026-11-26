@@ -184,7 +184,7 @@ A new package is available to import.</source>
     </message>
     <message>
       <source>No resources have been set up yet. Import the bundled Workflow, Assets, extension pages and Skills? Installed pages can run code when LALC is reloaded.</source>
-      <translation>检测到当前设置为空，是否导入默认资源包？它包含工作流、素材、扩展页面和 Skills。重新加载 LALC 后，已安装的页面可以运行代码。</translation>
+      <translation>检测到当前设置为空，是否导入默认资源包？它包含工作流、识别素材、扩展页面和 Skills。重新加载 LALC 后，已安装的页面可以运行代码。</translation>
     </message>
     <message>
       <source>Default resources imported. Reload LALC to load the pages, then select the imported Workflow version.</source>
@@ -543,7 +543,7 @@ You can copy the original error information and report it to the developer.</sou
     <message>
       <location filename="../developer_gui.py" line="376" />
       <source>Confirm Asset save</source>
-      <translation>确认保存 Asset</translation>
+      <translation>确认保存 识别素材</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="621" />
@@ -749,12 +749,12 @@ Log: {1}</source>
     <message>
       <location filename="../developer_gui.py" line="313" />
       <source>Full Asset logical name</source>
-      <translation>Asset 完整逻辑名</translation>
+      <translation>识别素材 完整逻辑名</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="310" />
       <source>Full Asset logical name, e.g. ui/claim</source>
-      <translation>Asset 完整逻辑名，例如 ui/claim</translation>
+      <translation>识别素材 完整逻辑名，例如 ui/claim</translation>
     </message>
     <message>
       <location filename="../gui.py" line="485" />
@@ -936,7 +936,7 @@ Log: {1}</source>
     <message>
       <location filename="../developer_gui.py" line="282" />
       <source>Open Asset directory</source>
-      <translation>打开 Asset 目录</translation>
+      <translation>打开 识别素材 目录</translation>
     </message>
     <message>
       <location filename="../gui.py" line="518" />
@@ -1127,7 +1127,7 @@ Log: {1}</source>
     <message>
       <location filename="../i18n.py" line="80" />
       <source>Saving Asset</source>
-      <translation>保存 Asset</translation>
+      <translation>保存 识别素材</translation>
     </message>
     <message>
       <location filename="../developer_gui.py" line="332" />
@@ -1671,7 +1671,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Assets</source>
-      <translation>Assets</translation>
+      <translation>识别素材</translation>
     </message>
     <message>
       <source>Extension Pages</source>
@@ -1711,7 +1711,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Select an Asset to inspect conflicts.</source>
-      <translation>请选择 Asset 查看冲突。</translation>
+      <translation>请选择 识别素材 查看冲突。</translation>
     </message>
     <message>
       <source>Show conflict details</source>
@@ -1751,7 +1751,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Only selected objects are shared. Assets are independent of Workflow. Agent History is off by default.</source>
-      <translation>仅分享所选对象；Assets 与 Workflow 独立选择，Agent 历史默认不勾选。</translation>
+      <translation>仅分享所选对象；识别素材 与 Workflow 独立选择，Agent 历史默认不勾选。</translation>
     </message>
     <message>
       <source>Privacy warning: conversations, screenshots, paths, source and resources may contain private information. No privacy scan is performed. Check before sharing.</source>
@@ -1807,7 +1807,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>No Default change or automatic execution. Assets are imported separately.</source>
-      <translation>不改变 Default，不自动执行；Assets 独立导入。</translation>
+      <translation>不改变 Default，不自动执行；识别素材 独立导入。</translation>
     </message>
     <message>
       <source>{0}/{1} categories viewed</source>
@@ -1815,7 +1815,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Asset conflicts: {0} groups, {1} files</source>
-      <translation>Asset 冲突：{0} 组，{1} 个文件</translation>
+      <translation>识别素材 冲突：{0} 组，{1} 个文件</translation>
     </message>
     <message>
       <source>Check failed</source>
@@ -1831,7 +1831,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Install these pages without Review? Runtime identity, loading and interface have not been verified; they may fail after reload.</source>
-      <translation>是否安装以下尚未核验 的页面？运行时身份、加载和页面接口未经验证，重载后可能报错。</translation>
+      <translation>是否安装以下尚未核验的页面？运行时身份、加载和页面接口未经验证，重载后可能报错。</translation>
     </message>
     <message>
       <source>Unreviewed pages</source>
@@ -1863,7 +1863,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Choose Replace all conflicts or Skip all conflicts for Assets.</source>
-      <translation>请为重复的 Assets 选择全部替换或全部跳过。</translation>
+      <translation>请为重复的 识别素材 选择全部替换或全部跳过。</translation>
     </message>
     <message>
       <source>Conflict</source>
@@ -1919,7 +1919,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Share Workflows, Assets, extension pages or Agent history.</source>
-      <translation>分享 Workflow、Assets、扩展页面或 Agent 历史。</translation>
+      <translation>分享 Workflow、识别素材、扩展页面或 Agent 历史。</translation>
     </message>
     <message>
       <source>Export…</source>
@@ -1943,7 +1943,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Assets are selected by default. Deselect groups you do not want to share.</source>
-      <translation>Assets 默认全选，请取消不希望分享的逻辑组。</translation>
+      <translation>识别素材 默认全选，请取消不希望分享的逻辑组。</translation>
     </message>
     <message>
       <source>Candidate and page drafts are snapshots taken at export time, not per-round versions.</source>
@@ -2055,11 +2055,11 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Select an Asset or image. Capture once, adjust parameters, then run on the frozen screenshot.</source>
-      <translation>选择 Asset 或单图；截图后固定原图，调整参数并运行匹配。</translation>
+      <translation>选择 识别素材 或单图；截图后固定原图，调整参数并运行匹配。</translation>
     </message>
     <message>
       <source>Assets / Templates</source>
-      <translation>Asset / 模板</translation>
+      <translation>识别素材 / 模板</translation>
     </message>
     <message>
       <source>No template selected.</source>
@@ -2107,7 +2107,7 @@ Original pixel region: {2}</source>
     </message>
     <message>
       <source>Asset group: {0}</source>
-      <translation>Asset 整组：{0}</translation>
+      <translation>识别素材 整组：{0}</translation>
     </message>
     <message>
       <source>Search region: {0}</source>
@@ -2315,7 +2315,7 @@ Original pixel region: {2}</source>
     <message><source>Replace draft</source><translation>替换草稿</translation></message>
     <message><source>Image unavailable: {0}</source><translation>图片不可用：{0}</translation></message>
 <message><source>Skills</source><translation>Skills</translation></message>
-<message><source>Choose Replace all conflicts or Skip all conflicts for Assets / Skills.</source><translation>请为冲突的 Asset／Skill 选择全部覆盖或全部跳过。</translation></message>
+<message><source>Choose Replace all conflicts or Skip all conflicts for Assets / Skills.</source><translation>请为冲突的 识别素材／Skill 选择全部覆盖或全部跳过。</translation></message>
 <message><source>Allow querying published Manifests</source><translation>允许查询已发布 Manifest</translation></message>
 <message><source>Allow searching Agent history</source><translation>允许检索历史 Agent 记录</translation></message>
 <message><source>Allow viewing logs from other runs</source><translation>允许查看其他 Run 的日志</translation></message>
@@ -2666,7 +2666,7 @@ Original pixel region: {2}</source>
     <message><source>Recent remote operations</source><translation>近期远程操作</translation></message>
     <message><source>Remote code can publish and execute Python with this Windows user's permissions. Validation is not a sandbox. Allow remote development until revoked or LALC exits?</source><translation>远程代码可使用当前 Windows 用户权限发布和执行 Python，校验不提供沙箱隔离。允许远程开发，直到撤销或退出 LALC？</translation></message>
     <message><source>Replace MCP Candidate</source><translation>替换 MCP Candidate</translation></message>
-    <message><source>Replace the unpublished Candidate and its baseline? Page drafts, published versions, Assets and operation history are retained.</source><translation>替换未发布的 Candidate 及比较基线？页面草稿、已发布版本、Assets 和操作记录保留。</translation></message>
+    <message><source>Replace the unpublished Candidate and its baseline? Page drafts, published versions, Assets and operation history are retained.</source><translation>替换未发布的 Candidate 及比较基线？页面草稿、已发布版本、识别素材 和操作记录保留。</translation></message>
     <message><source>Reset connection token</source><translation>重置连接令牌</translation></message>
     <message><source>Revoke remote control</source><translation>撤销远程控制</translation></message>
     <message><source>Save connection</source><translation>保存连接设置</translation></message>
@@ -2703,14 +2703,14 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Page settings may contain private information. The matching page may not be installed; configuration compatibility is not verified.</source><translation>页面配置可能包含私人信息。对应页面可能尚未安装；配置字段兼容性未经验证。</translation></message>
     <message><source>Current settings:</source><translation>当前配置：</translation></message>
     <message><source>Settings after import:</source><translation>导入后的配置：</translation></message>
-    <message><source>Choose Replace or Skip for each selected conflict (Assets / Skills / Page Settings).</source><translation>请为选中的冲突项选择替换或跳过（Asset／Skill／页面配置）。</translation></message>
+    <message><source>Choose Replace or Skip for each selected conflict (Assets / Skills / Page Settings).</source><translation>请为选中的冲突项选择替换或跳过（识别素材／Skill／页面配置）。</translation></message>
     <message><source>Page settings were imported. Reload the application before running.</source><translation>页面配置已导入，请重载应用后再运行。</translation></message>
     <message><source>All roles</source><translation>全部角色</translation></message>
     <message><source>All sources</source><translation>所有来源</translation></message>
     <message><source>All versions</source><translation>全部版本</translation></message>
     <message><source>Any date</source><translation>不限</translation></message>
-    <message><source>Asset name</source><translation>素材逻辑名</translation></message>
-    <message><source>Asset names</source><translation>素材逻辑名</translation></message>
+    <message><source>Asset name</source><translation>识别素材逻辑名</translation></message>
+    <message><source>Asset names</source><translation>识别素材逻辑名</translation></message>
     <message><source>Calls</source><translation>调用次数</translation></message>
     <message><source>Calls are counted by source version from available local logs and usage summaries.</source><translation>按源码版本统计，覆盖可用的本机日志和使用摘要。</translation></message>
     <message><source>Cancelled</source><translation>已取消</translation></message>
@@ -2742,7 +2742,7 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Imported logs</source><translation>导入日志</translation></message>
     <message><source>Items to delete</source><translation>待删条目</translation></message>
     <message><source>Last match</source><translation>最近命中</translation></message>
-    <message><source>Last match is read from the Asset usage index.</source><translation>最近命中来自素材使用索引。</translation></message>
+    <message><source>Last match is read from the Asset usage index.</source><translation>最近命中来自识别素材使用索引。</translation></message>
     <message><source>Last used</source><translation>最近使用</translation></message>
     <message><source>Latest</source><translation>最新</translation></message>
     <message><source>Loading data…</source><translation>正在加载数据…</translation></message>
@@ -2769,7 +2769,7 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>Run count</source><translation>运行次数</translation></message>
     <message><source>Run counts cover available local logs and usage summaries.</source><translation>运行次数覆盖可用的本机日志和使用摘要。</translation></message>
     <message><source>Run logs</source><translation>运行日志</translation></message>
-    <message><source>Search Asset name</source><translation>搜索素材逻辑名</translation></message>
+    <message><source>Search Asset name</source><translation>搜索识别素材逻辑名</translation></message>
     <message><source>Search Component name or version</source><translation>搜索组件逻辑名或版本</translation></message>
     <message><source>Select filtered results</source><translation>全选筛选结果</translation></message>
     <message><source>Show {0} Component sources to be deleted</source><translation>查看将删除的 {0} 份组件源码</translation></message>
@@ -2809,7 +2809,7 @@ Last used: {1}</source><translation>来源 Manifest：{0}
     <message><source>{0} sources</source><translation>{0} 份</translation></message>
     <message><source>{0} names</source><translation>{0} 个</translation></message>
     <message><source>{0} images</source><translation>{0} 张</translation></message>
-    <message><source>Asset inventory</source><translation>素材</translation></message>
+    <message><source>Asset inventory</source><translation>识别素材</translation></message>
     <message><source>All workflow versions will be checked for references again before deletion.</source><translation>删除前会重新检查全部工作流版本中的引用。</translation></message>
     <message><source>A selected Component source is invalid or still referenced.</source><translation>所选组件源码无效，或仍被工作流版本引用。</translation></message>
     <message><source>Component sources</source><translation>组件源码</translation></message>
