@@ -90,7 +90,8 @@ class RepairTools:
                        "page_list": self.page_list, "page_read": self.page_read,
                        "page_create": self.page_create, "page_update": self.page_update,
                        "page_resource": self.page_resource,
-                       "page_preview": self.page_preview, "page_set_enabled": self.page_set_enabled}
+                       "page_render": self.page_render, "page_preview": self.page_preview,
+                       "page_set_enabled": self.page_set_enabled}
             methods.update(list_game_versions=self.list_game_versions, search_agent_sessions=self.search_agent_sessions,
                            read_agent_session=self.read_agent_session)
             result = methods[name](**arguments)
@@ -191,6 +192,17 @@ class RepairTools:
             else:
                 raise ValueError("资源复制仅允许页面、Asset 或知识库中的明确文件。")
         return self.text(self.page_drafts().write_resource(filename, path, content, remove=remove))
+
+    def page_render(self, filename, *, width=900):
+        """仅内置 Construct 可渲染当前草稿；结果不参与安装审批。"""
+        from .i18n import current_language
+        from .page_render import render_snapshot
+        drafts = self.page_drafts()
+        if drafts.session.entry != "gui" or "page_render" not in self.allowed:
+            raise ValueError("草稿截图仅限内置 Construct Agent。")
+        snapshot = drafts.snapshot(filename)
+        image = render_snapshot(snapshot["package"], self.library.data_root, current_language(), width, self.checkpoint)
+        return self.image(image, {"filename": filename, "sha256": snapshot["sha256"], "view": "draft_defaults"})
 
     def page_preview(self, filename, summary):
         """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""

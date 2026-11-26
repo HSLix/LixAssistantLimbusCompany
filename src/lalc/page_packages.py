@@ -154,9 +154,9 @@ def _write_snapshot(snapshot, directory):
 
 
 @contextmanager
-def materialized_page(snapshot):
+def materialized_page(snapshot, *, work_dir=None):
     """临时提供固定整包入口，供预览在整个窗口生命周期内使用。"""
-    with WorkDirectory(prefix="lalc-page-preview-") as temporary:
+    with WorkDirectory(dir=work_dir, prefix="lalc-page-preview-") as temporary:
         package = Path(temporary).resolve() / "package"
         _write_snapshot(snapshot, package)
         yield package / "page.py"

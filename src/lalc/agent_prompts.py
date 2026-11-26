@@ -41,7 +41,9 @@ revise_success=true 表示本轮请求的修订已完成且相关静态校验通
 """
 
 MODE_PROMPTS = {
-    "Construct": "# Mode: Construct\n根据开发者需求构建、扩展或修复 Workflow；页面工作仅在实际启用 page_* 工具时进行。",
+    "Construct": "# Mode: Construct\n根据开发者需求构建、扩展或修复 Workflow；页面工作仅在实际启用 page_* 工具时进行。"
+                 "如果提供 page_render，修改可见布局后用它检查当前草稿截图；必要时调整并重拍。"
+                 "截图仅含默认值和当前视口，不验证真实配置或安装；安装仍需 page_preview 人工审批。",
     "Repair": "# Mode: Repair\n聚焦 Workflow / Asset 的故障定位和修复，使用当前启用的工具。",
 }
 
