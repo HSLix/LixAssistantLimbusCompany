@@ -10,7 +10,7 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable,
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
-from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget
+from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, IndeterminateProgressRing
 
 from .work_files import WorkDirectory
 from .file_content import FileContent, image_preview
@@ -18,6 +18,10 @@ from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
 from .run_logs import image_metadata, read_page, run_manifest_ids, snapshot
 from .run_log_sharing import list_logs, export_log, import_log
+
+
+LOG_WINDOW = 40
+LOG_STEP = 20
 
 
 def log_colors(level: str) -> tuple[str, str]:
@@ -219,6 +223,7 @@ class RunLogPage(QWidget):
         self.images, self.pending_images = OrderedDict(), set()
         self.loading, self.older_done, self.newer_done = False, False, True
         self.pending_boundary = None
+        self.manifest_boundary, self.manifest_cancelled = None, Event()
         layout = QVBoxLayout(self)
         filters = QHBoxLayout()
         self.levels = {}
@@ -311,45 +316,73 @@ class RunLogPage(QWidget):
         self.details_toggle.toggled.connect(self.show_run_details)
         details.addWidget(self.run_metadata)
         details.addWidget(self.view, 1)
-        body.addWidget(detail_card, 1)
-        layout.addLayout(body, 1)
+        feedback = QHBoxLayout()
+        self.loading_ring = IndeterminateProgressRing(start=False)
+        self.loading_ring.setFixedSize(18, 18)
+        self.loading_ring.setStrokeWidth(2)
+        self.loading_ring.setAccessibleName(tr("Loading logs…"))
+        self.loading_ring.hide()
+        feedback.addWidget(self.loading_ring)
+        self.loading_label = BodyLabel(tr("Loading logs…"))
+        self.loading_label.hide()
+        feedback.addWidget(self.loading_label, 1)
         self.status = BodyLabel()
         self.status.setWordWrap(True)
-        layout.addWidget(self.status)
+        self.status.setMinimumHeight(max(18, self.status.sizeHint().height()))
+        feedback.addWidget(self.status, 1)
+        details.addLayout(feedback)
+        body.addWidget(detail_card, 1)
+        layout.addLayout(body, 1)
         self.debounce = QTimer(self)
         self.debounce.setSingleShot(True)
         self.debounce.setInterval(250)
         self.debounce.timeout.connect(self.reload_filter)
         self.search.textChanged.connect(self.filter_changed)
+        self.view.viewport().installEventFilter(self)
+        self.view.installEventFilter(self)
         self.destroyed.connect(lambda *_: self.cancelled.set())
+        self.destroyed.connect(lambda *_: self.manifest_cancelled.set())
 
-    def submit(self, operation, done):
+    def submit(self, operation, done, *, foreground=False, independent=False):
         """将文件读取移出主线程；旧筛选或旧运行的结果不能覆盖当前页。"""
         self.serial += 1
-        identity, generation = self.serial, self.generation
+        identity = self.serial
         task = ReadTask(identity, operation)
         self.tasks[identity] = task
-        self.callbacks[identity] = (generation, done)
+        self.callbacks[identity] = (None if independent else self.generation, done, foreground)
         task.signals.done.connect(self.completed, Qt.ConnectionType.QueuedConnection)
         QThreadPool.globalInstance().start(task)
 
     @Slot(int, object)
     def completed(self, identity, result):
         self.tasks.pop(identity, None)
-        generation, done = self.callbacks.pop(identity, (None, None))
-        if generation != self.generation:
+        generation, done, foreground = self.callbacks.pop(identity, (None, None, False))
+        if done is None or (generation is not None and generation != self.generation):
             return
-        if isinstance(result, Exception):
-            self.loading = False
+        if isinstance(result, Exception) and generation is not None:
+            if foreground:
+                self.set_loading(False)
             self.status.setText(tr("Log unavailable") + ": " + str(result))
         else:
             done(result)
+
+    def set_loading(self, loading):
+        if self.loading == loading:
+            return
+        self.loading = loading
+        if loading:
+            self.loading_ring.start()
+        else:
+            self.loading_ring.stop()
+        self.loading_ring.setVisible(loading)
+        self.loading_label.setVisible(loading)
+        self.status.setVisible(not loading)
 
     def invalidate(self):
         self.cancelled.set()
         self.cancelled = Event()
         self.generation += 1
-        self.loading = False
+        self.set_loading(False)
         self.pending_images.clear()
 
     def copy_log(self, index):
@@ -389,6 +422,9 @@ class RunLogPage(QWidget):
     def refresh_runs(self, *_, preferred=None):
         """按来源过滤并按原始运行时间排序，导入身份独立于本机编号。"""
         source = self.source_mode
+        initial = self.selected_key is None
+        if initial:
+            self.set_loading(True)
         self.listing_serial = getattr(self, 'listing_serial', 0) + 1
         serial = self.listing_serial
         def shown(entries):
@@ -416,6 +452,9 @@ class RunLogPage(QWidget):
                 self.select_run(self.runs.item(0))
             elif not self.runs.count():
                 self.invalidate()
+                self.manifest_cancelled.set()
+                self.manifest_boundary = self.pending_boundary = None
+                self.new_logs.hide()
                 self.model.replace([])
                 self.run_id = self.trace_run_id = self.selected_key = self.boundary = None
                 self.run_title.clear()
@@ -425,7 +464,7 @@ class RunLogPage(QWidget):
                 self.copy_run_id.hide()
                 self.export_button.setEnabled(False)
                 self.status.setText(tr('No run logs'))
-        self.submit(lambda: list_logs(self.root), shown)
+        self.submit(lambda: list_logs(self.root), shown, foreground=initial)
 
     def runs_scrolled(self, value):
         """用户滚到列表底部时追加下一批，不切换右侧运行。"""
@@ -434,7 +473,24 @@ class RunLogPage(QWidget):
             self.append_runs()
 
     def eventFilter(self, watched, event):
-        """首批不足以产生滚动条时，仍允许滚轮和键盘请求较旧记录。"""
+        """滚动条无法继续移动时，也能用滚轮和键盘请求相邻记录。"""
+        view = getattr(self, 'view', None)
+        if view is not None and (watched is view or watched is view.viewport()):
+            if not self.loading and self.model.rows and not self.debounce.isActive():
+                if event.type() == QEvent.Type.Wheel:
+                    delta = event.angleDelta().y() or event.pixelDelta().y()
+                elif event.type() == QEvent.Type.KeyPress:
+                    delta = {Qt.Key.Key_PageUp: 1, Qt.Key.Key_PageDown: -1}.get(event.key(), 0)
+                else:
+                    delta = 0
+                bar = self.view.verticalScrollBar()
+                if delta < 0 and bar.value() == bar.maximum() and not self.older_done:
+                    self.more(True, advance=True)
+                    return True
+                if delta > 0 and bar.value() == bar.minimum() and not self.newer_done:
+                    self.more(False, advance=True)
+                    return True
+            return super().eventFilter(watched, event)
         if self.runs.verticalScrollBar().maximum() == 0:
             if (watched is self.runs.viewport() and event.type() == QEvent.Type.Wheel
                     and event.angleDelta().y() < 0):
@@ -545,6 +601,9 @@ class RunLogPage(QWidget):
             self.run_metadata.setText('\n'.join(metadata))
             self.details_toggle.setChecked(False)
             self.copy_details.setEnabled(False)
+            self.manifest_cancelled.set()
+            self.manifest_boundary = self.pending_boundary = None
+            self.new_logs.hide()
         self.details_toggle.show()
         self.copy_details.show()
         self.copy_run_id.setVisible(entry['imported'])
@@ -555,39 +614,66 @@ class RunLogPage(QWidget):
         if changed:
             self.boundary = None
             self.model.replace([])
+            self.status.clear()
         self.run_id, self.trace_run_id, self.selected_key = entry['run_id'], identity, key
-        self.loading = True
+        self.set_loading(True)
         cancelled = self.cancelled
         def check():
             boundary = snapshot(root, identity)
             if boundary == old:
-                return boundary, "same", None
-            manifests = run_manifest_ids(root, identity, boundary, cancelled=cancelled)
+                return boundary, "same"
             if old is None or boundary[:2] != old[:2] or boundary[2] <= old[2]:
-                return boundary, "reset", manifests
+                return boundary, "reset"
             result = read_page(root, identity, boundary, start=old[2], reverse=False,
                                levels=tuple(self.levels), limit=1, cancelled=cancelled)
-            return boundary, "new" if result["rows"] else "same", manifests
+            return boundary, "new" if result["rows"] else "same"
         def checked(value):
-            self.loading = False
-            boundary, change, manifests = value
-            if manifests is not None:
-                base, final = manifests
-                manifest_lines = [tr('Based on Manifest: {0}').format(base)] if base else []
-                if final:
-                    manifest_lines.append(tr('Final Manifest: {0}').format(final))
-                self.run_metadata.setText('\n'.join([*metadata, *manifest_lines]))
-            self.copy_details.setEnabled(True)
-            if change == "reset":
+            boundary, change = value
+            if change == "reset" or (not self.model.rows and not self.older_done):
                 self.boundary = boundary
                 self.pending_boundary = None
                 self.new_logs.hide()
+                self.manifest_cancelled.set()
+                self.manifest_boundary = None
+                self.copy_details.setEnabled(False)
                 self.load_reset()
-            elif change == "new":
-                self.pending_boundary = boundary
-                self.new_logs.show()
+            else:
+                self.set_loading(False)
+                if change == "new":
+                    self.pending_boundary = boundary
+                    self.new_logs.show()
+                self.load_manifest_details(boundary)
             self.view.viewport().update()
-        self.submit(check, checked)
+        self.submit(check, checked, foreground=True)
+
+    def load_manifest_details(self, boundary):
+        """正文出现后再补齐版本；改变筛选不取消同一快照的版本读取。"""
+        if boundary == self.manifest_boundary:
+            return
+        self.manifest_cancelled.set()
+        self.manifest_cancelled = cancelled = Event()
+        self.manifest_boundary = boundary
+        self.copy_details.setEnabled(False)
+        metadata = self.run_metadata_lines(self.entries[self.selected_key])
+        root, identity = self.read_root, self.trace_run_id
+
+        def shown(result):
+            if cancelled.is_set():
+                return
+            if isinstance(result, Exception):
+                metadata.append(tr('Log unavailable'))
+                self.manifest_boundary = None
+            else:
+                base, final = result
+                if base:
+                    metadata.append(tr('Based on Manifest: {0}').format(base))
+                if final:
+                    metadata.append(tr('Final Manifest: {0}').format(final))
+            self.run_metadata.setText('\n'.join(metadata))
+            self.copy_details.setEnabled(True)
+
+        self.submit(lambda: run_manifest_ids(root, identity, boundary, cancelled=cancelled),
+                    shown, independent=True)
 
     def accept_new(self):
         if self.pending_boundary:
@@ -637,25 +723,28 @@ class RunLogPage(QWidget):
 
     def load_reset(self, anchor=None):
         """加载最新或锚点附近的一批；较旧侧无匹配才寻找较新项。"""
-        self.loading, self.older_done, self.newer_done = True, False, anchor is None
+        self.set_loading(True)
+        self.older_done, self.newer_done = False, anchor is None
         root, identity, boundary, options, cancelled = self.read_root, self.trace_run_id, self.boundary, self.options(), self.cancelled
-        self.status.setText(tr("Loading logs…"))
         def load():
-            result = read_page(root, identity, boundary, end=anchor[1] if anchor else None, cancelled=cancelled, **options)
+            result = read_page(root, identity, boundary, end=anchor[1] if anchor else None,
+                               limit=LOG_WINDOW, cancelled=cancelled, **options)
             if anchor and not result["rows"] and not cancelled.is_set():
                 result = read_page(root, identity, boundary, start=anchor[1], reverse=False, limit=1, cancelled=cancelled, **options)
             return result
         def shown(result):
             self.model.replace(result["rows"])
             self.images.clear()
-            self.loading = False
-            self.older_done = len(result["rows"]) < 60
+            self.older_done = len(result["rows"]) < LOG_WINDOW
             self.report(result)
             if anchor:
                 self.restore(anchor)
             else:
                 self.view.scrollToTop()
-        self.submit(load, shown)
+            self.set_loading(False)
+            if self.manifest_boundary is None:
+                self.load_manifest_details(boundary)
+        self.submit(load, shown, foreground=True)
 
     def report(self, result):
         self.status.setText(tr("Damaged log records skipped") if result["damaged"] else
@@ -670,40 +759,41 @@ class RunLogPage(QWidget):
         elif bar.value() <= 80 and not self.newer_done:
             self.more(False)
 
-    def more(self, older):
-        """双向读取相邻页并淘汰远端行，保留当前顶部日志的屏幕位置。"""
-        self.loading = True
+    def more(self, older, *, advance=False):
+        """双向补读并限制窗口大小，优先保留返回时可见的日志。"""
+        self.set_loading(True)
         rows = self.model.rows
         options = self.options()
         options.update(end=rows[-1]["offset"]) if older else options.update(start=rows[0]["end"], reverse=False)
         root, identity, boundary, cancelled = self.read_root, self.trace_run_id, self.boundary, self.cancelled
         def shown(result):
             anchor = self.anchor()
+            top = self.view.indexAt(self.view.viewport().rect().topLeft())
             bottom = self.view.indexAt(self.view.viewport().rect().bottomLeft())
-            last_visible = bottom.row() if bottom.isValid() else len(rows) - 1
+            first = max(0, top.row())
+            last = bottom.row() if bottom.isValid() else len(rows) - 1
+            room = LOG_WINDOW - len(rows) + (first if older else len(rows) - 1 - last)
+            # 窗口全可见时，用户继续翻页至少前进一条。
+            room = max(1, room) if advance else room
             added = result["rows"]
+            reached_end = len(added) < LOG_STEP and len(added) <= room
+            count = min(room, len(added))
+            evicted = len(rows) + count > LOG_WINDOW
             if older:
-                self.older_done = len(added) < 60
-                combined = rows + added
-                start = max(0, len(combined) - 240)
+                self.older_done = reached_end
+                self.newer_done = self.newer_done and not evicted
+                combined = (rows + added[:count])[-LOG_WINDOW:]
             else:
-                self.newer_done = len(added) < 60
-                combined = added + rows
-                start = 0
-                last_visible += len(added)
-            if anchor:
-                first_visible = next(i for i, row in enumerate(combined) if row["offset"] == anchor[0])
-                # 读取期间可继续滚动；淘汰范围必须避开返回时的整个可见区域。
-                start = max(0, last_visible - 239, min(start, first_visible))
-            if start:
-                self.newer_done = False
-            if start + 240 < len(combined):
-                self.older_done = False
-            self.model.replace(combined[start:start + 240])
-            self.restore(anchor)
-            self.loading = False
+                self.newer_done = reached_end
+                self.older_done = self.older_done and not evicted
+                combined = (added[len(added) - count:] + rows)[:LOG_WINDOW]
+            if count:
+                self.model.replace(combined)
+                self.restore(anchor)
             self.report(result)
-        self.submit(lambda: read_page(root, identity, boundary, cancelled=cancelled, **options), shown)
+            self.set_loading(False)
+        self.submit(lambda: read_page(root, identity, boundary, limit=LOG_STEP, cancelled=cancelled, **options),
+                    shown, foreground=True)
 
     def request_image(self, row):
         """仅为可见项排队生成缩略图，缓存限制为十二张。"""
