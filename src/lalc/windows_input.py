@@ -10,6 +10,7 @@ from .control import PhysicalInputMonitor
 from .focused import WindowError
 
 INPUT_EXTRA_INFO = 0x4C414C43
+VK_OEM_JUMP = 0xEA
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -307,7 +308,17 @@ class WindowsInputBackend:
     def any_pressed(self) -> bool:
         """避免用户仍按住按键、修饰键或鼠标时恢复自动化。"""
 
-        return any(self.user32.GetAsyncKeyState(key) & 0x8000 for key in range(1, 256))
+        return self.first_pressed_key() is not None
+
+    def first_pressed_key(self) -> int | None:
+        """返回首个阻塞输入的虚拟键，供等待日志定位。"""
+        for key in range(1, 256):
+            # #344 的 OEM 键可能仅残留异步按下位；钩子确认的物理按下仍生效。
+            if key == VK_OEM_JUMP and key not in self._physical_keys:
+                continue
+            if self.user32.GetAsyncKeyState(key) & 0x8000:
+                return key
+        return None
 
     def client_point(self, hwnd: int, x: int, y: int) -> tuple[int, int]:
         return self.platform.client_to_screen(hwnd, x, y)

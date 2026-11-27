@@ -20,6 +20,7 @@ class PhysicalInputMonitor:
         self.generation = 0
         self.started_at = self.last_input = time.monotonic()
         self.kind = ""
+        self.last_activity_kind = ""
         self.target_hwnd: int | None = None
         self.pause_requested = False
         self.error: BaseException | None = None
@@ -29,17 +30,55 @@ class PhysicalInputMonitor:
             return
         with self.lock:
             self.last_input = time.monotonic()
+            self.last_activity_kind = kind
             if takeover or pause:
                 self.generation += 1
                 self.kind = kind
             if pause:
                 self.pause_requested = True
 
-    def snapshot(self) -> tuple[int, float, str]:
+    def snapshot(self) -> tuple[int, float, str, str]:
         with self.lock:
             if self.error is not None:
                 raise RuntimeError("Input monitor failed.") from self.error
-            return self.generation, self.last_input, self.kind
+            return self.generation, self.last_input, self.kind, self.last_activity_kind
+
+
+class _IdleWaitLog:
+    """将等待中的活动与会话计时合并成每秒一条运行日志。"""
+
+    def __init__(self, session: InputSession, waiting_for: str, activity: float) -> None:
+        self.session = session
+        self.waiting_for = waiting_for
+        self.activity = activity
+        self.session_activity = time.monotonic()
+        self.next_log = self.session_activity + 1
+
+    def update(self, duration: float, idle_since: float, activity: float, kind: str) -> None:
+        now = time.monotonic()
+        if now < self.next_log:
+            return
+        self.next_log = now + 1
+        idle = self.session.session_idle_seconds()
+        elapsed_idle = now - idle_since
+        if idle is not None:
+            elapsed_idle = min(elapsed_idle, idle)
+        remaining = math.ceil(max(0, duration - elapsed_idle))
+        source = kind if activity != self.activity else None
+        self.activity = activity
+        # Windows 会话计时是近似值，排除计时器粒度造成的波动。
+        if idle is not None and now - idle > self.session_activity + 0.05:
+            self.session_activity = now - idle
+            source = source or "Windows 会话"
+        if source:
+            message = f"检测到{source}输入，重新计时，剩余 {remaining} 秒。"
+        elif remaining:
+            message = f"等待键鼠空闲，还剩 {remaining} 秒。"
+        else:
+            self.session.log_wait_for_release(self.waiting_for, remaining_seconds=0)
+            return
+        self.session.log_input_wait(message, waiting_for=self.waiting_for, remaining_seconds=remaining,
+                                    activity_source=source)
 
 
 class InputSession:
@@ -78,7 +117,7 @@ class InputSession:
             raise InputReleaseFailure("Input session was disabled after release failure.")
         if self.gate.stopped:
             raise UserInterruption
-        generation, _, kind = self.monitor.snapshot()
+        generation, _, kind, _ = self.monitor.snapshot()
         if self.monitor.pause_requested:
             self._interrupt("全局快捷键请求暂停。", "pause")
         if generation != self.owned_generation:
@@ -158,10 +197,22 @@ class InputSession:
         self.emit("component_log", {"logical_name": "input.focus", "role": "trusted_action",
                   "phase": "execute", "level": "info", "message": message, **fields})
 
+    def log_wait_for_release(self, waiting_for: str, **fields: Any) -> None:
+        """记录仍在阻挡输入的键，供正常运行日志和 Trace 显示。"""
+        read_key = getattr(self.backend, "first_pressed_key", None)
+        key = read_key() if read_key is not None else None
+        message = (f"等待按键或鼠标按钮松开，当前阻塞 VK 0x{key:02X}。" if key is not None else
+                   "正在确认按键或鼠标按钮已松开。")
+        self.log_input_wait(message, waiting_for=waiting_for, blocking_vk=key, **fields)
+
+    def session_idle_seconds(self) -> float | None:
+        """查询 Windows 会话的空闲时间，平台未提供时返回空值。"""
+        read_idle = getattr(self.backend, "session_idle_seconds", None)
+        return read_idle() if read_idle is not None else None
+
     def session_idle_for(self, duration: float) -> bool:
         """钩子计时到期后，再确认当前桌面会话没有更近的输入。"""
-        read_idle = getattr(self.backend, "session_idle_seconds", None)
-        idle = read_idle() if read_idle is not None else None
+        idle = self.session_idle_seconds()
         return idle is None or idle >= duration
 
     def wait_for_activity(self, hwnd: int, process_id: int, *, after_takeover: bool = False,
@@ -169,7 +220,7 @@ class InputSession:
                           focus_lost_at: float | None = None) -> tuple[float | None, float]:
         """键鼠活动延后下次聚焦，显式恢复只豁免该次操作前的活动。"""
         started = time.monotonic()
-        waiting = False
+        progress = None
         outcome = "interrupted"
         paused_seconds = 0.0
 
@@ -192,7 +243,7 @@ class InputSession:
                     raise WindowError("Target Window is hidden or has an empty client area.")
                 foreground = info["foreground"] and not info["minimized"]
                 # 点击其他窗口的回调可能先于前台切换，空闲计时不依赖当时的前台。
-                activity = self.monitor.snapshot()[1]
+                _, activity, _, activity_kind = self.monitor.snapshot()
                 if self.resume_focus:
                     self.resume_focus = False
                     immediate_since = activity
@@ -208,13 +259,15 @@ class InputSession:
                     if self.monitor.snapshot()[1] == activity:
                         outcome = "idle"
                         return None, activity
-                if not waiting:
-                    waiting = True
+                if progress is None:
+                    progress = _IdleWaitLog(self, "focus", activity)
                     self.log_input_wait(f"等待键鼠连续空闲 {self.ACTIVITY_SECONDS:g} 秒后聚焦游戏。",
                                         idle_seconds=self.ACTIVITY_SECONDS)
+                else:
+                    progress.update(self.ACTIVITY_SECONDS, idle_since, activity, activity_kind)
                 time.sleep(self.POLL_SECONDS)
         finally:
-            if waiting:
+            if progress is not None:
                 duration = time.monotonic() - started
                 self.focus_wait_seconds += max(0.0, duration - paused_seconds)
                 reason = {"idle": "键鼠已空闲，可以请求游戏置前", "foreground": "游戏已在前台",
@@ -323,10 +376,11 @@ class InputSession:
     def wait_quiet(self, seconds: float | None = None, *, since: float | None = None) -> int:
         """等待物理输入释放且安静，供普通恢复与重启过渡期共用。"""
         duration = self.QUIET_SECONDS if seconds is None else seconds
+        progress = None
         while True:
             if self.gate.stopped:
                 raise UserInterruption
-            generation, last, _ = self.monitor.snapshot()
+            generation, last, _, activity_kind = self.monitor.snapshot()
             if self.monitor.pause_requested:
                 self._interrupt("全局快捷键请求暂停。", "pause")
             if self.gate.paused:
@@ -337,6 +391,11 @@ class InputSession:
                 # 查询实际按住状态期间也可能有键鼠输入。
                 if self.monitor.snapshot()[:2] == (generation, last):
                     break
+            if seconds is not None:
+                if progress is None:
+                    progress = _IdleWaitLog(self, "takeover", last)
+                else:
+                    progress.update(duration, idle_since, last, activity_kind)
             time.sleep(self.POLL_SECONDS)
         self.emit("input_quiet", {"quiet_seconds": duration})
         return generation
@@ -368,8 +427,13 @@ class InputSession:
         """固定输入动作；所有参数先验证，持有型输入在 finally 中释放。"""
 
         self.check()
+        next_wait_log = time.monotonic()
         while self.backend.any_pressed():
-            self.check()
+            self.check(record=False)
+            now = time.monotonic()
+            if now >= next_wait_log:
+                self.log_wait_for_release(operation)
+                next_wait_log = now + 1
             time.sleep(self.POLL_SECONDS)
         self.check()
         if operation == "wait":
