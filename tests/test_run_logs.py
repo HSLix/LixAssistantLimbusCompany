@@ -145,6 +145,58 @@ def test_selection_checks_for_updates_without_moving_view(log_page):
     assert page.view.verticalScrollBar().value() == 0
 
 
+def test_auto_open_shows_loading_then_rows_before_manifest_details(log_page, monkeypatch):
+    """首屏显示加载状态，版本读取变慢或切换失败时仍能正确更新右侧。"""
+    from threading import Event
+    import lalc.run_log_gui as gui
+
+    _, _, path, until = log_page
+    second = path.with_name('2.jsonl')
+    second.write_text(json.dumps(dict(event='component_log', level='info', message='older',
+                                      recorded_at='2026-11-01T12:00:00Z')) + '\n', encoding='utf-8')
+    reading_page, reading_manifest = Event(), Event()
+    release_page, release_manifest = Event(), Event()
+
+    def read(root, identity, boundary, **options):
+        if identity == 2:
+            raise ValueError('test read failure')
+        reading_page.set()
+        assert release_page.wait(5)
+        return read_page(root, identity, boundary, **options)
+
+    def manifest(*args, **kwargs):
+        reading_manifest.set()
+        assert release_manifest.wait(5)
+        return 'old version', None
+
+    monkeypatch.setattr(gui, 'read_page', read)
+    monkeypatch.setattr(gui, 'run_manifest_ids', manifest)
+    page = gui.RunLogPage(path.parent.parent)
+    page.resize(1100, 700)
+    page.show()
+    try:
+        until(reading_page.is_set)
+        assert page.selected_key == 1 and page.loading_ring.isVisible()
+        assert page.loading_label.isVisible() and not page.model.rows and not reading_manifest.is_set()
+        release_page.set()
+        until(reading_manifest.is_set)
+        assert len(page.model.rows) == 40 and not page.loading_ring.isVisible()
+        assert not page.copy_details.isEnabled()
+
+        page.select_run(page.runs.item(1))
+        until(lambda: not page.loading)
+        assert page.selected_key == 2 and not page.model.rows
+        assert not page.loading_ring.isVisible() and 'test read failure' in page.status.text()
+        release_manifest.set()
+        until(lambda: not page.tasks)
+        assert 'old version' not in page.run_metadata.text()
+    finally:
+        release_page.set()
+        release_manifest.set()
+        page.invalidate()
+        page.close()
+
+
 def test_manifest_header_updates_when_run_finishes_without_a_visible_log_row(log_page):
     _, page, path, until = log_page
     start = {'event': 'run_started', 'base_manifest_id': 'base-version'}
@@ -215,19 +267,41 @@ def test_annotation_interface_scales_without_changing_original(monkeypatch):
 
 def test_browsing_evicts_old_pages_and_can_read_them_again(log_page):
     app, page, path, until = log_page
+    assert [row['record']['sequence'] for row in page.model.rows] == list(range(320, 280, -1))
+    page.view.doItemsLayout()
+    page.view.scrollToBottom()
+    until(lambda: not page.loading)
+    assert [row['record']['sequence'] for row in page.model.rows] == list(range(300, 260, -1))
     while not page.older_done:
         page.loading = True
         page.view.scrollToBottom()
         page.more(True)
         until(lambda: not page.loading)
-    assert len(page.model.rows) == 240
+        assert len(page.model.rows) <= 40
+    assert len(page.model.rows) == 40
     assert page.model.rows[-1]['record']['sequence'] == 1
     assert not page.newer_done
-    page.more(False)
+    page.view.scrollToTop()
     until(lambda: not page.loading)
-    sequences = [row['record']['sequence'] for row in page.model.rows]
-    assert sequences == sorted(set(sequences), reverse=True)
-    assert sequences[0] > 240 and len(sequences) == 240
+    assert [row['record']['sequence'] for row in page.model.rows] == list(range(60, 20, -1))
+
+
+def test_browsing_can_advance_when_entire_window_fits(log_page):
+    """所有条目都可见时，继续滚动仍可向两个方向移动窗口。"""
+    from PySide6.QtCore import QPoint, QPointF, Qt
+    from PySide6.QtGui import QWheelEvent
+
+    app, page, _, until = log_page
+    page.resize(1100, 4200)
+    app.processEvents()
+    assert page.view.verticalScrollBar().maximum() == 0
+    for delta, expected in [(-120, 319), (120, 320)]:
+        event = QWheelEvent(QPointF(20, 20), QPointF(20, 20), QPoint(), QPoint(0, delta),
+                            Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier, Qt.ScrollPhase.NoScrollPhase, False)
+        app.sendEvent(page.view.viewport(), event)
+        until(lambda: not page.loading)
+        assert len(page.model.rows) == 40
+        assert page.model.rows[0]['record']['sequence'] == expected
 
 
 @pytest.mark.parametrize('older', [True, False])
@@ -236,14 +310,14 @@ def test_paging_preserves_latest_position_even_at_eviction_edge(log_page, monkey
     app, page, _, _ = log_page
     rows = read_page(page.read_root, page.run_id, page.boundary, limit=320)['rows']
     page.loading = True
-    page.model.replace(rows[:240] if older else rows[-240:])
+    page.model.replace(rows[:40] if older else rows[-40:])
     page.view.doItemsLayout()
-    page.view.scrollTo(page.model.index(230 if older else 2), page.view.ScrollHint.PositionAtTop)
+    page.view.scrollTo(page.model.index(30 if older else 2), page.view.ScrollHint.PositionAtTop)
     app.processEvents()
     pending = []
-    monkeypatch.setattr(page, 'submit', lambda operation, done: pending.append((operation, done)))
+    monkeypatch.setattr(page, 'submit', lambda operation, done, **_: pending.append((operation, done)))
     page.more(older)
-    page.view.scrollTo(page.model.index(2 if older else 230), page.view.ScrollHint.PositionAtTop)
+    page.view.scrollTo(page.model.index(2 if older else 30), page.view.ScrollHint.PositionAtTop)
     bar = page.view.verticalScrollBar()
     bar.setValue(bar.value() + 17)
     anchor = page.anchor()
@@ -251,7 +325,7 @@ def test_paging_preserves_latest_position_even_at_eviction_edge(log_page, monkey
     done(operation())
     app.processEvents()
     assert page.anchor() == anchor
-    assert len(page.model.rows) == 240
+    assert len(page.model.rows) == 40
     assert not pending
     assert not (page.older_done if older else page.newer_done)
 

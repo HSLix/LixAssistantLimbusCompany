@@ -58,9 +58,14 @@ def test_other_activity_restarts_ten_seconds_and_logs_visible_info(session):
     assert env.window.focus_calls == 2
     assert env.events[-1]["event"] != "input_takeover"
     logs = [e for e in env.events if e["event"] == "component_log"]
-    assert len(logs) == 2
     assert logs[-1]["duration_seconds"] == 24
     assert logs[-1]["outcome"] == "idle"
+    progress = [e for e in logs if "remaining_seconds" in e]
+    assert len(progress) == 23
+    assert [e["remaining_seconds"] for e in progress[:4]] == [9, 8, 7, 6]
+    assert [(e["activity_source"], e["remaining_seconds"]) for e in progress if e["activity_source"]] == [
+        ("鼠标", 10), ("键盘", 10),
+    ]
 
 
 def test_each_focus_loss_gets_a_fresh_idle_window_after_confirmation(session):
@@ -329,6 +334,9 @@ def test_windows_idle_clock_covers_events_not_received_by_the_hooks(session, mon
     else:
         env.inputs.check()
     assert env.clock.now == 144
+    resets = [e for e in env.events if e.get("activity_source") == "Windows 会话"]
+    assert [e["remaining_seconds"] for e in resets] == [10, 10]
+    assert {e["waiting_for"] for e in resets} == {"takeover" if takeover else "focus"}
 
 
 def test_windows_idle_clock_handles_tick_counter_wrap():
@@ -339,6 +347,24 @@ def test_windows_idle_clock_handles_tick_counter_wrap():
     backend.user32.GetLastInputInfo = last_input
     backend.kernel32 = SimpleNamespace(GetTickCount=lambda: 0x100)
     assert backend.session_idle_seconds() == 0.512
+
+
+def test_unobserved_oem_jump_does_not_block_other_keys_or_physical_press():
+    backend = native_backend()
+    pressed = {0xEA}
+    backend.user32.GetAsyncKeyState = lambda key: -32768 if key in pressed else 0
+    assert not backend.any_pressed()
+
+    event = SimpleNamespace(flags=0, vkCode=0xEA)
+    backend._keyboard_event(0x100, event)
+    assert backend.first_pressed_key() == 0xEA
+    backend._keyboard_event(0x101, event)
+    assert not backend.any_pressed()
+
+    for key in (0x01, 0x05, 0x10, 0x11, 0x12, 0x41, 0xF6):
+        pressed.add(key)
+        assert backend.first_pressed_key() == key
+        pressed.remove(key)
 
 
 @pytest.mark.parametrize("message,x,foreground,expected", [
@@ -473,8 +499,8 @@ def test_wait_log_is_readable_in_default_info_view(session, tmp_path):
     (directory / "1.jsonl").write_text("".join(json.dumps(e) + "\n" for e in env.events), encoding="utf-8")
     boundary = run_logs.snapshot(tmp_path, 1)
     result = run_logs.read_page(tmp_path, 1, boundary, levels={"info"})
-    assert len(result["rows"]) == 2
-    assert any("等待" in row["text"] for row in result["rows"])
+    assert len(result["rows"]) == 11
+    assert any("还剩 9 秒" in row["text"] for row in result["rows"])
 
 
 def test_minimized_game_waits_before_restore(session, monkeypatch):
@@ -497,10 +523,11 @@ def test_minimized_game_waits_before_restore(session, monkeypatch):
     assert not env.inputs.paused
 
 
-def test_other_application_held_input_delays_focus_without_takeover(session):
+def test_other_application_held_input_delays_focus_without_takeover(session, monkeypatch):
     env = session
     env.window.foreground = False
     env.window.backend.pressed = True
+    monkeypatch.setattr(env.window.backend, "first_pressed_key", lambda: 0x11, raising=False)
     def release():
         if env.clock.now == 112:
             env.window.backend.pressed = False
@@ -508,6 +535,34 @@ def test_other_application_held_input_delays_focus_without_takeover(session):
     env.inputs.check()
     assert env.clock.now == 112
     assert not env.inputs.paused
+    blocked = [e for e in env.events if e.get("blocking_vk") == 0x11]
+    assert [e["remaining_seconds"] for e in blocked] == [0, 0]
+
+
+def test_click_logs_blocking_key_once_per_second_until_release(session, monkeypatch):
+    env = session
+    env.window.foreground = True
+    env.clock.now = 128
+    env.inputs.POLL_SECONDS = 0.25
+    backend = native_backend()
+    backend.user32.GetAsyncKeyState = lambda key: -32768 if key == 0x41 and env.clock.now < 131 else 0
+    monkeypatch.setattr(env.window.backend, "first_pressed_key", backend.first_pressed_key, raising=False)
+    monkeypatch.setattr(env.window.backend, "any_pressed", backend.any_pressed)
+    # 浮点时钟替身也必须能越过点击保持时间的最后一个轮询点。
+    monkeypatch.setattr(control.time, "sleep", lambda seconds: env.clock.sleep(max(seconds, 0.000001)))
+    logs = []
+
+    def record(event, fields):
+        if event == "component_log" and fields.get("waiting_for") == "click":
+            logs.append((env.clock.now, fields["blocking_vk"]))
+        env.events.append({"event": event, **fields})
+
+    env.inputs.emit = record
+    env.inputs.execute("click", {"x": 100, "y": 100, "centerxy": None})
+    assert logs == [(128, 0x41), (129, 0x41), (130, 0x41)]
+    assert [event["event"] for event in env.events if event["event"].startswith("input_")] == [
+        "input_pressed", "input_released",
+    ]
 
 
 def test_resume_from_gate_checkpoint_also_skips_idle(tmp_path, monkeypatch):

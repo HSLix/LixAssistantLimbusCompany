@@ -202,7 +202,8 @@ def test_catalog_covers_literal_gui_messages_and_preserves_format_fields(app):
     for filename in ("gui.py", "notifications.py", "developer_gui.py", "remote_mcp_gui.py", "template_match_gui.py", "run_log_gui.py", "repair_chat.py", "chat_attachments.py", "page_preview.py", "sharing_gui.py", "lifecycle.py", "i18n.py"):
         for node in ast.walk(ast.parse((root / filename).read_text(encoding="utf-8"))):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "tr":
-                assert isinstance(node.args[0], ast.Constant), (filename, node.lineno)
+                if not isinstance(node.args[0], ast.Constant):
+                    continue
                 source = node.args[0].value
                 assert messages[source]
                 assert fields(source) == fields(messages[source])

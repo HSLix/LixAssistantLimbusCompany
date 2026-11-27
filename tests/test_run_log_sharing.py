@@ -195,7 +195,7 @@ def test_gui_local_and_imported_show_numbers_and_manifests(log_page, tmp_path):
     imported = next(page.runs.item(i) for i in range(2)
                     if page.runs.item(i).data(Qt.ItemDataRole.UserRole) == key)
     page.select_run(imported)
-    until(lambda: not page.loading and bool(page.model.rows))
+    until(lambda: not page.loading and bool(page.model.rows) and page.copy_details.isEnabled())
     assert page.read_root == tmp_path / 'imported-run-logs' / key
     assert page.run_id == 2 and page.trace_run_id == 1
     assert 'Imported' in page.run_title.text()
@@ -212,7 +212,8 @@ def test_gui_local_and_imported_show_numbers_and_manifests(log_page, tmp_path):
     assert app.clipboard().text() == '2'
     page.source_filter.setCurrentItem('local')
     page.select_source('local')
-    until(lambda: page.runs.count() == 1 and page.selected_key == 1 and not page.loading)
+    until(lambda: page.runs.count() == 1 and page.selected_key == 1 and not page.loading
+          and page.copy_details.isEnabled())
     assert page.read_root == tmp_path
     assert 'Based on Manifest: base-version' in page.run_metadata.text()
     assert 'Final Manifest: repaired-version' in page.run_metadata.text()
