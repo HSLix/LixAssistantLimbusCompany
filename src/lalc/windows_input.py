@@ -6,11 +6,17 @@ import ctypes
 import threading
 from ctypes import wintypes
 
-from .control import PhysicalInputMonitor
+from .control import InputActivity, PhysicalInputMonitor
 from .focused import WindowError
 
 INPUT_EXTRA_INFO = 0x4C414C43
 VK_OEM_JUMP = 0xEA
+MOUSE_ACTIONS = {
+    0x200: "移动",
+    0x201: "左键按下", 0x202: "左键松开", 0x203: "左键双击",
+    0x204: "右键按下", 0x205: "右键松开", 0x206: "右键双击",
+    0x207: "中键按下", 0x208: "中键松开", 0x209: "中键双击",
+}
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -194,6 +200,7 @@ class WindowsInputBackend:
             "WindowFromPoint": ([wintypes.POINT], wintypes.HWND),
             "GetAncestor": ([wintypes.HWND, wintypes.UINT], wintypes.HWND),
             "MapVirtualKeyW": ([wintypes.UINT, wintypes.UINT], wintypes.UINT),
+            "GetKeyNameTextW": ([wintypes.LONG, wintypes.LPWSTR, ctypes.c_int], ctypes.c_int),
             "SendInput": ([wintypes.UINT, ctypes.POINTER(INPUT), ctypes.c_int], wintypes.UINT),
             "GetClipCursor": ([ctypes.POINTER(wintypes.RECT)], wintypes.BOOL),
             "GetSystemMetrics": ([ctypes.c_int], ctypes.c_int),
@@ -262,31 +269,48 @@ class WindowsInputBackend:
 
     def _mouse_event(self, message: int, event: MSLLHOOKSTRUCT) -> None:
         """仅前台游戏客户区的按钮按下和滚轮构成接管，移动仅记录活动。"""
-        if event.flags & 0x1:
-            # 远程控制也可能通过注入传递输入，只让它延长空闲等待。
-            if event.dwExtraInfo != INPUT_EXTRA_INFO:
-                self.monitor.record("鼠标", False, takeover=False)
+        injected = bool(event.flags & 0x1)
+        if injected and event.dwExtraInfo == INPUT_EXTRA_INFO:
             return
         hwnd = self.monitor.target_hwnd
-        foreground = bool(hwnd and self.user32.GetForegroundWindow() == hwnd)
-        inside = False
+        foreground = not injected and bool(hwnd and self.user32.GetForegroundWindow() == hwnd)
+        client_point = None
         if foreground and message in {0x201, 0x204, 0x207, 0x20B, 0x20A, 0x20E}:
             point = wintypes.POINT(event.pt.x, event.pt.y)
             rect = wintypes.RECT()
             if not self.user32.ScreenToClient(hwnd, ctypes.byref(point)) or not self.user32.GetClientRect(hwnd, ctypes.byref(rect)):
                 raise ctypes.WinError(ctypes.get_last_error())
             hit = self.user32.WindowFromPoint(event.pt)
-            inside = (self.user32.GetAncestor(hit, 2) == hwnd
-                      and rect.left <= point.x < rect.right and rect.top <= point.y < rect.bottom)
-        self.monitor.record("鼠标", False, takeover=foreground and inside)
+            if (self.user32.GetAncestor(hit, 2) == hwnd
+                    and rect.left <= point.x < rect.right and rect.top <= point.y < rect.bottom):
+                client_point = (point.x, point.y)
+        delta = None
+        if message in {0x20A, 0x20E}:
+            delta = ctypes.c_int16(event.mouseData >> 16).value
+            if message == 0x20A:
+                action = "滚轮向上" if delta > 0 else "滚轮向下" if delta < 0 else "垂直滚轮"
+            else:
+                action = "滚轮向右" if delta > 0 else "滚轮向左" if delta < 0 else "水平滚轮"
+        elif message in {0x20B, 0x20C, 0x20D}:
+            button = event.mouseData >> 16
+            action = f"侧键 {button} " + {0x20B: "按下", 0x20C: "松开", 0x20D: "双击"}[message]
+        else:
+            action = MOUSE_ACTIONS.get(message, f"消息 0x{message:04X}")
+        detail = InputActivity("鼠标", "外部注入" if injected else "物理", action, wheel_delta=delta)
+        self.monitor.record("鼠标", False, takeover=client_point is not None,
+                            detail=detail, client_point=client_point)
 
     def _keyboard_event(self, message: int, event: KBDLLHOOKSTRUCT) -> None:
         """物理按键按前台判定；Ctrl Alt P 不依赖游戏焦点且只暂停。"""
-        if event.flags & 0x10:
-            if event.dwExtraInfo != INPUT_EXTRA_INFO:
-                self.monitor.record("键盘", False, takeover=False)
-            return
+        injected = bool(event.flags & 0x10)
         down = message in {0x100, 0x104}
+        if injected and event.dwExtraInfo == INPUT_EXTRA_INFO:
+            return
+        detail = InputActivity("键盘", "外部注入" if injected else "物理", "按下" if down else "松开",
+                               event.vkCode, event.scanCode, bool(event.flags & 0x01))
+        if injected:
+            self.monitor.record("键盘", False, takeover=False, detail=detail)
+            return
         if down:
             self._physical_keys.add(event.vkCode)
         else:
@@ -296,7 +320,20 @@ class WindowsInputBackend:
                   and bool(self._physical_keys & {0x12, 0xA4, 0xA5}))
         foreground = bool(self.monitor.target_hwnd and
                           self.user32.GetForegroundWindow() == self.monitor.target_hwnd)
-        self.monitor.record("键盘", False, takeover=down and foreground and not hotkey, pause=hotkey)
+        self.monitor.record("键盘", False, takeover=down and foreground and not hotkey, pause=hotkey, detail=detail)
+
+    def key_name(self, event: InputActivity) -> str:
+        """用钩子的扫描码和扩展位查询 Windows 键名，保留原始键码供比对。"""
+        vk = event.vk
+        if vk is not None and (0x30 <= vk <= 0x39 or 0x41 <= vk <= 0x5A):
+            return chr(vk)
+        if not event.scan_code:
+            return ""
+        name = ctypes.create_unicode_buffer(128)
+        flags = ((event.scan_code & 0xFF) << 16) | (int(event.extended) << 24)
+        if self.user32.GetKeyNameTextW(flags, name, len(name)):
+            return name.value
+        return ""
 
     def session_idle_seconds(self) -> float | None:
         """会话计时补足钩子漏报，按 GetTickCount 的 32 位时间计算。"""

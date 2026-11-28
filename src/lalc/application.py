@@ -548,7 +548,7 @@ class ApplicationService:
                     self._gate.checkpoint()
                     if not inputs.monitor.pause_requested:
                         # Plan 尚未操作游戏，可吸收接管代次并继续等待物理空闲。
-                        inputs.owned_generation = inputs.monitor.snapshot()[0]
+                        inputs.owned_generation = inputs.monitor.snapshot(acknowledge=True)[0]
                         return
 
             inputs.focus_checkpoint = startup_checkpoint
