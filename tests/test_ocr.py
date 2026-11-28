@@ -5,6 +5,8 @@
 
 import hashlib
 import json
+import os
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
@@ -12,6 +14,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+from lalc import ocr
 from lalc.actions import application_actions
 from lalc.application import ApplicationService
 from lalc.focused import FocusedAutomationSession, WindowError
@@ -221,3 +224,41 @@ def execute(ctx) -> list[str]:
     executor = WorkflowExecutor(published.loaded, RunGate(), lambda *args: None, ocr=service._ocr)
     with pytest.raises(ExecutionFailure, match="observe Trusted Action"):
         executor.context.ocr()
+
+
+def test_engine_thread_cap_scales_with_cores():
+    """线程上限按核数取一半并封顶 8；结果与机器核数无关地可预测。"""
+    assert ocr.engine_threads(28) == (8, 1)
+    assert ocr.engine_threads(16) == (8, 1)
+    assert ocr.engine_threads(8) == (4, 1)
+    assert ocr.engine_threads(4) == (2, 1)
+    assert ocr.engine_threads(2) == (1, 1)
+    assert ocr.engine_threads(1) == (1, 1)
+    assert ocr.engine_threads(0) == (1, 1)
+    assert ocr.engine_threads(None) == ocr.engine_threads(os.cpu_count())
+
+
+def test_engine_params_limit_onnxruntime_threads(monkeypatch, tmp_path):
+    """加载引擎时把线程上限写进 RapidOCR 参数；不加载真实模型。"""
+    det = tmp_path / "PP-OCRv6_det_small.onnx"
+    rec = tmp_path / "PP-OCRv6_rec_small.onnx"
+    det.write_bytes(b"det")
+    rec.write_bytes(b"rec")
+    monkeypatch.setattr(ocr, "model_files", lambda: {"PP-OCRv6_det_small.onnx": det,
+                                                     "PP-OCRv6_rec_small.onnx": rec})
+    monkeypatch.setattr(ocr, "engine_threads", lambda cpu_count=None: (4, 1))
+    seen = {}
+
+    class FakeRapidOCR:
+        def __init__(self, params):
+            seen.update(params)
+
+    fake = SimpleNamespace(EngineType=SimpleNamespace(ONNXRUNTIME="ort"),
+                           ModelType=SimpleNamespace(SMALL="small"),
+                           OCRVersion=SimpleNamespace(PPOCRV6="v6"),
+                           RapidOCR=FakeRapidOCR)
+    monkeypatch.setitem(sys.modules, "rapidocr", fake)
+    ocr.OcrService()._load_engine()
+    assert seen["EngineConfig.onnxruntime.intra_op_num_threads"] == 4
+    assert seen["EngineConfig.onnxruntime.inter_op_num_threads"] == 1
+    assert seen["Det.model_path"] == str(det) and seen["Rec.model_path"] == str(rec)
