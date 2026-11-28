@@ -439,7 +439,7 @@ wheels = [
 
 [[package]]
 name = "lix-assistant-limbus-company"
-version = "6.0.2"
+version = "6.0.3"
 source = { editable = "." }
 
 [package.optional-dependencies]
