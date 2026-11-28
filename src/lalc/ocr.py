@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import math
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,23 @@ MODEL_HASHES = {
     "PP-OCRv6_rec_small.onnx": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884",
 }
 _DET_OPTIONS = ("thresh", "box_thresh", "unclip_ratio", "use_dilation", "score_mode", "max_candidates")
+# 单帧 OCR 的算子图很小：onnxruntime 默认按物理核开 intra 线程，多核机器上线程过度订阅只多耗 CPU。
+MAX_INTRA_THREADS = 8
+INTER_THREADS = 1
+
+
+def engine_threads(cpu_count: int | None = None) -> tuple[int, int]:
+    """返回 (intra_op, inter_op) 线程上限；按核数取一半并封顶 8。
+
+    实测（onnxruntime 1.31.1、rapidocr 3.10.0、PP-OCRv6 det/rec small、2560x1440 整屏与
+    条带/局部裁剪、28 逻辑核）：默认 intra=-1 时单帧占约 24 线程、CPU 22–24 s、墙钟 0.94–1.02 s；
+    intra=4 时 CPU 5.7–6.4 s、墙钟 0.99–1.18 s；intra=8 时 CPU 10–12 s、墙钟 0.80–1.07 s。
+    三档识别文本逐条相同（按行排序后比较）。⇒ 限制线程后 CPU 至少降一半、墙钟不劣化，
+    多核机器上同时跑 GUI 与其他识别时余量更大。
+    """
+    cores = os.cpu_count() if cpu_count is None else cpu_count
+    cores = max(1, int(cores or 1))
+    return max(1, min(MAX_INTRA_THREADS, cores // 2)), INTER_THREADS
 
 
 def _check_det_options(options: dict[str, Any] | None) -> None:
@@ -70,10 +88,14 @@ class OcrService:
         paths = model_files()
         from rapidocr import EngineType, ModelType, OCRVersion, RapidOCR
 
+        intra, inter = engine_threads()
         params = {
             "Global.use_cls": False,
             "Global.text_score": 0.0,
             "Global.log_level": "warning",
+            # 线程上限：默认按物理核开线程，小算子图上只增加切换开销（见 engine_threads 实测）。
+            "EngineConfig.onnxruntime.intra_op_num_threads": intra,
+            "EngineConfig.onnxruntime.inter_op_num_threads": inter,
         }
         for stage, task in (("Det", "det"), ("Rec", "rec")):
             params.update({
