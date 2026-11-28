@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lix-assistant-limbus-company"
-version = "6.0.3"
+version = "6.0.4"
 description = "Windows automation framework for Limbus Company"
 requires-python = ">=3.12,<3.13"
 dependencies = []
