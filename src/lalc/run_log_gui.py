@@ -10,9 +10,11 @@ from PySide6.QtCore import (QAbstractListModel, QModelIndex, QObject, QRunnable,
 from PySide6.QtGui import QColor, QImage, QPainter, QTextLayout, QTextOption, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QAbstractItemView, QDialog, QHBoxLayout, QListView, QListWidget,
                                QListWidgetItem, QFileDialog, QMessageBox, QStyledItemDelegate, QVBoxLayout, QWidget)
-from qfluentwidgets import BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget, IndeterminateProgressRing
+from qfluentwidgets import (BodyLabel, CheckBox, LineEdit, PushButton, SegmentedWidget, CardWidget,
+                            IndeterminateProgressRing, isDarkTheme, qconfig)
 
 from .work_files import WorkDirectory
+from .appearance import DARK_ACCENT
 from .file_content import FileContent, image_preview
 from .i18n import tr
 from .image_annotations import action_annotations, paint_annotations
@@ -26,6 +28,13 @@ LOG_STEP = 20
 
 def log_colors(level: str) -> tuple[str, str]:
     """运行窗口和历史日志共用等级色块。"""
+    if isDarkTheme():
+        return {
+            "info": ("#243a4c", "#c9e6ff"),
+            "warning": ("#44371d", "#ffe1a0"),
+            "error": ("#482a30", "#ffb7bf"),
+            "debug": ("#343434", "#dedede"),
+        }[level]
     return {
         "info": ("#eaf4ff", "#163b60"),
         "warning": ("#fff4d6", "#604600"),
@@ -126,6 +135,7 @@ class LogDelegate(QStyledItemDelegate):
         painter.save()
         painter.setClipRect(option.rect)
         background, foreground = log_colors(row["level"])
+        link = QColor(DARK_ACCENT if isDarkTheme() else "#006873")
         painter.fillRect(option.rect.adjusted(4, 4, -4, -4), QColor(background))
         painter.setPen(QColor(foreground))
         record = row["record"]
@@ -134,7 +144,7 @@ class LogDelegate(QStyledItemDelegate):
         painter.drawText(rect.x(), rect.y() + 14,
                          f"{log_time(record.get('recorded_at'))}  [{row['level'].upper()}]  {record.get('logical_name', '')}")
         painter.restore()
-        painter.setPen(QColor("#009faa"))
+        painter.setPen(link)
         painter.drawText(QRectF(rect.right() - 105, rect.y(), 105, 22),
                          Qt.AlignmentFlag.AlignRight, tr("Copy details"))
         painter.setPen(QColor(foreground))
@@ -146,7 +156,7 @@ class LogDelegate(QStyledItemDelegate):
         painter.restore()
         y = rect.y() + 24 + height
         if toggle:
-            painter.setPen(QColor("#009faa"))
+            painter.setPen(link)
             painter.drawText(rect.x(), int(y + 18), tr("Collapse details") if row.get("expanded") else tr("Expand details"))
             y += 26
         if row["image"]:
@@ -273,6 +283,7 @@ class RunLogPage(QWidget):
         side.addWidget(self.runs, 1)
         body.addWidget(sidebar)
         self.view = QListView()
+        qconfig.themeChangedFinished.connect(self.view.viewport().update)
         self.view.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.view.verticalScrollBar().setSingleStep(20)
         self.view.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)

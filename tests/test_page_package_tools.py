@@ -192,25 +192,32 @@ def test_image_resource_read_and_preview_install_exact_package(gui, drafts):
     assert not preview_root.exists()
 
 
-def test_page_render_uses_defaults_and_does_not_install(drafts):
+@pytest.mark.parametrize("theme", ["light", "dark"])
+def test_page_render_uses_defaults_and_does_not_install(drafts, theme):
     from lalc.remote_mcp import MCP_TOOLS
     from lalc.agent_policy import allowed_tools
     from lalc.user_pages import UserSettings
 
-    source = SOURCE.replace("def create_page(context):", """def create_page(context):
-    assert context.load({"fallback": True}) == {"fallback": True}
+    source = SOURCE.replace("def create_page(context):", f"""def create_page(context):
+    from PySide6.QtGui import QPalette
+    from PySide6.QtWidgets import QApplication
+    from qfluentwidgets import isDarkTheme
+    assert isDarkTheme() == {theme == "dark"}
+    assert (QApplication.palette().color(QPalette.ColorRole.Window).lightness() < 128) == {theme == "dark"}
+    assert context.load({{"fallback": True}}) == {{"fallback": True}}
     assert context.resource_path("assets/info.txt").read_text() == "render input"
-    context.save({"field": "render only"})""")
+    context.save({{"field": "render only"}})""")
     drafts.create("sample.py", source)
     drafts.write_resource("sample.py", "assets/info.txt", b"render input")
     data_root = drafts.session.host.service.data_root
     store = UserSettings(data_root)
     store.save("pages", "sample.page", {"private": True})
     tools = drafts.session.host.conversation.tools
-    result = read_json(tools.call("page_render", {"filename": "sample.py", "width": 640}))
+    result = read_json(tools.call("page_render", {"filename": "sample.py", "width": 640, "theme": theme}))
     assert not result.get("isError"), result.get("details")
     assert result["details"]["sha256"] == drafts.snapshot("sample.py")["sha256"]
     assert result["details"]["width"] == 640
+    assert result["details"]["theme"] == theme
     assert result["content"][-1]["mimeType"] == "image/png"
     assert UserSettings(data_root).value["pages"]["sample.page"] == {"private": True}
     assert not (drafts.installed / "sample").exists()

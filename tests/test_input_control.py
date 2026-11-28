@@ -294,23 +294,29 @@ def test_release_failure_ends_plan_without_resume_or_later_task(tmp_path):
 
 
 def test_wait_observes_takeover_and_can_be_cancelled(tmp_path, monkeypatch):
+    from lalc.application_settings import save_application_setting
+
     service, window = service_for(tmp_path)
-    entered = threading.Event()
+    save_application_setting(tmp_path, "input_idle_seconds", 60)
     original_wait = InputSession._wait
 
     def wait(self, duration, update=None):
-        entered.set()
+        save_application_setting(tmp_path, "input_idle_seconds", 90)
         window.backend.monitor.record("键盘", False)
         original_wait(self, duration, update)
 
     monkeypatch.setattr(InputSession, "_wait", wait)
-    monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 60)
-    service.start("tasks.control", {"operation": "wait"})
-    assert entered.wait(2)
-    state = wait_state(service, lambda state: any(row.get("waiting_for") == "takeover" for row in state["trace"]))
-    assert not state["paused"]
-    service.stop()
-    assert finished(service)["result"]["failure_code"] == "user_cancelled"
+    for seconds in (60, 90):
+        window.backend = FakeInput()
+        service.start("tasks.control", {"operation": "wait"})
+        try:
+            state = wait_state(service, lambda state: any(row.get("waiting_for") == "takeover"
+                                                         for row in state["trace"]))
+            assert not state["paused"]
+            assert next(row["idle_seconds"] for row in state["trace"] if "idle_seconds" in row) == seconds
+        finally:
+            service.stop()
+            assert finished(service)["result"]["failure_code"] == "user_cancelled"
 
 
 def test_quiet_resume_waits_for_released_input_without_another_resume(tmp_path, monkeypatch):

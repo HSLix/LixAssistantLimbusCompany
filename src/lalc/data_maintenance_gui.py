@@ -131,7 +131,7 @@ class CleanupDialog(MessageBoxBase):
             warning = tr("Deleted versions cannot be selected for runs or rollback.")
         self.viewLayout.addWidget(BodyLabel(retained))
         notice = BodyLabel(warning)
-        notice.setStyleSheet("color: #c64b42;")
+        notice.setTextColor("#ae3c35", "#ff9c94")
         self.viewLayout.addWidget(notice)
         self.yesButton.setText(tr("Delete permanently"))
         self.yesButton.setMinimumWidth(98)

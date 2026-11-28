@@ -12,7 +12,7 @@ from .runtime import EnvironmentFailure, InputReleaseFailure, TraceWriteError, U
 
 CLOSE_SECONDS = 5.0
 TERMINATE_SECONDS = 5.0
-START_SECONDS = 60.0
+START_SECONDS = 180.0
 POLL_SECONDS = 0.05
 
 

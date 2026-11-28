@@ -10,6 +10,7 @@ from collections import Counter
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
+from .application_settings import DEFAULT_IDLE_SECONDS
 from .focused import FocusedAutomationSession, WindowError
 from .runtime import GameProcessExited, InputReleaseFailure, UserInterruption, RunGate, _exception_fields
 
@@ -151,13 +152,16 @@ class InputSession:
     """在运行线程注入输入并负责唯一的释放；物理接管只中断，不重放。"""
 
     QUIET_SECONDS = 0.3
-    ACTIVITY_SECONDS = 10.0
+    ACTIVITY_SECONDS = DEFAULT_IDLE_SECONDS
     POLL_SECONDS = 0.012
     KEYS = {"esc": 0x1B, "p": 0x50, "enter": 0x0D}
 
     def __init__(self, window: FocusedAutomationSession, backend: Any, gate: RunGate,
-                 emit: Callable[[str, dict[str, Any]], None], *, process_id: int | None = None) -> None:
+                 emit: Callable[[str, dict[str, Any]], None], *, process_id: int | None = None,
+                 idle_seconds: int | None = None) -> None:
         self.window, self.backend, self.gate, self.emit = window, backend, gate, emit
+        if idle_seconds is not None:
+            self.ACTIVITY_SECONDS = idle_seconds
         self.monitor = backend.monitor
         self.cursor_interrupted_at: float | None = None
         self.paused = False

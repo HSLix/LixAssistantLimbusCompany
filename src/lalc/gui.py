@@ -9,7 +9,7 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize, QUrl, QPointF, QRectF
+from PySide6.QtCore import QObject, Signal, Slot, Qt, QTimer, QSize, QUrl, QPointF, QRectF, QSignalBlocker
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap, QTextDocument
 from PySide6.QtWidgets import (
     QApplication,
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QMessageBox, QScrollArea, QFileDialog,
-    QGraphicsOpacityEffect, QListWidgetItem, QSizePolicy, QFrame, QTextBrowser,
+    QGraphicsOpacityEffect, QListWidgetItem, QSizePolicy, QFrame, QTextBrowser, QLabel as NativeLabel,
 )
 
 from qfluentwidgets import (
@@ -27,12 +27,15 @@ from qfluentwidgets import (
     CardWidget, SubtitleLabel, TitleLabel, PrimaryPushButton, ListWidget, FlowLayout, SearchLineEdit,
     NavigationAvatarWidget, NavigationItemPosition,
     TransparentToolButton, ToolButton, HyperlinkButton, IconWidget, MessageBox, MessageBoxBase, StrongBodyLabel,
-    setCustomStyleSheet, Theme, setTheme,
+    CustomStyleSheet, isDarkTheme, qconfig, setCustomStyleSheet,
     BodyLabel as QLabel, PushButton as QPushButton, PlainTextEdit as QPlainTextEdit,
     ComboBox as QComboBox, SpinBox as QSpinBox, CheckBox as QCheckBox, LineEdit as QLineEdit,
 )
 
 from .i18n import tr
+from .appearance import DARK_SURFACE, DARK_WINDOW, apply_appearance
+from .application_settings import (DEFAULT_APPEARANCE, DEFAULT_IDLE_SECONDS, MAX_IDLE_SECONDS,
+                                   MIN_IDLE_SECONDS, load_application_settings, save_application_setting)
 from .manifest_source_gui import METADATA_ROLE, NOTES_ROLE, ManifestResultDelegate, manifest_search_text
 from .notifications import NotificationList
 
@@ -132,8 +135,12 @@ class SecretInputDialog(QDialog):
 def show_secret_status(label, configured):
     """用相同的短标签显示 API Key 和 CDK 是否已保存。"""
     label.setText(tr('Credential set') if configured else tr('Credential not set'))
-    colors = 'color: #126442; background: #e8f5ee;' if configured else 'color: #50565c; background: #eceff1;'
-    label.setStyleSheet(f'{colors} border-radius: 10px; padding: 2px 9px;')
+    light, dark = (('#126442', '#e8f5ee'), ('#9de1be', '#253e33')) if configured else (
+        ('#50565c', '#eceff1'), ('#c3c9d0', '#353a40'))
+    CustomStyleSheet(label).setCustomStyleSheet(*(
+        f'QLabel {{color: {text}; background: {background}; border-radius: 10px; padding: 2px 9px;}}'
+        for text, background in (light, dark)
+    )).apply(label)
 
 
 class ErrorDialog(QDialog):
@@ -167,7 +174,7 @@ class ErrorDialog(QDialog):
         copy = QPushButton(copy_text)
         if error:
             style = 'QPushButton { color: #c42b1c; }'
-            setCustomStyleSheet(copy, style, style)
+            setCustomStyleSheet(copy, style, 'QPushButton { color: #ff9c94; }')
         self.copy_timer = QTimer(self)
         self.copy_timer.setSingleShot(True)
         self.copy_timer.setInterval(1500)
@@ -247,9 +254,19 @@ class MainWindow(FluentWindow):
     feedback_requested = Signal(object)
     page_preview_requested = Signal(object)
 
+    def refresh_window_appearance(self):
+        """深色窗口使用固定冷灰黑，浅色沿用 Fluent 的系统材质。"""
+        mica = not isDarkTheme()
+        if self.isMicaEffectEnabled() != mica:
+            self.setMicaEffectEnabled(mica)
+
     def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None,
                  *, host=None, coordinator=None) -> None:
         super().__init__()
+        self.setCustomBackgroundColor("#f0f4f9", DARK_WINDOW)
+        self.refresh_window_appearance()
+        self.setBackgroundColor(self._normalBackgroundColor())
+        qconfig.themeChangedFinished.connect(self.refresh_window_appearance)
         self.service = service
         self.lifecycle = lifecycle or ApplicationLifecycle()
         self.coordinator = coordinator
@@ -518,8 +535,10 @@ class UserWindow(MainWindow):
         left.addWidget(self.manifest_notes)
         self.latest_card = QFrame()
         self.latest_card.setObjectName('manifest-update')
-        self.latest_card.setStyleSheet(
-            'QFrame#manifest-update { background-color: #f3f3f3; border-radius: 6px; }')
+        CustomStyleSheet(self.latest_card).setCustomStyleSheet(*(
+            f'QFrame#manifest-update {{background-color: {color}; border-radius: 6px;}}'
+            for color in ('#f3f3f3', DARK_SURFACE)
+        )).apply(self.latest_card)
         latest_layout = QHBoxLayout(self.latest_card)
         latest_layout.setContentsMargins(12, 8, 12, 8)
         latest_text = QVBoxLayout()
@@ -745,6 +764,31 @@ class UserWindow(MainWindow):
         application_layout = QVBoxLayout(application)
         application_layout.setContentsMargins(16, 16, 16, 16)
         application_layout.addWidget(SubtitleLabel(tr('Application')))
+        local_settings = load_application_settings(service.data_root)
+        appearance_label = QLabel(tr('Appearance'))
+        self.appearance_choice = QComboBox()
+        self.appearance_choice.setAccessibleName(appearance_label.text())
+        for label, value in ((tr('Follow system'), 'system'), (tr('Light'), 'light'), (tr('Dark'), 'dark')):
+            self.appearance_choice.addItem(label, userData=value)
+        self.appearance_choice.setCurrentIndex(self.appearance_choice.findData(
+            local_settings.get("appearance", DEFAULT_APPEARANCE)))
+        self.appearance_choice.currentIndexChanged.connect(lambda: self._interact(self.save_appearance))
+        application_layout.addWidget(appearance_label)
+        application_layout.addWidget(self.appearance_choice)
+        idle_label = QLabel(tr('Keyboard and mouse idle time before automatic recovery'))
+        idle_label.setWordWrap(True)
+        self.input_idle_seconds = QSpinBox()
+        self.input_idle_seconds.setAccessibleName(idle_label.text())
+        self.input_idle_seconds.setRange(MIN_IDLE_SECONDS, MAX_IDLE_SECONDS)
+        self.input_idle_seconds.setSuffix(" " + tr('seconds'))
+        self.input_idle_seconds.setKeyboardTracking(False)
+        self.input_idle_seconds.setValue(local_settings.get("input_idle_seconds", DEFAULT_IDLE_SECONDS))
+        self.input_idle_seconds.valueChanged.connect(lambda: self._interact(self.save_input_idle_seconds))
+        application_layout.addWidget(idle_label)
+        application_layout.addWidget(self.input_idle_seconds)
+        idle_notice = QLabel(tr('Applies from the next run, including after user takeover and before automatic refocusing.'))
+        idle_notice.setWordWrap(True)
+        application_layout.addWidget(idle_notice)
         from .agent_settings import secret_path
         from .framework_update import CDK_SECRET
         self.mirror_cdk_row = QWidget()
@@ -752,7 +796,7 @@ class UserWindow(MainWindow):
         cdk_row = QHBoxLayout(self.mirror_cdk_row)
         cdk_row.setContentsMargins(0, 0, 0, 0)
         cdk_row.addWidget(StrongBodyLabel(tr('MirrorChyan CDK')))
-        self.mirror_cdk_status = QLabel()
+        self.mirror_cdk_status = NativeLabel()
         cdk_row.addWidget(self.mirror_cdk_status)
         cdk_row.addStretch()
         cdk_row.addWidget(HyperlinkButton(FluentIcon.LINK, MIRROR_PROJECT_URL, tr('Open the MirrorChyan project page')))
@@ -1102,6 +1146,30 @@ class UserWindow(MainWindow):
             self.language_choice.blockSignals(True)
             self.language_choice.setCurrentIndex(self.language_choice.findData(previous))
             self.language_choice.blockSignals(False)
+            raise
+
+    def save_appearance(self):
+        """持久化成功后立即切换整个应用的主题。"""
+        data_root = self.service.data_root
+        previous = load_application_settings(data_root).get("appearance", DEFAULT_APPEARANCE)
+        selection = self.appearance_choice.currentData()
+        try:
+            save_application_setting(data_root, "appearance", selection)
+        except Exception:
+            with QSignalBlocker(self.appearance_choice):
+                self.appearance_choice.setCurrentIndex(self.appearance_choice.findData(previous))
+            raise
+        apply_appearance(QApplication.instance(), selection)
+
+    def save_input_idle_seconds(self):
+        """保存下次运行的等待时间；写入失败时恢复旧值。"""
+        data_root = self.service.data_root
+        previous = load_application_settings(data_root).get("input_idle_seconds", DEFAULT_IDLE_SECONDS)
+        try:
+            save_application_setting(data_root, "input_idle_seconds", self.input_idle_seconds.value())
+        except Exception:
+            with QSignalBlocker(self.input_idle_seconds):
+                self.input_idle_seconds.setValue(previous)
             raise
 
     def choose_steam_directory(self):
@@ -1520,6 +1588,7 @@ class GuiCoordinator:
     def __init__(self, service, lifecycle, *, initialize_user_window=False):
         from .i18n import install_translations, load_language, resolve_language
         app = QApplication.instance()
+        apply_appearance(app, load_application_settings(service.data_root).get("appearance", DEFAULT_APPEARANCE))
         icon_path = (Path(__file__).with_name("MagicAndWonder.ico") if getattr(sys, "frozen", False)
                      else Path(__file__).resolve().parents[2] / "MagicAndWonder.ico")
         app.setWindowIcon(QIcon(str(icon_path)))
@@ -1652,12 +1721,6 @@ class GuiCoordinator:
         self.service.shutdown()
 
 
-def use_light_theme(app: QApplication) -> None:
-    """统一原生 Qt 控件和 Fluent 控件的浅色外观。"""
-    app.styleHints().setColorScheme(Qt.ColorScheme.Light)
-    setTheme(Theme.LIGHT)
-
-
 def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, restore=(), ready=None) -> int:
     """归并重复 GUI 入口，在唯一事件循环内持有双窗口。"""
     from .sharing import cleanup_staging
@@ -1666,7 +1729,6 @@ def run_gui(lifecycle: ApplicationLifecycle | None = None, *, developer=False, r
         return run_application(lambda owner: run_gui(owner, developer=developer, restore=restore, ready=ready))
     from .gui_instance import GuiInstance
     app = QApplication.instance() or QApplication(sys.argv)
-    use_light_theme(app)
     instance = GuiInstance()
     if instance.forward(developer):
         return 0

@@ -7,7 +7,7 @@ import sys
 from .page_packages import materialized_page
 
 
-def render_snapshot(snapshot, data_root, language, width, checkpoint):
+def render_snapshot(snapshot, data_root, language, appearance, width, checkpoint):
     """固定页面整包，等待有界截图；取消或超时先停止子进程再清理。"""
     if type(width) is not int or not 480 <= width <= 1200:
         raise ValueError("截图宽度须为 480–1200。")
@@ -21,7 +21,7 @@ def render_snapshot(snapshot, data_root, language, width, checkpoint):
         command = [sys.executable]
         if not getattr(sys, "frozen", False):
             command += ["-m", "lalc"]
-        command += ["--page-render-worker", str(entry), str(output), language, str(width)]
+        command += ["--page-render-worker", str(entry), str(output), language, appearance, str(width)]
         checkpoint()
         with subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                               stderr=subprocess.DEVNULL, env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
@@ -48,11 +48,11 @@ def render_snapshot(snapshot, data_root, language, width, checkpoint):
         return output.read_bytes()
 
 
-def render_worker(entry, output, language, width):
+def render_worker(entry, output, language, appearance, width):
     """启动独立 Qt 环境，用页面默认值截图；不调用 submit。"""
     from PySide6.QtWidgets import QApplication, QScrollArea
-    from qfluentwidgets import Theme, setTheme
 
+    from .appearance import apply_appearance
     from .i18n import install_translations
     from .page_drafts import MemorySettings
     from .user_pages import create_business_page, load_page_module
@@ -62,7 +62,7 @@ def render_worker(entry, output, language, width):
             raise ValueError("截图宽度须为 480–1200。")
         app = QApplication([])
         install_translations(app, language)
-        setTheme(Theme.LIGHT)
+        apply_appearance(app, appearance)
         page = create_business_page(entry, *load_page_module(entry, entry.read_bytes()), MemorySettings({"pages": {}}))
         viewport = QScrollArea()
         viewport.setWidgetResizable(True)

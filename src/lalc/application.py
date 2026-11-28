@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .process_lock import ProcessLock
+from .application_settings import load_application_settings
 from .focused import FocusedAutomationSession, WindowsWindowPlatform, WindowError
 from .assets import AssetLibrary, game_language as checked_game_language
 from .run_logs import ACTION_ENDS, COMPONENT_TIMING_SUMMARY, LIVE_LOG_LIMIT, component_timing_text, is_live_log
@@ -93,6 +94,7 @@ class ApplicationService:
         self._runtime_chat = None
         self._runtime_session_key = None
         self._run_options = {"automatic_repair_default": True}
+        self._run_idle_seconds: int | None = None
         self._state: dict[str, Any] = {
             "phase": "idle",
             "paused": False,
@@ -255,7 +257,8 @@ class ApplicationService:
                 normalized_inputs = WorkflowExecutor.prepare_inputs(component, inputs)
                 from .agent_settings import settings_document
                 options = settings_document(self.data_root)
-            except (InputValidationError, TypeError, ValueError) as error:
+                idle_seconds = load_application_settings(self.data_root).get("input_idle_seconds")
+            except (InputValidationError, OSError, TypeError, ValueError) as error:
                 raise StartError("inputs_invalid", str(error)) from error
 
             entry = {"logical_name": logical_name, "component_id": component.component_id, "role": component.role}
@@ -266,6 +269,7 @@ class ApplicationService:
                 entry["remote_operation_id"] = remote.operation_id
             run_id, snapshot, gate = self._begin_run(manifest, entry, normalized_inputs, run_state, use_saved_config)
             self._run_options = options
+            self._run_idle_seconds = idle_seconds
             self._runtime_allowed = options["user_enabled"] and not _developer_trial
             self._runtime_chat = None
             self._runtime_session_key = None
@@ -536,7 +540,7 @@ class ApplicationService:
             process_id = info["process_id"]
             backend_pending = False
             inputs = self._input_session = InputSession(self._focused_session, backend, self._gate, self._emit,
-                                                        process_id=process_id)
+                                                        process_id=process_id, idle_seconds=self._run_idle_seconds)
 
             def startup_checkpoint():
                 while True:
@@ -591,7 +595,7 @@ class ApplicationService:
                 self._focused_session.connect()
             self._input_session = InputSession(
                 self._focused_session, self._focused_session.platform.create_input_backend(),
-                self._gate, self._emit,
+                self._gate, self._emit, idle_seconds=self._run_idle_seconds,
             )
 
     def _check_input(self) -> None:

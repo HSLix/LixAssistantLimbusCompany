@@ -742,6 +742,36 @@ Log: {1}</source>
       <translation>跟随系统</translation>
     </message>
     <message>
+      <location filename="../gui.py" />
+      <source>Appearance</source>
+      <translation>界面主题</translation>
+    </message>
+    <message>
+      <location filename="../gui.py" />
+      <source>Light</source>
+      <translation>浅色</translation>
+    </message>
+    <message>
+      <location filename="../gui.py" />
+      <source>Dark</source>
+      <translation>深色</translation>
+    </message>
+    <message>
+      <location filename="../gui.py" />
+      <source>Keyboard and mouse idle time before automatic recovery</source>
+      <translation>自动恢复前的键鼠空闲时间</translation>
+    </message>
+    <message>
+      <location filename="../gui.py" />
+      <source>seconds</source>
+      <translation>秒</translation>
+    </message>
+    <message>
+      <location filename="../gui.py" />
+      <source>Applies from the next run, including after user takeover and before automatic refocusing.</source>
+      <translation>下次运行生效，包括用户接管后与自动聚焦前的等待。</translation>
+    </message>
+    <message>
       <location filename="../gui.py" line="641" />
       <source>Develop or repair workflows and start conversations with the built-in Agent.</source>
       <translation>辅助开发者开发或修复工作流，以及和内置 Agent 主动对话。</translation>

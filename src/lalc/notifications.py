@@ -6,10 +6,11 @@ from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QScrollArea, QSizePolicy, QVBoxLayout, QWidget
 from qfluentwidgets import (BodyLabel, CardWidget, FluentIcon, PushButton, SimpleCardWidget,
-                            TransparentToolButton, setCustomStyleSheet)
+                            TransparentToolButton, isDarkTheme, setCustomStyleSheet)
 
 from .errors import result_diagnostics
 from .i18n import tr
+from .appearance import DARK_ACCENT, DARK_SURFACE, DARK_WINDOW
 
 
 class NotificationCard(CardWidget):
@@ -21,11 +22,14 @@ class NotificationCard(CardWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 10, 12, 10)
         heading = QHBoxLayout()
-        symbol, color = {"success": ("✓", "#16844a"), "warning": ("⚠", "#b57900"),
-                         "error": ("✕", "#c42b1c"), "stopped": ("■", "#777777")}.get(
-                             kind, ("ⓘ", "#009faa"))
+        symbol, light, dark = {"success": ("✓", "#16844a", "#78d4a0"), "warning": ("⚠", "#956400", "#f1c46c"),
+                               "error": ("✕", "#c42b1c", "#ff9c94"), "stopped": ("■", "#777777", "#bbbbbb")}.get(
+                                   kind, ("ⓘ", "#007580", DARK_ACCENT))
         icon = BodyLabel(symbol)
-        icon.setStyleSheet(f"color: {color}; font-size: 20px;")
+        icon.setTextColor(light, dark)
+        font = icon.font()
+        font.setPixelSize(20)
+        icon.setFont(font)
         heading.addWidget(icon, 0, Qt.AlignmentFlag.AlignTop)
         self.title_label = BodyLabel(message)
         self.title_label.setTextFormat(Qt.TextFormat.PlainText)
@@ -36,8 +40,10 @@ class NotificationCard(CardWidget):
         heading.addWidget(self.title_label, 1)
         self.badge = PushButton()
         self.badge.setFixedHeight(28)
-        badge_style = 'QPushButton {background: #008f93; color: white; border: none; border-radius: 14px; padding: 0 9px;}'
-        setCustomStyleSheet(self.badge, badge_style, badge_style)
+        setCustomStyleSheet(self.badge, *(
+            f'QPushButton {{background: {background}; color: {text}; border: none; border-radius: 14px; padding: 0 9px;}}'
+            for background, text in (('#008f93', 'white'), (DARK_ACCENT, DARK_WINDOW))
+        ))
         self.badge.setToolTip(tr('Expand notifications'))
         self.badge.setAccessibleName(tr('Expand notifications'))
         self.badge.clicked.connect(parent.expand)
@@ -112,7 +118,7 @@ class NotificationList(SimpleCardWidget):
 
     def _normalBackgroundColor(self):
         # 覆盖页面的浮层必须不透明，不能透出下方的文字和控件。
-        return QColor('#ffffff')
+        return QColor(DARK_SURFACE if isDarkTheme() else '#ffffff')
 
     def notify(self, message: str, details: str = '', *, kind='information', summary='') -> None:
         """新结果置顶；展开阅读时先隐藏新增卡片，避免改变阅读位置。"""

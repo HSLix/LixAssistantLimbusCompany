@@ -193,16 +193,23 @@ class RepairTools:
                 raise ValueError("资源复制仅允许页面、Asset 或知识库中的明确文件。")
         return self.text(self.page_drafts().write_resource(filename, path, content, remove=remove))
 
-    def page_render(self, filename, *, width=900):
+    def page_render(self, filename, *, width=900, theme=None):
         """仅内置 Construct 可渲染当前草稿；结果不参与安装审批。"""
+        from qfluentwidgets import isDarkTheme
+
         from .i18n import current_language
         from .page_render import render_snapshot
         drafts = self.page_drafts()
         if drafts.session.entry != "gui" or "page_render" not in self.allowed:
             raise ValueError("草稿截图仅限内置 Construct Agent。")
         snapshot = drafts.snapshot(filename)
-        image = render_snapshot(snapshot["package"], self.library.data_root, current_language(), width, self.checkpoint)
-        return self.image(image, {"filename": filename, "sha256": snapshot["sha256"], "view": "draft_defaults"})
+        if theme is not None and theme not in ("light", "dark"):
+            raise ValueError("草稿截图主题须为 light 或 dark。")
+        appearance = theme or ("dark" if isDarkTheme() else "light")
+        image = render_snapshot(snapshot["package"], self.library.data_root, current_language(),
+                                appearance, width, self.checkpoint)
+        return self.image(image, {"filename": filename, "sha256": snapshot["sha256"],
+                                  "view": "draft_defaults", "theme": appearance})
 
     def page_preview(self, filename, summary):
         """等待人审查固定版本；不把普通反馈或历史批准当成安装授权。"""

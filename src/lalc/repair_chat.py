@@ -8,8 +8,9 @@ import time
 from PySide6.QtCore import QEvent, QSize, Signal, QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QTextDocument, QTextCursor, QImage
 from PySide6.QtWidgets import QApplication, QHBoxLayout, QTextBrowser, QWidget
-from qfluentwidgets import FluentIcon, Theme, TransparentToolButton, setCustomStyleSheet
+from qfluentwidgets import FluentIcon, TransparentToolButton, isDarkTheme, qconfig, setCustomStyleSheet
 
+from .appearance import DARK_ACCENT
 from .i18n import tr
 from .agent_prompts import user_message_text, chat_title
 
@@ -82,7 +83,7 @@ class MessageActions(QWidget):
         self.setFixedSize(self.sizeHint())
 
     def add_button(self, icon, label):
-        button = TransparentToolButton(icon.icon(Theme.LIGHT), self)
+        button = TransparentToolButton(icon, self)
         button.setFixedSize(26, 26)
         button.setIconSize(QSize(14, 14))
         button.setAccessibleName(label)
@@ -90,18 +91,21 @@ class MessageActions(QWidget):
         button.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         style = ('TransparentToolButton:hover { background: #d4e0ee; } '
                  'TransparentToolButton:focus { border: 1px solid #46698e; }')
-        setCustomStyleSheet(button, style, style)
+        setCustomStyleSheet(button, style, (
+            'TransparentToolButton:hover { background: #475369; } '
+            f'TransparentToolButton:focus {{ border: 1px solid {DARK_ACCENT}; }}'
+        ))
         self.layout().addWidget(button)
         return button
 
     def copy_message(self):
         QApplication.clipboard().setText(self.entry['text'])
-        self.copy.setIcon(FluentIcon.ACCEPT.icon(Theme.LIGHT))
+        self.copy.setIcon(FluentIcon.ACCEPT)
         self.copy.setToolTip(tr('Copied successfully'))
         self.copy_timer.start(1200)
 
     def reset_copy(self):
-        self.copy.setIcon(FluentIcon.COPY.icon(Theme.LIGHT))
+        self.copy.setIcon(FluentIcon.COPY)
         self.copy.setToolTip(tr('Copy message'))
 
 
@@ -138,6 +142,12 @@ class RepairChat(QTextBrowser):
         self.verticalScrollBar().valueChanged.connect(self._scroll_changed)
         self.verticalScrollBar().rangeChanged.connect(self._scroll_range_changed)
         self.verticalScrollBar().valueChanged.connect(self.position_inline_widgets)
+        qconfig.themeChangedFinished.connect(self.refresh_theme)
+
+    def refresh_theme(self):
+        """按新主题重绘已显示的对话，并沿用当前滚动状态。"""
+        if self.entries or self.activities:
+            self.render()
 
     def _slider_released(self):
         """松手后按最终位置恢复跟随，并合并刷新拖动期间积累的内容。"""
@@ -234,12 +244,14 @@ class RepairChat(QTextBrowser):
         elif duration is not None:
             title += ' · ' + escape(tr('Worked for {0}').format(working_duration(duration)))
         tooltip = escape(activity['tooltip'], quote=True)
+        text = '#b5bdc7' if isDarkTheme() else '#606970'
+        line = '#717a85' if isDarkTheme() else '#c5c9ce'
         if has_content:
             arrow = '▾' if activity['expanded'] else '▸'
-            title = f'<a href="raw:{number}" title="{tooltip}" style="color:#737980;text-decoration:none">{title} {arrow}</a>'
+            title = f'<a href="raw:{number}" title="{tooltip}" style="color:{text};text-decoration:none">{title} {arrow}</a>'
         elif not activity['status'] and duration is None:
             return ''
-        body = f'<p style="color:#737980" title="{tooltip}">{title}</p>'
+        body = f'<p style="color:{text}" title="{tooltip}">{title}</p>'
         if has_content and activity['expanded']:
             nodes = list(activity['timeline'])
             if activity['pending']:
@@ -248,7 +260,7 @@ class RepairChat(QTextBrowser):
             for node in nodes:
                 content = (self.tool_html(node) if isinstance(node, dict) else
                            '<pre style="white-space: pre-wrap">' + escape(node) + '</pre>')
-                body += ('<tr><td width="18" valign="top" style="border-left:1px solid #c5c9ce;color:#737980">•</td>'
+                body += (f'<tr><td width="18" valign="top" style="border-left:1px solid {line};color:{text}">•</td>'
                          '<td>' + content + '</td></tr>')
             body += '</table>'
         return body
@@ -325,7 +337,10 @@ class RepairChat(QTextBrowser):
 
     def tool_html(self, entry):
         """工具摘要保留独立折叠与失败颜色，嵌入本轮过程节点。"""
-        color = "#9e1c1c" if entry["failed"] else "#333333"
+        if isDarkTheme():
+            color = "#ff9c94" if entry["failed"] else "#dddddd"
+        else:
+            color = "#9e1c1c" if entry["failed"] else "#333333"
         status = {"失败": tr("Failed"), "成功": tr("Succeeded"),
                   "等待完成确认": tr("Awaiting completion"), "执行中": tr("In progress")}[entry["status"]]
         title = tr('Tool: {0} · {1}').format(escape(entry['name']), status)
@@ -418,6 +433,9 @@ class RepairChat(QTextBrowser):
         position = bar.value()
         self._following = self._following and follow
         parts, previous_round = [], None
+        dark = isDarkTheme()
+        backgrounds = ({"你": "#26394c", "Agent": "#2e3136"} if dark else {"你": "#e8f2ff", "Agent": "#f2f4f6"})
+        foreground = "#edf2f8" if dark else "#172b4d"
         today = date.today()
         # 每轮折叠区跟随该轮用户消息，续聊仍保留旧轮次内容。
         activity_indices = {}
@@ -439,7 +457,7 @@ class RepairChat(QTextBrowser):
                 if number in self.round_times:
                     stamp = self.round_times[number].astimezone()
                     tooltip = escape(stamp.strftime('%Y-%m-%d %H:%M:%S %Z'))
-                    color = '#68788b'
+                    color = '#b5bdc7' if dark else '#68788b'
                     shown_time = stamp.strftime('%H:%M:%S' if stamp.date() == today else '%Y-%m-%d %H:%M:%S')
                     time_label = f'&nbsp;&nbsp;<span style="color:{color}" title="{tooltip}">{shown_time}</span>'
                     heading = heading.removesuffix('</p>') + time_label + '</p>'
@@ -449,12 +467,14 @@ class RepairChat(QTextBrowser):
                 continue
             shown_role = {"你": tr("You"), "系统": tr("System")}.get(role, role)
             heading = escape(shown_role) + (tr(' · Round {0}').format(number) if number else "")
-            background = {"你": "#e8f2ff", "Agent": "#f2f4f6"}.get(role, "#fff6dd")
+            background = backgrounds.get(role, "#443722" if dark else "#fff6dd")
             if role == "Agent":
                 document = QTextDocument()
                 document.setMarkdown(entry["text"], QTextDocument.MarkdownFeature.MarkdownDialectGitHub
                                      | QTextDocument.MarkdownFeature.MarkdownNoHTML)
                 body = document.toHtml().split("<body", 1)[1].split(">", 1)[1].rsplit("</body>", 1)[0]
+                if dark:
+                    body = body.replace('<span style=" color:#0000ff;">', f'<span style=" color:{DARK_ACCENT};">')
             else:
                 body = "<p>" + escape(entry["text"]).replace("\n", "<br>") + "</p>"
             key = id(entry)
@@ -483,7 +503,7 @@ class RepairChat(QTextBrowser):
                 body += (f'<p><img src="message-actions:{key}" width="{actions.width()}" '
                          f'height="{actions.height()}" /></p>')
             parts.append(f'<table width="100%" cellspacing="0" cellpadding="10" bgcolor="{background}" '
-                         f'style="color:#172b4d"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
+                         f'style="color:{foreground}"><tr><td><b>{heading}</b>{body}</td></tr></table><p></p>')
         for number in activity_at.get(len(self.entries), []):
             parts.append(self.activity_html(number))
         viewport = self.viewport()

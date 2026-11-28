@@ -98,7 +98,6 @@ def environment(tmp_path, monkeypatch):
     monkeypatch.setattr(InputSession, "ACTIVITY_SECONDS", 0)
     monkeypatch.setattr(game_restart, "CLOSE_SECONDS", 0.01)
     monkeypatch.setattr(game_restart, "TERMINATE_SECONDS", 0.01)
-    monkeypatch.setattr(game_restart, "START_SECONDS", 0.02)
     monkeypatch.setattr(game_restart, "POLL_SECONDS", 0.001)
     yield SimpleNamespace(root=data, platform=platform, inputs=inputs, events=events)
     inputs.close()
@@ -127,8 +126,15 @@ def test_restart_closes_only_original_then_binds_and_discards_old_image(environm
     assert any("强制终止原游戏" in m for m in messages) is (not graceful)
 
 
-def test_restart_binds_delayed_window_after_launch_process_exits(environment, monkeypatch):
+@pytest.mark.parametrize("delay", [179, 181])
+def test_restart_binds_delayed_window_after_launch_process_exits(environment, monkeypatch, delay):
+    from test_input_activity import Clock
+
     env = environment
+    clock = Clock()
+    monkeypatch.setattr(game_restart.time, "monotonic", lambda: clock.now)
+    monkeypatch.setattr(game_restart.time, "sleep", clock.sleep)
+    monkeypatch.setattr(game_restart, "POLL_SECONDS", 1)
     env.platform.creates_window = False
     env.platform.launch_exit_code = 1
     find_windows = env.platform.find_windows
@@ -137,14 +143,20 @@ def test_restart_binds_delayed_window_after_launch_process_exits(environment, mo
         if env.platform.launches and 9 not in env.platform.processes:
             if not env.platform.processes[8].dead:
                 env.platform.processes[8].dead = True
+            if clock.now < 100 + delay:
                 return []
             env.platform.processes[9] = FakeProcess(9, env.platform.executable)
             env.platform.windows[43] = 9
         return find_windows()
 
     monkeypatch.setattr(env.platform, "find_windows", find_delayed_window)
-    restart_game(env.root, env.inputs)
-    assert env.inputs.window.hwnd == 43 and env.inputs.process.pid == 9
+    if delay < 180:
+        restart_game(env.root, env.inputs)
+        assert env.inputs.window.hwnd == 43 and env.inputs.process.pid == 9
+    else:
+        with pytest.raises(EnvironmentFailure, match="Timed out waiting for the new game window"):
+            restart_game(env.root, env.inputs)
+        assert clock.now == 280
     assert env.platform.launches == 1
     assert [event["exit_code"] for event in env.events if "exit_code" in event] == [1]
 
@@ -171,6 +183,7 @@ def test_invalid_launch_target_has_no_destructive_side_effect(environment, probl
 
 @pytest.mark.parametrize("problem", ["terminate_timeout", "no_window", "focus_timeout", "launch_error"])
 def test_restart_failure_is_terminal_and_logged(environment, problem, monkeypatch):
+    monkeypatch.setattr(game_restart, "START_SECONDS", 0.02)
     env = environment
     if problem == "terminate_timeout":
         env.platform.normal_close = False
@@ -450,6 +463,7 @@ def test_user_activity_wait_does_not_consume_restart_timeout(environment, monkey
     from test_input_activity import Clock
     from lalc import control
     env = environment
+    monkeypatch.setattr(game_restart, "START_SECONDS", 0.02)
     clock = Clock()
     monkeypatch.setattr(control.time, "monotonic", lambda: clock.now)
     monkeypatch.setattr(control.time, "sleep", clock.sleep)

@@ -70,6 +70,25 @@ def owner(tmp_path, app, monkeypatch):
     app.processEvents()
 
 
+def test_installed_page_follows_theme_without_replacing_widgets_or_values(owner):
+    from PySide6.QtGui import QPalette
+    from lalc.appearance import DARK_WINDOW
+
+    user = owner.user
+    widget = next(page.widget for page in user.business_pages if page.page_id == "sample.general")
+    user.switchTo(widget)
+    widget.prefix.setText("edited")
+    light_style = widget.prefix.styleSheet().strip()
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData("dark"))
+
+    assert user.pages.currentWidget() is widget
+    assert widget.prefix.text() == "edited"
+    assert widget.prefix.styleSheet().strip() != light_style
+    assert widget.palette().color(QPalette.ColorRole.Window).name() == DARK_WINDOW
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData("light"))
+    assert widget.prefix.styleSheet().strip() == light_style
+
+
 def test_pages_run_real_plan_with_pure_settings_and_independent_snapshot(owner, app, monkeypatch):
     user = owner.user
     assert user.pages.count() == 6

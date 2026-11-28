@@ -14,7 +14,7 @@ from PySide6.QtGui import QImage, QPainter, QPixmap, QPen, QFontDatabase, QTextC
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QFileDialog, QListWidgetItem, QAbstractItemView, QSizePolicy, QStyle,
-    QMessageBox, QDialog, QDialogButtonBox,
+    QMessageBox, QDialog, QDialogButtonBox, QLabel as NativeLabel,
 )
 
 from qfluentwidgets import (
@@ -26,6 +26,7 @@ from qfluentwidgets import (
 )
 
 from .run_logs import LIVE_LOG_LIMIT, ai_repair_message
+from .appearance import DARK_WINDOW
 from .i18n import tr
 from .run_log_gui import ReadTask, log_colors, log_time
 
@@ -223,7 +224,10 @@ class TrialDialog(QDialog):
         super().__init__(parent)
         self.service = service
         self.setObjectName("running-dialog")
-        self.setStyleSheet('QDialog#running-dialog { background-color: #f3f3f3; }')
+        CustomStyleSheet(self).setCustomStyleSheet(
+            'QDialog#running-dialog { background-color: #f3f3f3; }',
+            f'QDialog#running-dialog {{ background-color: {DARK_WINDOW}; }}',
+        ).apply(self)
         self.setWindowTitle(tr('Agent trial'))
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
@@ -255,6 +259,20 @@ class TrialDialog(QDialog):
         self.pause_notice.setWordWrap(True)
         layout.addWidget(self.pause_notice)
         self._pause_notice_shown = False
+        qconfig.themeChangedFinished.connect(self.refresh_log_theme)
+
+    def refresh_log_theme(self):
+        """重绘已有试运行日志并保留当前阅读位置。"""
+        bar = self.logs.verticalScrollBar()
+        position = bar.value()
+        self._rendering_logs = True
+        try:
+            self.logs.setHtml("".join(self.log_html(record, *_run_log_entry(record))
+                                      for record in self.log_records.values()))
+            self.logs.document().documentLayout().documentSize()
+            bar.setValue(bar.maximum() if self._following_logs else position)
+        finally:
+            self._rendering_logs = False
 
     def _log_scroll_changed(self, value):
         if not self._rendering_logs:
@@ -577,9 +595,12 @@ class CapturePage(QWidget):
         layout.addWidget(self.resize_result)
         self.coordinates = QLabel(tr('Refresh the window to track coordinates.'))
         layout.addWidget(self.coordinates)
-        self.instructions = QLabel(tr('1. Capture a screenshot. 2. Drag with the left mouse button to select an area (drag again to replace). 3. Enter a name and tags, then preview and save.'))
+        self.instructions = NativeLabel(tr('1. Capture a screenshot. 2. Drag with the left mouse button to select an area (drag again to replace). 3. Enter a name and tags, then preview and save.'))
         self.instructions.setWordWrap(True)
-        self.instructions.setStyleSheet("QLabel { background: #fff3cd; color: #332700; padding: 10px; font-weight: bold; }")
+        CustomStyleSheet(self.instructions).setCustomStyleSheet(*(
+            f"QLabel {{background: {background}; color: {text}; padding: 10px; font-weight: bold;}}"
+            for background, text in (("#fff3cd", "#332700"), ("#4c3b20", "#ffe4aa"))
+        )).apply(self.instructions)
         layout.addWidget(self.instructions)
         self.view = CropView()
         layout.addWidget(self.view, 1)
@@ -831,7 +852,7 @@ class SettingsPage(QWidget):
         for label, control in ((tr('Base URL'), self.url), (tr('Model'), self.model)):
             layout.addWidget(QLabel(label))
             layout.addWidget(control)
-        self.secret_state = QLabel()
+        self.secret_state = NativeLabel()
         key_layout = QHBoxLayout()
         key_layout.addWidget(QLabel(tr('API Key')))
         key_layout.addWidget(self.secret_state)
@@ -1272,6 +1293,7 @@ class RepairPage(QWidget):
         self.message = ChatInput()
         self.message.focusChanged.connect(self.update_composer_focus)
         qconfig.themeColorChanged.connect(self.update_composer_focus)
+        qconfig.themeChangedFinished.connect(self.update_composer_focus)
         self.update_composer_focus()
         self.message.setPlaceholderText(tr('Message the Agent…'))
         self.message.sendRequested.connect(self.send)
@@ -1512,13 +1534,14 @@ class RepairPage(QWidget):
         if (type(tokens) not in (int, float) or type(limit) not in (int, float)
                 or not math.isfinite(tokens) or not math.isfinite(limit) or tokens < 0 or limit <= 0):
             self.context_label.setText(tr('Context —'))
-            self.context_label.setTextColor('#606060')
+            self.context_label.setTextColor('#606060', '#b5bdc7')
             self.context_label.setToolTip(tr('Context: unknown'))
             self.context_usage.setToolTip(tr('Context: unknown'))
             return
         percent = tokens / limit * 100
-        color = '#237b4b' if percent < 50 else '#906400' if percent < 80 else '#c42b2b'
-        self.context_label.setTextColor(color)
+        colors = ('#237b4b', '#86dea7') if percent < 50 else (
+            ('#906400', '#f3cc79') if percent < 80 else ('#c42b2b', '#ff9c94'))
+        self.context_label.setTextColor(*colors)
         self.context_label.setText(tr('Context: {0}%').format(int(percent)))
         details = tr('Estimated {0} / {1} tokens; 100% triggers compaction.').format(int(tokens), int(limit))
         self.context_label.setToolTip(details)
@@ -1527,7 +1550,7 @@ class RepairPage(QWidget):
     def show_empty_chat(self):
         self.context_event_order = (-1, "")
         self.show_context_usage()
-        self.chat.setHtml('<p style="color:#808080;text-align:center">' + tr('Start a new chat. Choose a mode and set the source in Chat context.') + '</p>')
+        self.chat.setHtml('<p style="text-align:center">' + tr('Start a new chat. Choose a mode and set the source in Chat context.') + '</p>')
 
     def update_attachment_notice(self):
         """附件卡片仅反映当前待发送列表，不触碰历史或原文件。"""

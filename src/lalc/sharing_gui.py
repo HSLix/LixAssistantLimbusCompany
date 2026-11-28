@@ -7,13 +7,13 @@ from datetime import datetime
 import time
 from typing import TypeVar, Callable, cast
 
-from PySide6.QtCore import Qt, Signal, Slot, QEventLoop
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtCore import Qt, Signal, Slot, QEventLoop, QSignalBlocker
+from PySide6.QtGui import QBrush, QColor, QPixmap
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QStackedWidget, QWidget,
     QTreeWidget, QTreeWidgetItem, QTreeWidgetItemIterator, QListWidget, QListWidgetItem,
     QScrollArea, QFileDialog, QMessageBox, QProgressBar, QApplication, QHeaderView, QSplitter)
 from qfluentwidgets import (BodyLabel, TitleLabel, PushButton, PrimaryPushButton, PlainTextEdit,
-                            CheckBox, SegmentedWidget, StrongBodyLabel, themeColor)
+                            CheckBox, SegmentedWidget, StrongBodyLabel, isDarkTheme, qconfig)
 
 from .i18n import current_language, tr
 from .developer_gui import Operation
@@ -27,6 +27,14 @@ from .sharing import (KINDS, SharingPackage, asset_files, build_export, catalog,
     import_selected, inspect_objects, installed_page, page_selection_errors, save_package,
     saved_settings_groups, sharing_activity)
 from .user_pages import check_page_registration
+
+
+CHANGE_COLORS = {
+    "New": ("#16664d", "#8bdab7"),
+    "Modified": ("#8b500f", "#f2c183"),
+    "Same content": ("#5b6573", "#b6c0ce"),
+    "Check failed": ("#a12637", "#ffa5b0"),
+}
 
 
 class SharingWorker(Operation):
@@ -128,7 +136,6 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
                 super().closeEvent(event)
     dialog = ProgressDialog(parent)
     dialog.setObjectName("sharingProgressDialog")
-    dialog.setStyleSheet("QDialog#sharingProgressDialog { background: #ffffff; }")
     dialog.setWindowTitle(heading)
     dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
     dialog.resize(600, 360)
@@ -150,7 +157,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
     bar.setTextVisible(False)
     bar.setFixedHeight(14)
     bar.setStyleSheet(f"QProgressBar {{ border: none; border-radius: 7px; background: rgba(128,128,128,0.18); }}"
-                     f"QProgressBar::chunk {{ border-radius: 7px; background: {themeColor().name()}; }}")
+                     "QProgressBar::chunk { border-radius: 7px; background: palette(highlight); }")
     bar.setRange(0, 0)
     layout.addWidget(bar)
     count = notice("")
@@ -172,7 +179,7 @@ def sharing_task(parent, operation: Callable[[], T], *, allow_unknown_space=Fals
     file_bar.setValue(0)
     file_bar.setFixedHeight(8)
     file_bar.setStyleSheet(f"QProgressBar {{ border: none; border-radius: 4px; background: rgba(128,128,128,0.18); }}"
-                          f"QProgressBar::chunk {{ border-radius: 4px; background: {themeColor().name()}; }}")
+                          "QProgressBar::chunk { border-radius: 4px; background: palette(highlight); }")
     layout.addWidget(file_bar)
     file_label = notice(tr("Current file {0}%").format(0))
     file_label.setObjectName("currentFilePercent")
@@ -610,12 +617,13 @@ class ImportDialog(QDialog):
         self.counter = notice("")
         overview = QHBoxLayout()
         self.change_counts = {}
-        for status, color in (("New", "#16664d"), ("Modified", "#8b500f"),
-                              ("Same content", "#5b6573"), ("Check failed", "#a12637")):
+        for status, colors in CHANGE_COLORS.items():
             badge = StrongBodyLabel()
-            badge.setStyleSheet(f"color: {color}; padding: 8px 5px;")
+            badge.setTextColor(*colors)
+            badge.setContentsMargins(5, 8, 5, 8)
             overview.addWidget(badge, 1)
             self.change_counts[status] = badge
+        qconfig.themeChangedFinished.connect(self.refresh_change_colors)
         self.changes_only = CheckBox(tr("Show changes only"))
         self.changes_only.toggled.connect(self.filter_changes)
         overview.addWidget(self.changes_only)
@@ -1099,6 +1107,16 @@ class ImportDialog(QDialog):
             return {"replace": "Replace", "skip": "Skip"}.get(self.asset_actions.get(number), "Decision needed")
         return "Import"
 
+    def refresh_change_colors(self):
+        """系统主题变化时，仅刷新当前树的状态文字颜色。"""
+        dark = isDarkTheme()
+        for tree in (self.assets, self.page_settings, *self.object_trees.values()):
+            with QSignalBlocker(tree):
+                for item in tree_items(tree):
+                    status = item.data(1, Qt.ItemDataRole.UserRole)
+                    if status in CHANGE_COLORS:
+                        item.setForeground(1, QColor(CHANGE_COLORS[status][dark]))
+
     def update_state(self, *_):
         if not hasattr(self, "commit"):
             return
@@ -1140,9 +1158,11 @@ class ImportDialog(QDialog):
             item.setToolTip(0, full_name)
             item.setText(1, tr(status))
             item.setText(2, tr(action))
-            color = {"New": "#16664d", "Modified": "#8b500f", "Same content": "#5b6573", "Check failed": "#a12637"}.get(status)
-            if color:
-                item.setForeground(1, QColor(color))
+            item.setData(1, Qt.ItemDataRole.UserRole, status)
+            if status in CHANGE_COLORS:
+                item.setForeground(1, QColor(CHANGE_COLORS[status][isDarkTheme()]))
+            else:
+                item.setForeground(1, QBrush())
             item.setHidden(filtered and status == "Same content")
             if status:
                 totals[status] += 1

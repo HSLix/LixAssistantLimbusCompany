@@ -10,7 +10,7 @@ description: 开发、修改和预览 LALC Business Settings Page 时使用，�
 4. 通过 page_create 新建草稿或复制已安装整包。GUI Construct 用 edit(scope="page_draft", path="sample.py", edits=[{oldText, newText}]) 局部修改当前草稿入口，每个片段须在原文唯一匹配且不重叠；整份替换用 source。受控远程 MCP 沿用 page_update。满足 PAGE_ID、PAGE_NAME、create_page(context)、返回 QWidget 的 submit() 契约。
 5. 页面必须显式设置与业务主题相关的 PAGE_ICON，使用 qfluentwidgets.FluentIcon 的有效成员。新建或修改页面时检查图标与主题是否相符；不要省略 PAGE_ICON、设为 None 或使用默认的 FluentIcon.APPLICATION，不臆造枚举成员。
 6. page_list(filename=...) 列举包内文件。GUI Construct 用 read(scope="page_draft" 或 "page_installed", filename="sample.py") 读入口，可指定包内 path 和 image=true 查看图片；用 read(scope="page_settings") 查看保存的配置。受控远程 MCP 沿用 page_read。page_resource 只改当前草稿资源。图片通过 context.resource_path("assets/banner.png") 定位。源码和资源共同构成批准版本。
-7. 如果当前入口提供 page_render，修改可见布局后用 page_render(filename) 获取当前草稿的默认值截图；可用 width=640 复查窄窗口。看清标签、分组、控件和是否裁切；发现确切问题后修正并重拍。只验证截图里看得到的状态，不把它当配置兼容性验证或审批。
+7. 如果当前入口提供 page_render，修改可见布局或样式后分别用 page_render(filename, theme="light") 和 page_render(filename, theme="dark") 获取默认值截图；可用 width=640 复查窄窗口。核对标签、控件、分隔线和状态色在两种主题下的可读性及裁切，问题修正后重拍。省略 theme 时沿用应用当前主题。只验证截图可见的状态，不把它当配置兼容性验证或审批。
    需要人工审查或安装时，调用 page_preview 并提供简洁修改说明。渲染或预览失败时按工具错误修正草稿；加载成功不表示配置兼容或业务验证通过。
 8. 安装必须经过 page_preview 的专用人工审批，其他反馈不构成批准。等待结果：installed 表示固定内容版本已安装；关闭或跳过不安装，可继续修改；取消轮次则停止。草稿改变后重新预览和审批。
 9. 总结页面修改、兼容性影响、预览和安装状态及未验证业务行为。试填配置不会随安装保存；提醒开发者主动重启应用以应用变更，安装不会自动重启。Workflow 修改和运行另读 `../publish-and-trial/SKILL.md`。
@@ -21,7 +21,9 @@ description: 开发、修改和预览 LALC Business Settings Page 时使用，�
 
 选控件前优先查本地 [Fluent Gallery 参考](references/fluent-gallery.md)，复用与操作含义匹配的 QFluentWidgets 组件，不必联网搜索常见控件。
 
-- **统一样式，不强制统一布局。** 沿用 LALC 当前的 Fluent 样式，统一标题层级、间距、分组与控件反馈；不另做深色版本。说明仅保留影响操作或结果的信息。可以改进页内操作，但不随视觉改版改变配置含义、默认值或任务行为。
+- **统一样式，不强制统一布局。** 沿用 LALC 的 Fluent 样式，统一标题层级、间距、分组与控件反馈；同一套页面和布局同时支持浅色及深色。说明仅保留影响操作或结果的信息。可以改进页内操作，但不随视觉改版改变配置含义、默认值或任务行为。
+- **主题由宿主统一管理。** 优先使用 QFluentWidgets 标准控件，原生 Qt 控件和自绘内容可读取 `QPalette`。不要在页面调用 `setTheme()` 或设置应用调色板，也不要写死白底、黑字或单色图标。图标优先直接传 `FluentIcon`，让控件在绘制时选色。确有自定义样式时用 `setCustomStyleSheet(widget, light_qss, dark_qss)`，状态文字可用 Fluent 标签的 `setTextColor(light, dark)`。自绘按当前调色板取色，缓存的富文本、颜色或图片通过 `qconfig.themeChangedFinished` 或 Qt 的调色板变更事件刷新，切换时保持用户编辑和页面状态。浅深两色与双语同属页面验收要求；没有截图工具时报告未验证的主题。
+- **复用全局颜色角色。** 页面底色和表面优先沿用宿主或卡片组件。自定义界面可用 `QPalette.Window`、`Base`、`Text`、`Link`、`Highlight` 等角色，QSS 也可使用对应的 `palette(...)` 值。主操作、选中和焦点使用 Fluent 组件的主题强调色。业务状态色需要自定义时成对验证深浅主题的对比度；游戏截图和素材保留原色。
 - **编辑细节可收起，运行关键信息要可见。** 简单页直接展示设置，不强加总览或折叠。复杂页可用默认总览和摘要卡，卡片直达对应编辑位置；较复杂的编辑倾向用标签页，能独立完成的编辑可用弹窗。跨页编辑指定对象时，直接选中该对象并打开主要编辑区，不要求用户再次查找。
 - **优先自动保存，不另设整页「保存」。** 开关和下拉选定后保存；文本或数字在编辑完成后保存；拖动在放下后保存。多步弹窗可用「确定／取消」：确定后保存，取消不改。正常保存不弹提示；失败时就地标明「未保存」，保留改动供重试。不改变当前运行已取用的配置。
 - **先定文字方案，再确认视觉预览。** 涉及可见布局改版时，先逐页确认要改什么，再出图供确认；按需要展示窄窗口、空状态或错误状态。设计预览不代表正式页面已实现或验证，也不替代专用安装审批。

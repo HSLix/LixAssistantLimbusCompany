@@ -19,35 +19,6 @@ from lalc.lifecycle import ApplicationLifecycle
 from test_agent_repair import host_for
 
 
-@pytest.mark.parametrize('developer', [False, True])
-def test_gui_startup_selects_light_theme(monkeypatch, developer):
-    from PySide6.QtCore import Qt
-    from PySide6.QtGui import QStyleHints
-    from qfluentwidgets import Theme, qconfig, setTheme
-
-    from lalc.gui import run_gui
-    from lalc.gui_instance import GuiInstance
-
-    requested_schemes = []
-    # offscreen 不支持切换原生外观，直接验证应用发出的请求。
-    monkeypatch.setattr(QStyleHints, 'setColorScheme', lambda _, scheme: requested_schemes.append(scheme))
-    monkeypatch.setattr('lalc.sharing.cleanup_staging', lambda: None)
-
-    def forward(_, requested_developer):
-        assert requested_developer is developer
-        assert requested_schemes == [Qt.ColorScheme.Light]
-        assert qconfig.theme is Theme.LIGHT
-        return True
-
-    monkeypatch.setattr(GuiInstance, 'forward', forward)
-    previous_theme = qconfig.get(qconfig.themeMode)
-    try:
-        setTheme(Theme.DARK)
-        assert run_gui(ApplicationLifecycle(), developer=developer) == 0
-    finally:
-        setTheme(previous_theme)
-
-
 @pytest.fixture
 def windows(tmp_path, monkeypatch):
     monkeypatch.setenv('QT_QPA_PLATFORM', 'offscreen')
@@ -69,6 +40,53 @@ def windows(tmp_path, monkeypatch):
             window.shutdown()
             window.close()
     app.processEvents()
+
+
+def test_general_settings_switches_live_and_restores_saved_theme(windows, monkeypatch):
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QPalette
+    from qfluentwidgets import Theme, qconfig
+
+    from lalc.application_settings import load_application_settings
+
+    app, owner, user, developer = windows
+    root = owner.service.data_root
+    assert user.appearance_choice.currentData() == 'system'
+    assert user.input_idle_seconds.value() == 10
+    assert (user.input_idle_seconds.minimum(), user.input_idle_seconds.maximum()) == (1, 120)
+    developer.repair_page.chat.add_message('Agent', 'Readable in both themes')
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('dark'))
+    assert qconfig.theme is Theme.DARK
+    assert app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    assert '#edf2f8' in developer.repair_page.chat.toHtml()
+    user.input_idle_seconds.setValue(17)
+    assert load_application_settings(root) == {'appearance': 'dark', 'input_idle_seconds': 17}
+
+    user.close()
+    user = owner.open_window()
+    assert user.appearance_choice.currentData() == 'dark'
+    assert user.input_idle_seconds.value() == 17
+    app.styleHints().colorSchemeChanged.emit(Qt.ColorScheme.Light)
+    assert qconfig.theme is Theme.DARK
+
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('system'))
+    app.styleHints().colorSchemeChanged.emit(Qt.ColorScheme.Dark)
+    assert qconfig.theme is Theme.DARK
+    app.styleHints().colorSchemeChanged.emit(Qt.ColorScheme.Light)
+    assert qconfig.theme is Theme.LIGHT
+
+    def fail(*_):
+        raise OSError('disk failure')
+
+    with monkeypatch.context() as patch:
+        patch.setattr('lalc.application_settings.atomic_write_json', fail)
+        user.appearance_choice.blockSignals(True)
+        user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('dark'))
+        user.appearance_choice.blockSignals(False)
+        with pytest.raises(OSError, match='disk failure'):
+            user.save_appearance()
+        assert user.appearance_choice.currentData() == 'system'
+        assert qconfig.theme is Theme.LIGHT
 
 
 def test_shared_windows_and_independent_idle_close(windows):
