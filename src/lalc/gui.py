@@ -254,19 +254,25 @@ class MainWindow(FluentWindow):
     feedback_requested = Signal(object)
     page_preview_requested = Signal(object)
 
+    def init_window_appearance(self):
+        """让独立构建页面的两个窗口共用外观初始化。"""
+        self.setCustomBackgroundColor("#f0f4f9", DARK_WINDOW)
+        self.refresh_window_appearance()
+        qconfig.themeChangedFinished.connect(self.refresh_window_appearance)
+
     def refresh_window_appearance(self):
         """深色窗口使用固定冷灰黑，浅色沿用 Fluent 的系统材质。"""
         mica = not isDarkTheme()
         if self.isMicaEffectEnabled() != mica:
             self.setMicaEffectEnabled(mica)
+        # Fluent 在材质切换前启动的动画可能覆盖新背景。
+        self.backgroundColorAni.stop()
+        self.setBackgroundColor(self._normalBackgroundColor())
 
     def __init__(self, service: ApplicationService, lifecycle: ApplicationLifecycle | None = None,
                  *, host=None, coordinator=None) -> None:
         super().__init__()
-        self.setCustomBackgroundColor("#f0f4f9", DARK_WINDOW)
-        self.refresh_window_appearance()
-        self.setBackgroundColor(self._normalBackgroundColor())
-        qconfig.themeChangedFinished.connect(self.refresh_window_appearance)
+        self.init_window_appearance()
         self.service = service
         self.lifecycle = lifecycle or ApplicationLifecycle()
         self.coordinator = coordinator
@@ -494,6 +500,7 @@ class UserWindow(MainWindow):
     def __init__(self, service, lifecycle=None, *, host, coordinator):
         # 共用窗口清理/后台操作和脱敏错误处理，用户页面独立构建。
         FluentWindow.__init__(self)
+        self.init_window_appearance()
         self.service, self.host, self.coordinator = service, host, coordinator
         self.feedback_requested.connect(self.show_runtime_feedback)
         service.on_runtime_feedback = self.feedback_requested.emit

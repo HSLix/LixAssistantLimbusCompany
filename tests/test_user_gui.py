@@ -47,6 +47,7 @@ def test_general_settings_switches_live_and_restores_saved_theme(windows, monkey
     from PySide6.QtGui import QPalette
     from qfluentwidgets import Theme, qconfig
 
+    from lalc.appearance import DARK_WINDOW
     from lalc.application_settings import load_application_settings
 
     app, owner, user, developer = windows
@@ -58,6 +59,7 @@ def test_general_settings_switches_live_and_restores_saved_theme(windows, monkey
     user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('dark'))
     assert qconfig.theme is Theme.DARK
     assert app.palette().color(QPalette.ColorRole.Window).lightness() < 128
+    assert {window.backgroundColor.name() for window in (user, developer)} == {DARK_WINDOW}
     assert '#edf2f8' in developer.repair_page.chat.toHtml()
     user.input_idle_seconds.setValue(17)
     assert load_application_settings(root) == {'appearance': 'dark', 'input_idle_seconds': 17}
@@ -66,6 +68,7 @@ def test_general_settings_switches_live_and_restores_saved_theme(windows, monkey
     user = owner.open_window()
     assert user.appearance_choice.currentData() == 'dark'
     assert user.input_idle_seconds.value() == 17
+    assert user.backgroundColor.name() == DARK_WINDOW
     app.styleHints().colorSchemeChanged.emit(Qt.ColorScheme.Light)
     assert qconfig.theme is Theme.DARK
 
@@ -87,6 +90,35 @@ def test_general_settings_switches_live_and_restores_saved_theme(windows, monkey
             user.save_appearance()
         assert user.appearance_choice.currentData() == 'system'
         assert qconfig.theme is Theme.LIGHT
+
+
+def test_developer_background_stays_dark_after_mica_animation(windows, monkeypatch):
+    from PySide6.QtTest import QTest
+    from lalc.appearance import DARK_WINDOW
+
+    _, _, user, developer = windows
+
+    def set_mica(enabled):
+        # 替代 Win11 材质开关，沿用 Fluent 对窗口背景的实际处理。
+        developer._isMicaEnabled = enabled
+        developer.setBackgroundColor(developer._normalBackgroundColor())
+
+    monkeypatch.setattr(developer.windowEffect, 'setMicaEffect', lambda *_: None)
+    monkeypatch.setattr(developer, 'setMicaEffectEnabled', set_mica)
+    set_mica(True)
+
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('dark'))
+    QTest.qWait(developer.backgroundColorAni.duration() + 40)
+
+    assert not developer.isMicaEffectEnabled()
+    assert developer.backgroundColor.name() == DARK_WINDOW
+    assert developer.backgroundColor.alpha() == 255
+
+    user.appearance_choice.setCurrentIndex(user.appearance_choice.findData('light'))
+    QTest.qWait(developer.backgroundColorAni.duration() + 40)
+
+    assert developer.isMicaEffectEnabled()
+    assert developer.backgroundColor.alpha() == 0
 
 
 def test_shared_windows_and_independent_idle_close(windows):
